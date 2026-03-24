@@ -99,21 +99,38 @@ function App() {
 
   const handleAssistantChat = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && assistantInput.trim()) {
-      const userMsg = assistantInput.trim();
-      setMessages(prev => [...prev, { role: "user", content: userMsg }]);
+      const userMsg = assistantInput.trim().toLowerCase();
+      setMessages(prev => [...prev, { role: "user", content: assistantInput }]);
       setAssistantInput("");
 
-      // Simple AI logic
+      // Executive AI logic
       setTimeout(() => {
-        let response = "I'm analyzing your request. Current intent matches: Control Engine.";
-        if (userMsg.toLowerCase().includes("status")) {
+        let response = "Instruction Received. Command queued for execution.";
+        
+        if (userMsg.includes("status")) {
           const aura = contexts.find(c => c.id === activeContext)?.name;
-          response = `System Operational. Current Aura: ${aura}. Cloud Sync: Stable.`;
-        } else if (userMsg.toLowerCase().includes("log")) {
-          response = `I've recently recorded ${logs.length} neural transitions in your log.`;
+          response = `System Operational. Active Aura: ${aura}. Cloud Sync: Stable.`;
+        } else if (userMsg.includes("log") || userMsg.includes("activity") || userMsg.includes("history")) {
+          response = "Accessing Neural Activity Stream. Control Center deployed.";
+          setActiveSettingTab("Neural Logs");
+          setShowSettings(true);
+        } else if (userMsg.includes("crate") || userMsg.includes("snapshot")) {
+          response = "Retrieving Context Crates. Neural Repository opened.";
+          setActiveSettingTab("Crates");
+          setShowSettings(true);
+        } else if (userMsg.includes("sync") || userMsg.includes("pulse") || userMsg.includes("push")) {
+          response = "Initiating Oasis Pulse. Synchronizing with Neural Cloud...";
+          handleSync();
+        } else {
+          // Check for context names
+          const matched = contexts.find(ctx => userMsg.includes(ctx.name.toLowerCase()) || userMsg.includes(ctx.id));
+          if (matched) {
+            response = `Executing Aura Transition: Setting context to ${matched.name}.`;
+            handleContextSwitch(matched.id);
+          }
         }
         setMessages(prev => [...prev, { role: "assistant", content: response }]);
-      }, 600);
+      }, 500);
     }
   };
 
@@ -356,10 +373,13 @@ function App() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setShowSettings(true)}
+              onClick={() => {
+                setActiveSettingTab("Crates");
+                setShowSettings(true);
+              }}
               className="flex flex-col items-center justify-center w-20 h-20 rounded-2xl hover:bg-white/5 border border-dashed border-white/10 group"
             >
-              <Plus className="w-6 h-6 text-slate-500 group-hover:text-slate-300" />
+              <Settings className="w-6 h-6 text-slate-500 group-hover:text-slate-300" />
             </motion.button>
           </div>
         </div>
