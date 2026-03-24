@@ -25,3 +25,4 @@
 - **Feature Name**: Oasis Sync Automator
 - **Primary Script**: `scripts/sync.ps1`
 - **Requirement**: Automated staging of code and `/docs` logs.
+- **Status**: ACTIVE. Initial local commit performed. Awaiting GitHub Remote URL.
