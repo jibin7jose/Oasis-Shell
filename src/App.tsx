@@ -31,8 +31,34 @@ function App() {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [autoPulse, setAutoPulse] = useState(false);
   const [pulseInterval] = useState(15); // minutes
+  const [crates, setCrates] = useState<any[]>([]);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
+
+  const fetchCrates = async () => {
+    try {
+      const data: any[] = await invoke("get_crates");
+      setCrates(data.map(c => ({
+        ...c,
+        apps: JSON.parse(c.apps)
+      })));
+    } catch (e) {
+      console.error("Failed to fetch crates", e);
+    }
+  };
+
+  const createCrate = async () => {
+    const name = prompt("Enter a name for your new Context Crate:");
+    if (!name) return;
+
+    try {
+      const currentWindows = await invoke("get_running_windows");
+      await invoke("save_crate", { name, apps: currentWindows });
+      fetchCrates();
+    } catch (e) {
+      console.error("Failed to create crate", e);
+    }
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -48,6 +74,12 @@ function App() {
       setIsSyncing(false);
     }
   };
+  useEffect(() => {
+    if (showSettings) {
+      fetchCrates();
+    }
+  }, [showSettings]);
+
   useEffect(() => {
     const scan = async () => {
       try {
@@ -236,25 +268,34 @@ function App() {
                       <>
                         <div className="flex justify-between items-center mb-8">
                           <h4 className="text-lg font-bold">Manage Context Crates</h4>
-                          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20">
+                          <button 
+                            onClick={createCrate}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20"
+                          >
                             Create New Crate
                           </button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {contexts.map(ctx => (
+                          {crates.length === 0 && (
+                            <div className="col-span-2 text-center py-12 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                              <Monitor className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                              <p className="text-slate-500 font-medium">No crates found. Snapshot your current workspace to get started.</p>
+                            </div>
+                          )}
+                          {crates.map(ctx => (
                             <div key={ctx.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-white/20 transition-all flex items-center justify-between group">
                               <div className="flex items-center gap-4">
                                 <div className="p-3 bg-slate-800 rounded-xl">
-                                  <ctx.icon className="w-5 h-5 text-white/70" />
+                                  <Monitor className="w-5 h-5 text-white/70" />
                                 </div>
                                 <div>
                                   <div className="font-bold">{ctx.name}</div>
-                                  <div className="text-xs text-slate-500">4 apps defined</div>
+                                  <div className="text-xs text-slate-500">{ctx.apps.length} apps defined</div>
                                 </div>
                               </div>
-                              <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all">
-                                Edit
+                              <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all text-xs font-bold text-blue-400">
+                                Launch
                               </button>
                             </div>
                           ))}
