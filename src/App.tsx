@@ -29,6 +29,8 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [autoPulse, setAutoPulse] = useState(false);
+  const [pulseInterval] = useState(15); // minutes
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -59,6 +61,16 @@ function App() {
     const interval = setInterval(scan, 2000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!autoPulse) return;
+    
+    const intervalId = setInterval(() => {
+      handleSync();
+    }, pulseInterval * 60 * 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [autoPulse, pulseInterval]);
 
   const handleSearchIntent = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -285,6 +297,25 @@ function App() {
                             >
                               <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
                               {isSyncing ? "Pulsing..." : "Trigger Pulse"}
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/5">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold">Auto-Pulse Mode</span>
+                              <span className="text-xs text-slate-500">Automatically backup context every {pulseInterval} minutes</span>
+                            </div>
+                            <button 
+                              onClick={() => setAutoPulse(!autoPulse)}
+                              className={cn(
+                                "relative w-12 h-6 rounded-full transition-colors",
+                                autoPulse ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" : "bg-slate-800"
+                              )}
+                            >
+                              <motion.div 
+                                animate={{ x: autoPulse ? 26 : 2 }}
+                                className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-lg"
+                              />
                             </button>
                           </div>
                         </div>
