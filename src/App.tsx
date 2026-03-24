@@ -60,6 +60,15 @@ function App() {
     }
   };
 
+  const launchCrate = async (id: number) => {
+    try {
+      await invoke("launch_crate", { id });
+      setShowSettings(false);
+    } catch (e) {
+      console.error("Failed to launch crate", e);
+    }
+  };
+
   const handleSync = async () => {
     setIsSyncing(true);
     setSyncStatus("idle");
@@ -83,6 +92,15 @@ function App() {
   const [suggestedContext, setSuggestedContext] = useState<string | null>(null);
 
   useEffect(() => {
+    const init = async () => {
+      try {
+        await invoke("start_watcher");
+      } catch (e) {
+        console.error("Failed to start watcher", e);
+      }
+    };
+    init();
+
     const scan = async () => {
       try {
         const windows: any[] = await invoke("get_running_windows");
@@ -365,7 +383,10 @@ function App() {
                                   <div className="text-xs text-slate-500">{ctx.apps.length} apps defined</div>
                                 </div>
                               </div>
-                              <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all text-xs font-bold text-blue-400">
+                              <button 
+                                onClick={() => launchCrate(ctx.id)}
+                                className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all text-xs font-bold text-blue-400"
+                              >
                                 Launch
                               </button>
                             </div>

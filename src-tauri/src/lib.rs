@@ -3,8 +3,51 @@ use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWin
 use windows::Win32::Foundation::{HWND, LPARAM, BOOL};
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
+use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
+use std::path::Path;
+use std::time::Duration;
 
 struct DbState(Mutex<Connection>);
+
+#[tauri::command]
+fn start_watcher() -> Result<(), String> {
+    std::thread::spawn(|| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(move |res| {
+            let _ = tx.send(res);
+        }, Config::default()).unwrap();
+
+        watcher.watch(Path::new("."), RecursiveMode::Recursive).unwrap();
+
+        for res in rx {
+            match res {
+                Ok(event) => {
+                    let mut should_sync = false;
+                    for path in event.paths {
+                        let path_str = path.to_string_lossy();
+                        if !path_str.contains(".git") && !path_str.contains("target") && !path_str.contains("node_modules") {
+                            should_sync = true;
+                            break;
+                        }
+                    }
+
+                    if should_sync && event.kind.is_modify() {
+                        std::thread::sleep(Duration::from_millis(1000)); // Debounce
+                        let _ = std::process::Command::new("powershell")
+                            .arg("-ExecutionPolicy")
+                            .arg("Bypass")
+                            .arg("-File")
+                            .arg("./scripts/sync.ps1")
+                            .output();
+                    }
+                }
+                Err(e) => println!("watch error: {:?}", e),
+            }
+        }
+    });
+
+    Ok(())
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContextCrate {
@@ -16,6 +59,7 @@ pub struct ContextCrate {
 pub struct WindowInfo {
     pub title: String,
     pub pid: u32,
+    pub exe_path: String,
 }
 
 #[tauri::command]
@@ -37,14 +81,30 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
         let length = GetWindowTextW(hwnd, &mut buffer);
         let title = String::from_utf16_lossy(&buffer[..length as usize]);
 
-        if !title.is_empty() && title != "Program Manager" {
+        if !title.is_empty() && title != "Program Manager" && title != "Settings" {
             let mut pid = 0u32;
             GetWindowThreadProcessId(hwnd, Some(&mut pid));
             
-            windows.push(WindowInfo {
-                title,
-                pid,
-            });
+            use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+            use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
+            
+            let mut exe_path = String::new();
+            if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                let mut path_buffer = [0u16; 1024];
+                let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
+                if path_len > 0 {
+                    exe_path = String::from_utf16_lossy(&path_buffer[..path_len as usize]);
+                }
+                let _ = windows::Win32::Foundation::CloseHandle(handle);
+            }
+
+            if !exe_path.is_empty() && !exe_path.contains("oasis-shell") {
+                windows.push(WindowInfo {
+                    title,
+                    pid,
+                    exe_path,
+                });
+            }
         }
     }
     BOOL(1)
@@ -103,6 +163,23 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
     Ok(crates)
 }
 
+#[tauri::command]
+fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
+    
+    let apps_json: String = stmt.query_row(params![id], |row| row.get(0)).map_err(|e| e.to_string())?;
+    let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
+
+    for app in apps {
+        if !app.exe_path.is_empty() {
+            let _ = std::process::Command::new(app.exe_path).spawn();
+        }
+    }
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("oasis_crates.db").expect("failed to open database");
@@ -124,7 +201,9 @@ pub fn run() {
             get_running_windows, 
             sync_project, 
             save_crate, 
-            get_crates
+            get_crates,
+            start_watcher,
+            launch_crate
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
