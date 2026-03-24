@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId};
-use windows::Win32::Foundation::{HWND, LPARAM, BOOL};
+use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed};
+use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
@@ -26,10 +26,16 @@ pub struct NeuralLog {
     pub message: String,
     pub timestamp: String,
 }
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WindowInfo {
     pub title: String,
     pub pid: u32,
     pub exe_path: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub is_maximized: bool,
 }
 
 #[tauri::command]
@@ -69,10 +75,19 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
             }
 
             if !exe_path.is_empty() && !exe_path.contains("oasis-shell") {
+                let mut rect = RECT::default();
+                let _ = GetWindowRect(hwnd, &mut rect);
+                let is_maximized = IsZoomed(hwnd).as_bool();
+
                 windows.push(WindowInfo {
                     title,
                     pid,
                     exe_path,
+                    x: rect.left,
+                    y: rect.top,
+                    width: rect.right - rect.left,
+                    height: rect.bottom - rect.top,
+                    is_maximized,
                 });
             }
         }

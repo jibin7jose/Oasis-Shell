@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2 } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
 
@@ -33,6 +33,7 @@ function App() {
   const [pulseInterval] = useState(15); // minutes
   const [crates, setCrates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [isNative, setIsNative] = useState(true);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -44,9 +45,16 @@ function App() {
   const fetchLogs = async () => {
     try {
       const data: any[] = await invoke("get_logs");
-      setLogs(data);
+      if (data.length === 0) {
+        logEvent("SYSTEM", "Oasis Shell Neural Bridge Initiated.");
+        fetchLogs();
+      } else {
+        setLogs(data);
+      }
+      setIsNative(true);
     } catch (e) {
       console.error("Failed to fetch logs", e);
+      setIsNative(false);
     }
   };
 
@@ -65,8 +73,10 @@ function App() {
         ...c,
         apps: JSON.parse(c.apps)
       })));
+      setIsNative(true);
     } catch (e) {
       console.error("Failed to fetch crates", e);
+      setIsNative(false);
     }
   };
 
@@ -110,6 +120,13 @@ function App() {
         if (userMsg.includes("status")) {
           const aura = contexts.find(c => c.id === activeContext)?.name;
           response = `System Operational. Active Aura: ${aura}. Cloud Sync: Stable.`;
+        } else if (userMsg.includes("summarize") || userMsg.includes("what did i do")) {
+          if (logs.length === 0) {
+            response = "No neural patterns recorded for this cycle yet. Suggest creating a 'Crate' to begin tracking.";
+          } else {
+            const summary = logs.slice(0, 3).map(l => l.message).join(", ");
+            response = `Neural Summary: Recent activity includes ${summary}. You are currently ${activeContext === "dev" ? "in deep work" : "exploring"}.`;
+          }
         } else if (userMsg.includes("log") || userMsg.includes("activity") || userMsg.includes("history")) {
           response = "Accessing Neural Activity Stream. Control Center deployed.";
           setActiveSettingTab("Neural Logs");
@@ -180,6 +197,7 @@ function App() {
       try {
         const windows: any[] = await invoke("get_running_windows");
         setWindowCount(windows.length);
+        setIsNative(true);
 
         // Simple Heuristic AI (Neural Suggestion)
         const titles = windows.map(w => w.title.toLowerCase()).join(" ");
@@ -197,6 +215,8 @@ function App() {
 
       } catch (e) {
         console.error("Failed to scan windows", e);
+        setIsNative(false);
+        setWindowCount(12); // Simulated count for Browser Preview
       }
     };
     scan();
@@ -585,6 +605,47 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Native Bridge Warning Overlays */}
+        {!isNative && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6"
+          >
+            <div className="bg-blue-600/10 backdrop-blur-xl border border-blue-500/20 p-6 rounded-3xl flex items-center gap-6 shadow-2xl">
+              <div className="p-4 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/30">
+                <Bot className="w-8 h-8 text-white animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-bold text-blue-400 mb-1 tracking-tight">Oasis Preview Mode</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  You are currently in the Web Portal. To engage Neural Sync, Hotkeys, and Crating, please launch the <span className="text-white font-bold">Oasis Shell Desktop App</span>.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Native Bridge Warning Overlays */}
+        {!isNative && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6"
+          >
+            <div className="bg-blue-600/10 backdrop-blur-xl border border-blue-500/20 p-6 rounded-3xl flex items-center gap-6 shadow-2xl">
+              <div className="p-4 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/30">
+                <Bot className="w-8 h-8 text-white animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-bold text-blue-400 mb-1 tracking-tight">Oasis Preview Mode</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  You are currently in the Web Portal. To engage Neural Sync, Hotkeys, and Crating, please launch the <span className="text-white font-bold">Oasis Shell Desktop App</span>.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Footer Info */}
         <motion.div 
@@ -597,7 +658,15 @@ function App() {
             <Monitor className="w-4 h-4 text-blue-400" />
             {windowCount} Active Windows
           </div>
-          <div>Oasis v0.1.0-alpha</div>
+          <div className="flex gap-2 items-center">
+            <RefreshCw className={cn("w-4 h-4", isSyncing ? "text-blue-400 animate-spin" : "text-slate-600")} />
+            {isSyncing ? "Neural Pulse In Progress" : `Last Pulse: ${lastSync || "NEVER"}`}
+          </div>
+          <div className="flex gap-2 items-center">
+            <CloudLightning className="w-4 h-4 text-indigo-400" />
+            Neural Link Stable
+          </div>
+          <div className="text-slate-700">Oasis v0.1.0-alpha</div>
         </motion.div>
 
         {/* AI Assistant Bubble */}
@@ -656,6 +725,18 @@ function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSync}
+            className={cn(
+              "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl",
+              isSyncing ? "bg-blue-600/20 text-blue-400" : "bg-white/5 backdrop-blur-xl border border-white/10 text-yellow-400 hover:bg-yellow-400/10"
+            )}
+          >
+            <Zap className={cn("w-5 h-5", isSyncing && "animate-pulse")} />
+          </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.05, rotate: 5 }}
