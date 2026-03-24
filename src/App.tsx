@@ -36,6 +36,11 @@ function App() {
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
+  const [messages, setMessages] = useState<any[]>([
+    { role: "assistant", content: "Oasis Neural Link Established. I'm monitoring your context and cloud pulses." }
+  ]);
+  const [assistantInput, setAssistantInput] = useState("");
+
   const fetchLogs = async () => {
     try {
       const data: any[] = await invoke("get_logs");
@@ -89,6 +94,26 @@ function App() {
       fetchLogs();
     } catch (e) {
       console.error("Failed to launch crate", e);
+    }
+  };
+
+  const handleAssistantChat = async (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && assistantInput.trim()) {
+      const userMsg = assistantInput.trim();
+      setMessages(prev => [...prev, { role: "user", content: userMsg }]);
+      setAssistantInput("");
+
+      // Simple AI logic
+      setTimeout(() => {
+        let response = "I'm analyzing your request. Current intent matches: Control Engine.";
+        if (userMsg.toLowerCase().includes("status")) {
+          const aura = contexts.find(c => c.id === activeContext)?.name;
+          response = `System Operational. Current Aura: ${aura}. Cloud Sync: Stable.`;
+        } else if (userMsg.toLowerCase().includes("log")) {
+          response = `I've recently recorded ${logs.length} neural transitions in your log.`;
+        }
+        setMessages(prev => [...prev, { role: "assistant", content: response }]);
+      }, 600);
     }
   };
 
@@ -563,34 +588,65 @@ function App() {
                 initial={{ opacity: 0, y: 20, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                className="w-80 h-96 bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                className="w-80 h-[450px] bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
               >
-                <div className="p-4 bg-white/5 border-b border-white/5 flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm font-bold">Neural Intent Engine</span>
-                </div>
-                <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                  <div className="bg-white/5 p-3 rounded-xl text-sm max-w-[80%]">
-                    Hello! I'm ready to manage your contexts. What would you like to do?
+                <div className="p-5 bg-white/5 border-b border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Bot className="w-5 h-5 text-blue-400" />
+                    <span className="text-sm font-bold tracking-tight">Neural Link</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.15s]" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
                   </div>
                 </div>
-                <div className="p-4">
-                  <input 
-                    type="text" 
-                    placeholder="Type a command..."
-                    className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500/50"
-                  />
+                
+                <div className="flex-1 p-5 overflow-y-auto space-y-4 custom-scrollbar bg-black/10">
+                  {messages.map((msg, i) => (
+                    <motion.div 
+                      initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      key={i} 
+                      className={cn(
+                        "p-4 rounded-2xl text-[13px] leading-relaxed max-w-[90%] shadow-lg",
+                        msg.role === "user" 
+                          ? "bg-blue-600 text-white self-end ml-auto rounded-tr-none shadow-blue-600/20" 
+                          : "bg-white/5 border border-white/5 text-slate-300 self-start rounded-tl-none"
+                      )}
+                    >
+                      {msg.content}
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="p-4 border-t border-white/5 bg-black/40">
+                  <div className="relative flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus-within:border-blue-500/50 focus-within:bg-white/10 transition-all">
+                    <input 
+                      type="text" 
+                      value={assistantInput}
+                      onChange={(e) => setAssistantInput(e.target.value)}
+                      onKeyDown={handleAssistantChat}
+                      placeholder="Neural Command..."
+                      className="flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-slate-600 py-2"
+                    />
+                    <MessageSquare className="w-4 h-4 text-slate-500" />
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
+
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05, rotate: 5 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setShowAI(!showAI)}
-            className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30 text-white"
+            className={cn(
+              "w-16 h-16 rounded-[2rem] flex items-center justify-center shadow-2xl transition-all duration-500",
+              showAI ? "bg-blue-600 text-white rotate-90" : "bg-white/10 backdrop-blur-xl text-white border border-white/10 hover:bg-white/20 shadow-blue-500/10"
+            )}
           >
-            <MessageSquare className="w-6 h-6" />
+            {showAI ? <Plus className="w-8 h-8 rotate-45" /> : <Bot className="w-8 h-8" />}
           </motion.button>
         </div>
       </div>
