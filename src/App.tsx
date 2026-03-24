@@ -80,11 +80,28 @@ function App() {
     }
   }, [showSettings]);
 
+  const [suggestedContext, setSuggestedContext] = useState<string | null>(null);
+
   useEffect(() => {
     const scan = async () => {
       try {
         const windows: any[] = await invoke("get_running_windows");
         setWindowCount(windows.length);
+
+        // Simple Heuristic AI (Neural Suggestion)
+        const titles = windows.map(w => w.title.toLowerCase()).join(" ");
+        if (titles.includes("code") || titles.includes("vscode") || titles.includes("studio")) {
+          setSuggestedContext("dev");
+        } else if (titles.includes("blender") || titles.includes("unity") || titles.includes("unreal")) {
+          setSuggestedContext("design");
+        } else if (titles.includes("steam") || titles.includes("epic") || titles.includes("battle.net")) {
+          setSuggestedContext("gaming");
+        } else if (titles.includes("chrome") || titles.includes("edge") || titles.includes("search")) {
+          setSuggestedContext("research");
+        } else {
+          setSuggestedContext(null);
+        }
+
       } catch (e) {
         console.error("Failed to scan windows", e);
       }
@@ -104,15 +121,48 @@ function App() {
     return () => clearInterval(intervalId);
   }, [autoPulse, pulseInterval]);
 
-  const handleSearchIntent = (e: React.KeyboardEvent) => {
+  const handleSearchIntent = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
+      
+      // 1. Sync Intent
+      if (query.includes("sync") || query.includes("pulse") || query.includes("push") || query.includes("backup")) {
+        handleSync();
+        setSearchQuery("");
+        return;
+      }
+
+      // 2. Crate Intent
+      if (query.startsWith("crate ") || query.startsWith("save ") || query.startsWith("snapshot ")) {
+        const name = query.split(" ").slice(1).join(" ");
+        if (name) {
+          try {
+            const currentWindows = await invoke("get_running_windows");
+            await invoke("save_crate", { name, apps: currentWindows });
+            fetchCrates();
+            setSearchQuery("");
+          } catch (e) { console.error(e); }
+        }
+        return;
+      }
+
+      // 3. Context Switch Intent
       const matched = contexts.find(ctx => 
-        query.includes(ctx.id) || query.includes(ctx.name.toLowerCase())
+        query.includes(ctx.id) || 
+        query.includes(ctx.name.toLowerCase()) ||
+        query.includes("move to") ||
+        query.includes("switch to")
       );
       
       if (matched) {
         setActiveContext(matched.id);
+        setSearchQuery("");
+        return;
+      }
+
+      // 4. Fallback search (google)
+      if (query.length > 0) {
+        await invoke("plugin:opener|open", { path: `https://www.google.com/search?q=${encodeURIComponent(query)}` });
         setSearchQuery("");
       }
     }
@@ -143,6 +193,27 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-2xl mb-12"
         >
+          {/* Neural Suggestion Hint */}
+          <AnimatePresence>
+            {suggestedContext && activeContext !== suggestedContext && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="mb-4 text-[10px] font-bold text-blue-500/80 uppercase tracking-[0.2em] flex items-center justify-center gap-2 bg-blue-500/5 py-2 px-4 rounded-full border border-blue-500/10 backdrop-blur-sm self-center"
+              >
+                <Bot className="w-3 h-3 animate-pulse" />
+                Neural Intent: Suggested Context - {contexts.find(c => c.id === suggestedContext)?.name}
+                <button 
+                  onClick={() => { setActiveContext(suggestedContext); setSuggestedContext(null); }}
+                  className="ml-2 hover:text-white transition-colors"
+                >
+                  [Approve]
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="relative group">
             <div className="absolute inset-0 bg-blue-500/10 rounded-2xl blur-xl group-focus-within:bg-blue-500/20 transition-all duration-500" />
             <div className="relative flex items-center bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 transition-all duration-300 group-focus-within:border-blue-500/40">
