@@ -6,6 +6,8 @@ use std::sync::Mutex;
 use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
 use std::path::Path;
 use std::time::Duration;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri::Manager;
 
 struct DbState(Mutex<Connection>);
 
@@ -197,6 +199,21 @@ pub fn run() {
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new()
+            .with_shortcut("Alt+Space").expect("failed to register Alt+Space")
+            .with_handler(|app, _shortcut, event| {
+                if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = if window.is_visible().unwrap_or(false) {
+                            window.hide()
+                        } else {
+                            window.show().and_then(|_| window.set_focus())
+                        };
+                    }
+                }
+            })
+            .build()
+        )
         .invoke_handler(tauri::generate_handler![
             get_running_windows, 
             sync_project, 
