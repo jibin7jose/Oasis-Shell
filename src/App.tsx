@@ -32,8 +32,26 @@ function App() {
   const [autoPulse, setAutoPulse] = useState(false);
   const [pulseInterval] = useState(15); // minutes
   const [crates, setCrates] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
+
+  const fetchLogs = async () => {
+    try {
+      const data: any[] = await invoke("get_logs");
+      setLogs(data);
+    } catch (e) {
+      console.error("Failed to fetch logs", e);
+    }
+  };
+
+  const logEvent = async (type: string, message: string) => {
+    try {
+      await invoke("log_event", { eventType: type, message });
+    } catch (e) {
+      console.error("Failed to log event", e);
+    }
+  };
 
   const fetchCrates = async () => {
     try {
@@ -54,7 +72,9 @@ function App() {
     try {
       const currentWindows = await invoke("get_running_windows");
       await invoke("save_crate", { name, apps: currentWindows });
+      logEvent("CRATE_CREATE", `Neural Snapshot created: ${name}`);
       fetchCrates();
+      fetchLogs();
     } catch (e) {
       console.error("Failed to create crate", e);
     }
@@ -62,8 +82,11 @@ function App() {
 
   const launchCrate = async (id: number) => {
     try {
+      const crateName = crates.find(c => c.id === id)?.name || id;
+      logEvent("CRATE_LAUNCH", `Restoring Workspace: ${crateName}`);
       await invoke("launch_crate", { id });
       setShowSettings(false);
+      fetchLogs();
     } catch (e) {
       console.error("Failed to launch crate", e);
     }
@@ -76,9 +99,11 @@ function App() {
       await invoke("sync_project");
       setSyncStatus("success");
       setLastSync(new Date().toLocaleTimeString());
-    } catch (error) {
-      console.error("Sync failed", error);
+      logEvent("SYNC", "Oasis Pulse completed. Neural Cloud updated.");
+      fetchLogs();
+    } catch (e) {
       setSyncStatus("error");
+      logEvent("SYNC_ERROR", "Neural Pulse failed. Interface unstable.");
     } finally {
       setIsSyncing(false);
     }
@@ -86,8 +111,15 @@ function App() {
   useEffect(() => {
     if (showSettings) {
       fetchCrates();
+      fetchLogs();
     }
   }, [showSettings]);
+
+  const handleContextSwitch = (id: string) => {
+    const contextName = contexts.find(c => c.id === id)?.name || id;
+    logEvent("CONTEXT_SWITCH", `Aura transitioned to ${contextName}`);
+    setActiveContext(id);
+  };
 
   const [suggestedContext, setSuggestedContext] = useState<string | null>(null);
 
@@ -269,7 +301,7 @@ function App() {
               return (
                 <motion.button
                   key={ctx.id}
-                  onClick={() => setActiveContext(ctx.id)}
+                  onClick={() => handleContextSwitch(ctx.id)}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className={cn(
@@ -337,7 +369,7 @@ function App() {
                 <div className="flex flex-1 overflow-hidden">
                   {/* Sidebar */}
                   <div className="w-64 border-right border-white/5 p-4 flex flex-col gap-2 bg-black/20">
-                    {["Crates", "AI Settings", "Appearance", "Oasis Pulse"].map(item => (
+                    {["Crates", "Neural Logs", "AI Settings", "Appearance", "Oasis Pulse"].map(item => (
                       <button 
                         key={item} 
                         onClick={() => setActiveSettingTab(item)}
@@ -346,6 +378,7 @@ function App() {
                         activeSettingTab === item ? "bg-blue-500/10 text-blue-400" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
                       )}>
                         {item === "Oasis Pulse" && <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />}
+                        {item === "Neural Logs" && <Bot className="w-4 h-4" />}
                         {item}
                       </button>
                     ))}
@@ -353,6 +386,31 @@ function App() {
 
                   {/* Content */}
                   <div className="flex-1 p-8 overflow-y-auto">
+                    {activeSettingTab === "Neural Logs" && (
+                      <div className="space-y-3">
+                        <h4 className="text-lg font-bold mb-6">Neural Activity Stream</h4>
+                        {logs.length === 0 && (
+                          <div className="text-center py-12 text-slate-600 italic">No neural patterns recorded yet.</div>
+                        )}
+                        {logs.map(log => (
+                          <div key={log.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-start gap-4 hover:border-white/10 transition-all">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full mt-2 animate-pulse",
+                              log.event_type === "SYNC" ? "bg-emerald-500 shadow-[0_0_8px_bg-emerald-500/50]" : 
+                              log.event_type === "CONTEXT_SWITCH" ? "bg-blue-500 shadow-[0_0_8px_bg-blue-500/50]" : "bg-slate-500"
+                            )} />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{log.event_type}</span>
+                                <span className="text-[10px] text-slate-600 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                              </div>
+                              <p className="text-sm text-slate-300 leading-relaxed leading-snug">{log.message}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {activeSettingTab === "Crates" && (
                       <>
                         <div className="flex justify-between items-center mb-8">

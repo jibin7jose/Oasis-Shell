@@ -58,6 +58,14 @@ pub struct ContextCrate {
     pub timestamp: String,
     pub apps: String, // JSON string of applications
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct NeuralLog {
+    pub id: Option<i32>,
+    pub event_type: String,
+    pub message: String,
+    pub timestamp: String,
+}
 pub struct WindowInfo {
     pub title: String,
     pub pid: u32,
@@ -182,6 +190,41 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn log_event(state: tauri::State<DbState>, event_type: String, message: String) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let timestamp = chrono::Local::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
+        params![event_type, message, timestamp],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+    
+    let log_iter = stmt.query_map([], |row| {
+        Ok(NeuralLog {
+            id: Some(row.get(0)?),
+            event_type: row.get(1)?,
+            message: row.get(2)?,
+            timestamp: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut logs = Vec::new();
+    for l in log_iter {
+        logs.push(l.map_err(|e| e.to_string())?);
+    }
+    
+    Ok(logs)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("oasis_crates.db").expect("failed to open database");
@@ -195,6 +238,16 @@ pub fn run() {
         )",
         [],
     ).expect("failed to create table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS neural_logs (
+            id INTEGER PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create logs table");
 
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
@@ -220,7 +273,9 @@ pub fn run() {
             save_crate, 
             get_crates,
             start_watcher,
-            launch_crate
+            launch_crate,
+            log_event,
+            get_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
