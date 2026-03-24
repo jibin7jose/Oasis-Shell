@@ -11,46 +11,6 @@ use tauri::Manager;
 
 struct DbState(Mutex<Connection>);
 
-#[tauri::command]
-fn start_watcher() -> Result<(), String> {
-    std::thread::spawn(|| {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = RecommendedWatcher::new(move |res| {
-            let _ = tx.send(res);
-        }, Config::default()).unwrap();
-
-        watcher.watch(Path::new("."), RecursiveMode::Recursive).unwrap();
-
-        for res in rx {
-            match res {
-                Ok(event) => {
-                    let mut should_sync = false;
-                    for path in event.paths {
-                        let path_str = path.to_string_lossy();
-                        if !path_str.contains(".git") && !path_str.contains("target") && !path_str.contains("node_modules") {
-                            should_sync = true;
-                            break;
-                        }
-                    }
-
-                    if should_sync && event.kind.is_modify() {
-                        std::thread::sleep(Duration::from_millis(1000)); // Debounce
-                        let _ = std::process::Command::new("powershell")
-                            .arg("-ExecutionPolicy")
-                            .arg("Bypass")
-                            .arg("-File")
-                            .arg("./scripts/sync.ps1")
-                            .output();
-                    }
-                }
-                Err(e) => println!("watch error: {:?}", e),
-            }
-        }
-    });
-
-    Ok(())
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContextCrate {
     pub id: Option<i32>,
@@ -121,20 +81,73 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
 }
 
 #[tauri::command]
-fn sync_project() -> Result<String, String> {
-    let output = std::process::Command::new("powershell")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-File")
-        .arg("./scripts/sync.ps1")
-        .output()
-        .map_err(|e| e.to_string())?;
+fn sync_project(message: Option<String>) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.arg("-ExecutionPolicy").arg("Bypass").arg("-File").arg("./scripts/sync.ps1");
+    if let Some(msg) = message {
+        cmd.arg("-message").arg(msg);
+    }
+    
+    let output = cmd.output().map_err(|e| e.to_string())?;
 
     if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        Ok(())
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
+}
+
+#[tauri::command]
+fn start_watcher() -> Result<(), String> {
+    std::thread::spawn(|| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(move |res| {
+            let _ = tx.send(res);
+        }, Config::default()).unwrap();
+
+        watcher.watch(Path::new("."), RecursiveMode::Recursive).unwrap();
+
+        for res in rx {
+            match res {
+                Ok(event) => {
+                    let mut should_sync = false;
+                    for path in event.paths {
+                        let path_str = path.to_string_lossy();
+                        if !path_str.contains(".git") && !path_str.contains("target") && !path_str.contains("node_modules") {
+                            should_sync = true;
+                            break;
+                        }
+                    }
+
+                    if should_sync && event.kind.is_modify() {
+                        std::thread::sleep(Duration::from_millis(1500)); // Debounce
+                        
+                        // Try to get the latest neural log for a meaningful commit message
+                        let mut display_message = "Automated System Update".to_string();
+                        if let Ok(conn) = Connection::open("oasis_crates.db") {
+                            if let Ok(mut stmt) = conn.prepare("SELECT message FROM neural_logs ORDER BY id DESC LIMIT 1") {
+                                if let Ok(msg) = stmt.query_row([], |row| row.get::<_, String>(0)) {
+                                    display_message = msg;
+                                }
+                            }
+                        }
+
+                        let _ = std::process::Command::new("powershell")
+                            .arg("-ExecutionPolicy")
+                            .arg("Bypass")
+                            .arg("-File")
+                            .arg("./scripts/sync.ps1")
+                            .arg("-message")
+                            .arg(display_message)
+                            .output();
+                    }
+                }
+                Err(e) => println!("watch error: {:?}", e),
+            }
+        }
+    });
+
+    Ok(())
 }
 
 #[tauri::command]

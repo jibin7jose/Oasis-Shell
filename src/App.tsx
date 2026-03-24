@@ -96,7 +96,8 @@ function App() {
     setIsSyncing(true);
     setSyncStatus("idle");
     try {
-      await invoke("sync_project");
+      const latestMessage = logs.length > 0 ? logs[0].message : null;
+      await invoke("sync_project", { message: latestMessage });
       setSyncStatus("success");
       setLastSync(new Date().toLocaleTimeString());
       logEvent("SYNC", "Oasis Pulse completed. Neural Cloud updated.");

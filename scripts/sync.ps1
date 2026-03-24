@@ -1,3 +1,7 @@
+Param(
+    [string]$message = ""
+)
+
 # Oasis Shell - Neural Sync (Oasis Pulse)
 # This script stages ALL changes including newly created Docs & Code.
 
@@ -6,8 +10,12 @@ Write-Host ">>> Triggering Oasis Pulse: Neural Sync for GitHub <<<" -ForegroundC
 # Stage all files
 git add .
 
-# Prompt for a custom message or use a generic one
-$commitMessage = "Oasis Sync: Feature Update & Documentation Refresh - $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+# Use provided message or generate a generic timestamped one
+if ($message -eq "") {
+    $commitMessage = "Oasis Sync: Feature Update & Documentation Refresh - $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+} else {
+    $commitMessage = "Oasis Pulse: $message"
+}
 
 git commit -m "$commitMessage"
 
