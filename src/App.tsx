@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
 
@@ -24,7 +24,28 @@ function App() {
   const [windowCount, setWindowCount] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [activeSettingTab, setActiveSettingTab] = useState("Crates");
+  
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
+  const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncStatus("idle");
+    try {
+      await invoke("sync_project");
+      setSyncStatus("success");
+      setLastSync(new Date().toLocaleTimeString());
+    } catch (error) {
+      console.error("Sync failed", error);
+      setSyncStatus("error");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
   useEffect(() => {
     const scan = async () => {
       try {
@@ -183,11 +204,15 @@ function App() {
                 <div className="flex flex-1 overflow-hidden">
                   {/* Sidebar */}
                   <div className="w-64 border-right border-white/5 p-4 flex flex-col gap-2 bg-black/20">
-                    {["Crates", "AI Settings", "Appearance", "System"].map(item => (
-                      <button key={item} className={cn(
-                        "text-left px-4 py-3 rounded-xl text-sm font-medium transition-all",
-                        item === "Crates" ? "bg-blue-500/10 text-blue-400" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
+                    {["Crates", "AI Settings", "Appearance", "Oasis Pulse"].map(item => (
+                      <button 
+                        key={item} 
+                        onClick={() => setActiveSettingTab(item)}
+                        className={cn(
+                        "text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-3",
+                        activeSettingTab === item ? "bg-blue-500/10 text-blue-400" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
                       )}>
+                        {item === "Oasis Pulse" && <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />}
                         {item}
                       </button>
                     ))}
@@ -195,31 +220,97 @@ function App() {
 
                   {/* Content */}
                   <div className="flex-1 p-8 overflow-y-auto">
-                    <div className="flex justify-between items-center mb-8">
-                      <h4 className="text-lg font-bold">Manage Context Crates</h4>
-                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20">
-                        Create New Crate
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {contexts.map(ctx => (
-                        <div key={ctx.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-white/20 transition-all flex items-center justify-between group">
-                          <div className="flex items-center gap-4">
-                            <div className="p-3 bg-slate-800 rounded-xl">
-                              <ctx.icon className="w-5 h-5 text-white/70" />
-                            </div>
-                            <div>
-                              <div className="font-bold">{ctx.name}</div>
-                              <div className="text-xs text-slate-500">4 apps defined</div>
-                            </div>
-                          </div>
-                          <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all">
-                            Edit
+                    {activeSettingTab === "Crates" && (
+                      <>
+                        <div className="flex justify-between items-center mb-8">
+                          <h4 className="text-lg font-bold">Manage Context Crates</h4>
+                          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20">
+                            Create New Crate
                           </button>
                         </div>
-                      ))}
-                    </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {contexts.map(ctx => (
+                            <div key={ctx.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl hover:border-white/20 transition-all flex items-center justify-between group">
+                              <div className="flex items-center gap-4">
+                                <div className="p-3 bg-slate-800 rounded-xl">
+                                  <ctx.icon className="w-5 h-5 text-white/70" />
+                                </div>
+                                <div>
+                                  <div className="font-bold">{ctx.name}</div>
+                                  <div className="text-xs text-slate-500">4 apps defined</div>
+                                </div>
+                              </div>
+                              <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all">
+                                Edit
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {activeSettingTab === "Oasis Pulse" && (
+                      <div className="flex flex-col gap-6">
+                        <div className="p-6 bg-gradient-to-br from-blue-600/20 to-indigo-900/10 border border-blue-500/20 rounded-3xl">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
+                              <RefreshCw className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold">Neural Cloud Sync</h4>
+                              <p className="text-sm text-slate-400">Linked to Oasis GitHub Repository</p>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-black/40 rounded-xl p-4 font-mono text-sm text-blue-300 border border-white/5 mb-6">
+                            {repoUrl}
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-1">Last Pulsed</span>
+                              <span className="text-sm text-slate-300">{lastSync || "Never"}</span>
+                            </div>
+                            
+                            <button 
+                              onClick={handleSync}
+                              disabled={isSyncing}
+                              className={cn(
+                                "flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all",
+                                isSyncing 
+                                  ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                                  : "bg-white text-black hover:bg-blue-500 hover:text-white shadow-xl"
+                              )}
+                            >
+                              <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+                              {isSyncing ? "Pulsing..." : "Trigger Pulse"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {syncStatus === "success" && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400"
+                          >
+                            <CheckCircle2 className="w-5 h-5" />
+                            <span className="text-sm font-medium">Neural Synchonization Successful. Your context is now in the cloud.</span>
+                          </motion.div>
+                        )}
+                        
+                        {syncStatus === "error" && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400"
+                          >
+                            <span className="text-sm font-medium">Pulse Interrupted. Check your network or GitHub permissions.</span>
+                          </motion.div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
