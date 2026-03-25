@@ -103,6 +103,11 @@ function App() {
     loadStatus: "Engine Optimized"
   });
   const [securityStatus, setSecurityStatus] = useState<any>({ oauth: "Ready", tempMail: "Active", vault: "Locked" });
+  const [pulseSummary, setPulseSummary] = useState<any>({
+    totalProjects: 9,
+    activeNodes: 4,
+    ecosystemHealth: "Optimal"
+  });
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
@@ -454,6 +459,7 @@ function App() {
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
+                  onKeyDown={handleSearchIntent}
                   placeholder="Neural Search across your ecosystem..." 
                   className="w-full bg-transparent border-none outline-none text-sm placeholder:text-slate-600 font-medium text-white"
                 />
@@ -900,6 +906,45 @@ function App() {
 
                     {activeSettingTab === "Oasis Pulse" && (
                       <div className="flex flex-col gap-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 rounded-xl bg-slate-800/20 border border-slate-700/30 flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unified Project Pulse</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">Total Projects Indexed</span>
+                                <span className="text-white font-bold">{pulseSummary.totalProjects}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">Active Node Trajectories</span>
+                                <span className="text-white font-bold">{pulseSummary.activeNodes}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">Ecosystem Health</span>
+                                <span className="text-emerald-400 font-bold uppercase tracking-widest">{pulseSummary.ecosystemHealth}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="p-4 rounded-xl bg-slate-800/20 border border-slate-700/30 flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">GitHub Sync Bridge</span>
+                              <RefreshCw size={10} className="text-indigo-400" />
+                            </div>
+                            <div className="p-2 rounded bg-indigo-500/5 border border-indigo-500/10 text-[9px] text-indigo-300 font-mono text-center">
+                              Synchronized to Origin Main
+                            </div>
+                            <button 
+                              onClick={() => window.open(repoUrl, '_blank')}
+                              className="w-full py-1 text-[9px] text-slate-500 hover:text-white transition-colors uppercase font-bold"
+                            >
+                              View Repository
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="p-6 bg-gradient-to-br from-blue-600/20 to-indigo-900/10 border border-blue-500/20 rounded-3xl">
                           <div className="flex items-center gap-4 mb-4">
                             <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20">
