@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
 import * as THREE from 'three';
@@ -85,9 +85,25 @@ function App() {
   const [nearbyProjects, setNearbyProjects] = useState<string[]>([]);
   const [neuroProfile, setNeuroProfile] = useState<any>(null);
   const [nexusHealth, setNexusHealth] = useState<any>(null);
-  const [careerData, setCareerData] = useState<any>(null);
-  const [scoutData, setScoutData] = useState<any>({ hp: 120, torque: 210, status: "Tuned / Ready" });
-  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career'>('neuro');
+  const [careerData, setCareerData] = useState<any>({
+    role: "Full Stack & 3D Engineer",
+    score: 98,
+    experience: "Software Engineer @ ABHRAM TECHNOLOGIES",
+    portfolio: "https://portfolio-pi-cyan-64.vercel.app"
+  });
+  const [scoutData, setScoutData] = useState<any>({ hp: 120, torque: 210, status: "M3A1 Ready" });
+  const [marketData, setMarketData] = useState<any>({ property: "4 Bhk Villa - Kakkanad", price: "₹90L", trend: "+2.4%" });
+  const [learningData, setLearningData] = useState<any>({
+    languages: ["Rust", "Go", "C++", ".NET", "C#", "Shell"],
+    maturity: { "Rust": 85, "Go": 70, "C++": 92 }
+  });
+  const [diagStatus, setDiagStatus] = useState<any>({ linker: "Offline", port1420: "Active", node: "v20.x" });
+  const [gameEngineData, setGameEngineData] = useState<any>({
+    active: ["Z-Racing (15GB)", "Z-Attact (7GB)", "GTA V (5GB)"],
+    loadStatus: "Engine Optimized"
+  });
+  const [securityStatus, setSecurityStatus] = useState<any>({ oauth: "Ready", tempMail: "Active", vault: "Locked" });
+  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -95,6 +111,20 @@ function App() {
     { role: "assistant", content: "Oasis Neural Link Established. I'm monitoring your context and cloud pulses." }
   ]);
   const [assistantInput, setAssistantInput] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  const handleSearch = (q: string) => {
+    setSearchQuery(q);
+    if (q.length > 2) {
+      setSearchResults([
+        { title: "NeuroForge DNA", type: "Code", aura: "indigo" },
+        { title: "M3A1 Scout Tuning", type: "Performance", aura: "rose" },
+        { title: "Kakkanad Villa #4", type: "Market", aura: "amber" }
+      ]);
+    } else {
+      setSearchResults([]);
+    }
+  };
 
   const fetchLogs = async () => {
     try {
@@ -417,20 +447,39 @@ function App() {
           </AnimatePresence>
 
           <div className="relative group">
-            <div className="absolute inset-0 bg-blue-500/10 rounded-2xl blur-xl group-focus-within:bg-blue-500/20 transition-all duration-500" />
-            <div className="relative flex items-center bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-4 transition-all duration-300 group-focus-within:border-blue-500/40">
-              <Search className="w-5 h-5 text-slate-400 mr-4" />
-              <input 
-                type="text" 
-                placeholder="What are we doing today?"
-                className="bg-transparent border-none outline-none w-full text-lg placeholder:text-slate-500"
-                value={searchQuery}
-                onKeyDown={handleSearchIntent}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div className="ml-4 px-2 py-1 bg-white/5 border border-white/10 rounded-md text-[10px] uppercase tracking-widest font-bold text-slate-500">
-                Alt + Space
+            <div className="relative w-full max-w-xl">
+              <div className="flex items-center px-4 py-3 bg-slate-900/40 border border-slate-700/50 rounded-2xl backdrop-blur-xl group-focus-within:border-blue-500/50 transition-all shadow-xl shadow-black/20">
+                <Search className="w-5 h-5 text-slate-400 mr-4" />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Neural Search across your ecosystem..." 
+                  className="w-full bg-transparent border-none outline-none text-sm placeholder:text-slate-600 font-medium text-white"
+                />
+                <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-[9px] text-slate-500 font-bold whitespace-nowrap">ALT + SPACE</kbd>
               </div>
+
+              <AnimatePresence>
+                {searchResults.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 mt-2 p-2 bg-slate-900/90 border border-slate-700/50 rounded-xl backdrop-blur-xl z-50 flex flex-col gap-1 shadow-2xl"
+                  >
+                    {searchResults.map((result, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg cursor-pointer transition-colors group">
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", `bg-${result.aura}-500 shadow-[0_0_8px_currentColor]`)} />
+                          <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">{result.title}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{result.type}</span>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.div>
@@ -502,7 +551,8 @@ function App() {
                 {[
                   { name: 'NeuroForge', id: 'neuro' as const, color: 'bg-indigo-500 shadow-[0_0_8px_#6366f1]' },
                   { name: 'Nexus Engine', id: 'nexus' as const, color: 'bg-emerald-500 shadow-[0_0_8px_#10b981]' },
-                  { name: 'Resume AI', id: 'career' as const, color: 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' }
+                  { name: 'Career Link', id: 'career' as const, color: 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' },
+                  { name: 'Market Watch', id: 'market' as const, color: 'bg-amber-500 shadow-[0_0_8px_#f59e0b]' }
                 ].map((node) => (
                   <button 
                     key={node.id}
@@ -543,20 +593,25 @@ function App() {
                       <div className="flex items-end justify-between gap-4">
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 font-medium">Archetype</span>
-                          <span className="text-sm font-bold text-white tracking-tight">{neuroProfile.risk_archetype || "Pragmatic Hacker"}</span>
+                          <span className="text-sm font-bold text-white tracking-tight">{neuroProfile.risk_archetype || "Pioneer-Class"}</span>
                         </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Maturity</span>
-                          <div className="flex gap-1 mt-1">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                              <div 
-                                key={i}
-                                className={cn(
-                                  "w-3 h-1 rounded-full",
-                                  i <= (neuroProfile.maturity_score / 20) ? "bg-indigo-500" : "bg-white/5"
-                                )}
-                              />
-                            ))}
+                        <div className="p-2 rounded bg-indigo-500/5 border border-indigo-500/10 flex items-center gap-2">
+                          <Shield size={10} className="text-indigo-400" />
+                          <span className="text-[10px] font-mono text-indigo-400">Vault: {securityStatus.vault}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-indigo-500/10 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Privacy & Auth Vault</span>
+                          <span className="text-[10px] font-mono text-indigo-300/50">NextAuth • TempMail</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="px-2 py-1 rounded bg-indigo-500/5 border border-indigo-500/10 text-[9px] text-indigo-300 font-bold text-center">
+                            OAuth: {securityStatus.oauth}
+                          </div>
+                          <div className="px-2 py-1 rounded bg-indigo-500/5 border border-indigo-500/10 text-[9px] text-indigo-300 font-bold text-center">
+                            Mail: {securityStatus.tempMail}
                           </div>
                         </div>
                       </div>
@@ -599,6 +654,37 @@ function App() {
                         </div>
                       </div>
                       <DesignShowroom />
+                      
+                      <div className="pt-2 border-t border-emerald-500/10 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Hardware & Build Pulse</span>
+                          <span className="text-[9px] text-emerald-400 font-bold uppercase animate-pulse">Monitoring...</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 rounded bg-slate-900/60 border border-emerald-500/5">
+                            <span className="text-[8px] text-slate-600 font-bold uppercase block">Linker (MSVC)</span>
+                            <span className={cn("text-[10px] font-mono", diagStatus.linker === "Offline" ? "text-rose-500" : "text-emerald-500")}>{diagStatus.linker}</span>
+                          </div>
+                          <div className="p-2 rounded bg-slate-900/60 border border-emerald-500/5">
+                            <span className="text-[8px] text-slate-600 font-bold uppercase block">Vite Port (1420)</span>
+                            <span className="text-[10px] font-mono text-emerald-400">ACTIVE</span>
+                          </div>
+                        </div>
+                        <div className="p-2 rounded bg-rose-500/5 border border-rose-500/10 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] text-rose-300 font-bold uppercase block">Diagnostic Alert</span>
+                            <AlertCircle size={10} className="text-rose-500" />
+                          </div>
+                          <p className="text-[9px] text-rose-400 font-medium leading-tight">Linker pulse not found. Visual Studio Build Tools required for native build.</p>
+                          <button 
+                            onClick={() => window.open('https://visualstudio.microsoft.com/visual-cpp-build-tools/', '_blank')}
+                            className="mt-1 px-2 py-1 bg-rose-500/20 border border-rose-500/20 rounded text-[9px] text-rose-300 font-bold uppercase hover:bg-rose-500/30 transition-all flex items-center justify-center gap-1"
+                          >
+                            <ExternalLink size={10} />
+                            Install Build Tools
+                          </button>
+                        </div>
+                      </div>
                     </motion.div>
                   )}
 
@@ -621,22 +707,72 @@ function App() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ATS Score</span>
-                          <span className="text-xl font-black text-rose-500">{careerData?.score || "--"}%</span>
+                          <span className="text-xl font-black text-rose-500">{careerData?.score || 98}%</span>
                         </div>
                         <div className="flex flex-col gap-1 items-end">
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Scout M3A1</span>
-                          <span className="text-xs font-bold text-white tracking-tight">{scoutData.status}</span>
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">HP / Torque</span>
+                          <span className="text-xs font-bold text-white tracking-tight">{scoutData.hp}hp / {scoutData.torque}ft-lb</span>
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-rose-500/10 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-slate-600 font-bold uppercase">HP / Torque</span>
-                          <span className="text-xs font-mono text-slate-400">{scoutData.hp}hp / {scoutData.torque}lb-ft</span>
+                      <div className="pt-2 border-t border-rose-500/10 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Alpha Engine Pulse</span>
+                          <span className="text-[9px] text-rose-400 font-bold uppercase animate-pulse">Syncing...</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Gamepad2 size={12} className="text-rose-500/50" />
-                          <span className="text-[9px] text-slate-500 font-bold uppercase">Scout Racer Link</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {gameEngineData.active.map((game: string) => (
+                            <div key={game} className="px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-[9px] text-rose-300 font-mono">
+                              {game}
+                            </div>
+                          ))}
+                        </div>
+                        <button 
+                          onClick={() => window.open(careerData?.portfolio || 'https://portfolio-pi-cyan-64.vercel.app', '_blank')}
+                          className="flex items-center justify-center gap-2 w-full p-2 mt-2 bg-rose-500/20 border border-rose-500/20 rounded-xl group hover:bg-rose-500/30 transition-all"
+                        >
+                          <Globe size={12} className="text-rose-400 group-hover:rotate-12 transition-transform" />
+                          <span className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Open Portfolio</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activePortal === 'market' && (
+                    <motion.div 
+                      key="market"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex flex-col gap-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Market Watch Active</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Real Estate</span>
+                      </div>
+                      
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-400 font-medium">Hot Property</span>
+                          <span className="text-sm font-bold text-white tracking-tight">{marketData.property}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Price Point</span>
+                          <span className="text-xl font-black text-amber-500">{marketData.price}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-amber-500/10 flex flex-col gap-2">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase">Technical Encyclopedia</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {learningData.languages.map((lang: string) => (
+                            <div key={lang} className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-bold tracking-tight">
+                              {lang}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </motion.div>
