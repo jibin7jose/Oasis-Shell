@@ -37,7 +37,8 @@ function App() {
   const [nearbyProjects, setNearbyProjects] = useState<string[]>([]);
   const [neuroProfile, setNeuroProfile] = useState<any>(null);
   const [nexusHealth, setNexusHealth] = useState<any>(null);
-  const [nexusActive, setNexusActive] = useState(false);
+  const [careerData, setCareerData] = useState<any>(null);
+  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career'>('neuro');
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -182,6 +183,9 @@ function App() {
 
       const health = await invoke("get_nexus_health");
       setNexusHealth(health);
+
+      const career = await invoke("get_latest_resume_analysis");
+      setCareerData(career);
     } catch (e) {
       console.error("Failed to fetch nearby or profiles", e);
     }
@@ -435,29 +439,32 @@ function App() {
               className="flex flex-col gap-6 mt-6 w-full max-w-sm"
             >
               <div className="flex items-center gap-6">
-                {nearbyProjects.slice(0, 4).map((proj) => (
+                {[
+                  { name: 'NeuroForge', id: 'neuro' as const, color: 'bg-indigo-500 shadow-[0_0_8px_#6366f1]' },
+                  { name: 'Nexus Engine', id: 'nexus' as const, color: 'bg-emerald-500 shadow-[0_0_8px_#10b981]' },
+                  { name: 'Resume AI', id: 'career' as const, color: 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' }
+                ].map((node) => (
                   <button 
-                    key={proj}
-                    onClick={() => setNexusActive(proj.toLowerCase().includes("nexus"))}
+                    key={node.id}
+                    onClick={() => setActivePortal(node.id)}
                     className="flex items-center gap-2 group cursor-pointer focus:outline-none"
-                    title={`Focus Node: ${proj}`}
+                    title={`Focus Node: ${node.name}`}
                   >
                     <div className={cn(
                       "w-2 h-2 rounded-full transition-all duration-500",
-                      proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : 
-                      proj.toLowerCase().includes("nexus") ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-slate-700"
+                      activePortal === node.id ? node.color : "bg-slate-700"
                     )} />
                     <span className={cn(
                       "text-[10px] font-bold tracking-widest uppercase transition-colors",
-                      (nexusActive && proj.toLowerCase().includes("nexus")) || (!nexusActive && proj.toLowerCase().includes("forge")) ? "text-white" : "text-slate-500 group-hover:text-slate-300"
-                    )}>{proj}</span>
+                      activePortal === node.id ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                    )}>{node.name}</span>
                   </button>
                 ))}
               </div>
 
               <div className="relative">
                 <AnimatePresence mode="wait">
-                  {!nexusActive && neuroProfile ? (
+                  {activePortal === 'neuro' && neuroProfile && (
                     <motion.div 
                       key="neuro"
                       initial={{ opacity: 0, x: -10 }}
@@ -494,7 +501,9 @@ function App() {
                         </div>
                       </div>
                     </motion.div>
-                  ) : nexusActive && nexusHealth ? (
+                  )}
+
+                  {activePortal === 'nexus' && nexusHealth && (
                     <motion.div 
                       key="nexus"
                       initial={{ opacity: 0, x: -10 }}
@@ -530,7 +539,36 @@ function App() {
                         </div>
                       </div>
                     </motion.div>
-                  ) : null}
+                  )}
+
+                  {activePortal === 'career' && (
+                    <motion.div 
+                      key="career"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex flex-col gap-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Career Link active</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resume AI</span>
+                      </div>
+                      
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-400 font-medium">Target Role</span>
+                          <span className="text-sm font-bold text-white tracking-tight">{careerData?.role || "Scanning Portfolio..."}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ATS Score</span>
+                          <span className="text-xl font-black text-rose-500">{careerData?.score || "--"}%</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </AnimatePresence>
               </div>
             </motion.div>

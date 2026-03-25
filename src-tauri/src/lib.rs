@@ -232,6 +232,56 @@ fn log_event(state: tauri::State<DbState>, event_type: String, message: String) 
 }
 
 #[tauri::command]
+fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
+        [role, score.to_string()],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
+    let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+    
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let role: String = row.get(0).map_err(|e| e.to_string())?;
+        let score: i32 = row.get(1).map_err(|e| e.to_string())?;
+        Ok(serde_json::json!({ "role": role, "score": score }))
+    } else {
+        Ok(serde_json::Value::Null)
+    }
+}
+
+#[tauri::command]
+fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
+        "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
+        [role, score.to_string()],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
+    let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+    
+    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let role: String = row.get(0).map_err(|e| e.to_string())?;
+        let score: i32 = row.get(1).map_err(|e| e.to_string())?;
+        Ok(serde_json::json!({ "role": role, "score": score }))
+    } else {
+        Ok(serde_json::Value::Null)
+    }
+}
+
+#[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client.get("http://localhost:4000/projects/health")
@@ -331,6 +381,16 @@ pub fn run() {
         [],
     ).expect("failed to create logs table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS resume_analysis (
+            id INTEGER PRIMARY KEY,
+            role TEXT NOT NULL,
+            match_score INTEGER NOT NULL,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )",
+        [],
+    ).expect("failed to create resume analysis table");
+
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
@@ -360,7 +420,9 @@ pub fn run() {
             get_logs,
             get_nearby_projects,
             get_neuroforge_profile,
-            get_nexus_health
+            get_nexus_health,
+            save_resume_analysis,
+            get_latest_resume_analysis
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
