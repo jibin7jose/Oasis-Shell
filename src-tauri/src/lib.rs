@@ -232,6 +232,30 @@ fn log_event(state: tauri::State<DbState>, event_type: String, message: String) 
 }
 
 #[tauri::command]
+fn get_nearby_projects() -> Result<Vec<String>, String> {
+    let mut projects = Vec::new();
+    let search_paths = vec!["..", "../.."];
+    
+    for base in search_paths {
+        if let Ok(entries) = std::fs::read_dir(base) {
+            for entry in entries.flatten() {
+                 if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if !name.starts_with(".") && name != "node_modules" && name != "target" {
+                            projects.push(name);
+                        }
+                    }
+                 }
+            }
+        }
+    }
+    projects.sort();
+    projects.dedup();
+    Ok(projects)
+}
+
+#[tauri::command]
 fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
     let conn = state.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
@@ -303,7 +327,8 @@ pub fn run() {
             start_watcher,
             launch_crate,
             log_event,
-            get_logs
+            get_logs,
+            get_nearby_projects
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

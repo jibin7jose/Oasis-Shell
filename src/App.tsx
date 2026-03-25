@@ -34,6 +34,7 @@ function App() {
   const [crates, setCrates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [isNative, setIsNative] = useState(true);
+  const [nearbyProjects, setNearbyProjects] = useState<string[]>([]);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -168,9 +169,19 @@ function App() {
       setIsSyncing(false);
     }
   };
+  const fetchNearby = async () => {
+    try {
+      const projects: string[] = await invoke("get_nearby_projects");
+      setNearbyProjects(projects.filter(p => !p.includes("oasis-shell")));
+    } catch (e) {
+      console.error("Failed to fetch nearby", e);
+    }
+  };
+
   useEffect(() => {
     fetchCrates();
     fetchLogs();
+    fetchNearby();
   }, []);
 
   useEffect(() => {
@@ -407,6 +418,28 @@ function App() {
               <Settings className="w-6 h-6 text-slate-500 group-hover:text-slate-300" />
             </motion.button>
           </div>
+
+          {nearbyProjects.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-6 mt-4"
+            >
+              {nearbyProjects.slice(0, 4).map((proj) => (
+                <div 
+                  key={proj}
+                  className="flex items-center gap-2 group cursor-pointer"
+                  title={`Launch Node: ${proj}`}
+                >
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : "bg-slate-700 active:bg-blue-500"
+                  )} />
+                  <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase group-hover:text-white transition-colors">{proj}</span>
+                </div>
+              ))}
+            </motion.div>
+          )}
         </div>
 
         {/* Settings Overlay */}
