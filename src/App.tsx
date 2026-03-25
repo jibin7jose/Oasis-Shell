@@ -35,6 +35,7 @@ function App() {
   const [logs, setLogs] = useState<any[]>([]);
   const [isNative, setIsNative] = useState(true);
   const [nearbyProjects, setNearbyProjects] = useState<string[]>([]);
+  const [neuroProfile, setNeuroProfile] = useState<any>(null);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -173,8 +174,11 @@ function App() {
     try {
       const projects: string[] = await invoke("get_nearby_projects");
       setNearbyProjects(projects.filter(p => !p.includes("oasis-shell")));
+      
+      const profile = await invoke("get_neuroforge_profile");
+      setNeuroProfile(profile);
     } catch (e) {
-      console.error("Failed to fetch nearby", e);
+      console.error("Failed to fetch nearby or profile", e);
     }
   };
 
@@ -423,21 +427,60 @@ function App() {
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-6 mt-4"
+              className="flex flex-col gap-6 mt-6 w-full max-w-sm"
             >
-              {nearbyProjects.slice(0, 4).map((proj) => (
-                <div 
-                  key={proj}
-                  className="flex items-center gap-2 group cursor-pointer"
-                  title={`Launch Node: ${proj}`}
+              <div className="flex items-center gap-6">
+                {nearbyProjects.slice(0, 4).map((proj) => (
+                  <div 
+                    key={proj}
+                    className="flex items-center gap-2 group cursor-pointer"
+                    title={`Launch Node: ${proj}`}
+                  >
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : "bg-slate-700 active:bg-blue-500"
+                    )} />
+                    <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase group-hover:text-white transition-colors">{proj}</span>
+                  </div>
+                ))}
+              </div>
+
+              {neuroProfile && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-3"
                 >
-                  <div className={cn(
-                    "w-2 h-2 rounded-full",
-                    proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : "bg-slate-700 active:bg-blue-500"
-                  )} />
-                  <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase group-hover:text-white transition-colors">{proj}</span>
-                </div>
-              ))}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Neural DNA Link active</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">NeuroForge Core</span>
+                  </div>
+                  
+                  <div className="flex items-end justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-slate-400 font-medium">Archetype</span>
+                      <span className="text-sm font-bold text-white tracking-tight">{neuroProfile.risk_archetype || "Pragmatic Hacker"}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Maturity</span>
+                      <div className="flex gap-1 mt-1">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div 
+                            key={i}
+                            className={cn(
+                              "w-3 h-1 rounded-full",
+                              i <= (neuroProfile.maturity_score / 20) ? "bg-indigo-500" : "bg-white/5"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </div>

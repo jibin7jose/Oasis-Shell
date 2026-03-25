@@ -232,6 +232,21 @@ fn log_event(state: tauri::State<DbState>, event_type: String, message: String) 
 }
 
 #[tauri::command]
+async fn get_neuroforge_profile() -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let res = client.get("http://localhost:8000/projects/profile")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let json = res.json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    Ok(json)
+}
+
+#[tauri::command]
 fn get_nearby_projects() -> Result<Vec<String>, String> {
     let mut projects = Vec::new();
     let search_paths = vec!["..", "../.."];
@@ -328,7 +343,8 @@ pub fn run() {
             launch_crate,
             log_event,
             get_logs,
-            get_nearby_projects
+            get_nearby_projects,
+            get_neuroforge_profile
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
