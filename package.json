@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
+    "frontend": "vite --port 1420",
     "build": "tauri build",
     "preview": "vite preview",
     "tauri": "tauri",
