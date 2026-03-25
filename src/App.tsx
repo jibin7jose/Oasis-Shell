@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const contexts = [
   { id: "dev", name: "Development", icon: Code, color: "blue", aura: "from-blue-600/30 to-blue-900/10" },
@@ -17,6 +19,52 @@ const auraColors: Record<string, string> = {
   gaming: "#dc2626",
   research: "#059669",
 };
+
+const DesignShowroom = () => {
+  const mountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
+    camera.position.set(0, 0, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    mountRef.current.appendChild(renderer.domElement);
+
+    const loader = new GLTFLoader();
+    let model: THREE.Group;
+
+    loader.load('/design/scene.gltf', (gltf) => {
+      model = gltf.scene;
+      model.scale.set(1.5, 1.5, 1.5);
+      model.position.set(0, -1, 0);
+      scene.add(model);
+    });
+
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.position.set(5, 5, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      if (model) model.rotation.y += 0.005;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      renderer.dispose();
+      mountRef.current?.removeChild(renderer.domElement);
+    };
+  }, []);
+
+  return <div ref={mountRef} className="w-full h-40 bg-slate-900/40 rounded-xl overflow-hidden mt-2 border border-emerald-500/10" />;
+}
 
 function App() {
   const [activeContext, setActiveContext] = useState("dev");
@@ -38,6 +86,7 @@ function App() {
   const [neuroProfile, setNeuroProfile] = useState<any>(null);
   const [nexusHealth, setNexusHealth] = useState<any>(null);
   const [careerData, setCareerData] = useState<any>(null);
+  const [scoutData, setScoutData] = useState<any>({ hp: 120, torque: 210, status: "Tuned / Ready" });
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career'>('neuro');
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
@@ -156,21 +205,25 @@ function App() {
     }
   };
 
-  const handleSync = async () => {
+  const handleSync = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isSyncing) return;
+
     setIsSyncing(true);
     setSyncStatus("idle");
+
     try {
-      const latestMessage = logs.length > 0 ? logs[0].message : null;
-      await invoke("sync_project", { message: latestMessage });
+      const msg = logs.length > 0 ? logs[0].message : "Neural Pattern Update";
+      await invoke("sync_project", { message: msg });
       setSyncStatus("success");
       setLastSync(new Date().toLocaleTimeString());
-      logEvent("SYNC", "Oasis Pulse completed. Neural Cloud updated.");
-      fetchLogs();
+      logEvent("SYNC", "Oasis Pulse: Synchronized with Neural Cloud.");
     } catch (e) {
+      console.error("Sync failed", e);
       setSyncStatus("error");
-      logEvent("SYNC_ERROR", "Neural Pulse failed. Interface unstable.");
+      logEvent("SYNC_ERROR", "Oasis Pulse: Interrupted. Connection unstable.");
     } finally {
-      setIsSyncing(false);
+      setTimeout(() => setIsSyncing(false), 2000);
     }
   };
   const fetchNearby = async () => {
@@ -195,6 +248,13 @@ function App() {
     fetchCrates();
     fetchLogs();
     fetchNearby();
+    
+    const interval = setInterval(() => {
+      fetchNearby();
+      fetchLogs();
+    }, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -538,6 +598,7 @@ function App() {
                           </div>
                         </div>
                       </div>
+                      <DesignShowroom />
                     </motion.div>
                   )}
 
@@ -547,24 +608,35 @@ function App() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 10 }}
-                      className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex flex-col gap-3"
+                      className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 flex flex-col gap-4"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
-                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Career Link active</span>
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Career & Gaming Pulse</span>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Resume AI</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Elite Profile</span>
                       </div>
                       
-                      <div className="flex items-end justify-between gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-slate-400 font-medium">Target Role</span>
-                          <span className="text-sm font-bold text-white tracking-tight">{careerData?.role || "Scanning Portfolio..."}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ATS Score</span>
                           <span className="text-xl font-black text-rose-500">{careerData?.score || "--"}%</span>
+                        </div>
+                        <div className="flex flex-col gap-1 items-end">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Scout M3A1</span>
+                          <span className="text-xs font-bold text-white tracking-tight">{scoutData.status}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-rose-500/10 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] text-slate-600 font-bold uppercase">HP / Torque</span>
+                          <span className="text-xs font-mono text-slate-400">{scoutData.hp}hp / {scoutData.torque}lb-ft</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Gamepad2 size={12} className="text-rose-500/50" />
+                          <span className="text-[9px] text-slate-500 font-bold uppercase">Scout Racer Link</span>
                         </div>
                       </div>
                     </motion.div>
