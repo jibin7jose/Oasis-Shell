@@ -36,6 +36,8 @@ function App() {
   const [isNative, setIsNative] = useState(true);
   const [nearbyProjects, setNearbyProjects] = useState<string[]>([]);
   const [neuroProfile, setNeuroProfile] = useState<any>(null);
+  const [nexusHealth, setNexusHealth] = useState<any>(null);
+  const [nexusActive, setNexusActive] = useState(false);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -177,8 +179,11 @@ function App() {
       
       const profile = await invoke("get_neuroforge_profile");
       setNeuroProfile(profile);
+
+      const health = await invoke("get_nexus_health");
+      setNexusHealth(health);
     } catch (e) {
-      console.error("Failed to fetch nearby or profile", e);
+      console.error("Failed to fetch nearby or profiles", e);
     }
   };
 
@@ -431,56 +436,103 @@ function App() {
             >
               <div className="flex items-center gap-6">
                 {nearbyProjects.slice(0, 4).map((proj) => (
-                  <div 
+                  <button 
                     key={proj}
-                    className="flex items-center gap-2 group cursor-pointer"
-                    title={`Launch Node: ${proj}`}
+                    onClick={() => setNexusActive(proj.toLowerCase().includes("nexus"))}
+                    className="flex items-center gap-2 group cursor-pointer focus:outline-none"
+                    title={`Focus Node: ${proj}`}
                   >
                     <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : "bg-slate-700 active:bg-blue-500"
+                      "w-2 h-2 rounded-full transition-all duration-500",
+                      proj.toLowerCase().includes("forge") ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : 
+                      proj.toLowerCase().includes("nexus") ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-slate-700"
                     )} />
-                    <span className="text-[10px] font-bold text-slate-500 tracking-widest uppercase group-hover:text-white transition-colors">{proj}</span>
-                  </div>
+                    <span className={cn(
+                      "text-[10px] font-bold tracking-widest uppercase transition-colors",
+                      (nexusActive && proj.toLowerCase().includes("nexus")) || (!nexusActive && proj.toLowerCase().includes("forge")) ? "text-white" : "text-slate-500 group-hover:text-slate-300"
+                    )}>{proj}</span>
+                  </button>
                 ))}
               </div>
 
-              {neuroProfile && (
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Neural DNA Link active</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">NeuroForge Core</span>
-                  </div>
-                  
-                  <div className="flex items-end justify-between gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-slate-400 font-medium">Archetype</span>
-                      <span className="text-sm font-bold text-white tracking-tight">{neuroProfile.risk_archetype || "Pragmatic Hacker"}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Maturity</span>
-                      <div className="flex gap-1 mt-1">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div 
-                            key={i}
-                            className={cn(
-                              "w-3 h-1 rounded-full",
-                              i <= (neuroProfile.maturity_score / 20) ? "bg-indigo-500" : "bg-white/5"
-                            )}
-                          />
-                        ))}
+              <div className="relative">
+                <AnimatePresence mode="wait">
+                  {!nexusActive && neuroProfile ? (
+                    <motion.div 
+                      key="neuro"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Neural DNA Link active</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">NeuroForge Core</span>
                       </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
+                      
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-400 font-medium">Archetype</span>
+                          <span className="text-sm font-bold text-white tracking-tight">{neuroProfile.risk_archetype || "Pragmatic Hacker"}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Maturity</span>
+                          <div className="flex gap-1 mt-1">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div 
+                                key={i}
+                                className={cn(
+                                  "w-3 h-1 rounded-full",
+                                  i <= (neuroProfile.maturity_score / 20) ? "bg-indigo-500" : "bg-white/5"
+                                )}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : nexusActive && nexusHealth ? (
+                    <motion.div 
+                      key="nexus"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col gap-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Nexus Pulse Active</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Infra Center</span>
+                      </div>
+                      
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-400 font-medium">Deployment</span>
+                          <span className="text-sm font-bold text-white tracking-tight">{nexusHealth.status || "Healthy / Stable"}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Load Pulse</span>
+                          <div className="flex gap-0.5 mt-1 h-3 items-end">
+                            {[5, 12, 8, 15, 6, 10].map((h, i) => (
+                              <motion.div 
+                                key={i}
+                                animate={{ height: [h, h * 1.5, h] }}
+                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
+                                className="w-1.5 bg-emerald-500/40 rounded-t-sm"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
             </motion.div>
           )}
         </div>
