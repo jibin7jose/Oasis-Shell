@@ -46,8 +46,8 @@ function App() {
     try {
       const data: any[] = await invoke("get_logs");
       if (data.length === 0) {
-        logEvent("SYSTEM", "Oasis Shell Neural Bridge Initiated.");
-        fetchLogs();
+        await logEvent("SYSTEM", "Oasis Shell Neural Bridge Initiated.");
+        await fetchLogs();
       } else {
         setLogs(data);
       }
@@ -168,6 +168,11 @@ function App() {
       setIsSyncing(false);
     }
   };
+  useEffect(() => {
+    fetchCrates();
+    fetchLogs();
+  }, []);
+
   useEffect(() => {
     if (showSettings) {
       fetchCrates();
