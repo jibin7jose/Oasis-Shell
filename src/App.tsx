@@ -73,7 +73,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
-  
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -205,7 +205,7 @@ function App() {
       // Executive AI logic
       setTimeout(() => {
         let response = "Instruction Received. Command queued for execution.";
-        
+
         if (userMsg.includes("status")) {
           const aura = contexts.find(c => c.id === activeContext)?.name;
           response = `System Operational. Active Aura: ${aura}. Cloud Sync: Stable.`;
@@ -265,7 +265,7 @@ function App() {
     try {
       const projects: string[] = await invoke("get_nearby_projects");
       setNearbyProjects(projects.filter(p => !p.includes("oasis-shell")));
-      
+
       const profile = await invoke("get_neuroforge_profile");
       setNeuroProfile(profile);
 
@@ -283,12 +283,12 @@ function App() {
     fetchCrates();
     fetchLogs();
     fetchNearby();
-    
+
     const interval = setInterval(() => {
       fetchNearby();
       fetchLogs();
     }, 60000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -350,18 +350,18 @@ function App() {
 
   useEffect(() => {
     if (!autoPulse) return;
-    
+
     const intervalId = setInterval(() => {
       handleSync();
     }, pulseInterval * 60 * 1000);
-    
+
     return () => clearInterval(intervalId);
   }, [autoPulse, pulseInterval]);
 
   const handleSearchIntent = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       const query = searchQuery.toLowerCase().trim();
-      
+
       // 1. Sync Intent
       if (query.includes("sync") || query.includes("pulse") || query.includes("push") || query.includes("backup")) {
         handleSync();
@@ -384,13 +384,13 @@ function App() {
       }
 
       // 3. Context Switch Intent
-      const matched = contexts.find(ctx => 
-        query.includes(ctx.id) || 
+      const matched = contexts.find(ctx =>
+        query.includes(ctx.id) ||
         query.includes(ctx.name.toLowerCase()) ||
         query.includes("move to") ||
         query.includes("switch to")
       );
-      
+
       if (matched) {
         setActiveContext(matched.id);
         setSearchQuery("");
@@ -411,21 +411,21 @@ function App() {
     <div className="min-h-screen w-full bg-[#030712] text-slate-200 selection:bg-blue-500/30 font-sans overflow-hidden">
       {/* Background Glows (Neural Aura) */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none transition-all duration-1000">
-        <motion.div 
+        <motion.div
           animate={{ backgroundColor: currentAura }}
-          className="absolute top-[-20%] left-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-20" 
+          className="absolute top-[-20%] left-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-20"
         />
-        <motion.div 
+        <motion.div
           animate={{ backgroundColor: currentAura }}
-          className="absolute bottom-[-20%] right-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-10" 
+          className="absolute bottom-[-20%] right-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-10"
         />
       </div>
 
       {/* Main Layout */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8">
-        
+
         {/* Header/Search Bar */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-2xl mb-12"
@@ -433,7 +433,7 @@ function App() {
           {/* Neural Suggestion Hint */}
           <AnimatePresence>
             {suggestedContext && activeContext !== suggestedContext && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
@@ -441,7 +441,7 @@ function App() {
               >
                 <Bot className="w-3 h-3 animate-pulse" />
                 Neural Intent: Suggested Context - {contexts.find(c => c.id === suggestedContext)?.name}
-                <button 
+                <button
                   onClick={() => { setActiveContext(suggestedContext); setSuggestedContext(null); }}
                   className="ml-2 hover:text-white transition-colors"
                 >
@@ -455,20 +455,20 @@ function App() {
             <div className="relative w-full max-w-xl">
               <div className="flex items-center px-4 py-3 bg-slate-900/40 border border-slate-700/50 rounded-2xl backdrop-blur-xl group-focus-within:border-blue-500/50 transition-all shadow-xl shadow-black/20">
                 <Search className="w-5 h-5 text-slate-400 mr-4" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   onKeyDown={handleSearchIntent}
-                  placeholder="Neural Search across your ecosystem..." 
+                  placeholder="Neural Search across your ecosystem..."
                   className="w-full bg-transparent border-none outline-none text-sm placeholder:text-slate-600 font-medium text-white"
                 />
-                <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-[9px] text-slate-500 font-bold whitespace-nowrap">ALT + SPACE</kbd>
+                <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-[9px] text-slate-500 font-bold whitespace-nowrap">CTRL + SHIFT + SPACE</kbd>
               </div>
 
               <AnimatePresence>
                 {searchResults.length > 0 && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
@@ -492,7 +492,7 @@ function App() {
 
         {/* Action Center / Context Switcher */}
         <div className="flex flex-col items-center gap-8">
-          <motion.h2 
+          <motion.h2
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-sm font-medium uppercase tracking-[0.3em] text-slate-500"
@@ -504,7 +504,7 @@ function App() {
             {contexts.map((ctx) => {
               const Icon = ctx.icon;
               const isActive = activeContext === ctx.id;
-              
+
               return (
                 <motion.button
                   key={ctx.id}
@@ -513,8 +513,8 @@ function App() {
                   whileTap={{ scale: 0.95 }}
                   className={cn(
                     "relative flex flex-col items-center justify-center w-20 h-20 rounded-2xl transition-all duration-300 group",
-                    isActive 
-                      ? "bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-xl" 
+                    isActive
+                      ? "bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-xl"
                       : "hover:bg-white/5 border border-transparent"
                   )}
                 >
@@ -523,7 +523,7 @@ function App() {
                     isActive ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300"
                   )} />
                   {isActive && (
-                    <motion.div 
+                    <motion.div
                       layoutId="active-pill"
                       className="absolute -bottom-1 w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]"
                     />
@@ -531,9 +531,9 @@ function App() {
                 </motion.button>
               );
             })}
-            
+
             <div className="w-[1px] h-12 bg-white/10 mx-2" />
-            
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -548,7 +548,7 @@ function App() {
           </div>
 
           {nearbyProjects.length > 0 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-6 mt-6 w-full max-w-sm"
@@ -560,7 +560,7 @@ function App() {
                   { name: 'Career Link', id: 'career' as const, color: 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' },
                   { name: 'Market Watch', id: 'market' as const, color: 'bg-amber-500 shadow-[0_0_8px_#f59e0b]' }
                 ].map((node) => (
-                  <button 
+                  <button
                     key={node.id}
                     onClick={() => setActivePortal(node.id)}
                     className="flex items-center gap-2 group cursor-pointer focus:outline-none"
@@ -581,7 +581,7 @@ function App() {
               <div className="relative">
                 <AnimatePresence mode="wait">
                   {activePortal === 'neuro' && neuroProfile && (
-                    <motion.div 
+                    <motion.div
                       key="neuro"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -595,7 +595,7 @@ function App() {
                         </div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">NeuroForge Core</span>
                       </div>
-                      
+
                       <div className="flex items-end justify-between gap-4">
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 font-medium">Archetype</span>
@@ -625,7 +625,7 @@ function App() {
                   )}
 
                   {activePortal === 'nexus' && nexusHealth && (
-                    <motion.div 
+                    <motion.div
                       key="nexus"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -639,7 +639,7 @@ function App() {
                         </div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Infra Center</span>
                       </div>
-                      
+
                       <div className="flex items-end justify-between gap-4">
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 font-medium">Deployment</span>
@@ -649,7 +649,7 @@ function App() {
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Load Pulse</span>
                           <div className="flex gap-0.5 mt-1 h-3 items-end">
                             {[5, 12, 8, 15, 6, 10].map((h, i) => (
-                              <motion.div 
+                              <motion.div
                                 key={i}
                                 animate={{ height: [h, h * 1.5, h] }}
                                 transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
@@ -660,7 +660,7 @@ function App() {
                         </div>
                       </div>
                       <DesignShowroom />
-                      
+
                       <div className="pt-2 border-t border-emerald-500/10 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Hardware & Build Pulse</span>
@@ -682,7 +682,7 @@ function App() {
                             <AlertCircle size={10} className="text-rose-500" />
                           </div>
                           <p className="text-[9px] text-rose-400 font-medium leading-tight">Linker pulse not found. Visual Studio Build Tools required for native build.</p>
-                          <button 
+                          <button
                             onClick={() => window.open('https://visualstudio.microsoft.com/visual-cpp-build-tools/', '_blank')}
                             className="mt-1 px-2 py-1 bg-rose-500/20 border border-rose-500/20 rounded text-[9px] text-rose-300 font-bold uppercase hover:bg-rose-500/30 transition-all flex items-center justify-center gap-1"
                           >
@@ -695,7 +695,7 @@ function App() {
                   )}
 
                   {activePortal === 'career' && (
-                    <motion.div 
+                    <motion.div
                       key="career"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -709,7 +709,7 @@ function App() {
                         </div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Elite Profile</span>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">ATS Score</span>
@@ -733,7 +733,7 @@ function App() {
                             </div>
                           ))}
                         </div>
-                        <button 
+                        <button
                           onClick={() => window.open(careerData?.portfolio || 'https://portfolio-pi-cyan-64.vercel.app', '_blank')}
                           className="flex items-center justify-center gap-2 w-full p-2 mt-2 bg-rose-500/20 border border-rose-500/20 rounded-xl group hover:bg-rose-500/30 transition-all"
                         >
@@ -745,7 +745,7 @@ function App() {
                   )}
 
                   {activePortal === 'market' && (
-                    <motion.div 
+                    <motion.div
                       key="market"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -759,7 +759,7 @@ function App() {
                         </div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Real Estate</span>
                       </div>
-                      
+
                       <div className="flex items-end justify-between gap-4">
                         <div className="flex flex-col">
                           <span className="text-xs text-slate-400 font-medium">Hot Property</span>
@@ -792,13 +792,13 @@ function App() {
         {/* Settings Overlay */}
         <AnimatePresence>
           {showSettings && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/60 backdrop-blur-md"
             >
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -809,7 +809,7 @@ function App() {
                     <Settings className="w-5 h-5 text-blue-400" />
                     <h3 className="text-xl font-semibold">Oasis Control Center</h3>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setShowSettings(false)}
                     className="p-2 hover:bg-white/10 rounded-full transition-colors"
                   >
@@ -821,13 +821,13 @@ function App() {
                   {/* Sidebar */}
                   <div className="w-64 border-right border-white/5 p-4 flex flex-col gap-2 bg-black/20">
                     {["Crates", "Neural Logs", "AI Settings", "Appearance", "Oasis Pulse"].map(item => (
-                      <button 
-                        key={item} 
+                      <button
+                        key={item}
                         onClick={() => setActiveSettingTab(item)}
                         className={cn(
-                        "text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-3",
-                        activeSettingTab === item ? "bg-blue-500/10 text-blue-400" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
-                      )}>
+                          "text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-3",
+                          activeSettingTab === item ? "bg-blue-500/10 text-blue-400" : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
+                        )}>
                         {item === "Oasis Pulse" && <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />}
                         {item === "Neural Logs" && <Bot className="w-4 h-4" />}
                         {item}
@@ -847,8 +847,8 @@ function App() {
                           <div key={log.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-start gap-4 hover:border-white/10 transition-all">
                             <div className={cn(
                               "w-2 h-2 rounded-full mt-2 animate-pulse",
-                              log.event_type === "SYNC" ? "bg-emerald-500 shadow-[0_0_8px_bg-emerald-500/50]" : 
-                              log.event_type === "CONTEXT_SWITCH" ? "bg-blue-500 shadow-[0_0_8px_bg-blue-500/50]" : "bg-slate-500"
+                              log.event_type === "SYNC" ? "bg-emerald-500 shadow-[0_0_8px_bg-emerald-500/50]" :
+                                log.event_type === "CONTEXT_SWITCH" ? "bg-blue-500 shadow-[0_0_8px_bg-blue-500/50]" : "bg-slate-500"
                             )} />
                             <div className="flex-1">
                               <div className="flex items-center justify-between mb-1">
@@ -866,7 +866,7 @@ function App() {
                       <>
                         <div className="flex justify-between items-center mb-8">
                           <h4 className="text-lg font-bold">Manage Context Crates</h4>
-                          <button 
+                          <button
                             onClick={createCrate}
                             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-all shadow-lg shadow-blue-600/20"
                           >
@@ -892,7 +892,7 @@ function App() {
                                   <div className="text-xs text-slate-500">{ctx.apps.length} apps defined</div>
                                 </div>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => launchCrate(ctx.id)}
                                 className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg transition-all text-xs font-bold text-blue-400"
                               >
@@ -927,7 +927,7 @@ function App() {
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="p-4 rounded-xl bg-slate-800/20 border border-slate-700/30 flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">GitHub Sync Bridge</span>
@@ -936,7 +936,7 @@ function App() {
                             <div className="p-2 rounded bg-indigo-500/5 border border-indigo-500/10 text-[9px] text-indigo-300 font-mono text-center">
                               Synchronized to Origin Main
                             </div>
-                            <button 
+                            <button
                               onClick={() => window.open(repoUrl, '_blank')}
                               className="w-full py-1 text-[9px] text-slate-500 hover:text-white transition-colors uppercase font-bold"
                             >
@@ -955,7 +955,7 @@ function App() {
                               <p className="text-sm text-slate-400">Linked to Oasis GitHub Repository</p>
                             </div>
                           </div>
-                          
+
                           <div className="bg-black/40 rounded-xl p-4 font-mono text-sm text-blue-300 border border-white/5 mb-6">
                             {repoUrl}
                           </div>
@@ -965,14 +965,14 @@ function App() {
                               <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-1">Last Pulsed</span>
                               <span className="text-sm text-slate-300">{lastSync || "Never"}</span>
                             </div>
-                            
-                            <button 
+
+                            <button
                               onClick={handleSync}
                               disabled={isSyncing}
                               className={cn(
                                 "flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all",
-                                isSyncing 
-                                  ? "bg-slate-800 text-slate-500 cursor-not-allowed" 
+                                isSyncing
+                                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
                                   : "bg-white text-black hover:bg-blue-500 hover:text-white shadow-xl"
                               )}
                             >
@@ -986,14 +986,14 @@ function App() {
                               <span className="text-sm font-bold">Auto-Pulse Mode</span>
                               <span className="text-xs text-slate-500">Automatically backup context every {pulseInterval} minutes</span>
                             </div>
-                            <button 
+                            <button
                               onClick={() => setAutoPulse(!autoPulse)}
                               className={cn(
                                 "relative w-12 h-6 rounded-full transition-colors",
                                 autoPulse ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)]" : "bg-slate-800"
                               )}
                             >
-                              <motion.div 
+                              <motion.div
                                 animate={{ x: autoPulse ? 26 : 2 }}
                                 className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-lg"
                               />
@@ -1002,7 +1002,7 @@ function App() {
                         </div>
 
                         {syncStatus === "success" && (
-                          <motion.div 
+                          <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400"
@@ -1011,9 +1011,9 @@ function App() {
                             <span className="text-sm font-medium">Neural Synchonization Successful. Your context is now in the cloud.</span>
                           </motion.div>
                         )}
-                        
+
                         {syncStatus === "error" && (
-                          <motion.div 
+                          <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400"
@@ -1031,7 +1031,7 @@ function App() {
         </AnimatePresence>
         {/* Native Bridge Warning Overlays */}
         {!isNative && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6"
@@ -1052,7 +1052,7 @@ function App() {
 
         {/* Native Bridge Warning Overlays */}
         {!isNative && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6"
@@ -1072,7 +1072,7 @@ function App() {
         )}
 
         {/* Footer Info */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
@@ -1114,17 +1114,17 @@ function App() {
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
                   </div>
                 </div>
-                
+
                 <div className="flex-1 p-5 overflow-y-auto space-y-4 custom-scrollbar bg-black/10">
                   {messages.map((msg, i) => (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, x: msg.role === 'user' ? 10 : -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      key={i} 
+                      key={i}
                       className={cn(
                         "p-4 rounded-2xl text-[13px] leading-relaxed max-w-[90%] shadow-lg",
-                        msg.role === "user" 
-                          ? "bg-blue-600 text-white self-end ml-auto rounded-tr-none shadow-blue-600/20" 
+                        msg.role === "user"
+                          ? "bg-blue-600 text-white self-end ml-auto rounded-tr-none shadow-blue-600/20"
                           : "bg-white/5 border border-white/5 text-slate-300 self-start rounded-tl-none"
                       )}
                     >
@@ -1135,8 +1135,8 @@ function App() {
 
                 <div className="p-4 border-t border-white/5 bg-black/40">
                   <div className="relative flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus-within:border-blue-500/50 focus-within:bg-white/10 transition-all">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={assistantInput}
                       onChange={(e) => setAssistantInput(e.target.value)}
                       onKeyDown={handleAssistantChat}

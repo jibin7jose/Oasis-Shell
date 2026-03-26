@@ -256,30 +256,6 @@ fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json
     }
 }
 
-#[tauri::command]
-fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
-    conn.execute(
-        "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
-        [role, score.to_string()],
-    ).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
-    let conn = state.0.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
-    let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
-    
-    if let Some(row) = rows.next().map_err(|e| e.to_string())? {
-        let role: String = row.get(0).map_err(|e| e.to_string())?;
-        let score: i32 = row.get(1).map_err(|e| e.to_string())?;
-        Ok(serde_json::json!({ "role": role, "score": score }))
-    } else {
-        Ok(serde_json::Value::Null)
-    }
-}
 
 #[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
@@ -395,7 +371,7 @@ pub fn run() {
         .manage(DbState(Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new()
-            .with_shortcut("Alt+Space").expect("failed to register Alt+Space")
+            .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
             .with_handler(|app, _shortcut, event| {
                 if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                     if let Some(window) = app.get_webview_window("main") {
