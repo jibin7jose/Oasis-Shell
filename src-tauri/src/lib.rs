@@ -11,6 +11,8 @@ use std::io::Read;
 use tauri::Emitter;
 use tauri::Manager;
 use tiny_http::{Server, Response};
+use sysinfo::System;
+
 
 struct DbState(Mutex<Connection>);
 
@@ -560,6 +562,31 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
+    std::thread::spawn(move || {
+        let mut sys = System::new_all();
+        loop {
+            sys.refresh_all();
+            
+            let total_mem = sys.total_memory();
+            let used_mem = sys.used_memory();
+            let mem_percent = (used_mem as f32 / total_mem as f32) * 100.0;
+            
+            if mem_percent > 85.0 {
+                let _ = app.emit("proactive-pulse", serde_json::json!({
+                    "suggestion": "I notice your RAM is at 85%. Should I crate your inactive apps to free up space?",
+                    "action": "CRATE_SUGGESTION"
+                }));
+            }
+            
+            std::thread::sleep(Duration::from_secs(60));
+        }
+    });
+    Ok(())
+}
+
+
+#[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client.get("http://localhost:4000/projects/health")
@@ -721,7 +748,8 @@ pub fn run() {
             start_telemetry_server,
             generate_crate_name,
             execute_neural_command,
-            check_ai_status
+            check_ai_status,
+            start_proactive_sentience
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

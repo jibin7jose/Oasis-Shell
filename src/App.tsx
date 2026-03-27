@@ -140,19 +140,26 @@ function App() {
     ecosystemHealth: "Optimal"
   });
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
+  const [proactiveAlert, setProactiveAlert] = useState<any>(null);
 
-  // Scout-Racer Telemetry Link
   useEffect(() => {
-    // Spin up local Node bridge
-    invoke("start_telemetry_server").catch(e => console.error("Telemetry Server offline:", e));
+    // Spin up local Node bridge and proactive monitors
+    invoke("start_telemetry_server").catch(() => console.error("Telemetry server offline"));
+    invoke("start_proactive_sentience").catch(() => console.error("Proactive monitor offline"));
 
-    const unlistenPromise = listen('scout-telemetry', (event) => {
+    const unlistenTelemetry = listen('scout-telemetry', (event) => {
       const data = event.payload as any;
       setScoutData((prev: any) => ({ ...prev, ...data }));
     });
 
+    const unlistenPulse = listen('proactive-pulse', (event) => {
+      setProactiveAlert(event.payload);
+      setTimeout(() => setProactiveAlert(null), 8000);
+    });
+
     return () => {
-      unlistenPromise.then(unlistenFn => unlistenFn());
+      unlistenTelemetry.then(fn => fn());
+      unlistenPulse.then(fn => fn());
     };
   }, []);
 
@@ -199,7 +206,7 @@ function App() {
         setLogs(data);
       }
       setIsNative(true);
-    } catch (e) {
+    } catch {
       console.error("Failed to fetch logs", e);
       setIsNative(false);
     }
@@ -208,7 +215,7 @@ function App() {
   const logEvent = async (type: string, message: string) => {
     try {
       await invoke("log_event", { eventType: type, message });
-    } catch (e) {
+    } catch {
       console.error("Failed to log event", e);
     }
   };
@@ -221,7 +228,7 @@ function App() {
         apps: JSON.parse(c.apps)
       })));
       setIsNative(true);
-    } catch (e) {
+    } catch {
       console.error("Failed to fetch crates", e);
       setIsNative(false);
     }
@@ -240,7 +247,7 @@ function App() {
       logEvent("CRATE_CREATE", `Neural Snapshot created: ${name}`);
       fetchCrates();
       fetchLogs();
-    } catch (e) {
+    } catch {
       console.error("Failed to create crate", e);
     }
   };
@@ -1538,6 +1545,32 @@ function App() {
             {showAI ? <Plus className="w-8 h-8 rotate-45" /> : <Bot className="w-8 h-8" />}
           </motion.button>
         </div>
+
+        <AnimatePresence>
+          {proactiveAlert && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.9 }}
+              className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] bg-black/80 backdrop-blur-xl border border-blue-500/30 px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-4 max-w-md"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+                <Zap className="w-5 h-5 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Neural Pulse</div>
+                <div className="text-[13px] text-slate-200 font-medium leading-tight">{proactiveAlert.suggestion}</div>
+              </div>
+              <button
+                onClick={() => { setShowSettings(true); setProactiveAlert(null); }}
+                className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-[11px] font-bold hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 whitespace-nowrap"
+              >
+                Action
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );
