@@ -443,6 +443,13 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
 }
 
 #[tauri::command]
+async fn check_ai_status() -> Result<bool, String> {
+    let client = reqwest::Client::new();
+    let res = client.get("http://localhost:11434/api/tags").send().await;
+    Ok(res.is_ok())
+}
+
+#[tauri::command]
 fn execute_neural_command(command: String) -> Result<String, String> {
     let output = std::process::Command::new("powershell")
         .args(["-Command", &command])
@@ -701,7 +708,8 @@ pub fn run() {
             get_all_files,
             start_telemetry_server,
             generate_crate_name,
-            execute_neural_command
+            execute_neural_command,
+            check_ai_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

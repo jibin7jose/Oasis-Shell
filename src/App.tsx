@@ -76,6 +76,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [aiHeartbeat, setAiHeartbeat] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<any[]>([]);
@@ -153,6 +154,16 @@ function App() {
     return () => {
       unlistenPromise.then(unlistenFn => unlistenFn());
     };
+  }, []);
+
+  // Neural Heartbeat Poller
+  useEffect(() => {
+    const checkStatus = () => {
+      invoke("check_ai_status").then((status: any) => setAiHeartbeat(status)).catch(() => setAiHeartbeat(false));
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
@@ -247,6 +258,15 @@ function App() {
   const executeNeuralCmd = async (cmd: string) => {
     try {
       setMessages(prev => [...prev, { role: "assistant", content: `Executing: \`${cmd}\`...` }]);
+      
+      // If we are in the browser, simulate the result for the demo
+      if (!isNative) {
+        setTimeout(() => {
+          setMessages(prev => [...prev, { role: "assistant", content: `SUCCESS (MOCK): \n- src/\n- src-tauri/\n- public/\n- package.json\n- oasis_crates.db` }]);
+        }, 1200);
+        return;
+      }
+
       const output = await invoke("execute_neural_command", { command: cmd });
       setMessages(prev => [...prev, { role: "assistant", content: `SUCCESS: ${output}` }]);
     } catch (e) {
@@ -295,13 +315,27 @@ function App() {
           } else {
             // If completely unhandled, use RAG Engine (Context-Aware Local AI)
             setIsThinking(true);
+            
+            // MOCK MODE FALLBACK: If AI is offline, simulate a Command response for UX demo
+            if (!aiHeartbeat) {
+              setTimeout(() => {
+                if (userMsg.includes("git") || userMsg.includes("ls") || userMsg.includes("dir")) {
+                  setMessages(prev => [...prev, { role: "assistant", content: "I am currently disconnected from my Core AI (Ollama), but I detected a system command in your prompt. [CMD] ls [/CMD]" }]);
+                } else {
+                  setMessages(prev => [...prev, { role: "assistant", content: "Error: Semantic Engine or Local AI (Ollama) offline. (Oasis Heartbeat is Red)" }]);
+                }
+                setIsThinking(false);
+              }, 1000);
+              return;
+            }
+
             invoke("rag_query", { query: userMsg })
               .then((llmResponse: any) => {
-                setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
+                setMessages(prev => [...prev, { role: "assistant", content: llmResponse as string }]);
                 setIsThinking(false);
               })
               .catch((e) => {
-                setMessages(prev => [...prev, { role: "assistant", content: "Error: Semantic Engine or Local AI (Ollama) offline." }]);
+                setMessages(prev => [...prev, { role: "assistant", content: "AI Connection Failure. Please verify Ollama is active." }]);
                 setIsThinking(false);
               });
             return;
@@ -1385,6 +1419,10 @@ function App() {
               >
                 <div className="p-5 bg-white/5 border-b border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      aiHeartbeat ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                    )} />
                     <Bot className="w-5 h-5 text-blue-400" />
                     <span className="text-sm font-bold tracking-tight">Neural Link</span>
                   </div>
