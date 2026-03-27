@@ -165,6 +165,10 @@ function App() {
 
   // Neural Heartbeat Poller
   useEffect(() => {
+    if (!isNative) {
+      setAiHeartbeat({ ready: true, online: true, gemma3: true, nomic: true });
+      return;
+    }
     const checkStatus = () => {
       invoke("check_ai_status")
         .then((s: any) => setAiHeartbeat(s))
@@ -173,7 +177,7 @@ function App() {
     checkStatus();
     const interval = setInterval(checkStatus, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isNative]);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
@@ -207,7 +211,7 @@ function App() {
       }
       setIsNative(true);
     } catch {
-      console.error("Failed to fetch logs", e);
+      console.error("Failed to fetch logs");
       setIsNative(false);
     }
   };
@@ -216,7 +220,7 @@ function App() {
     try {
       await invoke("log_event", { eventType: type, message });
     } catch {
-      console.error("Failed to log event", e);
+      console.error("Failed to log event");
     }
   };
 
@@ -229,7 +233,7 @@ function App() {
       })));
       setIsNative(true);
     } catch {
-      console.error("Failed to fetch crates", e);
+      console.error("Failed to fetch crates");
       setIsNative(false);
     }
   };
@@ -248,7 +252,7 @@ function App() {
       fetchCrates();
       fetchLogs();
     } catch {
-      console.error("Failed to create crate", e);
+      console.error("Failed to create crate");
     }
   };
 
@@ -325,17 +329,15 @@ function App() {
             // If completely unhandled, use RAG Engine (Context-Aware Local AI)
             setIsThinking(true);
             
-            // MOCK MODE FALLBACK: If AI is offline, simulate a Command response for UX demo
-            if (!aiHeartbeat.ready) {
+            // MOCK MODE FALLBACK: If AI is offline, simulate a Command response for UX demo (OR IF IN BROWSER)
+            if (!aiHeartbeat.ready || !isNative) {
               setTimeout(() => {
-                if (!aiHeartbeat.online) {
+                if (!isNative) {
+                  setMessages(prev => [...prev, { role: "assistant", content: "I've detected your intent. Since you are in 'Simulation Mode' (Browser), I'll suggest a standard system command. [CMD] ls [/CMD]" }]);
+                } else if (!aiHeartbeat.online) {
                   setMessages(prev => [...prev, { role: "assistant", content: "Local AI Link offline. Please run `ollama serve` and verify port 11434 is open." }]);
-                } else if (!aiHeartbeat.gemma3 && !aiHeartbeat.nomic) {
-                  setMessages(prev => [...prev, { role: "assistant", content: "Missing neural models! Run `ollama pull gemma3:4b` and `ollama pull nomic-embed-text` in your terminal." }]);
-                } else if (!aiHeartbeat.gemma3) {
-                  setMessages(prev => [...prev, { role: "assistant", content: "Missing brain! Please run `ollama pull gemma3:4b`." }]);
                 } else {
-                  setMessages(prev => [...prev, { role: "assistant", content: "Missing embedder! Please run `ollama pull nomic-embed-text`." }]);
+                  setMessages(prev => [...prev, { role: "assistant", content: "Missing neural models! Run `ollama pull gemma3:4b` in your terminal." }]);
                 }
                 setIsThinking(false);
               }, 1200);
