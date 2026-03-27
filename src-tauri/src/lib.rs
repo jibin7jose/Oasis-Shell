@@ -443,11 +443,23 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
 }
 
 #[tauri::command]
-async fn check_ai_status() -> Result<bool, String> {
+async fn check_ai_status() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let res = client.get("http://localhost:11434/api/tags").send().await;
-    Ok(res.is_ok())
+    let res = client.get("http://localhost:11434/api/tags").send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let models = json["models"].as_array().ok_or("Invalid Ollama response")?;
+    let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma3:4b"));
+    let has_embed = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("nomic-embed-text"));
+    
+    Ok(serde_json::json!({
+        "online": true,
+        "gemma3": has_gemma,
+        "nomic": has_embed,
+        "ready": has_gemma && has_embed
+    }))
 }
+
 
 #[tauri::command]
 fn execute_neural_command(command: String) -> Result<String, String> {

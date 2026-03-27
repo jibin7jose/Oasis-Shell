@@ -76,7 +76,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [aiHeartbeat, setAiHeartbeat] = useState(false);
+  const [aiHeartbeat, setAiHeartbeat] = useState<any>({ ready: false, online: false });
   const [showGraph, setShowGraph] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<any[]>([]);
@@ -159,7 +159,9 @@ function App() {
   // Neural Heartbeat Poller
   useEffect(() => {
     const checkStatus = () => {
-      invoke("check_ai_status").then((status: any) => setAiHeartbeat(status)).catch(() => setAiHeartbeat(false));
+      invoke("check_ai_status")
+        .then((s: any) => setAiHeartbeat(s))
+        .catch(() => setAiHeartbeat({ ready: false, online: false }));
     };
     checkStatus();
     const interval = setInterval(checkStatus, 10000);
@@ -317,15 +319,19 @@ function App() {
             setIsThinking(true);
             
             // MOCK MODE FALLBACK: If AI is offline, simulate a Command response for UX demo
-            if (!aiHeartbeat) {
+            if (!aiHeartbeat.ready) {
               setTimeout(() => {
-                if (userMsg.includes("git") || userMsg.includes("ls") || userMsg.includes("dir")) {
-                  setMessages(prev => [...prev, { role: "assistant", content: "I am currently disconnected from my Core AI (Ollama), but I detected a system command in your prompt. [CMD] ls [/CMD]" }]);
+                if (!aiHeartbeat.online) {
+                  setMessages(prev => [...prev, { role: "assistant", content: "Local AI Link offline. Please run `ollama serve` and verify port 11434 is open." }]);
+                } else if (!aiHeartbeat.gemma3 && !aiHeartbeat.nomic) {
+                  setMessages(prev => [...prev, { role: "assistant", content: "Missing neural models! Run `ollama pull gemma3:4b` and `ollama pull nomic-embed-text` in your terminal." }]);
+                } else if (!aiHeartbeat.gemma3) {
+                  setMessages(prev => [...prev, { role: "assistant", content: "Missing brain! Please run `ollama pull gemma3:4b`." }]);
                 } else {
-                  setMessages(prev => [...prev, { role: "assistant", content: "Error: Semantic Engine or Local AI (Ollama) offline. (Oasis Heartbeat is Red)" }]);
+                  setMessages(prev => [...prev, { role: "assistant", content: "Missing embedder! Please run `ollama pull nomic-embed-text`." }]);
                 }
                 setIsThinking(false);
-              }, 1000);
+              }, 1200);
               return;
             }
 
@@ -1421,8 +1427,10 @@ function App() {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-2 h-2 rounded-full",
-                      aiHeartbeat ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
-                    )} />
+                      aiHeartbeat.ready ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : 
+                      aiHeartbeat.online ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" : 
+                      "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                    )} title={aiHeartbeat.ready ? "Sentient" : aiHeartbeat.online ? "Brain Offline (Pull Models)" : "Link Offline"} />
                     <Bot className="w-5 h-5 text-blue-400" />
                     <span className="text-sm font-bold tracking-tight">Neural Link</span>
                   </div>
