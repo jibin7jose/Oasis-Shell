@@ -75,6 +75,11 @@ function App() {
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [indexCount, setIndexCount] = useState<number | null>(null);
+  const [indexStatus, setIndexStatus] = useState<"idle" | "success" | "error">("idle");
+  const [indexPath, setIndexPath] = useState("D:\\myproject\\scout-racer");
+
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [autoPulse, setAutoPulse] = useState(false);
@@ -369,7 +374,19 @@ function App() {
         return;
       }
 
-      // 2. Crate Intent
+      // 2. Semantic AI Search
+      try {
+        const results: any = await invoke("semantic_search", { query });
+        if (results && results.length > 0) {
+          await invoke("plugin:opener|open", { path: results[0].filepath });
+          setSearchQuery("");
+          return;
+        }
+      } catch (e) {
+        console.error("Semantic search failed:", e);
+      }
+
+      // 3. Crate Intent
       if (query.startsWith("crate ") || query.startsWith("save ") || query.startsWith("snapshot ")) {
         const name = query.split(" ").slice(1).join(" ");
         if (name) {
@@ -999,6 +1016,62 @@ function App() {
                               />
                             </button>
                           </div>
+                        </div>
+                        
+                        {/* Neural Indexer Component */}
+                        <div className="p-6 bg-gradient-to-br from-indigo-600/20 to-purple-900/10 border border-purple-500/20 rounded-3xl mt-4">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="p-3 bg-purple-600 rounded-2xl shadow-lg shadow-purple-600/20">
+                              <Search className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold">Neural Semantic Indexer</h4>
+                              <p className="text-sm text-slate-400">Scan folders into the Oasis Vector Database</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 mb-4">
+                            <input 
+                              type="text" 
+                              value={indexPath}
+                              onChange={(e) => setIndexPath(e.target.value)}
+                              placeholder="e.g. D:\myproject\scout-racer" 
+                              className="flex-1 bg-black/40 border border-white/10 outline-none text-sm text-white placeholder:text-slate-600 py-3 px-4 rounded-xl"
+                            />
+                            <button 
+                              onClick={async () => {
+                                setIsIndexing(true);
+                                setIndexStatus("idle");
+                                try {
+                                  const count: number = await invoke("index_folder", { path: indexPath });
+                                  setIndexCount(count);
+                                  setIndexStatus("success");
+                                } catch (e) {
+                                  setIndexStatus("error");
+                                }
+                                setIsIndexing(false);
+                              }}
+                              disabled={isIndexing}
+                              className={cn(
+                                "flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap",
+                                isIndexing ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-purple-600 text-white hover:bg-purple-500 shadow-xl"
+                              )}
+                            >
+                              <RefreshCw className={cn("w-4 h-4", isIndexing && "animate-spin")} />
+                              {isIndexing ? "Embedding..." : "Index Folder"}
+                            </button>
+                          </div>
+                          
+                          {indexStatus === "success" && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-sm font-medium">
+                              Successfully vectorized {indexCount} files. It is now searchable via CTRL + SHIFT + SPACE.
+                            </motion.div>
+                          )}
+                          {indexStatus === "error" && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium">
+                              Failed to index folder. Ensure Ollama is running natively.
+                            </motion.div>
+                          )}
                         </div>
 
                         {syncStatus === "success" && (

@@ -257,6 +257,106 @@ fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json
 }
 
 
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+}
+
+#[tauri::command]
+async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<i32, String> {
+    let mut files = Vec::new();
+    for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            let fp = entry.path().to_string_lossy().to_string();
+            // simple filters to avoid massive binaries
+            if fp.ends_with(".exe") || fp.ends_with(".dll") || fp.ends_with(".png") || fp.ends_with(".jpg") || fp.ends_with(".glb") { continue; }
+            if fp.contains("node_modules") || fp.contains("target\\") || fp.contains(".git") { continue; }
+            
+            let name = entry.file_name().to_string_lossy().to_string();
+            if let Ok(content) = std::fs::read_to_string(&fp) {
+                // limit to 2000 chars for MVP to avoid local llm context size caps
+                let safe_content = if content.len() > 2000 { content[..2000].to_string() } else { content };
+                files.push((name, fp, safe_content));
+            }
+        }
+    }
+
+    let client = reqwest::Client::new();
+    let mut count = 0;
+    
+    for (name, fp, content) in files {
+        if content.trim().is_empty() { continue; }
+        
+        let req_body = serde_json::json!({
+            "model": "nomic-embed-text",
+            "prompt": content
+        });
+        
+        let res = match client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await {
+            Ok(r) => r,
+            Err(_) => continue, // skip if ollama fails
+        };
+            
+        let json: serde_json::Value = match res.json().await {
+            Ok(j) => j,
+            Err(_) => continue,
+        };
+        
+        if let Some(embedding) = json["embedding"].as_array() {
+            let vector_str = serde_json::to_string(embedding).unwrap();
+            let conn = state.0.lock().unwrap();
+            let _ = conn.execute(
+                "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![name, fp, content, vector_str],
+            );
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+#[tauri::command]
+async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let req_body = serde_json::json!({
+        "model": "nomic-embed-text",
+        "prompt": query
+    });
+    
+    let res = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let query_vector: Vec<f32> = serde_json::from_value(json["embedding"].clone()).unwrap_or_default();
+    
+    if query_vector.is_empty() { return Ok(serde_json::json!([])); }
+    
+    #[derive(serde::Serialize)]
+    struct Match { filename: String, filepath: String, score: f32 }
+    let mut results = Vec::new();
+    
+    {
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").unwrap();
+        let rows = stmt.query_map([], |row| {
+            Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
+        }).unwrap();
+        
+        for row in rows {
+            if let Ok((filename, filepath, vec_str)) = row {
+                if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
+                    let score = cosine_similarity(&query_vector, &file_vec);
+                    if score > 0.3 { results.push(Match { filename, filepath, score }); }
+                }
+            }
+        }
+    }
+    
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    results.truncate(5);
+    Ok(serde_json::json!(results))
+}
+
 #[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
@@ -367,6 +467,18 @@ pub fn run() {
         [],
     ).expect("failed to create resume analysis table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS file_embeddings (
+            id INTEGER PRIMARY KEY,
+            filename TEXT NOT NULL,
+            filepath TEXT NOT NULL,
+            content TEXT NOT NULL,
+            vector TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create vector table");
+
+
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
@@ -398,7 +510,9 @@ pub fn run() {
             get_neuroforge_profile,
             get_nexus_health,
             save_resume_analysis,
-            get_latest_resume_analysis
+            get_latest_resume_analysis,
+            index_folder,
+            semantic_search
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
