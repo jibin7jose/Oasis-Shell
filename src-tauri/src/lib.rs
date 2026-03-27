@@ -425,9 +425,9 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
     
     // 3. Create Augmented Knowledge Prompt
     let final_prompt = if context_block.is_empty() {
-        query.clone()
+        format!("Answer the user's question. If the user asks to perform an action (like pushing to git, listing files, or checking sysinfo), suggest a specific powershell command in this EXACT format: [CMD] your_command_here [/CMD]. Otherwise, answer naturally.\n\nQuestion: {}", query)
     } else {
-        format!("Answer the user's question accurately using ONLY the provided local file context below (if helpful).\n\nContext block:{}\n\nQuestion: {}", context_block, query)
+        format!("Answer the user's question using ONLY the provided local file context. If the user asks for a file operation, suggest a command in [CMD] command [/CMD] format.\n\nContext block:{}\n\nQuestion: {}", context_block, query)
     };
 
     // 4. Generate Semantic Response via Gemma3
@@ -441,6 +441,22 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
         Err("Failed to parse local AI inference response".into())
     }
 }
+
+#[tauri::command]
+fn execute_neural_command(command: String) -> Result<String, String> {
+    let output = std::process::Command::new("powershell")
+        .args(["-Command", &command])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let res = String::from_utf8_lossy(&output.stdout).to_string();
+        if res.is_empty() { Ok("Command executed successfully (no output).".into()) } else { Ok(res) }
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
 
 #[tauri::command]
 async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
@@ -684,7 +700,8 @@ pub fn run() {
             get_neural_graph,
             get_all_files,
             start_telemetry_server,
-            generate_crate_name
+            generate_crate_name,
+            execute_neural_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

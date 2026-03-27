@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2 } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2, Terminal } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cn } from "./lib/utils";
@@ -241,6 +241,16 @@ function App() {
       fetchLogs();
     } catch (e) {
       console.error("Failed to launch crate", e);
+    }
+  };
+
+  const executeNeuralCmd = async (cmd: string) => {
+    try {
+      setMessages(prev => [...prev, { role: "assistant", content: `Executing: \`${cmd}\`...` }]);
+      const output = await invoke("execute_neural_command", { command: cmd });
+      setMessages(prev => [...prev, { role: "assistant", content: `SUCCESS: ${output}` }]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: "assistant", content: `ERROR: ${e}` }]);
     }
   };
 
@@ -1392,13 +1402,26 @@ function App() {
                       animate={{ opacity: 1, x: 0 }}
                       key={i}
                       className={cn(
-                        "p-4 rounded-2xl text-[13px] leading-relaxed max-w-[90%] shadow-lg",
+                        "p-4 rounded-2xl text-[13px] leading-relaxed max-w-[90%] shadow-lg flex flex-col gap-3",
                         msg.role === "user"
                           ? "bg-blue-600 text-white self-end ml-auto rounded-tr-none shadow-blue-600/20"
                           : "bg-white/5 border border-white/5 text-slate-300 self-start rounded-tl-none"
                       )}
                     >
-                      {msg.content}
+                      {msg.content.includes("[CMD]") ? (
+                        <>
+                          <div>{msg.content.split("[CMD]")[0]}</div>
+                          <button 
+                            onClick={() => executeNeuralCmd(msg.content.split("[CMD]")[1].split("[/CMD]")[0])}
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all text-xs font-bold"
+                          >
+                            <Terminal className="w-3.5 h-3.5" />
+                            RUN: {msg.content.split("[CMD]")[1].split("[/CMD]")[0]}
+                          </button>
+                        </>
+                      ) : (
+                        msg.content
+                      )}
                     </motion.div>
                   ))}
                   {isThinking && (
