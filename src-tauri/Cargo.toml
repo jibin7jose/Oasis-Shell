@@ -28,6 +28,6 @@ windows = { version = "0.58.0", features = ["Win32_Foundation", "Win32_UI_Window
 rusqlite = { version = "0.33.0", features = ["bundled"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 notify = "8.0.0"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 walkdir = "2.5.0"
 

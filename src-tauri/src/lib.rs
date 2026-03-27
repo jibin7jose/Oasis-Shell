@@ -113,51 +113,57 @@ fn sync_project(message: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_watcher() -> Result<(), String> {
-    std::thread::spawn(|| {
+fn start_watcher(path: String) -> Result<(), String> {
+    std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = RecommendedWatcher::new(move |res| {
+        let mut watcher = notify::RecommendedWatcher::new(move |res| {
             let _ = tx.send(res);
-        }, Config::default()).unwrap();
+        }, notify::Config::default()).unwrap();
 
-        watcher.watch(Path::new("."), RecursiveMode::Recursive).unwrap();
+        watcher.watch(std::path::Path::new(&path), notify::RecursiveMode::Recursive).unwrap();
+
+        // Blocking local reqwest client for background thread
+        let client = reqwest::blocking::Client::new();
 
         for res in rx {
-            match res {
-                Ok(event) => {
-                    let mut should_sync = false;
-                    for path in event.paths {
-                        let path_str = path.to_string_lossy();
-                        if !path_str.contains(".git") && !path_str.contains("target") && !path_str.contains("node_modules") {
-                            should_sync = true;
-                            break;
-                        }
-                    }
+            if let Ok(event) = res {
+                if !event.kind.is_modify() && !event.kind.is_create() { continue; }
+                
+                for path_buf in event.paths {
+                    let fp = path_buf.to_string_lossy().to_string();
+                    let name = path_buf.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    
+                    if fp.contains(".git") || fp.contains("node_modules") || fp.contains("target") { continue; }
+                    if fp.ends_with(".exe") || fp.ends_with(".db") || fp.ends_with(".dll") || fp.ends_with(".png") { continue; }
 
-                    if should_sync && event.kind.is_modify() {
-                        std::thread::sleep(Duration::from_millis(1500)); // Debounce
-                        
-                        // Try to get the latest neural log for a meaningful commit message
-                        let mut display_message = "Automated System Update".to_string();
-                        if let Ok(conn) = Connection::open("oasis_crates.db") {
-                            if let Ok(mut stmt) = conn.prepare("SELECT message FROM neural_logs ORDER BY id DESC LIMIT 1") {
-                                if let Ok(msg) = stmt.query_row([], |row| row.get::<_, String>(0)) {
-                                    display_message = msg;
+                    if let Ok(content) = std::fs::read_to_string(&fp) {
+                        let safe_content = if content.len() > 2000 { content[..2000].to_string() } else { content };
+                        if safe_content.trim().is_empty() { continue; }
+
+                        let req_body = serde_json::json!({
+                            "model": "nomic-embed-text",
+                            "prompt": safe_content
+                        });
+
+                        // Fire and forget embedding to local LLM
+                        if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&req_body).send() {
+                            if let Ok(json) = res.json::<serde_json::Value>() {
+                                if let Some(embedding) = json["embedding"].as_array() {
+                                    if let Ok(vector_str) = serde_json::to_string(embedding) {
+                                        if let Ok(conn) = rusqlite::Connection::open("oasis_crates.db") {
+                                            // Delete old version if exists, insert new
+                                            let _ = conn.execute("DELETE FROM file_embeddings WHERE filepath = ?1", rusqlite::params![fp]);
+                                            let _ = conn.execute(
+                                                "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
+                                                rusqlite::params![name, fp, safe_content, vector_str],
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }
-
-                        let _ = std::process::Command::new("powershell")
-                            .arg("-ExecutionPolicy")
-                            .arg("Bypass")
-                            .arg("-File")
-                            .arg("./scripts/sync.ps1")
-                            .arg("-message")
-                            .arg(display_message)
-                            .output();
                     }
                 }
-                Err(e) => println!("watch error: {:?}", e),
             }
         }
     });
@@ -416,6 +422,45 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
 }
 
 #[tauri::command]
+async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+    #[derive(serde::Serialize)]
+    struct Node { id: String, group: i32 }
+    #[derive(serde::Serialize)]
+    struct Link { source: String, target: String, value: f32 }
+    
+    let mut nodes = Vec::new();
+    let mut links = Vec::new();
+    let mut files_data = Vec::new();
+
+    {
+        let conn = state.0.lock().unwrap();
+        if let Ok(mut stmt) = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 100") {
+            if let Ok(rows) = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))) {
+                for row in rows.flatten() {
+                    if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
+                        files_data.push((row.0.clone(), vec));
+                        let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { 1 } else if row.0.ends_with(".rs") { 2 } else { 3 };
+                        nodes.push(Node { id: row.0.clone(), group });
+                    }
+                }
+            }
+        }
+    }
+
+    // Calculate relationships (only strong ones >= 0.5)
+    for i in 0..files_data.len() {
+        for j in (i + 1)..files_data.len() {
+            let score = cosine_similarity(&files_data[i].1, &files_data[j].1);
+            if score > 0.5 {
+                links.push(Link { source: files_data[i].0.clone(), target: files_data[j].0.clone(), value: score });
+            }
+        }
+    }
+
+    Ok(serde_json::json!({ "nodes": nodes, "links": links }))
+}
+
+#[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client.get("http://localhost:4000/projects/health")
@@ -571,7 +616,8 @@ pub fn run() {
             get_latest_resume_analysis,
             index_folder,
             semantic_search,
-            rag_query
+            rag_query,
+            get_neural_graph
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// @ts-ignore
+import ForceGraph3D from 'react-force-graph-3d';
 
 const contexts = [
   { id: "dev", name: "Development", icon: Code, color: "blue", aura: "from-blue-600/30 to-blue-900/10" },
@@ -72,7 +74,15 @@ function App() {
   const [windowCount, setWindowCount] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+  const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
+
+  useEffect(() => {
+    if (showGraph && graphData.nodes.length === 0) {
+      invoke("get_neural_graph").then((data: any) => setGraphData(data)).catch(console.error);
+    }
+  }, [showGraph]);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
@@ -83,6 +93,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [autoPulse, setAutoPulse] = useState(false);
+  const [autoWatch, setAutoWatch] = useState(false);
   const [pulseInterval] = useState(15); // minutes
   const [crates, setCrates] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -1031,6 +1042,36 @@ function App() {
                             </button>
                           </div>
                         </div>
+
+                        {/* Sentient Watcher Component */}
+                        <div className="p-6 bg-gradient-to-br from-indigo-900/20 to-purple-800/20 border border-purple-500/20 rounded-3xl mt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold flex items-center gap-2">
+                                <Activity className="w-4 h-4 text-purple-400" /> Auto-Sentience Overdrive
+                              </span>
+                              <span className="text-xs text-slate-500">Automatically AI-Vectoryze files in D:\myproject upon saving.</span>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                const newVal = !autoWatch;
+                                setAutoWatch(newVal);
+                                if (newVal) {
+                                  try { await invoke("start_watcher", { path: "D:\\myproject" }); } catch (e) { console.error(e); }
+                                }
+                              }}
+                              className={cn(
+                                "relative w-12 h-6 rounded-full transition-colors shadow-inner",
+                                autoWatch ? "bg-purple-600 shadow-[0_0_15px_rgba(147,51,234,0.6)]" : "bg-slate-800"
+                              )}
+                            >
+                              <motion.div
+                                animate={{ x: autoWatch ? 26 : 2 }}
+                                className="absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow-md"
+                              />
+                            </button>
+                          </div>
+                        </div>
                         
                         {/* Neural Indexer Component */}
                         <div className="p-6 bg-gradient-to-br from-indigo-600/20 to-purple-900/10 border border-purple-500/20 rounded-3xl mt-4">
@@ -1180,6 +1221,50 @@ function App() {
           <div className="text-slate-700">Oasis v0.1.0-alpha</div>
         </motion.div>
 
+        {/* 3D Neural Link Graph Overlay */}
+        <AnimatePresence>
+          {showGraph && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-3xl flex items-center justify-center cursor-move"
+            >
+              <div className="absolute top-10 left-10 z-[70] pointer-events-none">
+                <h2 className="text-4xl font-bold flex items-center gap-4 text-white">
+                  <Activity className="w-10 h-10 text-indigo-500 animate-pulse" />
+                  Neural Cortex Array
+                </h2>
+                <p className="text-slate-400 mt-2 max-w-sm text-sm leading-relaxed">
+                  Real-time 3D Semantic Map of <span className="text-indigo-400 font-bold">D:\myproject</span>. 
+                  Nodes physically pull together based on mathematical Cosine Similarity in their code logic.
+                </p>
+              </div>
+              
+              <button 
+                onClick={() => setShowGraph(false)}
+                className="absolute top-10 right-10 z-[70] w-14 h-14 bg-white/5 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white border border-white/20 shadow-2xl"
+              >
+                <Plus className="w-8 h-8 rotate-45" />
+              </button>
+              
+              <div className="w-full h-full">
+                <ForceGraph3D
+                  graphData={graphData}
+                  nodeAutoColorBy="group"
+                  nodeRelSize={8}
+                  backgroundColor="#00000000"
+                  linkColor={() => 'rgba(99,102,241,0.3)'}
+                  linkWidth={2}
+                  nodeLabel="id"
+                  enableNodeDrag={true}
+                  showNavInfo={false}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* AI Assistant Bubble */}
         <div className="fixed bottom-10 right-10 flex flex-col items-end gap-4 z-50">
           <AnimatePresence>
@@ -1236,6 +1321,15 @@ function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowGraph(true)}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-[0_0_20px_rgba(99,102,241,0.3)] bg-indigo-600/20 backdrop-blur-xl border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white"
+          >
+            <Activity className="w-5 h-5" />
+          </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.05 }}
