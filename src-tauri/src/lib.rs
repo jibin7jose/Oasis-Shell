@@ -7,7 +7,10 @@ use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, E
 use std::path::Path;
 use std::time::Duration;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use std::io::Read;
+use tauri::Emitter;
 use tauri::Manager;
+use tiny_http::{Server, Response};
 
 struct DbState(Mutex<Connection>);
 
@@ -483,6 +486,27 @@ async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::V
 }
 
 #[tauri::command]
+fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
+    std::thread::spawn(move || {
+        if let Ok(server) = tiny_http::Server::http("127.0.0.1:4040") {
+            for mut request in server.incoming_requests() {
+                let mut content = String::new();
+                if let Ok(_) = request.as_reader().read_to_string(&mut content) {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                        let _ = app.emit("scout-telemetry", json);
+                    }
+                }
+                
+                let response = tiny_http::Response::from_string("OK")
+                    .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                let _ = request.respond(response);
+            }
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client.get("http://localhost:4000/projects/health")
@@ -640,7 +664,8 @@ pub fn run() {
             semantic_search,
             rag_query,
             get_neural_graph,
-            get_all_files
+            get_all_files,
+            start_telemetry_server
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

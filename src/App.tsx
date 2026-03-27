@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { cn } from "./lib/utils";
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -137,6 +138,21 @@ function App() {
     ecosystemHealth: "Optimal"
   });
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
+
+  // Scout-Racer Telemetry Link
+  useEffect(() => {
+    // Spin up local Node bridge
+    invoke("start_telemetry_server").catch(e => console.error("Telemetry Server offline:", e));
+
+    const unlistenPromise = listen('scout-telemetry', (event) => {
+      const data = event.payload as any;
+      setScoutData((prev: any) => ({ ...prev, ...data }));
+    });
+
+    return () => {
+      unlistenPromise.then(unlistenFn => unlistenFn());
+    };
+  }, []);
 
   const repoUrl = "https://github.com/jibin7jose/Oasis-Shell.git";
 
