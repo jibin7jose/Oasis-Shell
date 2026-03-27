@@ -358,6 +358,25 @@ async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Res
 }
 
 #[tauri::command]
+async fn ask_ollama(prompt: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let req_body = serde_json::json!({
+        "model": "gemma3:4b",
+        "prompt": prompt,
+        "stream": false
+    });
+    
+    let res = client.post("http://localhost:11434/api/generate").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(response) = json["response"].as_str() {
+        Ok(response.to_string())
+    } else {
+        Err("Failed to parse LLM response".into())
+    }
+}
+
+#[tauri::command]
 async fn get_nexus_health() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let res = client.get("http://localhost:4000/projects/health")
@@ -512,7 +531,8 @@ pub fn run() {
             save_resume_analysis,
             get_latest_resume_analysis,
             index_folder,
-            semantic_search
+            semantic_search,
+            ask_ollama
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

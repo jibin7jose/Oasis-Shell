@@ -233,15 +233,29 @@ function App() {
           response = "Initiating Oasis Pulse. Synchronizing with Neural Cloud...";
           handleSync();
         } else {
-          // Check for context names
+          // Check for context names first
           const matched = contexts.find(ctx => userMsg.includes(ctx.name.toLowerCase()) || userMsg.includes(ctx.id));
           if (matched) {
             response = `Executing Aura Transition: Setting context to ${matched.name}.`;
             handleContextSwitch(matched.id);
+            setMessages(prev => [...prev, { role: "assistant", content: response }]);
+          } else {
+            // If completely unhandled, let local Ollama figure it out
+            invoke("ask_ollama", { prompt: userMsg })
+              .then((llmResponse: any) => {
+                setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
+              })
+              .catch((e) => {
+                setMessages(prev => [...prev, { role: "assistant", content: "Error: Local AI engine offline or unresponsive." }]);
+              });
+            return;
           }
         }
-        setMessages(prev => [...prev, { role: "assistant", content: response }]);
-      }, 500);
+        
+        if (userMsg.includes("status") || userMsg.includes("summarize") || userMsg.includes("log") || userMsg.includes("crate") || userMsg.includes("sync")) {
+          setMessages(prev => [...prev, { role: "assistant", content: response }]);
+        }
+      }, 100);
     }
   };
 
