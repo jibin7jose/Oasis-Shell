@@ -358,21 +358,60 @@ async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Res
 }
 
 #[tauri::command]
-async fn ask_ollama(prompt: String) -> Result<String, String> {
+async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<String, String> {
     let client = reqwest::Client::new();
-    let req_body = serde_json::json!({
-        "model": "gemma3:4b",
-        "prompt": prompt,
-        "stream": false
-    });
     
-    let res = client.post("http://localhost:11434/api/generate").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    // 1. Embed query
+    let embed_body = serde_json::json!({ "model": "nomic-embed-text", "prompt": &query });
+    let embed_res = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send().await.map_err(|e| e.to_string())?;
+    let embed_json: serde_json::Value = embed_res.json().await.map_err(|e| e.to_string())?;
+    let query_vector: Vec<f32> = serde_json::from_value(embed_json["embedding"].clone()).unwrap_or_default();
+    
+    // 2. Fetch Local Context Blocks
+    let mut context_block = String::new();
+    if !query_vector.is_empty() {
+        struct Match { score: f32, filepath: String, content: String }
+        let mut results: Vec<Match> = Vec::new();
+        
+        {
+            let conn = state.0.lock().unwrap();
+            let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").unwrap();
+            let rows = stmt.query_map([], |row| {
+                Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
+            }).unwrap();
+            
+            for row in rows {
+                if let Ok((filepath, content, vec_str)) = row {
+                    if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
+                        let score = cosine_similarity(&query_vector, &file_vec);
+                        if score > 0.3 { results.push(Match { score, filepath, content }); }
+                    }
+                }
+            }
+        }
+        
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        for m in results.iter().take(2) {
+            context_block.push_str(&format!("\n--- File context from: {} ---\n{}\n", m.filepath, m.content));
+        }
+    }
+    
+    // 3. Create Augmented Knowledge Prompt
+    let final_prompt = if context_block.is_empty() {
+        query.clone()
+    } else {
+        format!("Answer the user's question accurately using ONLY the provided local file context below (if helpful).\n\nContext block:{}\n\nQuestion: {}", context_block, query)
+    };
+
+    // 4. Generate Semantic Response via Gemma3
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": final_prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(response) = json["response"].as_str() {
         Ok(response.to_string())
     } else {
-        Err("Failed to parse LLM response".into())
+        Err("Failed to parse local AI inference response".into())
     }
 }
 
@@ -532,7 +571,7 @@ pub fn run() {
             get_latest_resume_analysis,
             index_folder,
             semantic_search,
-            ask_ollama
+            rag_query
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

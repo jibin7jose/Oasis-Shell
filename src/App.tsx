@@ -240,13 +240,13 @@ function App() {
             handleContextSwitch(matched.id);
             setMessages(prev => [...prev, { role: "assistant", content: response }]);
           } else {
-            // If completely unhandled, let local Ollama figure it out
-            invoke("ask_ollama", { prompt: userMsg })
+            // If completely unhandled, use RAG Engine (Context-Aware Local AI)
+            invoke("rag_query", { query: userMsg })
               .then((llmResponse: any) => {
                 setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
               })
               .catch((e) => {
-                setMessages(prev => [...prev, { role: "assistant", content: "Error: Local AI engine offline or unresponsive." }]);
+                setMessages(prev => [...prev, { role: "assistant", content: "Error: Semantic Engine or Local AI (Ollama) offline." }]);
               });
             return;
           }
