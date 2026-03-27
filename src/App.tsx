@@ -75,6 +75,7 @@ function App() {
   const [windowCount, setWindowCount] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<any[]>([]);
@@ -214,11 +215,14 @@ function App() {
   };
 
   const createCrate = async () => {
-    const name = prompt("Enter a name for your new Context Crate:");
-    if (!name) return;
-
     try {
-      const currentWindows = await invoke("get_running_windows");
+      const currentWindows: any = await invoke("get_running_windows");
+      // Ask AI for a punchy title based on these windows
+      const suggestedName = await invoke("generate_crate_name", { apps: currentWindows }) as string;
+      
+      const name = prompt("Oasis suggest this name for your Crate. Keep or modify it:", suggestedName);
+      if (!name) return;
+
       await invoke("save_crate", { name, apps: currentWindows });
       logEvent("CRATE_CREATE", `Neural Snapshot created: ${name}`);
       fetchCrates();
@@ -280,12 +284,15 @@ function App() {
             setMessages(prev => [...prev, { role: "assistant", content: response }]);
           } else {
             // If completely unhandled, use RAG Engine (Context-Aware Local AI)
+            setIsThinking(true);
             invoke("rag_query", { query: userMsg })
               .then((llmResponse: any) => {
                 setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
+                setIsThinking(false);
               })
               .catch((e) => {
                 setMessages(prev => [...prev, { role: "assistant", content: "Error: Semantic Engine or Local AI (Ollama) offline." }]);
+                setIsThinking(false);
               });
             return;
           }
@@ -1394,6 +1401,13 @@ function App() {
                       {msg.content}
                     </motion.div>
                   ))}
+                  {isThinking && (
+                    <div className="flex gap-2 p-4 bg-white/5 rounded-2xl w-fit animate-pulse">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:0.2s]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 border-t border-white/5 bg-black/40">

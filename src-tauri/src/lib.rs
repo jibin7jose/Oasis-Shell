@@ -211,6 +211,24 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
 }
 
 #[tauri::command]
+async fn generate_crate_name(apps: Vec<WindowInfo>) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let app_titles: Vec<String> = apps.iter().map(|a| a.title.clone()).collect();
+    let prompt = format!("I am saving a 'Desktop Context Crate' on my AI OS. Here are the open window titles: {}.\n\nSuggest a single, punchy, 3-4 word title for this workspace context (e.g. 'Figma UI & React Dev', 'Market Research Pulse'). Return ONLY the title string.", app_titles.join(", "));
+    
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(suggestion) = json["response"].as_str() {
+        Ok(suggestion.trim_matches('"').to_string())
+    } else {
+        Ok("Manual Context Layer".into())
+    }
+}
+
+
+#[tauri::command]
 fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
@@ -665,7 +683,8 @@ pub fn run() {
             rag_query,
             get_neural_graph,
             get_all_files,
-            start_telemetry_server
+            start_telemetry_server,
+            generate_crate_name
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
