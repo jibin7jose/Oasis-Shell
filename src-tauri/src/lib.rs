@@ -434,15 +434,13 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
 
     {
         let conn = state.0.lock().unwrap();
-        if let Ok(mut stmt) = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 100") {
-            if let Ok(rows) = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))) {
-                for row in rows.flatten() {
-                    if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
-                        files_data.push((row.0.clone(), vec));
-                        let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { 1 } else if row.0.ends_with(".rs") { 2 } else { 3 };
-                        nodes.push(Node { id: row.0.clone(), group });
-                    }
-                }
+        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 100").unwrap();
+        let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).unwrap();
+        for row in rows.flatten() {
+            if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
+                files_data.push((row.0.clone(), vec));
+                let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { 1 } else if row.0.ends_with(".rs") { 2 } else { 3 };
+                nodes.push(Node { id: row.0.clone(), group });
             }
         }
     }
@@ -458,6 +456,30 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
     }
 
     Ok(serde_json::json!({ "nodes": nodes, "links": links }))
+}
+
+#[tauri::command]
+async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+    #[derive(serde::Serialize)]
+    struct FileEntry { id: i32, filename: String, filepath: String, snippet: String }
+    let mut entries = Vec::new();
+
+    {
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").unwrap();
+        let rows = stmt.query_map([], |row| Ok((
+            row.get::<_, i32>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?
+        ))).unwrap();
+        for row in rows.flatten() {
+            let snippet = if row.3.len() > 150 { row.3[..150].to_string() + "..." } else { row.3 };
+            entries.push(FileEntry { id: row.0, filename: row.1, filepath: row.2, snippet });
+        }
+    }
+    
+    Ok(serde_json::json!(entries))
 }
 
 #[tauri::command]
@@ -617,7 +639,8 @@ pub fn run() {
             index_folder,
             semantic_search,
             rag_query,
-            get_neural_graph
+            get_neural_graph,
+            get_all_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

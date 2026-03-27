@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "./lib/utils";
 import * as THREE from 'three';
@@ -75,8 +75,20 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
+  const [showVault, setShowVault] = useState(false);
+  const [vaultFiles, setVaultFiles] = useState<any[]>([]);
   const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
+
+  const openVault = async () => {
+    try {
+      const data = await invoke("get_all_files");
+      setVaultFiles(data as any[]);
+      setShowVault(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     if (showGraph && graphData.nodes.length === 0) {
@@ -1265,6 +1277,69 @@ function App() {
           )}
         </AnimatePresence>
 
+        {/* Next-Gen File Vault Overlay */}
+        <AnimatePresence>
+          {showVault && (
+            <motion.div 
+              initial={{ opacity: 0, y: 50 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-3xl overflow-y-auto custom-scrollbar p-10"
+            >
+              <div className="max-w-7xl mx-auto mt-10">
+                <div className="flex items-center justify-between mb-12">
+                  <h2 className="text-4xl font-bold flex items-center gap-4 text-white">
+                    <FolderOpen className="w-10 h-10 text-emerald-400" />
+                    Neural File Vault
+                  </h2>
+                  <button 
+                    onClick={() => setShowVault(false)}
+                    className="w-14 h-14 bg-white/5 hover:bg-red-500/80 rounded-full flex items-center justify-center transition-all text-white border border-white/20 shadow-2xl"
+                  >
+                    <Plus className="w-8 h-8 rotate-45" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {vaultFiles.map((file, i) => (
+                    <motion.div 
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="bg-white/5 border border-white/10 rounded-3xl p-6 hover:bg-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group shadow-2xl"
+                    >
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="p-3 bg-emerald-500/20 rounded-2xl group-hover:bg-emerald-500 transition-colors">
+                          <FileCode2 className="w-6 h-6 text-emerald-300 group-hover:text-white" />
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <h3 className="text-lg font-bold text-white truncate">{file.filename}</h3>
+                          <p className="text-xs text-slate-500 truncate mt-1">{file.filepath}</p>
+                        </div>
+                      </div>
+                      <div className="bg-black/50 p-4 rounded-xl border border-white/5 h-24 overflow-hidden">
+                        <code className="text-xs text-slate-300 font-mono whitespace-pre-wrap">
+                          {file.snippet}
+                        </code>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <span className="px-3 py-1 bg-white/5 rounded-full text-[10px] text-emerald-300 font-semibold uppercase tracking-wider border border-emerald-500/20">Semantic Match</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {vaultFiles.length === 0 && (
+                    <div className="col-span-full h-64 flex flex-col items-center justify-center text-slate-500">
+                      <FolderOpen className="w-16 h-16 mb-4 opacity-50" />
+                      <p>Vault is empty. Auto-Watcher is waiting for files to be assimilated.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* AI Assistant Bubble */}
         <div className="fixed bottom-10 right-10 flex flex-col items-end gap-4 z-50">
           <AnimatePresence>
@@ -1321,6 +1396,15 @@ function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={openVault}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-[0_0_20px_rgba(52,211,153,0.3)] bg-emerald-600/20 backdrop-blur-xl border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-white"
+          >
+            <FolderOpen className="w-5 h-5" />
+          </motion.button>
 
           <motion.button
             whileHover={{ scale: 1.05 }}
