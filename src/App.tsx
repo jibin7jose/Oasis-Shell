@@ -166,9 +166,18 @@ function App() {
   // Neural Heartbeat Poller
   useEffect(() => {
     if (!isNative) {
-      setAiHeartbeat({ ready: true, online: true, gemma3: true, nomic: true });
-      return;
+      // PROACTIVE SYNC: Even in browser, try to talk to the Local Rust Bridge!
+      const checkLocalBridge = () => {
+        fetch("http://127.0.0.1:4040/heartbeat")
+          .then(r => r.json())
+          .then(data => setAiHeartbeat(data))
+          .catch(() => setAiHeartbeat({ ready: true, online: true, simulated: true }));
+      };
+      checkLocalBridge();
+      const interval = setInterval(checkLocalBridge, 5000);
+      return () => clearInterval(interval);
     }
+
     const checkStatus = () => {
       invoke("check_ai_status")
         .then((s: any) => setAiHeartbeat(s))

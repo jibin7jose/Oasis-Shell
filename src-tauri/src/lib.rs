@@ -542,16 +542,35 @@ async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::V
 #[tauri::command]
 fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
-        if let Ok(server) = tiny_http::Server::http("127.0.0.1:4040") {
+        if let Ok(server) = tiny_http::Server::http("0.0.0.0:4040") {
             for mut request in server.incoming_requests() {
-                let mut content = String::new();
-                if let Ok(_) = request.as_reader().read_to_string(&mut content) {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                        let _ = app.emit("scout-telemetry", json);
+                let url = request.url().to_string();
+                
+                // CORS Preflight
+                if request.method() == &tiny_http::Method::Options {
+                    let response = Response::empty(204)
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]).unwrap())
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type"[..]).unwrap());
+                    let _ = request.respond(response);
+                    continue;
+                }
+
+                if url == "/scout-sync" && request.method() == &tiny_http::Method::Post {
+                    let mut content = String::new();
+                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            let _ = app.emit("scout-telemetry", json);
+                        }
                     }
+                } else if url == "/heartbeat" {
+                    let response = Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                    let _ = request.respond(response);
+                    continue;
                 }
                 
-                let response = tiny_http::Response::from_string("OK")
+                let response = Response::from_string("OK")
                     .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                 let _ = request.respond(response);
             }
@@ -563,26 +582,26 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(5)); // Give app time to settle
+        std::thread::sleep(Duration::from_secs(5)); 
 
+        let mut sys = System::new(); // Use base System to minimize stack footprint
         loop {
-            // Re-allocate System every loop to prevent memory/stack buildup on some Windows configs
-            let mut sys = System::new_all();
-            sys.refresh_all();
+            // ONLY refresh memory - the most likely trigger for buffer overruns is heavy 'refresh_all'
+            sys.refresh_memory();
             
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
-            let mem_percent = (used_mem as f32 / total_mem as f32) * 100.0;
             
-            if mem_percent > 85.0 {
-                let _ = app.emit("proactive-pulse", serde_json::json!({
-                    "suggestion": "I notice your RAM is at 85%. Should I crate your inactive apps to free up space?",
-                    "action": "CRATE_SUGGESTION"
-                }));
+            if total_mem > 0 {
+                let mem_percent = (used_mem as f32 / total_mem as f32) * 100.0;
+                if mem_percent > 85.0 {
+                    let _ = app.emit("proactive-pulse", serde_json::json!({
+                        "suggestion": "I notice your RAM is at 85%. Should I crate your inactive apps to free up space?",
+                        "action": "CRATE_SUGGESTION"
+                    }));
+                }
             }
             
-            // Drop 'sys' explicitly and sleep
-            drop(sys);
             std::thread::sleep(Duration::from_secs(60));
         }
     });
