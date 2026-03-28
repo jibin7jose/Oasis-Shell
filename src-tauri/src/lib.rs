@@ -593,18 +593,45 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
         let mut sys = System::new(); 
         loop {
             sys.refresh_memory();
+            sys.refresh_all(); // Added: complete audit
+            
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
             
+            // RAM Protection (Neural Pulse)
             if total_mem > 0 {
                 let mem_percent = (used_mem as f32 / total_mem as f32) * 100.0;
-                if mem_percent > 85.0 {
+                if mem_percent > 90.0 {
                     let _ = app.emit("proactive-pulse", serde_json::json!({
-                        "suggestion": "I notice your RAM is at 85%. Should I crate your inactive apps to free up space?",
+                        "suggestion": "RAM Load Critical (90%). Should I crate your inactive browsers to optimize?",
                         "action": "CRATE_SUGGESTION"
                     }));
                 }
             }
+
+            // NEURAL GUARDIAN: C-Drive Protection (Level 8)
+            for disk in sys.disks() {
+                if disk.mount_point().to_string_lossy().contains("C:") {
+                    let free = disk.available_space();
+                    if free < 2 * 1024 * 1024 * 1024 {
+                        let _ = app.emit("proactive-pulse", serde_json::json!({
+                            "suggestion": "System Deadlock Alert: C-Drive < 2GB. Suggest emergency relocation of NPM/Cargo caches to D-Drive.",
+                            "action": "GUARDIAN_RELOCATE"
+                        }));
+                    }
+                }
+            }
+
+            // CPU MONITOR: Gaming Performance (Level 7)
+            sys.refresh_cpu_all();
+            let cpu_usage = sys.global_cpu_usage();
+            if cpu_usage > 70.0 {
+                let _ = app.emit("proactive-pulse", serde_json::json!({
+                    "suggestion": format!("High CPU load detected ({}%). Should I optimize your active Aura for performance?", cpu_usage as i32),
+                    "action": "CPU_OPTIMIZE"
+                }));
+            }
+
             std::thread::sleep(Duration::from_secs(60));
         }
     });

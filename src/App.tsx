@@ -338,7 +338,6 @@ function App() {
       setMessages(prev => [...prev, { role: "user", content: assistantInput }]);
       setAssistantInput("");
 
-      // Executive AI logic
       setTimeout(() => {
         let response = "Instruction Received. Command queued for execution.";
 
@@ -360,16 +359,19 @@ function App() {
           response = "Retrieving Context Crates. Neural Repository opened.";
           setActiveSettingTab("Crates");
           setShowSettings(true);
-        } else if (userMsg.includes("sync") || userMsg.includes("pulse") || userMsg.includes("push")) {
-          response = "Initiating Oasis Pulse. Synchronizing with Neural Cloud...";
-          handleSync();
+        } else if (userMsg.includes("next") || userMsg.includes("roadmap")) {
+          response = "The next sentinel phase is 'Level 6: Contextual Memory'. By indexing this repository, Oasis will generate a 3D semantic graph of your neural logic. [CMD] index_folder [/CMD]";
         } else {
           const matched = contexts.find(ctx => userMsg.includes(ctx.name.toLowerCase()) || userMsg.includes(ctx.id));
           if (matched) {
             response = `Executing Aura Transition: Setting context to ${matched.name}.`;
             handleContextSwitch(matched.id);
-            setMessages(prev => [...prev, { role: "assistant", content: response }]);
           } else {
+            if (userMsg.includes("index")) {
+              setMessages(prev => [...prev, { role: "assistant", content: "Initiating Neural Indexing. Building 3D Semantic Graph... [CMD] index_folder [/CMD]" }]);
+              return;
+            }
+            
             setIsThinking(true);
             if (!aiHeartbeat.ready || !isNative) {
               setTimeout(() => {
@@ -380,7 +382,7 @@ function App() {
                   setMessages(prev => [...prev, { role: "assistant", content: `I've detected your intent. Since you are in 'Simulation Mode' (Browser), I'll suggest a standard system command. [CMD] ${cmdSuggestion} [/CMD]` }]);
                 } else if (!aiHeartbeat.online) {
                   setMessages(prev => [...prev, { role: "assistant", content: "Local AI Link offline. Please run `ollama serve` and verify port 11434 is open." }]);
-                } else {
+                } else if (!aiHeartbeat.ready) {
                   setMessages(prev => [...prev, { role: "assistant", content: "Missing neural models! Run `ollama pull gemma3:4b` in your terminal." }]);
                 }
                 setIsThinking(false);
@@ -401,12 +403,9 @@ function App() {
           }
         }
         
-        if (userMsg.includes("status") || userMsg.includes("summarize") || userMsg.includes("log") || userMsg.includes("crate") || userMsg.includes("sync")) {
-          setMessages(prev => [...prev, { role: "assistant", content: response }]);
-        }
+        setMessages(prev => [...prev, { role: "assistant", content: response }]);
       }, 100);
     }
-
   };
 
   const handleSync = async (e?: React.MouseEvent) => {
@@ -1619,10 +1618,22 @@ function App() {
                 <div className="text-[13px] text-slate-200 font-medium leading-tight">{proactiveAlert.suggestion}</div>
               </div>
               <button
-                onClick={() => { setShowSettings(true); setProactiveAlert(null); }}
+                onClick={async () => { 
+                  if (proactiveAlert.action === "GUARDIAN_RELOCATE") {
+                    setMessages(prev => [...prev, { role: "assistant", content: "Executive Guardian Override: Migrating NPM/Cargo caches to D:\\ to reclaim system parity." }]);
+                    await executeNeuralCmd('robocopy "$env:USERPROFILE\\.npm" "D:\\npm_cache" /E /MOVE /V ; npm config set cache "D:\\npm_cache"');
+                  } else if (proactiveAlert.action === "CPU_OPTIMIZE" || proactiveAlert.action === "CRATE_SUGGESTION") {
+                    setMessages(prev => [...prev, { role: "assistant", content: "Aura Optimized: Crating background processes to stabilize Neural Core." }]);
+                    await createCrate();
+                  } else {
+                    setShowSettings(true); 
+                  }
+                  setProactiveAlert(null); 
+                }}
                 className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-[11px] font-bold hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 whitespace-nowrap"
               >
-                Action
+                {proactiveAlert.action === "GUARDIAN_RELOCATE" ? "Relocate Now" : 
+                 proactiveAlert.action === "CPU_OPTIMIZE" ? "Optimize" : "Action"}
               </button>
             </motion.div>
           )}
@@ -1668,6 +1679,22 @@ function App() {
                   initial={{ width: 0 }}
                   animate={{ width: aiHeartbeat.ready ? "100%" : "80%" }}
                   className={cn("h-full transition-all duration-1000", aiHeartbeat.ready ? "bg-emerald-500" : "bg-slate-700")}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <Shield size={12} className={isNative ? "text-blue-500" : "text-slate-700"} />
+                <span className={cn("text-[9px] font-bold uppercase tracking-widest", isNative ? "text-slate-300" : "text-slate-600")}>
+                  Guardian: {isNative ? "Active" : "Locked"}
+                </span>
+              </div>
+              <div className="h-0.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: isNative ? "100%" : "0%" }}
+                  className={cn("h-full transition-all duration-1000", isNative ? "bg-blue-600" : "bg-slate-700")}
                 />
               </div>
             </div>
