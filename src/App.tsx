@@ -1418,6 +1418,31 @@ function App() {
                 </p>
               </div>
 
+              {/* Inter-Node Global Search Bar (Stage 11) */}
+              <div className="absolute top-10 left-1/2 -translate-x-1/2 z-[70] w-full max-w-2xl px-10">
+                 <motion.div 
+                   initial={{ y: -20, opacity: 0 }}
+                   animate={{ y: 0, opacity: 1 }}
+                   className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-3xl px-8 py-5 backdrop-blur-3xl focus-within:border-indigo-500/50 focus-within:bg-orange-500/5 focus-within:ring-1 focus-within:ring-indigo-500/20 transition-all shadow-2xl"
+                 >
+                    <Search className="w-6 h-6 text-indigo-400" />
+                    <input 
+                      type="text"
+                      placeholder="Neural Query Across Node Ecosystem..."
+                      className="bg-transparent border-none outline-none text-xl text-white placeholder:text-slate-700 w-full font-light tracking-wide"
+                      onKeyDown={(e) => {
+                         if (e.key === "Enter") {
+                             const query = e.currentTarget.value;
+                             setMessages(prev => [...prev, { role: "user", content: `Searching Ecosystem Brain: ${query}` }]);
+                             invoke("rag_query", { query }).then(res => setMessages(prev => [...prev, { role: "assistant", content: res as string }]));
+                             e.currentTarget.value = "";
+                         }
+                      }}
+                    />
+                    <div className="hidden md:block text-[9px] font-bold text-slate-700 uppercase tracking-[0.2em] whitespace-nowrap">Enter to Ignite Query</div>
+                 </motion.div>
+              </div>
+
               {/* Nearby Nodes List (Stage 10) */}
               <div className="absolute bottom-10 left-10 z-[70] hidden xl:flex flex-col gap-6 p-6 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl">
                 <div>
