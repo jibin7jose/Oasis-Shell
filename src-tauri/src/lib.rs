@@ -632,6 +632,26 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }));
             }
 
+            // PREDICTIVE AURA SENTINEL (Level 12)
+            // Mock: Suggesting aura based on Day/Time pattern
+            let now = chrono::Local::now();
+            let day = now.format("%a").to_string(); // Mon, Tue...
+            let hour = now.hour();
+
+            if day == "Sat" || day == "Sun" {
+                if hour > 10 && hour < 22 {
+                    let _ = app.emit("proactive-pulse", serde_json::json!({
+                        "suggestion": "Weekend Cognitive Pattern detected. Switch to 'Research' or 'Gaming' Aura for maximum flow?",
+                        "action": "AURA_SUGGESTION"
+                    }));
+                }
+            } else if hour > 9 && hour < 18 {
+                let _ = app.emit("proactive-pulse", serde_json::json!({
+                    "suggestion": "Workspace Intensity detected. Should I switch to 'Development' Aura to prioritize build-chains?",
+                    "action": "AURA_SUGGESTION"
+                }));
+            }
+
             std::thread::sleep(Duration::from_secs(60));
         }
     });

@@ -293,8 +293,15 @@ function App() {
 
       const output = await invoke("execute_neural_command", { command: cmd });
       setMessages(prev => [...prev, { role: "assistant", content: `SUCCESS: ${output}` }]);
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: `ERROR: Failed to execute` }]);
+    } catch (e: any) {
+      const err = e.toString();
+      setMessages(prev => [...prev, { role: "assistant", content: `ERROR: Execution Pulse Interrupted. Initiating Neural Diagnosis...` }]);
+      try {
+        const diagnosis = await invoke("rag_query", { query: `Strictly analyze this CLI error and suggest a fix in 2 sentences: ${err}` });
+        setMessages(prev => [...prev, { role: "assistant", content: `Neural Diagnosis: ${diagnosis}` }]);
+      } catch {
+        setMessages(prev => [...prev, { role: "assistant", content: `ERROR: Neural Core offline. Suggest manual audit: ${err}` }]);
+      }
     }
   };
 
@@ -1733,6 +1740,11 @@ function App() {
                   } else if (proactiveAlert.action === "CPU_OPTIMIZE" || proactiveAlert.action === "CRATE_SUGGESTION") {
                     setMessages(prev => [...prev, { role: "assistant", content: "Aura Optimized: Crating background processes to stabilize Neural Core." }]);
                     await createCrate();
+                  } else if (proactiveAlert.action === "AURA_SUGGESTION") {
+                    const s = proactiveAlert.suggestion.toLowerCase();
+                    const ctxId = s.includes("dev") ? "dev" : s.includes("design") ? "design" : s.includes("game") ? "gaming" : "research";
+                    handleContextSwitch(ctxId);
+                    setMessages(prev => [...prev, { role: "assistant", content: `Neural Prediction Accepted: Switching to ${ctxId.toUpperCase()} Aura for optimized session flow.` }]);
                   } else {
                     setShowSettings(true); 
                   }
@@ -1741,6 +1753,7 @@ function App() {
                 className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-[11px] font-bold hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20 whitespace-nowrap"
               >
                 {proactiveAlert.action === "GUARDIAN_RELOCATE" ? "Relocate Now" : 
+                 proactiveAlert.action === "AURA_SUGGESTION" ? "Switch Aura" :
                  proactiveAlert.action === "CPU_OPTIMIZE" ? "Optimize" : "Action"}
               </button>
             </motion.div>
@@ -1761,7 +1774,15 @@ function App() {
           <div className="flex items-center gap-8">
             <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2">
-                <Eye size={12} className={aiHeartbeat.llava ? "text-blue-400" : "text-slate-700"} />
+                <div className="relative group/eye">
+                  <Eye size={12} className={aiHeartbeat.llava ? "text-blue-400" : "text-slate-700"} />
+                  {lastScreenshot && (
+                    <div className="absolute bottom-6 left-0 w-48 rounded-xl overflow-hidden border border-white/20 shadow-2xl opacity-0 translate-y-2 group-hover/eye:opacity-100 group-hover/eye:translate-y-0 transition-all pointer-events-none z-[100] bg-black/80 backdrop-blur-xl">
+                      <div className="p-1 px-2 border-b border-white/10 bg-blue-500/10 text-[6px] font-bold text-blue-400 uppercase tracking-widest">Vision Memory</div>
+                      <img src={`data:image/png;base64,${lastScreenshot}`} className="w-full h-auto max-h-32 object-cover opacity-80" />
+                    </div>
+                  )}
+                </div>
                 <span className={cn("text-[9px] font-bold uppercase tracking-widest", aiHeartbeat.llava ? "text-slate-300" : "text-slate-600")}>
                   Optics: {aiHeartbeat.llava ? "Active" : "Linked"}
                 </span>
