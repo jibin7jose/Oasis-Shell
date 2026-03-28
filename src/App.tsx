@@ -142,6 +142,7 @@ function App() {
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
   const [proactiveAlert, setProactiveAlert] = useState<any>(null);
   const [loadingVision, setLoadingVision] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     // Spin up local Node bridge and proactive monitors
@@ -330,6 +331,39 @@ function App() {
       setIsThinking(false);
       setLoadingVision(false);
     }
+  };
+
+  const handleVoicePulse = () => {
+    // Stage 7: Voice Command Horizon (WebSpeech Bridge)
+    // @ts-ignore
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+       setMessages(prev => [...prev, { role: "assistant", content: "Voice command is not supported on this neural interface." }]);
+       return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsRecording(true);
+    recognition.onend = () => setIsRecording(false);
+    recognition.onerror = () => setIsRecording(false);
+
+    recognition.onresult = (event: any) => {
+      const speechToText = event.results[0][0].transcript;
+      setAssistantInput(speechToText);
+      // Simulate Enter Key press
+      const fakeEvent = { key: "Enter" } as any;
+      setTimeout(() => {
+         // This is a direct call to the handler but I'll update handleAssistantChat to be more reactive
+         const btn = document.getElementById("assistant-input") as HTMLInputElement;
+         if (btn) btn.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));
+      }, 100);
+    };
+
+    recognition.start();
   };
 
   const handleAssistantChat = (e: React.KeyboardEvent) => {
@@ -1378,6 +1412,29 @@ function App() {
                   Nodes physically pull together based on mathematical Cosine Similarity in their code logic.
                 </p>
               </div>
+
+              {/* Nearby Nodes List (Stage 10) */}
+              <div className="absolute bottom-10 left-10 z-[70] hidden xl:flex flex-col gap-6 p-6 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl">
+                <div>
+                  <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    Neural Proximity
+                  </h3>
+                  <div className="flex flex-col gap-3 min-w-[200px]">
+                    {nearbyProjects.length > 0 ? nearbyProjects.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between group cursor-default">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-1 rounded-full bg-slate-700 group-hover:bg-indigo-400 transition-all" />
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-indigo-300 transition-all">{p}</span>
+                        </div>
+                        <div className="text-[8px] font-mono text-slate-700 uppercase group-hover:text-indigo-500 transition-all">Node Active</div>
+                      </div>
+                    )) : (
+                      <span className="text-[10px] text-slate-600 italic">No adjacent nodes detected.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
               
               <button 
                 onClick={() => setShowGraph(false)}
@@ -1535,6 +1592,7 @@ function App() {
                 <div className="p-4 border-t border-white/5 bg-black/40">
                   <div className="relative flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-2 focus-within:border-blue-500/50 focus-within:bg-white/10 transition-all">
                     <input
+                      id="assistant-input"
                       type="text"
                       value={assistantInput}
                       onChange={(e) => setAssistantInput(e.target.value)}
@@ -1551,6 +1609,17 @@ function App() {
                       )}
                     >
                       <Eye className={cn("w-4 h-4", !loadingVision && "hover:scale-110 transition-transform")} />
+                    </button>
+
+                    <button 
+                      onClick={handleVoicePulse}
+                      title="Neural Ear (Voice Command)"
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        isRecording ? "bg-red-500/40 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]" : "hover:bg-red-500/20 text-red-400"
+                      )}
+                    >
+                      <Monitor className={cn("w-4 h-4", !isRecording && "hover:scale-110 transition-transform")} />
                     </button>
                     <MessageSquare className="w-4 h-4 text-slate-500" />
                   </div>
