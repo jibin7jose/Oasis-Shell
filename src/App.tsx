@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2, Terminal } from "lucide-react";
+import { LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2, Terminal, Eye } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { cn } from "./lib/utils";
@@ -123,24 +123,25 @@ function App() {
     portfolio: "https://portfolio-pi-cyan-64.vercel.app"
   });
   const [scoutData, setScoutData] = useState<any>({ hp: 120, torque: 210, status: "M3A1 Ready" });
-  const [marketData, setMarketData] = useState<any>({ property: "4 Bhk Villa - Kakkanad", price: "₹90L", trend: "+2.4%" });
-  const [learningData, setLearningData] = useState<any>({
+  const [marketData] = useState<any>({ property: "4 Bhk Villa - Kakkanad", price: "₹90L", trend: "+2.4%" });
+  const [learningData] = useState<any>({
     languages: ["Rust", "Go", "C++", ".NET", "C#", "Shell"],
     maturity: { "Rust": 85, "Go": 70, "C++": 92 }
   });
-  const [diagStatus, setDiagStatus] = useState<any>({ linker: "Offline", port1420: "Active", node: "v20.x" });
-  const [gameEngineData, setGameEngineData] = useState<any>({
+  const [diagStatus] = useState<any>({ linker: "Offline", port1420: "Active", node: "v20.x" });
+  const [gameEngineData] = useState<any>({
     active: ["Z-Racing (15GB)", "Z-Attact (7GB)", "GTA V (5GB)"],
     loadStatus: "Engine Optimized"
   });
-  const [securityStatus, setSecurityStatus] = useState<any>({ oauth: "Ready", tempMail: "Active", vault: "Locked" });
-  const [pulseSummary, setPulseSummary] = useState<any>({
+  const [securityStatus] = useState<any>({ oauth: "Ready", tempMail: "Active", vault: "Locked" });
+  const [pulseSummary] = useState<any>({
     totalProjects: 9,
     activeNodes: 4,
     ecosystemHealth: "Optimal"
   });
   const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
   const [proactiveAlert, setProactiveAlert] = useState<any>(null);
+  const [loadingVision, setLoadingVision] = useState(false);
 
   useEffect(() => {
     // Spin up local Node bridge and proactive monitors
@@ -296,7 +297,42 @@ function App() {
     }
   };
 
-  const handleAssistantChat = async (e: React.KeyboardEvent) => {
+  const handleVisualPulse = async () => {
+    try {
+      if (!isNative) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Vision Interlink is only available in the Oasis Native Bridge." }]);
+        return;
+      }
+      setIsThinking(true);
+      setLoadingVision(true);
+      setMessages(prev => [...prev, { role: "assistant", content: "Activating Neural Lens. Capturing desktop context..." }]);
+      
+      const screenshot = await invoke("capture_screenshot") as string;
+      setMessages(prev => [...prev, { role: "assistant", content: "Optical sensor active. Analyzing visual patterns with Llava..." }]);
+      
+      const analysis = await invoke("query_vision", { 
+        image_base64: screenshot, 
+        prompt: "Describe the active windows, code, or activities you see on this desktop. Be brief and executive." 
+      }) as string;
+      
+      setMessages(prev => [...prev, { role: "assistant", content: `Neural Visual Analysis: ${analysis}` }]);
+      
+      // Proactive Aura suggestion based on Vision!
+      const a = analysis.toLowerCase();
+      if (a.includes("code") || a.includes("vs code") || a.includes("rust")) setSuggestedContext("dev");
+      else if (a.includes("blender") || a.includes("design") || a.includes("3d")) setSuggestedContext("design");
+      else if (a.includes("game") || a.includes("steam")) setSuggestedContext("gaming");
+      else if (a.includes("browser") || a.includes("research")) setSuggestedContext("research");
+
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: "Visual Pulse Failed. Ensure Ollama is running 'llava'." }]);
+    } finally {
+      setIsThinking(false);
+      setLoadingVision(false);
+    }
+  };
+
+  const handleAssistantChat = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && assistantInput.trim()) {
       const userMsg = assistantInput.trim().toLowerCase();
       setMessages(prev => [...prev, { role: "user", content: assistantInput }]);
@@ -1507,6 +1543,16 @@ function App() {
                       placeholder="Neural Command..."
                       className="flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-slate-600 py-2"
                     />
+                    <button 
+                      onClick={handleVisualPulse}
+                      title="Neural Lens (Vision Pulse)"
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        loadingVision ? "bg-blue-500/40 text-white animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "hover:bg-blue-500/20 text-blue-400"
+                      )}
+                    >
+                      <Eye className={cn("w-4 h-4", !loadingVision && "hover:scale-110 transition-transform")} />
+                    </button>
                     <MessageSquare className="w-4 h-4 text-slate-500" />
                   </div>
                 </div>
@@ -1581,6 +1627,52 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <div className="fixed bottom-6 left-8 flex items-center gap-8 z-50">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]", isNative ? "bg-emerald-500 text-emerald-500" : "bg-red-500 text-red-500")} />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 transition-colors">Neural Link {isNative ? "Stable" : "Offline"}</span>
+            </div>
+            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">{windowCount} Active Windows</span>
+          </div>
+
+          <div className="w-[1px] h-6 bg-white/5" />
+
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <Eye size={12} className={aiHeartbeat.llava ? "text-blue-400" : "text-slate-700"} />
+                <span className={cn("text-[9px] font-bold uppercase tracking-widest", aiHeartbeat.llava ? "text-slate-300" : "text-slate-600")}>
+                  Optics: {aiHeartbeat.llava ? "Active" : "Linked"}
+                </span>
+              </div>
+              <div className="h-0.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: aiHeartbeat.llava ? "100%" : "30%" }}
+                  className={cn("h-full transition-all duration-1000", aiHeartbeat.llava ? "bg-blue-500" : "bg-slate-700")}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <Activity size={12} className={aiHeartbeat.ready ? "text-emerald-400" : "text-slate-700"} />
+                <span className={cn("text-[9px] font-bold uppercase tracking-widest", aiHeartbeat.ready ? "text-slate-300" : "text-slate-600")}>
+                  Sentience: {aiHeartbeat.ready ? "Level 5" : "Syncing"}
+                </span>
+              </div>
+              <div className="h-0.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: aiHeartbeat.ready ? "100%" : "80%" }}
+                  className={cn("h-full transition-all duration-1000", aiHeartbeat.ready ? "bg-emerald-500" : "bg-slate-700")}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
 
       </div>
     </div>

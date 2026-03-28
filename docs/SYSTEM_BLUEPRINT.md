@@ -48,20 +48,21 @@ When you type a command (e.g., "how is my git status?"):
 
 ---
 
-## 🌌 3. Current Evolution State (Level 4)
+## 🌌 3. Current Evolution State (Level 5)
 
 - [x] **Relocated Intelligence:** AI Models migrated to D-drive for system stability.
 - [x] **Simulation Proxy:** Web portal fallback for demonstration without native bridge.
 - [x] **Proactive Heartbeat:** Real-time hardware monitoring.
 - [x] **3D Semantic Graph:** Visualizing project relationships.
+- [x] **Vision Interlink:** Local Llava-7B integration for optical perception.
 
 ---
 
 ## 🗺️ 4. Future Roadmap
 
-1. **Vision Interlink:** Integrating `Llava` so Oasis can "see" your screenshots and organize files visually.
-2. **Contextual Memory:** Persistent SQLite vector DB for long-term project "memory."
-3. **Voice Command Horizon:** Hands-free system navigation via Whisper/Local Speech-to-Text.
+1. **Contextual Memory:** Persistent SQLite vector DB for long-term project "memory." (Stage 6)
+2. **Voice Command Horizon:** Hands-free system navigation via Whisper/Local Speech-to-Text. (Stage 7)
+3. **Autonomous Agentic Flow:** Proactive file refactoring based on visual context. (Stage 8)
 
 ---
 

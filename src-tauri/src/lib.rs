@@ -11,6 +11,10 @@ use tauri::Emitter;
 use tauri::Manager;
 use tiny_http::{Server, Response};
 use sysinfo::System;
+use screenshots::Screen;
+use base64::{Engine as _, engine::general_purpose};
+use std::io::Cursor;
+use image::ImageFormat;
 
 
 struct DbState(Mutex<Connection>);
@@ -452,12 +456,14 @@ async fn check_ai_status() -> Result<serde_json::Value, String> {
     let models = json["models"].as_array().ok_or("Invalid Ollama response")?;
     let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma3:4b"));
     let has_embed = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("nomic-embed-text"));
+    let has_vision = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("llava"));
     
     Ok(serde_json::json!({
         "online": true,
         "gemma3": has_gemma,
         "nomic": has_embed,
-        "ready": has_gemma && has_embed
+        "llava": has_vision,
+        "ready": has_gemma && has_embed && has_vision
     }))
 }
 
@@ -683,6 +689,42 @@ fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
     Ok(logs)
 }
 
+#[tauri::command]
+async fn capture_screenshot() -> Result<String, String> {
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    if let Some(screen) = screens.first() {
+        let image = screen.capture().map_err(|e| e.to_string())?;
+        let mut buffer = Cursor::new(Vec::new());
+        // Use PNG for high fidelity visual reasoning
+        image.write_to(&mut buffer, ImageFormat::Png).map_err(|e| e.to_string())?;
+        Ok(general_purpose::STANDARD.encode(buffer.get_ref()))
+    } else {
+        Err("No screen found".to_string())
+    }
+}
+
+#[tauri::command]
+async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "model": "llava",
+        "prompt": prompt,
+        "images": [image_base64],
+        "stream": false
+    });
+
+    let res = client.post("http://localhost:11434/api/generate")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(res["response"].as_str().unwrap_or("Vision Failure").to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("oasis_crates.db").expect("failed to open database");
@@ -770,7 +812,9 @@ pub fn run() {
             generate_crate_name,
             execute_neural_command,
             check_ai_status,
-            start_proactive_sentience
+            start_proactive_sentience,
+            capture_screenshot,
+            query_vision
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

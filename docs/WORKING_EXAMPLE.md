@@ -4,6 +4,22 @@ This document walks you through a real-world scenario of using the Oasis Shell t
 
 ---
 
+## 👁️ The Visual Pulse (Neural Lens)
+
+Sometimes text isn't enough. You want Oasis to "see" what you're seeing.
+
+1. Open a complex piece of code or a 3D model in Blender.
+2. In the Oasis Chat, look for the **Eye Icon** (Neural Lens) next to the message box.
+3. Click it.
+4. **Active Logic:**
+   - The Eye icon glows and pulses blue.
+   - Oasis captures a high-fidelity snapshot of your desktop.
+   - The image is sent to the local **Llava** model on your D-Drive.
+5. **Output:** 
+   - Oasis describes your workspace: *"I see a VS Code window with a Rust project and a terminal showing a build error in 'lib.rs'. You also have a 3D Design showroom open in the background."*
+
+---
+
 ## 🛠️ Scenario: "The Morning Awakening"
 
 Imagine you just started your PC and want to resume work on your **Project Nebula**.
