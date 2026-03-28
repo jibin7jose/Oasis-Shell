@@ -263,8 +263,8 @@ function App() {
       await invoke("launch_crate", { id });
       setShowSettings(false);
       fetchLogs();
-    } catch (e) {
-      console.error("Failed to launch crate", e);
+    } catch {
+      console.error("Failed to launch crate");
     }
   };
 
@@ -282,8 +282,8 @@ function App() {
 
       const output = await invoke("execute_neural_command", { command: cmd });
       setMessages(prev => [...prev, { role: "assistant", content: `SUCCESS: ${output}` }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: `ERROR: ${e}` }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: `ERROR: Failed to execute` }]);
     }
   };
 
@@ -333,7 +333,10 @@ function App() {
             if (!aiHeartbeat.ready || !isNative) {
               setTimeout(() => {
                 if (!isNative) {
-                  setMessages(prev => [...prev, { role: "assistant", content: "I've detected your intent. Since you are in 'Simulation Mode' (Browser), I'll suggest a standard system command. [CMD] ls [/CMD]" }]);
+                  const cmdSuggestion = userMsg.toLowerCase().includes("git") ? "git status" : 
+                                        userMsg.toLowerCase().includes("ls") ? "ls" : 
+                                        userMsg.toLowerCase().includes("dir") ? "dir" : "ls";
+                  setMessages(prev => [...prev, { role: "assistant", content: `I've detected your intent. Since you are in 'Simulation Mode' (Browser), I'll suggest a standard system command. [CMD] ${cmdSuggestion} [/CMD]` }]);
                 } else if (!aiHeartbeat.online) {
                   setMessages(prev => [...prev, { role: "assistant", content: "Local AI Link offline. Please run `ollama serve` and verify port 11434 is open." }]);
                 } else {

@@ -7,7 +7,6 @@ use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, E
 use std::path::Path;
 use std::time::Duration;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-use std::io::Read;
 use tauri::Emitter;
 use tauri::Manager;
 use tiny_http::{Server, Response};
@@ -564,8 +563,11 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
-        let mut sys = System::new_all();
+        std::thread::sleep(Duration::from_secs(5)); // Give app time to settle
+
         loop {
+            // Re-allocate System every loop to prevent memory/stack buildup on some Windows configs
+            let mut sys = System::new_all();
             sys.refresh_all();
             
             let total_mem = sys.total_memory();
@@ -579,11 +581,14 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }));
             }
             
+            // Drop 'sys' explicitly and sleep
+            drop(sys);
             std::thread::sleep(Duration::from_secs(60));
         }
     });
     Ok(())
 }
+
 
 
 #[tauri::command]
