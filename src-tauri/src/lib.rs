@@ -584,11 +584,9 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(5)); 
 
-        let mut sys = System::new(); // Use base System to minimize stack footprint
+        let mut sys = System::new(); 
         loop {
-            // ONLY refresh memory - the most likely trigger for buffer overruns is heavy 'refresh_all'
             sys.refresh_memory();
-            
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
             
@@ -601,7 +599,6 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                     }));
                 }
             }
-            
             std::thread::sleep(Duration::from_secs(60));
         }
     });

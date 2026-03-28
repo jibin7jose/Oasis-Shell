@@ -308,7 +308,7 @@ function App() {
 
         if (userMsg.includes("status")) {
           const aura = contexts.find(c => c.id === activeContext)?.name;
-          response = `System Operational. Active Aura: ${aura}. Cloud Sync: Stable.`;
+          response = `System Operational. Active Aura: ${aura}. Cloud Sync: Stable. [CMD] git status [/CMD]`;
         } else if (userMsg.includes("summarize") || userMsg.includes("what did i do")) {
           if (logs.length === 0) {
             response = "No neural patterns recorded for this cycle yet. Suggest creating a 'Crate' to begin tracking.";
@@ -328,23 +328,19 @@ function App() {
           response = "Initiating Oasis Pulse. Synchronizing with Neural Cloud...";
           handleSync();
         } else {
-          // Check for context names first
           const matched = contexts.find(ctx => userMsg.includes(ctx.name.toLowerCase()) || userMsg.includes(ctx.id));
           if (matched) {
             response = `Executing Aura Transition: Setting context to ${matched.name}.`;
             handleContextSwitch(matched.id);
             setMessages(prev => [...prev, { role: "assistant", content: response }]);
           } else {
-            // If completely unhandled, use RAG Engine (Context-Aware Local AI)
             setIsThinking(true);
-            
-            // MOCK MODE FALLBACK: If AI is offline, simulate a Command response for UX demo (OR IF IN BROWSER)
             if (!aiHeartbeat.ready || !isNative) {
               setTimeout(() => {
                 if (!isNative) {
-                  const cmdSuggestion = userMsg.toLowerCase().includes("git") ? "git status" : 
-                                        userMsg.toLowerCase().includes("ls") ? "ls" : 
-                                        userMsg.toLowerCase().includes("dir") ? "dir" : "ls";
+                  const cmdSuggestion = userMsg.includes("git") ? "git status" : 
+                                        userMsg.includes("ls") ? "ls" : 
+                                        userMsg.includes("dir") ? "dir" : "ls";
                   setMessages(prev => [...prev, { role: "assistant", content: `I've detected your intent. Since you are in 'Simulation Mode' (Browser), I'll suggest a standard system command. [CMD] ${cmdSuggestion} [/CMD]` }]);
                 } else if (!aiHeartbeat.online) {
                   setMessages(prev => [...prev, { role: "assistant", content: "Local AI Link offline. Please run `ollama serve` and verify port 11434 is open." }]);
@@ -361,7 +357,7 @@ function App() {
                 setMessages(prev => [...prev, { role: "assistant", content: llmResponse as string }]);
                 setIsThinking(false);
               })
-              .catch((e) => {
+              .catch(() => {
                 setMessages(prev => [...prev, { role: "assistant", content: "AI Connection Failure. Please verify Ollama is active." }]);
                 setIsThinking(false);
               });
@@ -374,6 +370,7 @@ function App() {
         }
       }, 100);
     }
+
   };
 
   const handleSync = async (e?: React.MouseEvent) => {
