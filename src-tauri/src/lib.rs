@@ -593,12 +593,11 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
         let mut sys = System::new(); 
         loop {
             sys.refresh_memory();
-            sys.refresh_all(); // Added: complete audit
+            sys.refresh_all();
             
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
             
-            // RAM Protection (Neural Pulse)
             if total_mem > 0 {
                 let mem_percent = (used_mem as f32 / total_mem as f32) * 100.0;
                 if mem_percent > 90.0 {
@@ -609,7 +608,6 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            // NEURAL GUARDIAN: C-Drive Protection (Level 8)
             for disk in sys.disks() {
                 if disk.mount_point().to_string_lossy().contains("C:") {
                     let free = disk.available_space();
@@ -622,7 +620,6 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            // CPU MONITOR: Gaming Performance (Level 7)
             sys.refresh_cpu_all();
             let cpu_usage = sys.global_cpu_usage();
             if cpu_usage > 70.0 {
@@ -632,10 +629,8 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }));
             }
 
-            // PREDICTIVE AURA SENTINEL (Level 12)
-            // Mock: Suggesting aura based on Day/Time pattern
             let now = chrono::Local::now();
-            let day = now.format("%a").to_string(); // Mon, Tue...
+            let day = now.format("%a").to_string();
             let hour = now.hour();
 
             if day == "Sat" || day == "Sun" {
@@ -655,6 +650,21 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
             std::thread::sleep(Duration::from_secs(60));
         }
     });
+    Ok(())
+}
+
+#[tauri::command]
+fn sync_hardware_aura(aura: String) -> Result<(), String> {
+    let ps_cmd = match aura.as_str() {
+        "gaming" => "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)", 
+        "dev" => "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)",
+        _ => "echo 'Aura Parity Nominal'",
+    };
+
+    let _ = Command::new("powershell")
+        .args(["-Command", ps_cmd])
+        .spawn();
+
     Ok(())
 }
 
@@ -860,6 +870,7 @@ pub fn run() {
             execute_neural_command,
             check_ai_status,
             start_proactive_sentience,
+            sync_hardware_aura,
             capture_screenshot,
             query_vision
         ])

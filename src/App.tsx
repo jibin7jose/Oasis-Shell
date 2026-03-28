@@ -517,6 +517,9 @@ function App() {
     const contextName = contexts.find(c => c.id === id)?.name || id;
     logEvent("CONTEXT_SWITCH", `Aura transitioned to ${contextName}`);
     setActiveContext(id);
+    if (isNative) {
+      invoke("sync_hardware_aura", { aura: id }).catch(() => console.error("Hardware Aura sync failed"));
+    }
   };
 
   const [suggestedContext, setSuggestedContext] = useState<string | null>(null);
@@ -634,16 +637,25 @@ function App() {
   const currentAura = auraColors[activeContext] || auraColors.dev;
 
   return (
-    <div className="min-h-screen w-full bg-[#030712] text-slate-200 selection:bg-blue-500/30 font-sans overflow-hidden">
+    <div className="min-h-screen w-full bg-[#030712] text-slate-200 selection:bg-blue-500/30 font-sans overflow-hidden relative">
+      {/* Stage 13: Neural Noise Substrate */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03] grayscale invert contrast-[150%] mix-blend-overlay z-0 pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+
       {/* Background Glows (Neural Aura) */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none transition-all duration-1000">
         <motion.div
-          animate={{ backgroundColor: currentAura }}
-          className="absolute top-[-20%] left-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-20"
+          animate={{ 
+            backgroundColor: (isThinking || loadingVision) ? '#3b82f6' : currentAura,
+            opacity: (isThinking || loadingVision) ? 0.35 : 0.2
+          }}
+          className="absolute top-[-20%] left-[10%] w-[50%] h-[50%] rounded-full blur-[180px] transition-all duration-1000"
         />
         <motion.div
-          animate={{ backgroundColor: currentAura }}
-          className="absolute bottom-[-20%] right-[10%] w-[50%] h-[50%] rounded-full blur-[180px] opacity-10"
+          animate={{ 
+            backgroundColor: (isThinking || loadingVision) ? '#6366f1' : currentAura,
+            opacity: (isThinking || loadingVision) ? 0.25 : 0.1
+          }}
+          className="absolute bottom-[-20%] right-[10%] w-[50%] h-[50%] rounded-full blur-[180px] transition-all duration-1000"
         />
       </div>
 
