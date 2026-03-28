@@ -139,10 +139,10 @@ function App() {
     activeNodes: 4,
     ecosystemHealth: "Optimal"
   });
-  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
   const [proactiveAlert, setProactiveAlert] = useState<any>(null);
   const [loadingVision, setLoadingVision] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [lastScreenshot, setLastScreenshot] = useState<string | null>(null);
 
   useEffect(() => {
     // Spin up local Node bridge and proactive monitors
@@ -316,7 +316,12 @@ function App() {
         prompt: "Describe the active windows, code, or activities you see on this desktop. Be brief and executive." 
       }) as string;
       
-      setMessages(prev => [...prev, { role: "assistant", content: `Neural Visual Analysis: ${analysis}` }]);
+      setLastScreenshot(screenshot);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: `Neural Visual Analysis: ${analysis}`,
+        image: screenshot 
+      }]);
       
       // Proactive Aura suggestion based on Vision!
       const a = analysis.toLowerCase();
@@ -1576,7 +1581,16 @@ function App() {
                           </button>
                         </>
                       ) : (
-                        msg.content
+                        <div>{msg.content}</div>
+                      )}
+                      {msg.image && (
+                         <div className="mt-2 rounded-xl overflow-hidden border border-white/10 shadow-lg relative group">
+                           <img src={`data:image/png;base64,${msg.image}`} alt="Neural Pulse" className="w-full h-auto object-cover max-h-32" />
+                           <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md border border-blue-500/30 flex items-center gap-1.5 pointer-events-none">
+                             <div className="w-1 h-1 rounded-full bg-blue-400 animate-pulse shadow-[0_0_5px_#60a5fa]" />
+                             <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest">Optic Sensor Active</span>
+                           </div>
+                         </div>
                       )}
                     </motion.div>
                   ))}
