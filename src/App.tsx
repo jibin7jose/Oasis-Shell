@@ -5,7 +5,7 @@ import {
   Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
   Activity, Settings, Zap, Shield, Terminal, 
   Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck,
-  Globe, Cpu, RotateCcw
+  Globe, Cpu, RotateCcw, Eye
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
