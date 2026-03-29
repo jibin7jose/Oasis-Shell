@@ -70,6 +70,14 @@ pub struct VentureEntity {
     pub peak_arr: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AssetMetadata {
+    pub file_path: String,
+    pub debt: f32,
+    pub authorizer: String,
+    pub risk: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CLIDirective {
     pub cmd: String,
@@ -603,12 +611,34 @@ async fn get_cross_venture_wisdom(target_id: String) -> Result<Vec<String>, Stri
 }
 
 #[tauri::command]
+async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
+    Ok(vec![
+        AssetMetadata { file_path: "src-tauri/src/lib.rs".into(), debt: 12.5, authorizer: "Founder".into(), risk: "Emerald (Solid)".into() },
+        AssetMetadata { file_path: "src/App.tsx".into(), debt: 34.2, authorizer: "Tech Architect".into(), risk: "Amber (Scaling)".into() },
+        AssetMetadata { file_path: "manifested/pivot_audit.ts".into(), debt: 8.0, authorizer: "Foundry Oracle".into(), risk: "Ruby (Debt)".into() },
+    ])
+}
+
+#[tauri::command]
 async fn execute_cli_directive(directive: CLIDirective, stress_color: String) -> Result<CLIResponse, String> {
     match directive.cmd.as_str() {
         "audit" => Ok(CLIResponse {
             output: "System Audit Initiated via Oas-Shell. Report manifested to root.".into(),
             aura_color: stress_color,
         }),
+        "ls" => {
+            if directive.args.contains(&"--strategic".to_string()) {
+                Ok(CLIResponse {
+                    output: "Strategic Inventory Scan: 24 Emerald (Solid), 8 Ruby (Debt Critical).".into(),
+                    aura_color: "#6366f1".into(),
+                })
+            } else {
+                Ok(CLIResponse {
+                    output: "Foundry Project Node Listing... (Raw Mode)".into(),
+                    aura_color: "#94a3b8".into(),
+                })
+            }
+        },
         "manifest" => Ok(CLIResponse {
             output: format!("Golem Manifesting Module: {} via Oas-Shell.", directive.args.join(" ")),
             aura_color: "#6366f1".into(),
@@ -617,7 +647,7 @@ async fn execute_cli_directive(directive: CLIDirective, stress_color: String) ->
             output: "Reality Rewound to Previous Snapshot via Oas-Shell.".into(),
             aura_color: "#10b981".into(),
         }),
-        _ => Err("Invalid Oas Directive. Try 'audit', 'manifest' [title], or 'rewind'.".into()),
+        _ => Err("Invalid Oas Directive. Try 'audit', 'ls --strategic', 'manifest' [title], or 'rewind'.".into()),
     }
 }
 
@@ -1230,7 +1260,8 @@ pub fn run() {
             restore_venture_state,
             get_available_ventures,
             get_cross_venture_wisdom,
-            execute_cli_directive
+            execute_cli_directive,
+            get_strategic_inventory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -59,6 +59,7 @@ export default function App() {
   const [showCLI, setShowCLI] = useState(false);
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
+  const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -303,6 +304,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const syncInventoryData = async () => {
+      try {
+        const inv = await invoke("get_strategic_inventory") as any[];
+        setStrategicInventory(inv);
+      } catch (e) {}
+    };
+    syncInventoryData();
+    const interval = setInterval(syncInventoryData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleCLICommand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliInput) return;
@@ -525,7 +538,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.1.0-PLATFORM (OAS-SHELL)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.2.0-PLATFORM (INVENTORY)</span>
                  <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
@@ -830,25 +843,40 @@ export default function App() {
                 </div>
              </div>
              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
-                {[
-                  { name: 'Oasis_Whitepaper.pdf', cat: 'Strategic', size: '1.2MB' },
-                  { name: 'Foundry_Kernel.rs', cat: 'Technical', size: '45KB' },
-                  { name: 'Executive_Brand_Guide.fig', cat: 'Creative', size: '8.4MB' },
-                  { name: 'Q3_Revenue_Projection.xlsx', cat: 'Strategic', size: '220KB' },
-                  { name: 'Neural_Engine_Docs.md', cat: 'Technical', size: '12KB' }
-                ].map((node) => (
-                  <div key={node.name} className="glass-bright p-8 rounded-[2rem] border border-white/5 hover:border-indigo-500/30 transition-all group flex flex-col justify-between aspect-square">
-                     <div className="flex justify-between items-start">
-                        <div className={cn("p-4 rounded-xl", node.cat === 'Strategic' ? "bg-amber-500/10 text-amber-500" : node.cat === 'Technical' ? "bg-indigo-500/10 text-indigo-500" : "bg-purple-500/10 text-purple-500")}>
-                           <Shield className="w-6 h-6" />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">{node.size}</span>
-                     </div>
-                     <div>
-                        <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest block mb-2">{node.cat}</span>
-                        <h4 className="text-lg font-bold text-white truncate">{node.name}</h4>
-                     </div>
-                  </div>
+                {strategicInventory.map((asset, i) => (
+                   <motion.div 
+                     key={asset.file_path}
+                     initial={{ opacity: 0, y: 20 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     transition={{ delay: i * 0.05 }}
+                     className="glass-bright rounded-3xl p-8 border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer"
+                   >
+                      <div className="flex items-start justify-between mb-6">
+                         <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
+                            <FolderOpen className={cn("w-6 h-6", asset.risk.includes('Ruby') ? "text-red-400" : "text-emerald-400")} />
+                         </div>
+                         <div className={cn("px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border", 
+                           asset.risk.includes('Ruby') ? "bg-red-500/10 border-red-500/30 text-red-400" : 
+                           asset.risk.includes('Emerald') ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                           "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                         )}>
+                            {asset.risk}
+                         </div>
+                      </div>
+                      <h3 className="text-sm font-black text-white truncate mb-1">{asset.file_path.split('/').pop()}</h3>
+                      <p className="text-[10px] text-slate-500 font-mono truncate mb-4">{asset.file_path}</p>
+                      
+                      <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                         <div>
+                            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Strat Debt</span>
+                            <span className="text-sm font-black text-white">{asset.debt}%</span>
+                         </div>
+                         <div className="text-right">
+                            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Authorized By</span>
+                            <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
+                         </div>
+                      </div>
+                   </motion.div>
                 ))}
              </div>
           </motion.div>
@@ -934,7 +962,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.1.0-PLATFORM</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.2.0-PLATFORM</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
