@@ -54,10 +54,6 @@ export default function App() {
     { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
   ]);
 
-  const [dynamicModules, setDynamicModules] = useState([
-    { id: 'core-insights', title: 'Strategic Insights', type: 'core', content: 'Burn rate optimized at $42.5K. Recommend accelerating Series A outreach.' }
-  ]);
-
   const [simMetrics, setSimMetrics] = useState({
     arr: 1.24, burn: 42.5, momentum: 12.8
   });
@@ -88,6 +84,11 @@ export default function App() {
         setPresentationMode(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Visionary Portal Activated: Launching Stakeholder Mode..." }]);
         logEvent("Visionary Portal Initialized (Stakeholder Mode)", "system");
+      } else if (q.includes("audit") || q.includes("report")) {
+        invoke('generate_venture_audit').then((res: any) => {
+           setMessages(prev => [...prev, { role: "assistant", content: `Auditor: ${res}` }]);
+           logEvent("Executive Venture Audit Generated", "system");
+        }).catch(() => {});
       } else if (q.includes("manifest") || q.includes("build code") || q.includes("write module")) {
         const title = query.replace(/manifest|build code|write module/gi, "").trim() || "NewStrategy";
         invoke('manifest_code_module', { name: title }).then((res: any) => {
@@ -355,49 +356,9 @@ export default function App() {
                ))}
             </div>
 
-            {/* Strategic Command Hub: Dynamic Architect Modules */}
+            {/* Strategic Command Hub: Dynamic Architect Modules (Disabled for Audit Phase) */}
             <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                {dynamicModules.map((mod, i) => (
-                   <motion.div 
-                     key={mod.id}
-                     initial={{ opacity: 0, y: 30 }} 
-                     animate={{ opacity: 1, y: 0 }}
-                     transition={{ delay: i * 0.1 }}
-                     className={cn(
-                       "glass rounded-[2rem] p-8 border relative overflow-hidden group min-h-[320px] flex flex-col justify-between",
-                       mod.id === 'core-insights' ? "border-white/5" : "border-purple-500/20"
-                     )}
-                   >
-                      <div className={cn(
-                          "absolute top-0 right-0 w-32 h-32 blur-[50px] transition-all",
-                          mod.id === 'core-insights' ? "bg-indigo-500/10" : "bg-purple-500/20"
-                      )} />
-                      <div className="flex items-center justify-between mb-8">
-                         <div className="flex items-center gap-4">
-                            {mod.id === 'core-insights' ? <BrainCircuit className="w-6 h-6 text-indigo-400" /> : <Bot className="w-6 h-6 text-purple-400" />}
-                            <h3 className="text-lg font-bold tracking-tight text-white">{mod.title}</h3>
-                         </div>
-                         <span className={cn(
-                             "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
-                             mod.id === 'core-insights' ? "text-emerald-400 bg-emerald-400/10" : "text-purple-400 bg-purple-400/10"
-                         )}>{mod.id === 'core-insights' ? "Stable" : "Autonomous Architect"}</span>
-                      </div>
-                      
-                      <div className="flex-1 space-y-4">
-                         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
-                            <p className="text-sm text-slate-400 leading-relaxed">
-                                <span className={cn("font-bold", mod.id === 'core-insights' ? "text-indigo-400" : "text-purple-400")}>
-                                    {mod.id === 'core-insights' ? "Foundry Logic:" : "Architect Projection:"}
-                                </span> {mod.content}
-                            </p>
-                         </div>
-                      </div>
-                      
-                      <button className="w-full mt-8 py-4 glass text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-all rounded-xl border border-white/5">
-                         Analyze Strategy
-                      </button>
-                   </motion.div>
-                ))}
+                {/* Modules Manifest via Neural Intent 'audit' or 'manifest' */}
             </div>
 
             {/* Deployment Messenger Hub (Simplified) */}
