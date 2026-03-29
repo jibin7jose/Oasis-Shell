@@ -51,6 +51,7 @@ export default function App() {
   const [pendingManifests, setPendingManifests] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
   const [economicNews, setEconomicNews] = useState<string[]>([]);
+  const [hardwareStatus, setHardwareStatus] = useState<any>(null);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -262,6 +263,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const syncHardwareData = async () => {
+      try {
+        const hs = await invoke("trigger_hardware_symbiosis", { stressColor: founderMetrics.stress_color }) as any;
+        setHardwareStatus(hs);
+      } catch (e) {}
+    };
+    syncHardwareData();
+    const interval = setInterval(syncHardwareData, 10000);
+    return () => clearInterval(interval);
+  }, [founderMetrics.stress_color]);
+
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
@@ -288,7 +301,12 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30">
+    <div 
+        className={cn(
+            "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000",
+            hardwareStatus?.focus_mode.includes("Survival") ? "grayscale-lockdown" : ""
+        )}
+    >
       {/* Oracle Alert Notification (Pillar 20) */}
       <AnimatePresence>
         {oracleAlert && (
@@ -457,7 +475,12 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.3.0-SENTIENT</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.4.0-SENTIENT (SYMBIOSIS)</span>
+                 {hardwareStatus && (
+                    <span className="ml-4 text-[8px] font-black text-red-500/40 uppercase tracking-[0.25em] animate-pulse border-l border-white/5 pl-4">
+                        {hardwareStatus.focus_mode}
+                    </span>
+                 )}
                </h1>
             </div>
             
@@ -778,13 +801,14 @@ export default function App() {
                  <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
                     <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
                        <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable</span>
+                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable ({hardwareStatus.focus_mode})</span>
                        <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
                     </header>
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.3.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.4.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)

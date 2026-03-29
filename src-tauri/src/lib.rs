@@ -28,6 +28,18 @@ pub struct ContextCrate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct EconomicSignal {
+    pub trend: String,
+    pub impact: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HardwareStatus {
+    pub focus_mode: String,
+    pub aura_intensity: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VentureMetrics {
     pub arr: String,
     pub burn: String,
@@ -507,6 +519,21 @@ async fn trigger_oracle_audit() -> Result<OracleAlert, String> {
         divergence_level: "Critical (Action Required)".into(),
         economic_signal: "Tech Sector Momentum: +12.4% (Global Benchmark)".into(),
     })
+}
+
+#[tauri::command]
+async fn trigger_hardware_symbiosis(stress_color: String) -> Result<HardwareStatus, String> {
+    if stress_color == "#ef4444" {
+        Ok(HardwareStatus {
+            focus_mode: "Survival Mode (Grayscale Lockdown)".into(),
+            aura_intensity: 1.0,
+        })
+    } else {
+        Ok(HardwareStatus {
+            focus_mode: "Strategic Harmony (Full Spectrum)".into(),
+            aura_intensity: 0.2,
+        })
+    }
 }
 
 #[tauri::command]
@@ -1112,7 +1139,8 @@ pub fn run() {
             get_neural_workforce,
             get_pending_manifests,
             execute_golem_manifest,
-            get_economic_news
+            get_economic_news,
+            trigger_hardware_symbiosis
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
