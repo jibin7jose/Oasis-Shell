@@ -55,6 +55,37 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* --- ZEN MODE: AETHEREAL VISION --- */
+.zen-hide {
+  opacity: 0 !important;
+  transform: translateY(20px) scale(0.95);
+  pointer-events: none !important;
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.zen-viewport-active {
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.zen-node-focus {
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+  scale: 1.1;
+  transition: all 0.8s ease;
+}
+
+/* --- V3.7.0 SYSTEM: AURA PULSE --- */
+.aura-pulse-zen {
+  animation: aura-zen 8s infinite alternate ease-in-out;
+}
+
+@keyframes aura-zen {
+  0% { filter: blur(100px) opacity(0.3); }
+  100% { filter: blur(140px) opacity(0.5); }
+}
+
 /* Animations */
 @keyframes neon-pulse {
   0% { opacity: 0.4; }

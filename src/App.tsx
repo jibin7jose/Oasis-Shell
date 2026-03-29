@@ -61,6 +61,7 @@ export default function App() {
   const [cliHistory, setCliHistory] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
   const [systemStats, setSystemStats] = useState<any>(null);
+  const [zenMode, setZenMode] = useState(false);
 
   const handleCommitSim = () => {
     const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
@@ -587,11 +588,14 @@ export default function App() {
           <div className="flex items-center gap-12">
             <div className="flex flex-col">
                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
-               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+               <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.6.0-PARTNER (AGENTIC)</span>
-                 <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.7.0-ZEN (VISIONARY)</span>
+                 <button onClick={() => setZenMode(!zenMode)} className={cn("ml-8 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
+                    <Eye className="w-4 h-4" />
+                 </button>
+                 <button onClick={() => setShowCLI(!showCLI)} className={cn("ml-4 p-2 glass rounded-lg text-emerald-400 group relative", zenMode && "opacity-0 scale-90")}>
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
                  </button>
@@ -1013,7 +1017,7 @@ export default function App() {
 
       {/* Floating Chat Robot */}
       {!presentationMode && (
-        <div className="fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600]">
+        <div className={cn("fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600] transition-all", zenMode && "zen-hide")}>
            <AnimatePresence>
               {showAI && (
                  <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
@@ -1028,7 +1032,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.6.0-PARTNER (AGENTIC)</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.7.0-ZEN (VISIONARY)</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                <div className="flex items-center justify-between mb-4">
