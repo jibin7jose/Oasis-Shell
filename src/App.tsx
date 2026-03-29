@@ -3,7 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Eye, Mic, MicOff,
-  Bot, BrainCircuit, Settings, Terminal, Search, Trash2, Plus
+  Bot, BrainCircuit, Settings, Terminal, Search, Trash2, Plus,
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -14,58 +15,65 @@ const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 const contexts = [
   { id: 'dev', name: 'Strategic Core', icon: Terminal, aura: 'rgba(99, 102, 241, 0.4)' },
   { id: 'design', name: 'Creative Forge', icon: Shield, aura: 'rgba(168, 85, 247, 0.4)' },
-  { id: 'growth', name: 'Capital Matrix', icon: PulseIcon, aura: 'rgba(16, 185, 129, 0.4)' }
+  { id: 'growth', name: 'Capital Matrix', icon: Activity, aura: 'rgba(16, 185, 129, 0.4)' }
 ];
 
 export default function App() {
   // --- CORE STATE ---
-  const [activeContext, setActiveContext] = useState('dev');
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isThinking, setIsThinking] = useState(false);
-  const [lastSync, setLastSync] = useState("");
-  useEffect(() => {
-    if (lastSync) console.log(`[Oasis Sync]: ${lastSync}`);
-  }, [lastSync]);
+  const [founderMetrics, setFounderMetrics] = useState({
+    arr: "$1.24M",
+    burn: "$0.85M",
+    runway: "14.2 Mo",
+    momentum: "+12.8%",
+    stress_color: "#10b981"
+  });
+  const [marketIntel, setMarketIntel] = useState<any>([
+    { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
+    { symbol: "SAP_COMP", price: "$42.50", change: "-1.1%" },
+    { symbol: "GLOBAL_AI", price: "8,942.00", change: "+0.8%" }
+  ]);
+  const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
+  const [simMode, setSimMode] = useState(false);
+  const [timeline, setTimeline] = useState<any[]>([
+    { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
+    { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
+  ]);
+  const [notification, setNotification] = useState("");
   const [showAI, setShowAI] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
-  const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
-  
-  const [mounted, setMounted] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-
-  // --- FEATURE STATE ---
-  const [showGraph, setShowGraph] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [simMode, setSimMode] = useState(false);
-  
-  const [founderMetrics, setFounderMetrics] = useState({
-    arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#6366f1"
-  });
-  
-  const [oracleAlert, setOracleAlert] = useState<any>(null);
-  const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
-  const [notification, setNotification] = useState<string | null>(null);
-  const [workforce, setWorkforce] = useState<any[]>([]);
-  const [pendingManifests, setPendingManifests] = useState<any[]>([]);
-  const [activeGolem, setActiveGolem] = useState<any>(null);
-  const [economicNews, setEconomicNews] = useState<string[]>([]);
-  const [hardwareStatus, setHardwareStatus] = useState<any>(null);
-  const [manifestHistory, setManifestHistory] = useState<string[]>([]);
-  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
-  const [crossWisdom, setCrossWisdom] = useState<string[]>([]);
-  const [showNetwork, setShowNetwork] = useState(false);
   const [showCLI, setShowCLI] = useState(false);
-  const [cliInput, setCliInput] = useState("");
-  const [cliHistory, setCliHistory] = useState<any[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeContext, setActiveContext] = useState('dev');
+  const [lastSync, setLastSync] = useState("");
+  const [workforce, setWorkforce] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
   const [systemStats, setSystemStats] = useState<any>(null);
   const [zenMode, setZenMode] = useState(false);
   const [chronosLedger, setChronosLedger] = useState<any[]>([]);
   const [chronosIndex, setChronosIndex] = useState(-1);
   const [voiceActive, setVoiceActive] = useState(false);
+  const [crossWisdom, setCrossWisdom] = useState<any[]>([]);
+  const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
+  const [cliInput, setCliInput] = useState("");
+  const [cliHistory, setCliHistory] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [pendingManifests, setPendingManifests] = useState<any[]>([]);
+  const [oracleAlert, setOracleAlert] = useState<any>(null);
+  const [showGraph, setShowGraph] = useState(false);
+  const [showNetwork, setShowNetwork] = useState(false);
+  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
+  const [manifestHistory, setManifestHistory] = useState<string[]>([]);
+  const [hardwareStatus, setHardwareStatus] = useState<any>(null);
+  const [activeGolem, setActiveGolem] = useState<any>(null);
+  const [economicNews, setEconomicNews] = useState<string[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const handleVoiceIntent = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -84,6 +92,8 @@ export default function App() {
     };
     recognition.start();
   };
+
+  const handleCommitSim = async () => {
     const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
     setFounderMetrics(newMetrics);
     setSimMode(false);
@@ -98,26 +108,21 @@ export default function App() {
   };
 
   useEffect(() => {
+    const syncInventoryData = async () => {
+      try {
+        const inv = await invoke("get_strategic_inventory") as any[];
+        setStrategicInventory(inv);
+      } catch (e) {}
+    };
+    syncInventoryData();
+  }, []);
+
+  useEffect(() => {
     if (notification) {
-      const timer = setTimeout(() => setNotification(null), 4000);
+      const timer = setTimeout(() => (setNotification as any)(null), 4000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
-  
-  const [marketIntel, setMarketIntel] = useState([
-    { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
-    { symbol: "SAP_COMP", price: "$42.50", change: "-1.1%" },
-    { symbol: "GLOBAL_AI", price: "8,942.00", change: "+0.8%" }
-  ]);
-
-  const [timeline, setTimeline] = useState([
-    { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
-    { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
-  ]);
-
-  const [simMetrics, setSimMetrics] = useState({
-    arr: 1.24, burn: 42.5, momentum: 12.8
-  });
 
   // --- LOGIC: MEMORY & INTENT ---
   const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
@@ -665,7 +670,7 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.1.0-RESONANCE (VOICE)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.1.2-STABLE</span>
                  <button onClick={handleVoiceIntent} className={cn("ml-8 p-2 glass rounded-lg transition-all", voiceActive ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]" : "text-slate-400")}>
                     {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
                  </button>
@@ -760,7 +765,7 @@ export default function App() {
                  { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
                  { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
                  { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-                 { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: PulseIcon }
+                 { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
                ].map((m, i) => (
                  <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
                     <m.icon className="w-5 h-5 text-indigo-400" />
