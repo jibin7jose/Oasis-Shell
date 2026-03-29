@@ -1757,6 +1757,9 @@ function App() {
                     const ctxId = s.includes("dev") ? "dev" : s.includes("design") ? "design" : s.includes("game") ? "gaming" : "research";
                     handleContextSwitch(ctxId);
                     setMessages(prev => [...prev, { role: "assistant", content: `Neural Prediction Accepted: Switching to ${ctxId.toUpperCase()} Aura for optimized session flow.` }]);
+                  } else if (proactiveAlert.action === "GIT_BRANCH") {
+                    const branchName = `neural-${new Date().getTime().toString().slice(-6)}`;
+                    await executeNeuralCmd(`git checkout -b ${branchName}`);
                   } else {
                     setShowSettings(true); 
                   }
@@ -1766,6 +1769,7 @@ function App() {
               >
                 {proactiveAlert.action === "GUARDIAN_RELOCATE" ? "Relocate Now" : 
                  proactiveAlert.action === "AURA_SUGGESTION" ? "Switch Aura" :
+                 proactiveAlert.action === "GIT_BRANCH" ? "Branch Now" :
                  proactiveAlert.action === "CPU_OPTIMIZE" ? "Optimize" : "Action"}
               </button>
             </motion.div>

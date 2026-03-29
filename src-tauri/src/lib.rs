@@ -640,14 +640,32 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                         "action": "AURA_SUGGESTION"
                     }));
                 }
-            } else if hour > 9 && hour < 18 {
-                let _ = app.emit("proactive-pulse", serde_json::json!({
-                    "suggestion": "Workspace Intensity detected. Should I switch to 'Development' Aura to prioritize build-chains?",
-                    "action": "AURA_SUGGESTION"
-                }));
+                if hour > 9 && hour < 18 {
+                    let _ = app.emit("proactive-pulse", serde_json::json!({
+                        "suggestion": "Workspace Intensity detected. Should I switch to 'Development' Aura to prioritize build-chains?",
+                        "action": "AURA_SUGGESTION"
+                    }));
+                }
             }
 
-            std::thread::sleep(Duration::from_secs(60));
+            // NEURAL GIT SCOUT (Level 16)
+            #[cfg(target_os = "windows")]
+            let git_check = Command::new("powershell")
+                .args(["-Command", "git status --short"])
+                .output();
+
+            if let Ok(output) = git_check {
+                let status = String::from_utf8_lossy(&output.stdout);
+                let changed_files = status.lines().count();
+                if changed_files >= 5 {
+                    let _ = app.emit("proactive-pulse", serde_json::json!({
+                        "suggestion": format!("Neural Git Scout: Detected {} uncommitted modifications. Initiate a diagnostic feature branch?", changed_files),
+                        "action": "GIT_BRANCH"
+                    }));
+                }
+            }
+
+            std::thread::sleep(Duration::from_secs(120)); // Pulsing every 2 minutes
         }
     });
     Ok(())
