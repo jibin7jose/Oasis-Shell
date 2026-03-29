@@ -60,6 +60,7 @@ export default function App() {
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
+  const [systemStats, setSystemStats] = useState<any>(null);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -317,6 +318,25 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const syncSystemData = async () => {
+      try {
+        const stats = await invoke("run_system_diagnostic") as any;
+        setSystemStats(stats);
+      } catch (e) {}
+    };
+    syncSystemData();
+  }, []);
+
+  const handleInstallShell = async () => {
+    try {
+      const res = await invoke("install_oas_binary") as string;
+      setNotification(res);
+      const stats = await invoke("run_system_diagnostic") as any;
+      setSystemStats(stats);
+    } catch (e) {}
+  };
+
   const handleCLICommand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliInput) return;
@@ -539,7 +559,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.3.0-SENTIENT (REALITY)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.4.0-PLATFORM (SYSTEM)</span>
                  <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
@@ -747,9 +767,20 @@ export default function App() {
                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
                       <Terminal className="w-4 h-4 text-emerald-400" />
                    </div>
-                   <h3 className="text-xl font-black text-white uppercase tracking-tighter">Oasis Shell <span className="text-[10px] text-emerald-500/50 leading-none">v3.1.0-platform</span></h3>
+                   <h3 className="text-xl font-black text-white uppercase tracking-tighter">Oasis Shell <span className="text-[10px] text-emerald-500/50 leading-none">v3.4.0-platform</span></h3>
                  </div>
-                 <button onClick={() => setShowCLI(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
+                 <div className="flex items-center gap-6">
+                    {systemStats && (
+                       <div className="flex items-center gap-2 px-4 py-1.5 glass rounded-xl border-white/5">
+                          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", systemStats.binary_sync ? "bg-emerald-500" : "bg-red-500")} />
+                          <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em]">{systemStats.path_status}</span>
+                       </div>
+                    )}
+                    <button onClick={handleInstallShell} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black text-white uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-emerald-600/20">
+                       Deploy Global Shell
+                    </button>
+                    <button onClick={() => setShowCLI(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
+                 </div>
               </div>
               <div className="flex-1 w-full bg-black/40 rounded-3xl p-8 mb-6 font-mono text-sm overflow-y-auto custom-scrollbar space-y-3">
                  {cliHistory.map((h, i) => (
@@ -956,14 +987,17 @@ export default function App() {
               {showAI && (
                  <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
                     <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable ({hardwareStatus?.focus_mode})</span>
-                       <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
+                       <div className="flex flex-col">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">System Link</span>
+                          <span className="text-[9px] text-slate-500 font-mono">{systemStats?.path_status || 'Initializing...'}</span>
+                       </div>
+                       <button onClick={handleInstallShell} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black uppercase rounded-lg">Deploy Global Shell</button>
                     </header>
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.3.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.4.0-PLATFORM</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
