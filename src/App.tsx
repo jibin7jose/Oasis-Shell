@@ -63,8 +63,12 @@ export default function App() {
   const [systemStats, setSystemStats] = useState<any>(null);
 
   const handleCommitSim = () => {
-    setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
+    const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
+    setFounderMetrics(newMetrics);
     setSimMode(false);
+    
+    // PERSIST: Synchronize state with Neural Ledger
+    invoke("save_venture_state", { metrics: newMetrics });
     setNotification(`Simulation Committed: Venture Reality Re-forecasted to $${simMetrics.arr}M ARR.`);
   };
 
@@ -307,6 +311,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const restoreState = async () => {
+      try {
+        const met = await invoke("load_venture_state") as any;
+        setFounderMetrics(met);
+        // Normalize simulation inputs to persisted state
+        const arrVal = parseFloat(met.arr.replace('$', '').replace('M', ''));
+        const burnVal = parseFloat(met.burn.replace('$', '').replace('K/mo', ''));
+        setSimMetrics({ arr: arrVal, burn: burnVal, momentum: 12.8 });
+      } catch (e) {}
+    };
+    restoreState();
+  }, []);
+
+  useEffect(() => {
     const syncInventoryData = async () => {
       try {
         const inv = await invoke("get_strategic_inventory") as any[];
@@ -365,7 +383,10 @@ export default function App() {
       try {
         const metrics = await invoke("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
         const intel = await invoke("get_market_intelligence") as any;
-        if (!simMode) setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
+        if (!simMode) {
+            setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
+            invoke("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
+        }
         setMarketIntel(intel);
         setLastSync(new Date().toLocaleTimeString());
       } catch (e) {
@@ -559,7 +580,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.4.0-PLATFORM (SYSTEM)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.5.0-PRO (IMMORTAL)</span>
                  <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
@@ -997,7 +1018,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.4.0-PLATFORM</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.5.0-PRO</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)

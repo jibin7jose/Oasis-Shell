@@ -662,6 +662,31 @@ async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
 }
 
 #[tauri::command]
+async fn save_venture_state(metrics: VentureMetrics) -> Result<String, String> {
+    let data = serde_json::to_string(&metrics).map_err(|e| e.to_string())?;
+    std::fs::write(".foundry_state.json", data).map_err(|e| e.to_string())?;
+    Ok("Venture State Persisted to Neural Ledger.".into())
+}
+
+#[tauri::command]
+async fn load_venture_state() -> Result<VentureMetrics, String> {
+    let path = ".foundry_state.json";
+    if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let metrics: VentureMetrics = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+        Ok(metrics)
+    } else {
+        // Default state if no persistence file exists
+        Ok(VentureMetrics {
+            arr: "$1.24M".into(),
+            burn: "$0.85M".into(),
+            runway: "14.2 Mo".into(),
+            stress_color: "#10b981".into(),
+        })
+    }
+}
+
+#[tauri::command]
 async fn install_oas_binary() -> Result<String, String> {
     // REAL COMMAND: Registering the binary into the system path for 'oas' command access
     // This provides the 'System-Level Power' requested
@@ -1325,7 +1350,9 @@ pub fn run() {
             execute_cli_directive,
             get_strategic_inventory,
             install_oas_binary,
-            run_system_diagnostic
+            run_system_diagnostic,
+            save_venture_state,
+            load_venture_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
