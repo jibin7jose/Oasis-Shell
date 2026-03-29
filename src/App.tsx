@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
   Activity, Settings, Zap, Shield, Terminal, 
-  Plus, Activity as PulseIcon, AlertCircle, X
+  Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -45,6 +45,14 @@ export default function App() {
   
   const [oracleAlert, setOracleAlert] = useState<any>(null);
   const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
+  const [notification, setNotification] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
   
   const [marketIntel, setMarketIntel] = useState([
     { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
@@ -90,12 +98,14 @@ export default function App() {
       } else if (q.includes("audit") || q.includes("report")) {
         invoke('generate_venture_audit').then((res: any) => {
            setMessages(prev => [...prev, { role: "assistant", content: `Auditor: ${res}` }]);
+           setNotification("Venture Health Audit Manifested Successfully.");
            logEvent("Executive Venture Audit Generated", "system");
         }).catch(() => {});
       } else if (q.includes("manifest") || q.includes("build code") || q.includes("write module")) {
         const title = query.replace(/manifest|build code|write module/gi, "").trim() || "NewStrategy";
         invoke('manifest_code_module', { name: title }).then((res: any) => {
            setMessages(prev => [...prev, { role: "assistant", content: `Architect: ${res}` }]);
+           setNotification(`Strategic Module '${title}' Successfully Architected.`);
            logEvent(`Strategic Code '${title}' Manifested to Disk`, "deploy");
         }).catch(() => {});
       } else if (q.includes("create") || q.includes("architect")) {
@@ -251,7 +261,55 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Background Substrate */}
+      {/* Crisis Lockout Overlay (Pillar 18) */}
+      <AnimatePresence>
+        {founderMetrics.stress_color === "#ef4444" && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[2000] bg-red-950/40 backdrop-blur-xl flex items-center justify-center p-12"
+          >
+             <div className="max-w-2xl w-full glass-bright border border-red-500/50 shadow-[0_0_100px_rgba(239,68,68,0.2)] rounded-[3rem] p-12 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse" />
+                <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8 animate-bounce" />
+                <h2 className="text-4xl font-black text-white uppercase tracking-[0.2em] mb-4">Critical Venture Burn</h2>
+                <p className="text-red-200 text-lg mb-8 font-medium italic opacity-80">"Foundry Discipline Initiated. System restricted to Strategic Recovery Nodes."</p>
+                <div className="grid grid-cols-2 gap-6 mb-10 text-left">
+                   <div className="p-6 glass border-red-500/20 rounded-2xl">
+                      <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Alpha</h4>
+                      <p className="text-xs text-white">Activate Series A Outreach Code Module.</p>
+                   </div>
+                   <div className="p-6 glass border-red-500/20 rounded-2xl">
+                      <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Beta</h4>
+                      <p className="text-xs text-white">Generate Executive Venture Audit.</p>
+                   </div>
+                </div>
+                <button onClick={() => setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }))} className="px-12 py-5 bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-red-500/40">
+                   Override Lockout
+                </button>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Global Success Notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div 
+            initial={{ x: 300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 300, opacity: 0 }}
+            className="fixed bottom-12 left-12 z-[2500] glass-bright border-emerald-500/30 rounded-2xl p-6 shadow-4xl flex items-center gap-5"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
+              <ShieldCheck className="w-6 h-6 text-emerald-500" />
+            </div>
+            <p className="text-xs font-bold text-emerald-100 uppercase tracking-wider">{notification}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
           animate={{ background: simMode ? '#f59e0b' : founderMetrics.stress_color, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
@@ -597,6 +655,9 @@ export default function App() {
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
+                            <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.0.0-SENTIENT</span>
+                            </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
                             </h5>
