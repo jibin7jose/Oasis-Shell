@@ -53,6 +53,9 @@ export default function App() {
   const [economicNews, setEconomicNews] = useState<string[]>([]);
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
   const [manifestHistory, setManifestHistory] = useState<string[]>([]);
+  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
+  const [crossWisdom, setCrossWisdom] = useState<string[]>([]);
+  const [showNetwork, setShowNetwork] = useState(false);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -285,6 +288,26 @@ export default function App() {
     } catch (e) {}
   };
 
+  useEffect(() => {
+    const syncNetworkData = async () => {
+      try {
+        const net = await invoke("get_available_ventures") as any[];
+        setVentureNetwork(net);
+      } catch (e) {}
+    };
+    syncNetworkData();
+    const interval = setInterval(syncNetworkData, 120000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMirrorVenture = async (id: string) => {
+    try {
+      const wis = await invoke("get_cross_venture_wisdom", { targetId: id }) as string[];
+      setCrossWisdom(wis);
+      setNotification(`Neural Mirror Connected: Knowledge transfer initiated from Venture ${id}.`);
+    } catch (e) {}
+  };
+
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
@@ -485,7 +508,11 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.5.0-SENTIENT (REWIND)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.6.0-SENTIENT (NETWORK)</span>
+                 <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
+                 </button>
                  {hardwareStatus && (
                     <span className="ml-4 text-[8px] font-black text-red-500/40 uppercase tracking-[0.25em] animate-pulse border-l border-white/5 pl-4">
                         {hardwareStatus.focus_mode}
@@ -677,6 +704,32 @@ export default function App() {
           </motion.div>
         )}
 
+        {/* Venture Network Registry Portal (Phase 28) */}
+        {showNetwork && (
+           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-2xl flex items-center justify-end p-20">
+              <div className="w-[500px] h-full glass-bright rounded-[3.5rem] p-12 flex flex-col items-center">
+                 <div className="w-full flex justify-between items-center mb-12">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Venture Discovery</h3>
+                    <button onClick={() => setShowNetwork(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
+                 </div>
+                 <div className="flex-1 w-full space-y-6 overflow-y-auto custom-scrollbar pr-4">
+                    {ventureNetwork.map((v: any) => (
+                      <div key={v.id} className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all group">
+                         <div className="flex justify-between items-start mb-4">
+                            <div>
+                               <h4 className="text-lg font-black text-white uppercase tracking-tight">{v.name}</h4>
+                               <p className="text-[10px] text-slate-500 font-mono tracking-widest">{v.path}</p>
+                            </div>
+                            <span className="text-xs font-black text-indigo-400">{v.peak_arr} PEAK</span>
+                         </div>
+                         <button onClick={() => handleMirrorVenture(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+           </motion.div>
+        )}
+
         {activeGolem && (
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-2xl flex items-center justify-center p-12">
               <div className="max-w-4xl w-full glass-bright rounded-[3rem] border border-white/10 shadow-5xl overflow-hidden flex h-[600px]">
@@ -689,7 +742,7 @@ export default function App() {
                        <button onClick={() => {
                           invoke('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
                             setNotification(res);
-                            setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").to_lowercase()}.ts`]);
+                            setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
                             setActiveGolem(null);
                             setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
                           });
@@ -825,7 +878,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.5.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.6.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
@@ -835,6 +888,14 @@ export default function App() {
                             <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
                                Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
                             </div>
+                            <div className="space-y-3 mt-4">
+                               <h6 className="text-[9px] font-black text-indigo-500/50 uppercase tracking-widest pl-1">Network Insights (Pillar 28)</h6>
+                               {crossWisdom.map((w: string, i: number) => (
+                                 <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-400 italic">
+                                   "{w}"
+                                 </div>
+                               ))}
+                             </div>
                          </div>
                        )}
                        {messages.map((m, i) => (

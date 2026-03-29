@@ -63,6 +63,14 @@ pub struct PendingManifest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VentureEntity {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub peak_arr: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VentureSnapshot {
     pub id: String,
     pub timestamp: String,
@@ -558,6 +566,28 @@ async fn restore_venture_state(files: Vec<String>) -> Result<String, String> {
         }
     }
     Ok("Venture Core Reverted to Previous Equilibrium. Manifested files purged.".into())
+}
+
+#[tauri::command]
+async fn get_available_ventures() -> Result<Vec<VentureEntity>, String> {
+    Ok(vec![
+        VentureEntity { id: "01".into(), name: "Aegis Ledger".into(), path: "/projects/aegis".into(), peak_arr: "$4.1M".into() },
+        VentureEntity { id: "02".into(), name: "Lumina UX".into(), path: "/projects/lumina".into(), peak_arr: "$0.8M".into() },
+    ])
+}
+
+#[tauri::command]
+async fn get_cross_venture_wisdom(target_id: String) -> Result<Vec<String>, String> {
+    if target_id == "01" {
+        Ok(vec![
+            "Capital Efficiency Audit (78% success rate in Aegis)".into(),
+            "De-coupled Microservices Architecture".into(),
+        ])
+    } else {
+        Ok(vec![
+            "User Onboarding Flow (34% conversion in Lumina)".into(),
+        ])
+    }
 }
 
 #[tauri::command]
@@ -1166,7 +1196,9 @@ pub fn run() {
             get_economic_news,
             trigger_hardware_symbiosis,
             create_restore_point,
-            restore_venture_state
+            restore_venture_state,
+            get_available_ventures,
+            get_cross_venture_wisdom
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
