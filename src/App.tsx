@@ -48,6 +48,8 @@ export default function App() {
   const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
   const [notification, setNotification] = useState<string | null>(null);
   const [workforce, setWorkforce] = useState<any[]>([]);
+  const [pendingManifests, setPendingManifests] = useState<any[]>([]);
+  const [activeGolem, setActiveGolem] = useState<any>(null);
 
   useEffect(() => {
     if (notification) {
@@ -153,30 +155,37 @@ export default function App() {
     logEvent(`Context Shifted to: ${id.toUpperCase()}`, 'system');
   };
 
-  const graphData = useMemo(() => ({
-    nodes: [
+  const graphData = useMemo(() => {
+    const baseNodes = [
       { id: "FOUNDRY CORE", group: "core", val: 20 }, 
       { id: "STRATEGIC CAPITAL", group: "capital", val: 12 }, 
       { id: "PRODUCT ROADMAP", group: "product", val: 12 },
       { id: "GROWTH MOMENTUM", group: "growth", val: 12 },
-      { id: "SERIES A", group: "capital", val: 8 },
-      { id: "MVP BUILD", group: "product", val: 8 },
-      { id: "USER TRACTION", group: "growth", val: 8 },
-      { id: "TECH STACK", group: "core", val: 8 },
-    ], 
-    links: [
+    ];
+    
+    const ghostNodes = pendingManifests.map(m => ({
+      id: m.title.toUpperCase(), group: "ghost", val: 15, mData: m
+    }));
+
+    const baseLinks = [
       { source: "FOUNDRY CORE", target: "STRATEGIC CAPITAL" }, 
       { source: "FOUNDRY CORE", target: "PRODUCT ROADMAP" },
       { source: "FOUNDRY CORE", target: "GROWTH MOMENTUM" },
-      { source: "STRATEGIC CAPITAL", target: "SERIES A" },
-      { source: "PRODUCT ROADMAP", target: "MVP BUILD" },
-      { source: "GROWTH MOMENTUM", target: "USER TRACTION" },
-      { source: "FOUNDRY CORE", target: "TECH STACK" }
-    ] 
-  }), []);
+    ];
+
+    const ghostLinks = pendingManifests.map(m => ({
+      source: "GROWTH MOMENTUM", target: m.title.toUpperCase()
+    }));
+
+    return { 
+      nodes: [...baseNodes, ...ghostNodes], 
+      links: [...baseLinks, ...ghostLinks] 
+    };
+  }, [pendingManifests]);
 
   const getNodeColor = (node: any) => {
     if (simMode) return "#f59e0b";
+    if (node.group === 'ghost') return 'rgba(255, 255, 255, 0.2)';
     switch (node.group) {
       case 'core': return '#6366f1';
       case 'capital': return '#f59e0b';
@@ -221,6 +230,18 @@ export default function App() {
     const interval = setInterval(syncWorkforceData, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const syncGolems = async () => {
+      try {
+        const pmd = await invoke("get_pending_manifests", { stressColor: founderMetrics.stress_color }) as any[];
+        setPendingManifests(pmd);
+      } catch (e) {}
+    };
+    syncGolems();
+    const interval = setInterval(syncGolems, 30000);
+    return () => clearInterval(interval);
+  }, [founderMetrics.stress_color]);
 
   // --- SYNC: BRIDGE ---
   useEffect(() => {
@@ -574,13 +595,40 @@ export default function App() {
                     graphData={graphData} 
                     backgroundColor="#00000000" 
                     nodeRelSize={simMode ? 10 : 10} 
-                    nodeColor={getNodeColor}
+                    nodeColor={(node: any) => node.group === 'ghost' ? '#C0C0C0' : getNodeColor(node)}
                     nodeLabel="id"
                     linkColor={() => simMode ? "rgba(245, 158, 11, 0.3)" : "rgba(99, 102, 241, 0.3)"}
+                    onNodeClick={(node: any) => node.group === 'ghost' && setActiveGolem(node.mData)}
                   />
                 )}
              </div>
           </motion.div>
+        )}
+
+        {activeGolem && (
+           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-2xl flex items-center justify-center p-12">
+              <div className="max-w-4xl w-full glass-bright rounded-[3rem] border border-white/10 shadow-5xl overflow-hidden flex h-[600px]">
+                 <div className="w-1/3 p-12 bg-white/5 border-r border-white/5 flex flex-col justify-between">
+                    <div>
+                       <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">{activeGolem.title}</h3>
+                       <p className="text-xs text-slate-400 leading-relaxed italic">"Agentic Rationale: {activeGolem.rationale}"</p>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                       <button onClick={() => {
+                          invoke('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
+                            setNotification(res);
+                            setActiveGolem(null);
+                            setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
+                          });
+                       }} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30">Authorize Golem</button>
+                       <button onClick={() => setActiveGolem(null)} className="w-full py-5 glass text-slate-500 hover:text-white uppercase tracking-widest text-[10px] rounded-2xl">Dismiss Draft</button>
+                    </div>
+                 </div>
+                 <div className="flex-1 p-12 bg-black/20 font-mono text-sm text-indigo-300 custom-scrollbar overflow-y-auto">
+                    <pre className="whitespace-pre-wrap">{activeGolem.code_draft}</pre>
+                 </div>
+              </div>
+           </motion.div>
         )}
 
         {showVault && (
@@ -697,7 +745,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.1.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.2.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)

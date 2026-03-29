@@ -42,6 +42,14 @@ pub struct VentureStress {
     pub status: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PendingManifest {
+    pub id: String,
+    pub title: String,
+    pub rationale: String,
+    pub code_draft: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NeuralAgent {
     pub name: String,
@@ -462,6 +470,32 @@ async fn get_neural_workforce() -> Result<Vec<NeuralAgent>, String> {
             recommendation: "Monthly Audit manifested. Ready for stakeholder relay.".into(),
         }
     ])
+}
+
+#[tauri::command]
+async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManifest>, String> {
+    if stress_color == "#ef4444" {
+        Ok(vec![PendingManifest {
+            id: "pivot_01".into(),
+            title: "Emergency Pivot Audit".into(),
+            rationale: "Venture stress is critical. Auditor suggests immediate runway-burn decoupling.".into(),
+            code_draft: "export const PivotAudit = () => { console.log('Critical Pivot Node Active'); }".into(),
+        }])
+    } else {
+        Ok(vec![PendingManifest {
+            id: "growth_01".into(),
+            title: "Scaling Momentum Node".into(),
+            rationale: "Internal momentum is high. Growth Op suggests architecting a referral engine.".into(),
+            code_draft: "export const GrowthEngine = () => { console.log('Scaling Momentum Engine Active'); }".into(),
+        }])
+    }
+}
+
+#[tauri::command]
+async fn execute_golem_manifest(id: String, title: String, code: String) -> Result<String, String> {
+    let path = format!("manifested/{}.ts", title.replace(" ", "_").to_lowercase());
+    std::fs::write(&path, code).map_err(|e| e.to_string())?;
+    Ok(format!("Golem Manifestation Complete: Strategic Module {} is now active in {}", title, path))
 }
 
 #[tauri::command]
@@ -1064,7 +1098,9 @@ pub fn run() {
             generate_venture_audit,
             get_neural_wisdom,
             trigger_oracle_audit,
-            get_neural_workforce
+            get_neural_workforce,
+            get_pending_manifests,
+            execute_golem_manifest
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
