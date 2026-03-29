@@ -548,13 +548,26 @@ async fn execute_golem_manifest(id: String, title: String, code: String) -> Resu
 }
 
 #[tauri::command]
-async fn trigger_oracle_audit() -> Result<OracleAlert, String> {
-    Ok(OracleAlert {
-        title: "Strategic Economic Sentinel".into(),
-        body: "OASIS_INDEX sector growth outstripping internal traction by 4.8%. Market sentiment is BULLISH.".into(),
-        divergence_level: "Critical (Action Required)".into(),
-        economic_signal: "Tech Sector Momentum: +12.4% (Global Benchmark)".into(),
-    })
+async fn trigger_oracle_audit(arr: f32, burn: f32) -> Result<OracleAlert, String> {
+    let monthly_rev = arr / 12.0;
+    let net_burn = (burn - monthly_rev).max(0.1);
+    let runway = 24.0 / net_burn;
+
+    if runway < 6.0 {
+        Ok(OracleAlert {
+            title: "CRITICAL RUNWAY DEPLETION".into(),
+            body: format!("Current cash burn rate predicts total bankruptcy in {:.1} months. Emergency Pivot Manifest required.", runway),
+            divergence_level: "High Risk".into(),
+            economic_signal: "Market Beta Sector: RECOVERY FOCUS".into(),
+        })
+    } else {
+        Ok(OracleAlert {
+            title: "STRATEGIC EQUILIBRIUM".into(),
+            body: format!("Venture stability confirmed with {:.1} months of runway. Scaling directives optimal.", runway),
+            divergence_level: "Minimal".into(),
+            economic_signal: "Market Beta Sector: GROWTH FOCUS".into(),
+        })
+    }
 }
 
 #[tauri::command]
@@ -612,11 +625,33 @@ async fn get_cross_venture_wisdom(target_id: String) -> Result<Vec<String>, Stri
 
 #[tauri::command]
 async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
-    Ok(vec![
-        AssetMetadata { file_path: "src-tauri/src/lib.rs".into(), debt: 12.5, authorizer: "Founder".into(), risk: "Emerald (Solid)".into() },
-        AssetMetadata { file_path: "src/App.tsx".into(), debt: 34.2, authorizer: "Tech Architect".into(), risk: "Amber (Scaling)".into() },
-        AssetMetadata { file_path: "manifested/pivot_audit.ts".into(), debt: 8.0, authorizer: "Foundry Oracle".into(), risk: "Ruby (Debt)".into() },
-    ])
+    let mut inventory = Vec::new();
+    let path = "manifested";
+    
+    // Ensure directory exists
+    if !std::path::Path::new(path).exists() {
+        std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
+    }
+
+    let entries = std::fs::read_dir(path).map_err(|e| e.to_string())?;
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        let file_name = entry.file_name().into_string().unwrap_or_default();
+        
+        // Calculate Pseudo-Debt based on actual file size (e.g., larger = more complex/debt)
+        let debt = (metadata.len() as f32 / 100.0).min(100.0);
+        let risk = if debt > 60.0 { "Ruby (Debt)" } else if debt > 30.0 { "Amber (Scale)" } else { "Emerald (Solid)" };
+
+        inventory.push(AssetMetadata {
+            file_path: format!("{}/{}", path, file_name),
+            debt,
+            authorizer: "Oasis Golem".into(),
+            risk: risk.into(),
+        });
+    }
+
+    Ok(inventory)
 }
 
 #[tauri::command]

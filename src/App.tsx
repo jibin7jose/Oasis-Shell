@@ -224,14 +224,15 @@ export default function App() {
   }, [founderMetrics.stress_color]);
 
   useEffect(() => {
-    const checkOracle = async () => {
-       try {
-         const alert = await invoke('trigger_oracle_audit') as any;
-         setOracleAlert(alert);
-       } catch (e) {}
+    const triggerAudit = async () => {
+      try {
+        const alert = await invoke("trigger_oracle_audit", { arr: simMetrics.arr, burn: simMetrics.burn }) as any;
+        setOracleAlert(alert);
+        setNotification(`Neural Oracle Audit Complete: ${alert.title}`);
+      } catch (e) {}
     };
-    checkOracle();
-    const interval = setInterval(checkOracle, 60000);
+    triggerAudit();
+    const interval = setInterval(triggerAudit, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -342,7 +343,7 @@ export default function App() {
   useEffect(() => {
     const syncFoundryData = async () => {
       try {
-        const metrics = await invoke("get_venture_metrics") as any;
+        const metrics = await invoke("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
         const intel = await invoke("get_market_intelligence") as any;
         if (!simMode) setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
         setMarketIntel(intel);
@@ -359,7 +360,7 @@ export default function App() {
     syncFoundryData();
     const interval = setInterval(syncFoundryData, 10000);
     return () => clearInterval(interval);
-  }, [simMode]);
+  }, [simMode, simMetrics.arr, simMetrics.burn]);
 
 
 
@@ -538,7 +539,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.2.0-PLATFORM (INVENTORY)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.3.0-SENTIENT (REALITY)</span>
                  <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
@@ -955,14 +956,14 @@ export default function App() {
               {showAI && (
                  <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
                     <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable ({hardwareStatus.focus_mode})</span>
+                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable ({hardwareStatus?.focus_mode})</span>
                        <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
                     </header>
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.2.0-PLATFORM</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.3.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
