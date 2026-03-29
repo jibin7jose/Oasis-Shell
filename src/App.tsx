@@ -2,10 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
-  Activity, Settings, Zap, Shield, Terminal, 
-  Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck,
-  Globe, Cpu, RotateCcw, Eye
+  Globe, Cpu, RotateCcw, Eye, Mic, MicOff,
+  Bot, BrainCircuit, Settings, Terminal, Search, Trash2, Plus
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -67,8 +65,25 @@ export default function App() {
   const [zenMode, setZenMode] = useState(false);
   const [chronosLedger, setChronosLedger] = useState<any[]>([]);
   const [chronosIndex, setChronosIndex] = useState(-1);
+  const [voiceActive, setVoiceActive] = useState(false);
 
-  const handleCommitSim = async () => {
+  const handleVoiceIntent = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.onstart = () => setVoiceActive(true);
+    recognition.onend = () => setVoiceActive(false);
+    recognition.onresult = (event: any) => {
+       const transcript = event.results[0][0].transcript.toLowerCase();
+       setNotification(`Oasis Resonating: "${transcript}"`);
+       if (transcript.includes("zen mode")) setZenMode(true);
+       if (transcript.includes("normal mode")) setZenMode(false);
+       if (transcript.includes("shell") || transcript.includes("terminal")) setShowCLI(prev => !prev);
+       if (transcript.includes("restore reality")) setChronosIndex(chronosLedger.length - 1);
+    };
+    recognition.start();
+  };
     const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
     setFounderMetrics(newMetrics);
     setSimMode(false);
@@ -650,8 +665,11 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.0.0-UNIVERSE (PLATFORM)</span>
-                 <button onClick={() => setZenMode(!zenMode)} className={cn("ml-8 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.1.0-RESONANCE (VOICE)</span>
+                 <button onClick={handleVoiceIntent} className={cn("ml-8 p-2 glass rounded-lg transition-all", voiceActive ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]" : "text-slate-400")}>
+                    {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                 </button>
+                 <button onClick={() => setZenMode(!zenMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
                     <Eye className="w-4 h-4" />
                  </button>
                  <button onClick={() => setShowCLI(!showCLI)} className={cn("ml-4 p-2 glass rounded-lg text-emerald-400 group relative", zenMode && "opacity-0 scale-90")}>
@@ -988,7 +1006,7 @@ export default function App() {
                 </div>
              </div>
              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
-                {strategicInventory.map((asset, i) => (
+                {strategicInventory.map((asset: any, i: number) => (
                    <motion.div 
                      key={asset.file_path}
                      initial={{ opacity: 0, y: 20 }}
@@ -1039,7 +1057,7 @@ export default function App() {
              <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
                 <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
                 <div className="space-y-12">
-                   {timeline.map((event) => (
+                   {timeline.map((event: any) => (
                       <div key={event.id} className="relative pl-12">
                          <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center z-10", event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600")}>
                             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -1110,7 +1128,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className={cn("p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4 transition-all", zenMode && "opacity-0")}>
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.0.0-UNIVERSE</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.1.0-RESONANCE</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                <p className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</p>
