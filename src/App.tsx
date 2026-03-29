@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Bot, Search, LayoutDashboard, FolderOpen, Activity, 
-  Settings, Zap, BrainCircuit, Shield, Terminal, 
-  Plus, Activity as PulseIcon
+  Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
+  Activity, Settings, Zap, Shield, Terminal, 
+  Plus, Activity as PulseIcon, AlertCircle, X
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -42,6 +42,9 @@ export default function App() {
   const [founderMetrics, setFounderMetrics] = useState({
     arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#6366f1"
   });
+  
+  const [oracleAlert, setOracleAlert] = useState<any>(null);
+  const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
   
   const [marketIntel, setMarketIntel] = useState([
     { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
@@ -171,6 +174,30 @@ export default function App() {
     }
   };
 
+  // --- V2 COGNITION EFFECTORS ---
+  useEffect(() => {
+    if (founderMetrics.stress_color !== "#6366f1") {
+       invoke('get_neural_wisdom', { stressColor: founderMetrics.stress_color }).then((res: any) => {
+          setNeuralWisdom(res);
+          setMessages(prev => [...prev, { role: "assistant", content: `Neural Wisdom: ${res.recommendation}` }]);
+       }).catch(() => {});
+    } else {
+       setNeuralWisdom(null);
+    }
+  }, [founderMetrics.stress_color]);
+
+  useEffect(() => {
+    const checkOracle = async () => {
+       try {
+         const alert = await invoke('trigger_oracle_audit') as any;
+         setOracleAlert(alert);
+       } catch (e) {}
+    };
+    checkOracle();
+    const interval = setInterval(checkOracle, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
@@ -198,6 +225,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30">
+      {/* Oracle Alert Notification (Pillar 20) */}
+      <AnimatePresence>
+        {oracleAlert && (
+          <motion.div 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -100, opacity: 0 }}
+            className="fixed top-32 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-lg px-6"
+          >
+            <div className="glass-bright border border-red-500/30 rounded-3xl p-6 shadow-4xl flex items-center gap-6 overflow-hidden relative">
+              <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
+              <div className="w-12 h-12 rounded-2xl bg-red-500/20 flex items-center justify-center border border-red-500/40">
+                <AlertCircle className="w-6 h-6 text-red-500" />
+              </div>
+              <div className="flex-1 relative z-10">
+                <h4 className="text-red-400 font-bold text-sm mb-1 uppercase tracking-wider">{oracleAlert.title}</h4>
+                <p className="text-xs text-slate-300 leading-relaxed font-medium">{oracleAlert.body}</p>
+              </div>
+              <button onClick={() => setOracleAlert(null)} className="p-2 text-slate-500 hover:text-white transition-colors relative z-10">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background Substrate */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
@@ -542,6 +595,18 @@ export default function App() {
                        <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
                     </header>
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
+                       {neuralWisdom && (
+                         <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
+                            <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                              <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
+                            </h5>
+                            <p className="text-xs text-indigo-100 font-bold leading-relaxed mb-3">{neuralWisdom.recommendation}</p>
+                            <p className="text-[10px] text-indigo-300 italic opacity-80">{neuralWisdom.insight}</p>
+                            <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
+                               Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
+                            </div>
+                         </div>
+                       )}
                        {messages.map((m, i) => (
                          <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
                        ))}

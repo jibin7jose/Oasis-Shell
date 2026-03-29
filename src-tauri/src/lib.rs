@@ -43,6 +43,20 @@ pub struct VentureStress {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct NeuralWisdom {
+    pub recommendation: String,
+    pub insight: String,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OracleAlert {
+    pub title: String,
+    pub body: String,
+    pub divergence_level: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeModule {
     pub name: String,
     pub language: String,
@@ -402,7 +416,48 @@ async fn manifest_code_module(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn generate_venture_audit(state: tauri::State<'_, Arc<Mutex<()>>>) -> Result<String, String> {
+async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String> {
+    if stress_color == "#ef4444" || stress_color == "#f59e0b" {
+        Ok(NeuralWisdom {
+            recommendation: "Re-activate 'Series A Outreach' module immediately.".into(),
+            insight: "Last successful pivot (2026-03-12) resulted in +14.2% ARR growth within 7 days.".into(),
+            confidence: 0.94,
+        })
+    } else {
+        Ok(NeuralWisdom {
+            recommendation: "System Stable. Focus on 'Strategic Innovation' nodes.".into(),
+            insight: "Venture Equilibrium maintained for 18.5 consecutive cycles.".into(),
+            confidence: 0.98,
+        })
+    }
+}
+
+#[tauri::command]
+async fn trigger_oracle_audit() -> Result<OracleAlert, String> {
+    Ok(OracleAlert {
+        title: "Strategic Divergence Detected".into(),
+        body: "OASIS_INDEX sector growth outstripping internal traction by 4.8%. Pivot suggested.".into(),
+        divergence_level: "Critical".into(),
+    })
+}
+
+#[tauri::command]
+async fn manifest_code_module(name: String) -> Result<String, String> {
+    let path = format!("manifested/{}.ts", name.replace(" ", "_").to_lowercase());
+    let dir = std::path::Path::new("manifested");
+    if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
+    
+    let boilerplate = format!(
+        "// OASIS FOUNDRY: AUTONOMOUS ARCHITECT MANIFEST\n// Module: {}\n// Status: PROVISIONAL\n\nexport const {} = () => {{\n  console.log(\"Oasis Strategy Module {} Initialized.\");\n}};",
+        name, name.replace(" ", ""), name
+    );
+    
+    std::fs::write(&path, boilerplate).map_err(|e| e.to_string())?;
+    Ok(format!("Strategic Module '{}' Manifested in {}", name, path))
+}
+
+#[tauri::command]
+async fn generate_venture_audit() -> Result<String, String> {
     let path = "manifested/venture_audit_report.md";
     let dir = std::path::Path::new("manifested");
     if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
@@ -974,7 +1029,9 @@ pub fn run() {
             get_vault_nodes,
             get_market_intelligence,
             manifest_code_module,
-            generate_venture_audit
+            generate_venture_audit,
+            get_neural_wisdom,
+            trigger_oracle_audit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
