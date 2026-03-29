@@ -70,6 +70,7 @@ pub struct OracleAlert {
     pub title: String,
     pub body: String,
     pub divergence_level: String,
+    pub economic_signal: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -501,10 +502,20 @@ async fn execute_golem_manifest(id: String, title: String, code: String) -> Resu
 #[tauri::command]
 async fn trigger_oracle_audit() -> Result<OracleAlert, String> {
     Ok(OracleAlert {
-        title: "Strategic Divergence Detected".into(),
-        body: "OASIS_INDEX sector growth outstripping internal traction by 4.8%. Pivot suggested.".into(),
-        divergence_level: "Critical".into(),
+        title: "Strategic Economic Sentinel".into(),
+        body: "OASIS_INDEX sector growth outstripping internal traction by 4.8%. Market sentiment is BULLISH.".into(),
+        divergence_level: "Critical (Action Required)".into(),
+        economic_signal: "Tech Sector Momentum: +12.4% (Global Benchmark)".into(),
     })
+}
+
+#[tauri::command]
+async fn get_economic_news() -> Result<Vec<String>, String> {
+    Ok(vec![
+        "[Sentinel] SaaS Benchmark Burn rate decreased 15% globally.".into(),
+        "[Sentinel] New Pivot patterns detected in Series-A fintech startups.".into(),
+        "[Sentinel] GPU Scarcity Index: Stabilizing (Positive for product scale).".into(),
+    ])
 }
 
 #[tauri::command]
@@ -1100,7 +1111,8 @@ pub fn run() {
             trigger_oracle_audit,
             get_neural_workforce,
             get_pending_manifests,
-            execute_golem_manifest
+            execute_golem_manifest,
+            get_economic_news
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

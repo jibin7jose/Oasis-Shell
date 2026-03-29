@@ -50,6 +50,7 @@ export default function App() {
   const [workforce, setWorkforce] = useState<any[]>([]);
   const [pendingManifests, setPendingManifests] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
+  const [economicNews, setEconomicNews] = useState<string[]>([]);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -249,6 +250,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, [founderMetrics.stress_color]);
 
+  useEffect(() => {
+    const syncNewsData = async () => {
+      try {
+        const news = await invoke("get_economic_news") as string[];
+        setEconomicNews(news);
+      } catch (e) {}
+    };
+    syncNewsData();
+    const interval = setInterval(syncNewsData, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
@@ -292,7 +305,10 @@ export default function App() {
               </div>
               <div className="flex-1 relative z-10">
                 <h4 className="text-red-400 font-bold text-sm mb-1 uppercase tracking-wider">{oracleAlert.title}</h4>
-                <p className="text-xs text-slate-300 leading-relaxed font-medium">{oracleAlert.body}</p>
+                <p className="text-xs text-slate-300 leading-relaxed font-medium mb-3">{oracleAlert.body}</p>
+                <div className="flex items-center gap-2 text-[10px] font-black text-red-500 uppercase tracking-widest opacity-80">
+                   <Globe className="w-4 h-4" /> Market Signal: {oracleAlert.economic_signal}
+                </div>
               </div>
               <button onClick={() => setOracleAlert(null)} className="p-2 text-slate-500 hover:text-white transition-colors relative z-10">
                 <X className="w-5 h-5" />
@@ -441,7 +457,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.2.1-SENTIENT</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.3.0-SENTIENT</span>
                </h1>
             </div>
             
@@ -454,14 +470,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-8">
-            {marketIntel.map((m, i) => (
-              <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
-                <PulseIcon className={cn("w-3.5 h-3.5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")} />
-                <span>{m.symbol}: <span className="text-white">{m.price}</span></span>
-                <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.change}</span>
-              </div>
-            ))}
-            <div className="h-8 w-[1px] bg-white/5 shadow-[0_0_10px_rgba(255,255,255,0.05)]" />
             <button onClick={() => setPresentationMode(!presentationMode)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
               {presentationMode ? "Exit Portal" : "Neural Sync"}
             </button>
@@ -489,6 +497,31 @@ export default function App() {
                   </div>
               </motion.div>
             )}
+
+            {/* Global Venture Pulse Ticker (Enhanced with Economic Sentinel Pillar 25) */}
+            <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
+               <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#020617] to-transparent z-10" />
+               <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#020617] to-transparent z-10" />
+               <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
+                  {marketIntel.map((m, i) => (
+                    <div key={i} className="flex gap-4 items-center">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
+                       <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
+                       <span className={cn("text-[10px] font-black tracking-widest uppercase", m.change.startsWith('+') ? "text-emerald-500" : "text-red-500")}>
+                          {m.change}
+                       </span>
+                    </div>
+                  ))}
+                  {economicNews.map((n, i) => (
+                    <div key={i} className="flex gap-4 items-center pl-12 border-l border-white/10">
+                       <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                          <Globe className="w-4 h-4" /> Sentinel Insight
+                       </span>
+                       <span className="text-sm font-medium text-slate-400">{n}</span>
+                    </div>
+                  ))}
+               </div>
+            </div>
 
             {/* Metrics Ribbon */}
             <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
@@ -751,7 +784,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.2.1-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.3.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
