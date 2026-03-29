@@ -1,18 +1,14 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, Monitor, 
-  MessageSquare, Bot, RefreshCw, CheckCircle2, CloudLightning, Zap, 
-  AlertCircle, ExternalLink, Shield, Activity, FolderOpen, FileCode2, 
-  Terminal, Eye, LayoutDashboard, BrainCircuit, ShieldCheck, HardDrive, 
-  Command, Clock, Maximize2, Minimize2 
+  LayoutGrid, Code, Gamepad2, Globe, Settings, Search, Plus, 
+  Bot, CheckCircle2, Zap, RefreshCw,
+  Shield, Activity, FolderOpen, 
+  Terminal, LayoutDashboard, BrainCircuit,
+  Command, Clock, Maximize2
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { cn } from "./lib/utils";
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-// @ts-ignore
 import ForceGraph3D from 'react-force-graph-3d';
 
 const contexts = [
@@ -22,64 +18,70 @@ const contexts = [
   { id: "research", name: "Market Research", icon: Globe, color: "emerald", aura: "rgba(5, 150, 105, 0.4)" },
 ];
 
-const DesignShowroom = () => {
-  const mountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!mountRef.current) return;
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
-    camera.position.set(0, 0, 8);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-    mountRef.current.appendChild(renderer.domElement);
-    const light = new THREE.DirectionalLight(0xffffff, 2);
-    light.position.set(5, 5, 5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const animate = () => {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    };
-    animate();
-    return () => {
-      renderer.dispose();
-      mountRef.current?.removeChild(renderer.domElement);
-    };
-  }, []);
-  return <div ref={mountRef} className="w-full h-40 bg-slate-900/40 rounded-xl overflow-hidden mt-2 border border-emerald-500/10" />;
-}
+const getNodeColor = (node: any) => {
+  const colors: any = { core: "#3b82f6", capital: "#f59e0b", product: "#8b5cf6", growth: "#10b981" };
+  return colors[node.group] || "#6366f1";
+};
 
 export default function App() {
   const [activeContext, setActiveContext] = useState("dev");
-  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
   const [searchQuery, setSearchQuery] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [aiHeartbeat, setAiHeartbeat] = useState({ ready: true, online: true });
+  const [aiHeartbeat] = useState({ ready: true, online: true });
   const [showGraph, setShowGraph] = useState(false);
-  const [showVault, setShowVault] = useState(false);
-  const [vaultFiles, setVaultFiles] = useState([]);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
-  const [windowCount, setWindowCount] = useState(12);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [crates, setCrates] = useState<any[]>([]);
-  const [proactiveAlert, setProactiveAlert] = useState<any>(null);
+  const [windowCount] = useState(12);
+  const [logicPath, setLogicPath] = useState("Initializing Pathing...");
+  const [autoAcceptSentience, setAutoAcceptSentience] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showVault, setShowVault] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
   const [assistantInput, setAssistantInput] = useState("");
   const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
-  const [loadingVision, setLoadingVision] = useState(false);
-  const [logicPath, setLogicPath] = useState("Initializing Pathing...");
-  const [autoAcceptSentience, setAutoAcceptSentience] = useState(false);
+  const [loadingVision] = useState(false);
+  const [founderMetrics, setFounderMetrics] = useState({
+    arr: "$0.0M", burn: "$0K/mo", runway: "0 Mo.", momentum: "0%"
+  });
+
+  // Sync Foundry Metrics from Rust Kernel with Browser Fallback
+  useEffect(() => {
+    const syncMetrics = async () => {
+      try {
+        // Attempt native Tauri bridge
+        const metrics = await invoke("get_venture_metrics") as any;
+        setFounderMetrics(metrics);
+        setLastSync(new Date().toLocaleTimeString());
+      } catch (e) {
+        // Mock Fallback for Browser Audits
+        console.warn("Venture Data Bridge: Native Bridge Unreachable. Initiating Simulation.", e);
+        setFounderMetrics({
+          arr: "$1.24M",
+          burn: "$42.5K/mo",
+          runway: "18.4 Mo.",
+          momentum: "+12.8%"
+        });
+        setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
+      }
+    };
+    syncMetrics();
+    const interval = setInterval(syncMetrics, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const metrics = useMemo(() => [
+    { label: 'Target ARR', value: founderMetrics.arr, trend: founderMetrics.momentum, icon: Zap },
+    { label: 'Burn Rate', value: founderMetrics.burn, trend: '-2.1%', icon: Activity },
+    { label: 'Venture Runway', value: founderMetrics.runway, trend: 'Stable', icon: Shield },
+    { label: 'Market Pulse', value: '124.2K', trend: '+8.4%', icon: Globe },
+  ], [founderMetrics]);
 
   useEffect(() => {
     const paths: any = {
-      dev: "Dev > Code > Audit > Pulse",
-      design: "Scene > Render > Export > Sync",
-      gaming: "Focus > Optimize > Play > Record",
-      research: "Query > Analyze > Archive > Pulse"
+      dev: "Foundry > Deploy > Scale",
+      design: "Scene > Strategic Graph > Render",
+      gaming: "Performance > Optimize > Mission",
+      research: "Market > Analyze > Acquisition"
     };
     setLogicPath(paths[activeContext] || "Idle");
   }, [activeContext]);
@@ -92,17 +94,23 @@ export default function App() {
 
   const graphData = useMemo(() => ({
     nodes: [
-      { id: "Oasis Core", group: 1 }, 
-      { id: "Neural Lens", group: 2 }, 
-      { id: "Git Scout", group: 3 },
-      { id: "CPU_SENSOR", group: 0, label: "System Core" },
-      { id: "RAM_SENSOR", group: 0, label: "Neural Memory" }
+      { id: "FOUNDRY CORE", group: "core", val: 20 }, 
+      { id: "STRATEGIC CAPITAL", group: "capital", val: 12 }, 
+      { id: "PRODUCT ROADMAP", group: "product", val: 12 },
+      { id: "GROWTH MOMENTUM", group: "growth", val: 12 },
+      { id: "SERIES A", group: "capital", val: 8 },
+      { id: "MVP BUILD", group: "product", val: 8 },
+      { id: "USER TRACTION", group: "growth", val: 8 },
+      { id: "TECH STACK", group: "core", val: 8 },
     ], 
     links: [
-      { source: "Oasis Core", target: "Neural Lens" }, 
-      { source: "Oasis Core", target: "Git Scout" },
-      { source: "CPU_SENSOR", target: "Oasis Core" },
-      { source: "RAM_SENSOR", target: "Oasis Core" }
+      { source: "FOUNDRY CORE", target: "STRATEGIC CAPITAL" }, 
+      { source: "FOUNDRY CORE", target: "PRODUCT ROADMAP" },
+      { source: "FOUNDRY CORE", target: "GROWTH MOMENTUM" },
+      { source: "STRATEGIC CAPITAL", target: "SERIES A" },
+      { source: "PRODUCT ROADMAP", target: "MVP BUILD" },
+      { source: "GROWTH MOMENTUM", target: "USER TRACTION" },
+      { source: "FOUNDRY CORE", target: "TECH STACK" }
     ] 
   }), []);
 
@@ -149,8 +157,10 @@ export default function App() {
         <ForceGraph3D
           graphData={graphData}
           backgroundColor="#00000000"
-          nodeRelSize={4}
-          linkColor={() => "rgba(255,255,255,0.05)"}
+          nodeRelSize={6}
+          nodeColor={getNodeColor}
+          nodeLabel="id"
+          linkColor={() => "rgba(99, 102, 241, 0.1)"}
           showNavInfo={false}
         />
       </div>
@@ -227,32 +237,32 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-8">
-            <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Nodes: <span className="text-white">{windowCount}</span></span>
-            </div>
-            <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
-              <span>Pulse: <span className="text-white">{lastSync || "IDLE"}</span></span>
-            </div>
+            {metrics.map((m, i) => (
+              <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
+                <m.icon className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{m.label}: <span className="text-white">{m.value}</span></span>
+                <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.trend.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.trend}</span>
+              </div>
+            ))}
+            <div className="h-8 w-[1px] bg-white/5 mx-2" />
             <button className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
               Neural Sync
             </button>
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-12">
+        <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
             <motion.div 
                initial={{ y: 20, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
-               className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all"
+               className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
             >
                 <div className="flex items-center gap-5 px-4 py-2">
                   <Search className="w-7 h-7 text-indigo-400" />
                   <input 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchIntent}
+                    onKeyDown={(e) => e.key === "Enter" && setSearchQuery("")}
                     placeholder="Detecting Neural Intent..."
                     className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
                   />
@@ -260,14 +270,82 @@ export default function App() {
                 </div>
             </motion.div>
 
-            <div className="mt-16 flex gap-8">
+            {/* Deployment Sentinel Hub */}
+            <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8">
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.95 }} 
+                 animate={{ opacity: 1, scale: 1 }}
+                 className="glass rounded-[2rem] p-8 border border-white/5 relative overflow-hidden group"
+               >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-[50px] group-hover:bg-indigo-500/20 transition-all" />
+                  <div className="flex items-center justify-between mb-8">
+                     <div className="flex items-center gap-4">
+                        <Terminal className="w-6 h-6 text-indigo-400" />
+                        <h3 className="text-lg font-bold tracking-tight text-white">Foundry Pipeline</h3>
+                     </div>
+                     <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">All Systems Nominal</span>
+                  </div>
+
+                  <div className="space-y-6">
+                     {[
+                       { name: 'Edge Cluster', status: 'Deployed', color: 'emerald', progress: 100 },
+                       { name: 'Core Stable', status: 'Syncing', color: 'indigo', progress: 65 },
+                       { name: 'Stakeholder Preview', status: 'Idle', color: 'slate', progress: 0 }
+                     ].map((env) => (
+                       <div key={env.name} className="space-y-3">
+                          <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
+                             <span className="text-slate-400">{env.name}</span>
+                             <span className={`text-${env.color}-400`}>{env.status}</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                             <motion.div initial={{ width: 0 }} animate={{ width: `${env.progress}%` }} className={`h-full bg-${env.color}-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]`} />
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+
+                  <button 
+                    onClick={() => invoke('trigger_deploy', { env: 'Core Stable' }).catch(() => alert('Foundry Simulation: Core Deployment Initiated.'))}
+                    className="w-full mt-10 py-4 glass-bright border border-white/10 hover:border-indigo-500/50 rounded-2xl text-[11px] font-bold uppercase tracking-[0.2em] text-white transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
+                  >
+                    Trigger Global Deployment
+                  </button>
+               </motion.div>
+
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.95 }} 
+                 animate={{ opacity: 1, scale: 1 }}
+                 transition={{ delay: 0.1 }}
+                 className="glass rounded-[2rem] p-8 border border-white/5 flex flex-col justify-between"
+               >
+                  <div className="flex items-center gap-4 mb-8">
+                     <BrainCircuit className="w-6 h-6 text-purple-400" />
+                     <h3 className="text-lg font-bold tracking-tight text-white">Strategic Insights</h3>
+                  </div>
+                  
+                  <div className="flex-1 space-y-4">
+                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+                        <p className="text-sm text-slate-400 leading-relaxed"><span className="text-indigo-400 font-bold">Oasis Intel:</span> Burn rate is optimized at $42.5K. Runway exceeds 18 months. Recommend accelerating Series A outreach.</p>
+                     </div>
+                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
+                        <p className="text-sm text-slate-400 leading-relaxed"><span className="text-emerald-400 font-bold">Growth Tip:</span> User momentum is up 12.8%. Strategic Graph nodes suggest expanding 'Tech Stack' investment.</p>
+                     </div>
+                  </div>
+                  
+                  <button className="w-full mt-8 py-4 glass text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-all">
+                     View Deep Analytics
+                  </button>
+               </motion.div>
+            </div>
+
+            <div className="mt-16 flex gap-8 pb-12">
               {contexts.map((ctx) => {
                 const Icon = ctx.icon;
                 const isActive = activeContext === ctx.id;
                 return (
                   <motion.button
                     key={ctx.id}
-                    onClick={() => handleContextSwitch(ctx.id)}
+                    onClick={() => { setActiveContext(ctx.id); setLastSync(new Date().toLocaleTimeString()); }}
                     whileHover={{ y: -5 }}
                     className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
                   >
@@ -286,9 +364,16 @@ export default function App() {
       <AnimatePresence>
         {showGraph && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
-             <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white"><Plus className="w-8 h-8 rotate-45" /></button>
+             <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210]"><Plus className="w-8 h-8 rotate-45" /></button>
              <div className="w-full h-full">
-                <ForceGraph3D graphData={graphData} backgroundColor="#00000000" nodeRelSize={8} />
+                <ForceGraph3D 
+                  graphData={graphData} 
+                  backgroundColor="#00000000" 
+                  nodeRelSize={10} 
+                  nodeColor={getNodeColor}
+                  nodeLabel="id"
+                  linkColor={() => "rgba(99, 102, 241, 0.3)"}
+                />
              </div>
           </motion.div>
         )}

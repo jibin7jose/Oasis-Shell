@@ -902,7 +902,9 @@ pub fn run() {
             sync_hardware_aura,
             capture_screenshot,
             query_vision,
-            get_logic_path
+            get_logic_path,
+            get_venture_metrics,
+            trigger_deploy
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
