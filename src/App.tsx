@@ -24,7 +24,10 @@ export default function App() {
   const [activeContext, setActiveContext] = useState('dev');
   const [searchQuery, setSearchQuery] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [lastSync, setLastSync] = useState("Never");
+  const [lastSync, setLastSync] = useState("");
+  useEffect(() => {
+    if (lastSync) console.log(`[Oasis Sync]: ${lastSync}`);
+  }, [lastSync]);
   const [showAI, setShowAI] = useState(false);
   const [assistantInput, setAssistantInput] = useState("");
   const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
@@ -360,6 +363,8 @@ export default function App() {
   const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
     ? chronosLedger[chronosIndex].metrics 
     : founderMetrics;
+  
+  if (displayedMetrics) console.log("Current Metrics Context Restored.");
 
   const displayedMarket = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
     ? chronosLedger[chronosIndex].market 
@@ -384,11 +389,20 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleChronosSliderChange = (index: number) => {
+    setChronosIndex(index);
+    setNotification(`Temporal Rewind: Accessing Snapshot L_${index}`);
+  };
+
   const handleCLICommand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliInput) return;
     const [cmd, ...args] = cliInput.split(" ");
     try {
+      if (cmd === "manifest" && args[0] === "golem") {
+        await invoke("register_new_golem", { name: "DummyGolem", status: "Active" });
+        setNotification("New Golem Registered.");
+      }
       const res = await invoke("execute_cli_directive", { directive: { cmd, args }, stressColor: founderMetrics.stress_color }) as any;
       setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: res.output, color: res.aura_color }]);
       setNotification(`Oas Directive Executed: ${cmd.toUpperCase()}`);
@@ -612,7 +626,7 @@ export default function App() {
                            min="0" 
                            max={chronosLedger.length - 1} 
                            value={chronosIndex} 
-                           onChange={(e) => handleChronosChange(parseInt(e.target.value))}
+                           onChange={(e) => handleChronosSliderChange(parseInt(e.target.value))}
                            className="w-64 accent-indigo-500"
                         />
                         <span className="text-[9px] font-mono text-indigo-400/60 uppercase">
@@ -636,7 +650,7 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.9.0-CHRONOS (TEMPORAL)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.0.0-UNIVERSE (PLATFORM)</span>
                  <button onClick={() => setZenMode(!zenMode)} className={cn("ml-8 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
                     <Eye className="w-4 h-4" />
                  </button>
@@ -751,14 +765,29 @@ export default function App() {
                      className="glass-bright rounded-3xl p-8 border border-white/5 relative overflow-hidden group hover:border-indigo-500/30 transition-all shadow-xl"
                    >
                       <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-[40px]" />
-                      <div className="flex items-center gap-4 mb-6">
-                         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/20 transition-all">
-                            {agent.name.includes("Growth") ? <Globe className="w-5 h-5 text-indigo-400" /> : agent.name.includes("Architect") ? <Cpu className="w-5 h-5 text-purple-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+                      <div className="flex items-center justify-between mb-6">
+                         <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/20 transition-all">
+                               {agent.name.includes("Growth") ? <Globe className="w-5 h-5 text-indigo-400" /> : agent.name.includes("Architect") ? <Cpu className="w-5 h-5 text-purple-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+                            </div>
+                            <div>
+                               <h4 className="text-sm font-black text-white uppercase tracking-wider">{agent.name}</h4>
+                               <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{agent.status}</span>
+                            </div>
                          </div>
-                         <div>
-                            <h4 className="text-sm font-black text-white uppercase tracking-wider">{agent.name}</h4>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{agent.status}</span>
-                         </div>
+                         {agent.id !== "auditor" && agent.id !== "growth" && (
+                            <button 
+                              onClick={async () => {
+                                await invoke("delete_golem", { id: agent.id });
+                                setNotification(`Agent ${agent.name} Purged from Universe.`);
+                                const wf = await invoke("get_neural_workforce", { marketIndex: 100 }) as any;
+                                setWorkforce(wf);
+                              }}
+                              className="p-2 glass text-rose-400 hover:text-rose-500 transition-colors"
+                            >
+                               <Trash2 className="w-4 h-4" />
+                            </button>
+                         )}
                       </div>
                       <div className="p-4 rounded-2xl bg-black/20 border border-white/5 mb-4 min-h-[100px] flex items-center">
                          <p className="text-[11px] text-slate-400 font-medium leading-relaxed italic line-clamp-4">
@@ -1081,20 +1110,9 @@ export default function App() {
                        {neuralWisdom && (
                          <div className={cn("p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4 transition-all", zenMode && "opacity-0")}>
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.8.0-ORACLE</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.0.0-UNIVERSE</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                               <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-3">
-                                     <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                        <Bot className="w-4 h-4 text-emerald-400" />
-                                     </div>
-                                     <div>
-                                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">{neuralWisdom.agent?.name}</h4>
-                                        <p className="text-[9px] text-white/40 font-mono tracking-widest">{neuralWisdom.agent?.status}</p>
-                                     </div>
-                                  </div>
-                               </div>
                                <p className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</p>
                                
                                {/* STRATEGIC BRANCHES */}

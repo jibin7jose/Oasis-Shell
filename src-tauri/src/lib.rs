@@ -545,10 +545,40 @@ async fn get_market_intelligence() -> Result<MarketIntelligence, String> {
 }
 
 #[tauri::command]
+async fn register_new_golem(agent: NeuralAgent) -> Result<String, String> {
+    let path = ".golem_registry.json";
+    let mut registry = if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<Vec<NeuralAgent>>(&data).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    registry.push(agent.clone());
+    let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
+    std::fs::write(path, data).map_err(|e| e.to_string())?;
+    Ok(format!("Strategic Golem [{}] Forged into Registry.", agent.name))
+}
+
+#[tauri::command]
+async fn delete_golem(id: String) -> Result<String, String> {
+    let path = ".golem_registry.json";
+    if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let mut registry = serde_json::from_str::<Vec<NeuralAgent>>(&data).unwrap_or_default();
+        registry.retain(|a| a.id != id);
+        let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
+        std::fs::write(path, data).map_err(|e| e.to_string())?;
+        Ok("Golem purged from Registry.".into())
+    } else {
+        Err("No Registry found.".into())
+    }
+}
+
+#[tauri::command]
 async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, String> {
     let market_bias = if market_index < 90.0 { "EMERALD_BIAS (Safe)" } else { "RUBY_BIAS (Aggressive)" };
-    
-    Ok(vec![
+    let mut workforce = vec![
         NeuralAgent {
             id: "auditor".into(),
             name: "Neural Auditor".into(),
@@ -571,7 +601,17 @@ async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, Str
                 AgentBranch { tag: "paid".into(), title: "Capital Injection".into(), description: "Paid acquisition sprint.".into(), risk_level: "High Burn (Market Conflict)".into() },
             ],
         },
-    ])
+    ];
+
+    // Load dynamic golems
+    let path = ".golem_registry.json";
+    if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let mut registered: Vec<NeuralAgent> = serde_json::from_str(&data).unwrap_or_default();
+        workforce.append(&mut registered);
+    }
+
+    Ok(workforce)
 }
 
 #[tauri::command]
@@ -1432,7 +1472,9 @@ pub fn run() {
             load_venture_state,
             authorize_branch,
             create_chronos_snapshot,
-            get_chronos_ledger
+            get_chronos_ledger,
+            register_new_golem,
+            delete_golem
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
