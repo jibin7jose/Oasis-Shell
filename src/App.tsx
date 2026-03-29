@@ -36,10 +36,24 @@ export default function App() {
   const [autoAcceptSentience, setAutoAcceptSentience] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVault, setShowVault] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
   const [assistantInput, setAssistantInput] = useState("");
   const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
   const [loadingVision] = useState(false);
+  const [timeline, setTimeline] = useState([
+    { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
+    { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
+  ]);
+
+  const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
+    setTimeline(prev => [{ 
+      id: Date.now(), 
+      type, 
+      event, 
+      time: new Date().toLocaleTimeString() 
+    }, ...prev].slice(0, 50));
+  };
   const [founderMetrics, setFounderMetrics] = useState({
     arr: "$0.0M", burn: "$0K/mo", runway: "0 Mo.", momentum: "0%"
   });
@@ -114,27 +128,52 @@ export default function App() {
     ] 
   }), []);
 
+  const resolveNeuralIntent = (query: string) => {
+    const q = query.toLowerCase();
+    setMessages(prev => [...prev, { role: "user", content: query }]);
+    setIsThinking(true);
+    logEvent(`Neural Intent Captured: "${query}"`, 'neural');
+
+    setTimeout(() => {
+      setIsThinking(false);
+      if (q.includes("deploy") || q.includes("launch")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster..." }]);
+        invoke('trigger_deploy', { env: 'Global' }).catch(() => {});
+        logEvent("Deployment Sequence Alpha Initiated", "deploy");
+      } else if (q.includes("vault") || q.includes("files") || q.includes("open vault")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Accessing Sentient Vault Nodes..." }]);
+        setShowVault(true);
+        logEvent("Sentient Vault Portal Opened", "system");
+      } else if (q.includes("graph") || q.includes("cortex") || q.includes("3d")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating 3D Strategic Cortex..." }]);
+        setShowGraph(true);
+        logEvent("Strategic Cortex Visualization Launched", "system");
+      } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
+        setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
+        logEvent("Executive Metrics Audit Completed", "neural");
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", content: `Foundry Logic: Directive '${query}' acknowledged but currently unmapped. Analyzing strategic path...` }]);
+      }
+    }, 800);
+    setSearchQuery("");
+  };
+
   const handleSearchIntent = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-       setSearchQuery("");
-       setMessages(prev => [...prev, { role: "assistant", content: `Neural Intent Recognized: '${searchQuery}'. Executing sync sequence...` }]);
+    if (e.key === "Enter" && searchQuery.trim()) {
+      resolveNeuralIntent(searchQuery);
     }
   };
 
   const handleNeuralSend = () => {
     if (!assistantInput.trim()) return;
-    setMessages(prev => [...prev, { role: "user", content: assistantInput }]);
+    resolveNeuralIntent(assistantInput);
     setAssistantInput("");
-    setIsThinking(true);
-    setTimeout(() => {
-      setIsThinking(false);
-      setMessages(prev => [...prev, { role: "assistant", content: "Executive directive acknowledged. Workspace recalibration initiated." }]);
-    }, 1500);
   };
 
-  const handleContextSwitch = (id: string) => {
+  const handleContextSwitch = (id: string | any) => {
     setActiveContext(id);
     setLastSync(new Date().toLocaleTimeString());
+    logEvent(`Context Shifted to: ${id.toUpperCase()}`, 'system');
   };
 
   return (
@@ -142,12 +181,8 @@ export default function App() {
       {/* Background Substrate */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
-          animate={{ background: (isThinking || loadingVision) ? '#3b82f6' : currentAura, opacity: (isThinking || loadingVision) ? 0.25 : 0.1 }}
+          animate={{ background: currentAura, opacity: 0.1 }}
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
-        />
-        <motion.div
-          animate={{ background: (isThinking || loadingVision) ? '#6366f1' : currentAura, opacity: (isThinking || loadingVision) ? 0.2 : 0.08 }}
-          className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
         />
         <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
       </div>
@@ -187,7 +222,8 @@ export default function App() {
               onClick={() => {
                 if (item.id === 'graph') setShowGraph(true);
                 else if (item.id === 'vault') setShowVault(true);
-                else { setActiveSettingTab("Neural Logs"); setShowSettings(true); }
+                else if (item.id === 'logs') setShowLogs(true);
+                else { setActiveContext('dev'); }
               }}
               className="p-4 rounded-2xl text-slate-500 hover:text-white hover:bg-white/5 transition-all group relative"
             >
@@ -211,9 +247,8 @@ export default function App() {
               <Zap className={cn("w-6 h-6", autoAcceptSentience && "animate-pulse")} />
             </button>
             <div className={cn("w-2 h-2 rounded-full animate-pulse", aiHeartbeat.ready ? "bg-emerald-500" : "bg-red-500")} />
-            <button onClick={() => setShowSettings(true)} className="p-4 text-slate-500 hover:text-white"><Settings className="w-6 h-6" /></button>
+            <button className="p-4 text-slate-500 hover:text-white"><Settings className="w-6 h-6" /></button>
           </div>
-
       </motion.aside>
 
       {/* Main Command Stage */}
@@ -225,6 +260,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.4-PRO</span>
                </h1>
             </div>
             
@@ -262,7 +298,7 @@ export default function App() {
                   <input 
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && setSearchQuery("")}
+                    onKeyDown={handleSearchIntent}
                     placeholder="Detecting Neural Intent..."
                     className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
                   />
@@ -305,7 +341,7 @@ export default function App() {
                   </div>
 
                   <button 
-                    onClick={() => invoke('trigger_deploy', { env: 'Core Stable' }).catch(() => alert('Foundry Simulation: Core Deployment Initiated.'))}
+                    onClick={() => resolveNeuralIntent("Deploy Core Stable")}
                     className="w-full mt-10 py-4 glass-bright border border-white/10 hover:border-indigo-500/50 rounded-2xl text-[11px] font-bold uppercase tracking-[0.2em] text-white transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]"
                   >
                     Trigger Global Deployment
@@ -345,7 +381,7 @@ export default function App() {
                 return (
                   <motion.button
                     key={ctx.id}
-                    onClick={() => { setActiveContext(ctx.id); setLastSync(new Date().toLocaleTimeString()); }}
+                    onClick={() => handleContextSwitch(ctx.id)}
                     whileHover={{ y: -5 }}
                     className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
                   >
@@ -375,6 +411,97 @@ export default function App() {
                   linkColor={() => "rgba(99, 102, 241, 0.3)"}
                 />
              </div>
+          </motion.div>
+        )}
+
+        {showVault && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
+             <div className="flex items-center justify-between mb-12">
+                <div className="flex flex-col">
+                   <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Protocol</span>
+                   <h2 className="text-4xl font-bold text-white tracking-tighter flex items-center gap-4">
+                     <FolderOpen className="w-10 h-10 text-indigo-500" />
+                     Sentient Venture Vault
+                   </h2>
+                </div>
+                <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white"><Plus className="w-8 h-8 rotate-45" /></button>
+             </div>
+
+             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
+                {[
+                  { name: 'Oasis_Whitepaper.pdf', cat: 'Strategic', size: '1.2MB' },
+                  { name: 'Foundry_Kernel.rs', cat: 'Technical', size: '45KB' },
+                  { name: 'Executive_Brand_Guide.fig', cat: 'Creative', size: '8.4MB' },
+                  { name: 'Q3_Revenue_Projection.xlsx', cat: 'Strategic', size: '220KB' },
+                  { name: 'Neural_Engine_Docs.md', cat: 'Technical', size: '12KB' },
+                  { name: 'Venture_Cap_Deck.key', cat: 'Strategic', size: '15.2MB' }
+                ].map((node) => (
+                  <motion.div 
+                    key={node.name}
+                    whileHover={{ scale: 1.02 }}
+                    className="glass-bright p-6 rounded-[2rem] border border-white/5 hover:border-indigo-500/30 transition-all group flex flex-col justify-between aspect-square"
+                  >
+                     <div className="flex justify-between items-start">
+                        <div className={cn("p-4 rounded-xl", 
+                          node.cat === 'Strategic' ? "bg-amber-500/10 text-amber-500" :
+                          node.cat === 'Technical' ? "bg-indigo-500/10 text-indigo-500" :
+                          "bg-purple-500/10 text-purple-500"
+                        )}>
+                           <Shield className="w-6 h-6" />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{node.size}</span>
+                     </div>
+                     <div>
+                        <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest block mb-2">{node.cat}</span>
+                        <h4 className="text-lg font-bold text-white truncate group-hover:text-indigo-400 transition-colors">{node.name}</h4>
+                     </div>
+                  </motion.div>
+                ))}
+             </div>
+          </motion.div>
+        )}
+
+        {showLogs && (
+          <motion.div initial={{ opacity: 0, x: 500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 500 }} className="fixed inset-y-0 right-0 z-[400] w-[450px] glass-bright border-l border-white/10 p-12 backdrop-blur-4xl flex flex-col">
+             <div className="flex items-center justify-between mb-12">
+                <div className="flex flex-col">
+                   <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Ledger</span>
+                   <h2 className="text-3xl font-bold text-white tracking-tighter">Cognitive Timeline</h2>
+                </div>
+                <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-6 h-6 rotate-45" /></button>
+             </div>
+
+             <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
+                <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
+                
+                <div className="space-y-12">
+                   {timeline.map((event) => (
+                      <div key={event.id} className="relative pl-12">
+                         <div className={cn(
+                            "absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center transition-all shadow-[0_0_15px_rgba(99,102,241,0.2)]",
+                            event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600"
+                         )}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                         </div>
+                         <div className="glass p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-all group">
+                            <div className="flex justify-between items-center mb-2">
+                               <span className="text-[10px] font-mono text-slate-500">{event.time}</span>
+                               <span className={cn("text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded", 
+                                  event.type === 'neural' ? "text-indigo-400 bg-indigo-400/10" : 
+                                  event.type === 'deploy' ? "text-emerald-400 bg-emerald-400/10" : 
+                                  "text-slate-400 bg-slate-400/10"
+                               )}>{event.type}</span>
+                            </div>
+                            <p className="text-sm text-slate-300 font-medium leading-relaxed group-hover:text-white transition-colors">{event.event}</p>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+             
+             <button className="w-full mt-12 py-4 glass text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:text-white transition-all">
+                Export Audit Ledger
+             </button>
           </motion.div>
         )}
       </AnimatePresence>

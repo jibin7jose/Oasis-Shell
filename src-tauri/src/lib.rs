@@ -904,7 +904,8 @@ pub fn run() {
             query_vision,
             get_logic_path,
             get_venture_metrics,
-            trigger_deploy
+            trigger_deploy,
+            get_vault_nodes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
