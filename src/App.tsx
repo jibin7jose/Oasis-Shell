@@ -56,6 +56,9 @@ export default function App() {
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [crossWisdom, setCrossWisdom] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [showCLI, setShowCLI] = useState(false);
+  const [cliInput, setCliInput] = useState("");
+  const [cliHistory, setCliHistory] = useState<any[]>([]);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -300,6 +303,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleCLICommand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cliInput) return;
+    const [cmd, ...args] = cliInput.split(" ");
+    try {
+      const res = await invoke("execute_cli_directive", { directive: { cmd, args }, stressColor: founderMetrics.stress_color }) as any;
+      setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: res.output, color: res.aura_color }]);
+      setNotification(`Oas Directive Executed: ${cmd.toUpperCase()}`);
+    } catch (e: any) {
+      setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: e, color: '#ef4444' }]);
+    }
+    setCliInput("");
+  };
+
   const handleMirrorVenture = async (id: string) => {
     try {
       const wis = await invoke("get_cross_venture_wisdom", { targetId: id }) as string[];
@@ -508,7 +525,11 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.6.0-SENTIENT (NETWORK)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.1.0-PLATFORM (OAS-SHELL)</span>
+                 <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
+                 </button>
                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
                     <Globe className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
@@ -704,6 +725,41 @@ export default function App() {
           </motion.div>
         )}
 
+        {/* Oasis Shell: Strategic CLI Module (Phase 31) */}
+        {showCLI && (
+           <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[3000] w-[800px] h-[450px] glass-bright rounded-[3rem] p-12 flex flex-col border border-emerald-500/20 shadow-5xl shadow-emerald-900/10">
+              <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
+                 <div className="flex items-center gap-4">
+                   <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                      <Terminal className="w-4 h-4 text-emerald-400" />
+                   </div>
+                   <h3 className="text-xl font-black text-white uppercase tracking-tighter">Oasis Shell <span className="text-[10px] text-emerald-500/50 leading-none">v3.1.0-platform</span></h3>
+                 </div>
+                 <button onClick={() => setShowCLI(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
+              </div>
+              <div className="flex-1 w-full bg-black/40 rounded-3xl p-8 mb-6 font-mono text-sm overflow-y-auto custom-scrollbar space-y-3">
+                 {cliHistory.map((h, i) => (
+                   <div key={i} className="flex gap-4">
+                      <span className="text-slate-600">[{h.type === 'cmd' ? '>' : '#'}]</span>
+                      <span style={{ color: h.color }} className="font-bold tracking-tight">{h.text}</span>
+                   </div>
+                 ))}
+                 <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth' })} />
+              </div>
+              <form onSubmit={handleCLICommand} className="relative">
+                 <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 font-mono text-sm">{">"}</span>
+                 <input 
+                   autoFocus
+                   value={cliInput}
+                   onChange={(e) => setCliInput(e.target.value)}
+                   type="text" 
+                   className="w-full h-16 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-6 text-emerald-400 font-mono text-sm focus:outline-none focus:border-emerald-500/30 transition-all placeholder:text-slate-700"
+                   placeholder="Enter directive: 'audit', 'manifest [module]', 'rewind'..."
+                 />
+              </form>
+           </motion.div>
+        )}
+
         {/* Venture Network Registry Portal (Phase 28) */}
         {showNetwork && (
            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-2xl flex items-center justify-end p-20">
@@ -877,8 +933,8 @@ export default function App() {
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
-                            <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.6.0-SENTIENT</span>
+                            <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.1.0-PLATFORM</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
@@ -889,7 +945,7 @@ export default function App() {
                                Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
                             </div>
                             <div className="space-y-3 mt-4">
-                               <h6 className="text-[9px] font-black text-indigo-500/50 uppercase tracking-widest pl-1">Network Insights (Pillar 28)</h6>
+                               <h6 className="text-[9px] font-black text-indigo-500/50 uppercase tracking-widest pl-1">Network Insights (CLI Platform)</h6>
                                {crossWisdom.map((w: string, i: number) => (
                                  <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-400 italic">
                                    "{w}"

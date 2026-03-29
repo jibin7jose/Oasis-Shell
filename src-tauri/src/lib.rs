@@ -70,6 +70,18 @@ pub struct VentureEntity {
     pub peak_arr: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CLIDirective {
+    pub cmd: String,
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CLIResponse {
+    pub output: String,
+    pub aura_color: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VentureSnapshot {
     pub id: String,
@@ -587,6 +599,25 @@ async fn get_cross_venture_wisdom(target_id: String) -> Result<Vec<String>, Stri
         Ok(vec![
             "User Onboarding Flow (34% conversion in Lumina)".into(),
         ])
+    }
+}
+
+#[tauri::command]
+async fn execute_cli_directive(directive: CLIDirective, stress_color: String) -> Result<CLIResponse, String> {
+    match directive.cmd.as_str() {
+        "audit" => Ok(CLIResponse {
+            output: "System Audit Initiated via Oas-Shell. Report manifested to root.".into(),
+            aura_color: stress_color,
+        }),
+        "manifest" => Ok(CLIResponse {
+            output: format!("Golem Manifesting Module: {} via Oas-Shell.", directive.args.join(" ")),
+            aura_color: "#6366f1".into(),
+        }),
+        "rewind" => Ok(CLIResponse {
+            output: "Reality Rewound to Previous Snapshot via Oas-Shell.".into(),
+            aura_color: "#10b981".into(),
+        }),
+        _ => Err("Invalid Oas Directive. Try 'audit', 'manifest' [title], or 'rewind'.".into()),
     }
 }
 
@@ -1198,7 +1229,8 @@ pub fn run() {
             create_restore_point,
             restore_venture_state,
             get_available_ventures,
-            get_cross_venture_wisdom
+            get_cross_venture_wisdom,
+            execute_cli_directive
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
