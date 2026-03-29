@@ -102,7 +102,8 @@ pub struct VentureSnapshot {
     pub id: String,
     pub timestamp: String,
     pub metrics: VentureMetrics,
-    pub files: Vec<String>,
+    pub market: MarketIntelligence,
+    pub strategic_debt: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -732,7 +733,38 @@ async fn load_venture_state() -> Result<VentureMetrics, String> {
 }
 
 #[tauri::command]
-async fn install_oas_binary() -> Result<String, String> {
+async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
+    let path = ".chronos_ledger.json";
+    let mut snapshots = if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<Vec<VentureSnapshot>>(&data).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    snapshots.push(VentureSnapshot {
+        id: format!("S_{}", snapshots.len()),
+        timestamp: chrono::Local::now().to_rfc3339(),
+        metrics,
+        market,
+        strategic_debt: 12.5, // Seed value
+    });
+
+    let data = serde_json::to_string(&snapshots).map_err(|e| e.to_string())?;
+    std::fs::write(path, data).map_err(|e| e.to_string())?;
+    Ok("Chronos Snapshot Etched to Neural Ledger.".into())
+}
+
+#[tauri::command]
+async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
+    let path = ".chronos_ledger.json";
+    if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        Ok(serde_json::from_str(&data).unwrap_or_default())
+    } else {
+        Ok(Vec::new())
+    }
+}
     // REAL COMMAND: Registering the binary into the system path for 'oas' command access
     // This provides the 'System-Level Power' requested
     Ok("Oas Binary Registered to System PATH. Restart terminal to invoke 'oas' commands globally.".into())
@@ -1398,7 +1430,9 @@ pub fn run() {
             run_system_diagnostic,
             save_venture_state,
             load_venture_state,
-            authorize_branch
+            authorize_branch,
+            create_chronos_snapshot,
+            get_chronos_ledger
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

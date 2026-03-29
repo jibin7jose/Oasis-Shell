@@ -62,15 +62,21 @@ export default function App() {
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
   const [systemStats, setSystemStats] = useState<any>(null);
   const [zenMode, setZenMode] = useState(false);
+  const [chronosLedger, setChronosLedger] = useState<any[]>([]);
+  const [chronosIndex, setChronosIndex] = useState(-1);
 
-  const handleCommitSim = () => {
+  const handleCommitSim = async () => {
     const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
     setFounderMetrics(newMetrics);
     setSimMode(false);
     
-    // PERSIST: Synchronize state with Neural Ledger
-    invoke("save_venture_state", { metrics: newMetrics });
-    setNotification(`Simulation Committed: Venture Reality Re-forecasted to $${simMetrics.arr}M ARR.`);
+    // PERSIST & SNAPSHOT
+    await invoke("save_venture_state", { metrics: newMetrics });
+    await invoke("create_chronos_snapshot", { metrics: newMetrics, market: marketIntel });
+    const ledger = await invoke("get_chronos_ledger") as any[];
+    setChronosLedger(ledger);
+    setChronosIndex(ledger.length - 1);
+    setNotification("Venture State Etched to Chronos Ledger.");
   };
 
   useEffect(() => {
@@ -342,10 +348,22 @@ export default function App() {
       try {
         const stats = await invoke("run_system_diagnostic") as any;
         setSystemStats(stats);
+        
+        const ledger = await invoke("get_chronos_ledger") as any[];
+        setChronosLedger(ledger);
+        setChronosIndex(ledger.length - 1);
       } catch (e) {}
     };
     syncSystemData();
   }, []);
+
+  const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
+    ? chronosLedger[chronosIndex].metrics 
+    : founderMetrics;
+
+  const displayedMarket = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
+    ? chronosLedger[chronosIndex].market 
+    : marketIntel;
 
   const handleInstallShell = async () => {
     try {
@@ -580,7 +598,29 @@ export default function App() {
             >
               <Zap className={cn("w-6 h-6", simMode && "animate-pulse")} />
             </button>
-            <button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
+            <div className="absolute right-8 bottom-8 flex flex-col items-end gap-3 z-30 transition-all">
+                  {chronosIndex < chronosLedger.length - 1 && (
+                     <button onClick={() => setChronosIndex(chronosLedger.length - 1)} className="px-4 py-2 bg-indigo-600/40 hover:bg-indigo-600 text-[10px] font-black text-white rounded-xl border border-indigo-500/30 animate-pulse">
+                        JUMP TO PRESENT →
+                     </button>
+                  )}
+                  {chronosLedger.length > 0 && (
+                     <div className="flex flex-col items-end gap-2 p-4 glass rounded-2xl border-white/5">
+                        <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em]">Neural Chronos Scrubber</span>
+                        <input 
+                           type="range" 
+                           min="0" 
+                           max={chronosLedger.length - 1} 
+                           value={chronosIndex} 
+                           onChange={(e) => handleChronosChange(parseInt(e.target.value))}
+                           className="w-64 accent-indigo-500"
+                        />
+                        <span className="text-[9px] font-mono text-indigo-400/60 uppercase">
+                           {(chronosLedger[chronosIndex] as any)?.timestamp?.split('T')[1].split('.')[0]}
+                        </span>
+                     </div>
+                  )}
+               </div><button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
               <Settings className="w-6 h-6" />
             </button>
           </div>
@@ -596,7 +636,7 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.8.0-ORACLE (MARKET)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.9.0-CHRONOS (TEMPORAL)</span>
                  <button onClick={() => setZenMode(!zenMode)} className={cn("ml-8 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
                     <Eye className="w-4 h-4" />
                  </button>
@@ -622,8 +662,8 @@ export default function App() {
             <div className="flex flex-col items-end">
                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Oasis-X Index</span>
                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">{marketIntel?.market_index?.toFixed(1) || '0.0'}</span>
-                  <span className="text-[9px] text-rose-500/50 font-bold">{marketIntel?.index_change}</span>
+                  <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">{(displayedMarket as any)?.market_index?.toFixed(1) || '0.0'}</span>
+                  <span className="text-[9px] text-rose-500/50 font-bold">{(displayedMarket as any)?.index_change}</span>
                </div>
             </div>
           </div>
