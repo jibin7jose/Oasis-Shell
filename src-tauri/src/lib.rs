@@ -139,6 +139,15 @@ pub struct OracleAlert {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct MarketIntelligence {
+    pub sentiment: String,
+    pub index_change: String,
+    pub sectors_active: Vec<String>,
+    pub market_index: f32,
+    pub sector_divergence: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeModule {
     pub name: String,
     pub language: String,
@@ -523,13 +532,44 @@ async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String>
 }
 
 #[tauri::command]
-async fn get_neural_workforce() -> Result<Vec<NeuralAgent>, String> {
+async fn get_market_intelligence() -> Result<MarketIntelligence, String> {
+    // REAL MARKET REACTOR: Simulating an 18.4% Market Downturn (Oasis-X Index)
+    Ok(MarketIntelligence {
+        sentiment: "Bear Divergence".into(),
+        index_change: "-18.2% (SaaS Core)".into(),
+        sectors_active: vec!["AI Infrastructure".into(), "Neural Compute".into()],
+        market_index: 82.4, // Down from 100 base
+        sector_divergence: 12.8,
+    })
+}
+
+#[tauri::command]
+async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, String> {
+    let market_bias = if market_index < 90.0 { "EMERALD_BIAS (Safe)" } else { "RUBY_BIAS (Aggressive)" };
+    
     Ok(vec![
         NeuralAgent {
-            role: "Portal & Audit Readiness".into(),
-            status: "Verifying Visionary Portal access".into(),
-            recommendation: "Monthly Audit manifested. Ready for stakeholder relay.".into(),
-        }
+            id: "auditor".into(),
+            name: "Neural Auditor".into(),
+            role: "Financial Sentinel".into(),
+            status: format!("Market Aware: {}", market_bias),
+            recommendation: "Sector divergence detected. Pivot emerald for capital preservation.".into(),
+            branches: vec![
+                AgentBranch { tag: "emerald".into(), title: "Emerald Path".into(), description: "Conservative Burn Reduction.".into(), risk_level: "Minimal".into() },
+                AgentBranch { tag: "ruby".into(), title: "Ruby Path".into(), description: "Aggressive ARR Expansion.".into(), risk_level: "High Risk (Market Divergence)".into() },
+            ],
+        },
+        NeuralAgent {
+            id: "growth".into(),
+            name: "The Expansion Golem".into(),
+            role: "Viral Architect".into(),
+            status: "Monitoring Market Momentum".into(),
+            recommendation: "Internal momentum is diverging from SaaS core trends by 12.8%.".into(),
+            branches: vec![
+                AgentBranch { tag: "organic".into(), title: "Organic Link".into(), description: "Community-led retention focus.".into(), risk_level: "Market Verified".into() },
+                AgentBranch { tag: "paid".into(), title: "Capital Injection".into(), description: "Paid acquisition sprint.".into(), risk_level: "High Burn (Market Conflict)".into() },
+            ],
+        },
     ])
 }
 

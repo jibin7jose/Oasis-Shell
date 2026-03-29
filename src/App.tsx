@@ -394,11 +394,16 @@ export default function App() {
       try {
         const metrics = await invoke("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
         const intel = await invoke("get_market_intelligence") as any;
+        setMarketIntel(intel);
+        
+        // Pass market index to workforce for reactor logic
+        const wf = await invoke("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
+        setWorkforce(wf);
+
         if (!simMode) {
             setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
             invoke("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
         }
-        setMarketIntel(intel);
         setLastSync(new Date().toLocaleTimeString());
       } catch (e) {
         if (!simMode) {
@@ -591,7 +596,7 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.7.0-ZEN (VISIONARY)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.8.0-ORACLE (MARKET)</span>
                  <button onClick={() => setZenMode(!zenMode)} className={cn("ml-8 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
                     <Eye className="w-4 h-4" />
                  </button>
@@ -613,9 +618,13 @@ export default function App() {
             
             <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
 
-            <div className="hidden md:flex flex-col">
-               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Last System Sync</span>
-               <span className="text-xs font-mono text-indigo-400/80 tracking-tighter animate-pulse">{lastSync}</span>
+            {/* MARKET INDEX PULSE */}
+            <div className="flex flex-col items-end">
+               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Oasis-X Index</span>
+               <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">{marketIntel?.market_index?.toFixed(1) || '0.0'}</span>
+                  <span className="text-[9px] text-rose-500/50 font-bold">{marketIntel?.index_change}</span>
+               </div>
             </div>
           </div>
 
@@ -653,7 +662,7 @@ export default function App() {
                <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#020617] to-transparent z-10" />
                <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#020617] to-transparent z-10" />
                <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                  {marketIntel.map((m, i) => (
+                  {marketIntel.map((m: any, i: number) => (
                     <div key={i} className="flex gap-4 items-center">
                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
                        <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
@@ -662,7 +671,7 @@ export default function App() {
                        </span>
                     </div>
                   ))}
-                  {economicNews.map((n, i) => (
+                  {economicNews.map((n: string, i: number) => (
                     <div key={i} className="flex gap-4 items-center pl-12 border-l border-white/10">
                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
                           <Globe className="w-4 h-4" /> Sentinel Insight
@@ -1030,9 +1039,9 @@ export default function App() {
                     </header>
                     <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
                        {neuralWisdom && (
-                         <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
+                         <div className={cn("p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4 transition-all", zenMode && "opacity-0")}>
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.7.0-ZEN (VISIONARY)</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.8.0-ORACLE</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                <div className="flex items-center justify-between mb-4">
