@@ -586,6 +586,17 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn get_logic_path(aura: String) -> String {
+    match aura.as_str() {
+        "dev" => "Native Logic > Cargo Link > Build Cycle > Pulse".into(),
+        "design" => "Mesh Logic > Texture Link > GLTF Build > Sync".into(),
+        "gaming" => "Stream Logic > Frame Pulse > Latency Sync > Record".into(),
+        "research" => "Query Logic > Semantic Link > Vector Search > Archive".into(),
+        _ => "Idle Logic > Waiting for Neural Intent".into()
+    }
+}
+
+#[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(5)); 
@@ -890,7 +901,8 @@ pub fn run() {
             start_proactive_sentience,
             sync_hardware_aura,
             capture_screenshot,
-            query_vision
+            query_vision,
+            get_logic_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
