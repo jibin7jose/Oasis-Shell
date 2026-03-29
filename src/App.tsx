@@ -80,7 +80,21 @@ function App() {
   const [showGraph, setShowGraph] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [vaultFiles, setVaultFiles] = useState<any[]>([]);
-  const [graphData, setGraphData] = useState<any>({ nodes: [], links: [] });
+  const [graphData, setGraphData] = useState<any>({ 
+    nodes: [
+      { id: "Oasis Core", group: 1 }, 
+      { id: "Neural Lens", group: 2 }, 
+      { id: "Git Scout", group: 3 },
+      { id: "CPU_SENSOR", group: 0, label: "System Core" },
+      { id: "RAM_SENSOR", group: 0, label: "Neural Memory" }
+    ], 
+    links: [
+      { source: "Oasis Core", target: "Neural Lens" }, 
+      { source: "Oasis Core", target: "Git Scout" },
+      { source: "CPU_SENSOR", target: "Oasis Core" },
+      { source: "RAM_SENSOR", target: "Oasis Core" }
+    ] 
+  });
   const [activeSettingTab, setActiveSettingTab] = useState("Crates");
 
   const openVault = async () => {
@@ -139,6 +153,7 @@ function App() {
     activeNodes: 4,
     ecosystemHealth: "Optimal"
   });
+  const [activePortal, setActivePortal] = useState<'neuro' | 'nexus' | 'career' | 'market'>('neuro');
   const [proactiveAlert, setProactiveAlert] = useState<any>(null);
   const [loadingVision, setLoadingVision] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1374,6 +1389,21 @@ function App() {
           </motion.div>
         )}
 
+        {/* Stage 18: Neural Chronicle Timeline */}
+        <div className="fixed top-1/2 left-8 -translate-y-1/2 z-[40] hidden lg:flex flex-col items-center gap-4">
+           <div className="text-[8px] font-bold text-slate-700 uppercase vertical-text tracking-[0.4em] mb-4">Neural Chronicle</div>
+           <div className="w-0.5 h-48 bg-slate-800/50 rounded-full relative">
+              <motion.div 
+                 drag="y"
+                 dragConstraints={{ top: 0, bottom: 192 }}
+                 className="absolute top-0 -left-1 w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_10px_#6366f1] cursor-pointer"
+              />
+              <div className="absolute top-1/2 -left-1 w-2.5 h-0.5 bg-slate-700" />
+              <div className="absolute top-1/4 -left-1 w-2.5 h-0.5 bg-slate-700" />
+              <div className="absolute top-3/4 -left-1 w-2.5 h-0.5 bg-slate-700" />
+           </div>
+        </div>
+
         {/* Native Bridge Warning Overlays */}
         {!isNative && (
           <motion.div
@@ -1497,10 +1527,11 @@ function App() {
                   graphData={graphData}
                   nodeAutoColorBy="group"
                   nodeRelSize={8}
+                  nodeVal={(node: any) => (node.group === 0 ? 15 : 8)}
                   backgroundColor="#00000000"
-                  linkColor={() => 'rgba(99,102,241,0.3)'}
+                  linkColor={(link: any) => (link.source.group === 0 || link.target.group === 0 ? 'rgba(236, 72, 153, 0.2)' : 'rgba(99,102,241,0.3)')}
                   linkWidth={2}
-                  nodeLabel="id"
+                  nodeLabel={(node: any) => node.label || node.id}
                   enableNodeDrag={true}
                   showNavInfo={false}
                 />
