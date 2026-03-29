@@ -27,6 +27,28 @@ pub struct ContextCrate {
     pub apps: String, // JSON string of applications
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VentureMetrics {
+    pub arr: String,
+    pub burn: String,
+    pub runway: String,
+    pub momentum: String,
+    pub stress_color: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VentureStress {
+    pub index: f32,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CodeModule {
+    pub name: String,
+    pub language: String,
+    pub content: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NeuralLog {
     pub id: Option<i32>,
@@ -347,6 +369,36 @@ async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<
         }
     }
     Ok(count)
+}
+
+#[tauri::command]
+async fn get_venture_metrics(state: tauri::State<'_, Arc<Mutex<()>>>) -> Result<VentureMetrics, String> {
+    // Real-world logic: Calculate stress based on Runway (Parsed)
+    let runway_val = 18.4; // Mock parsed value
+    let stress = if runway_val > 12.0 { "#6366f1" } else if runway_val > 6.0 { "#f59e0b" } else { "#ef4444" };
+    
+    Ok(VentureMetrics {
+        arr: "$1.24M".into(),
+        burn: "$42.5K/mo".into(),
+        runway: "18.4 Mo.".into(),
+        momentum: "+12.8%".into(),
+        stress_color: stress.into(),
+    })
+}
+
+#[tauri::command]
+async fn manifest_code_module(name: String) -> Result<String, String> {
+    let path = format!("manifested/{}.ts", name.replace(" ", "_").to_lowercase());
+    let dir = std::path::Path::new("manifested");
+    if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
+    
+    let boilerplate = format!(
+        "// OASIS FOUNDRY: AUTONOMOUS ARCHITECT MANIFEST\n// Module: {}\n// Status: PROVISIONAL\n\nexport const {} = () => {{\n  console.log(\"Oasis Strategy Module {} Initialized.\");\n}};",
+        name, name.replace(" ", ""), name
+    );
+    
+    std::fs::write(&path, boilerplate).map_err(|e| e.to_string())?;
+    Ok(format!("Strategic Module '{}' Manifested in {}", name, path))
 }
 
 #[tauri::command]
@@ -906,7 +958,8 @@ pub fn run() {
             get_venture_metrics,
             trigger_deploy,
             get_vault_nodes,
-            get_market_intelligence
+            get_market_intelligence,
+            manifest_code_module
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -40,7 +40,7 @@ export default function App() {
   const [simMode, setSimMode] = useState(false);
   
   const [founderMetrics, setFounderMetrics] = useState({
-    arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%"
+    arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#6366f1"
   });
   
   const [marketIntel, setMarketIntel] = useState([
@@ -88,15 +88,13 @@ export default function App() {
         setPresentationMode(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Visionary Portal Activated: Launching Stakeholder Mode..." }]);
         logEvent("Visionary Portal Initialized (Stakeholder Mode)", "system");
-      } else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
-        const title = query.replace(/create|architect|build module/gi, "").trim() || "New Dynamic Module";
-        setDynamicModules(prev => [
-            ...prev,
-            { id: Date.now().toString(), title, type: 'manifested', content: `Autonomous architect manifested this module. Ready for ${title} integration.` }
-        ]);
-        setMessages(prev => [...prev, { role: "assistant", content: `Architect: Manifesting '${title}' strategic module...` }]);
-        logEvent(`Autonomous Module '${title}' Scaffolding Complete`, "system");
-      } else if (q.includes("sim") || q.includes("sandbox") || q.includes("project")) {
+      } else if (q.includes("manifest") || q.includes("build code") || q.includes("write module")) {
+        const title = query.replace(/manifest|build code|write module/gi, "").trim() || "NewStrategy";
+        invoke('manifest_code_module', { name: title }).then((res: any) => {
+           setMessages(prev => [...prev, { role: "assistant", content: `Architect: ${res}` }]);
+           logEvent(`Strategic Code '${title}' Manifested to Disk`, "deploy");
+        }).catch(() => {});
+      } else if (q.includes("create") || q.includes("architect")) {
         setSimMode(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Venture Sandbox..." }]);
         logEvent("Venture Simulation Portal Opened", "system");
@@ -139,35 +137,6 @@ export default function App() {
     logEvent(`Context Shifted to: ${id.toUpperCase()}`, 'system');
   };
 
-  // --- SYNC: BRIDGE ---
-  useEffect(() => {
-    const syncFoundryData = async () => {
-      try {
-        const metrics = await invoke("get_venture_metrics") as any;
-        const intel = await invoke("get_market_intelligence") as any;
-        if (!simMode) setFounderMetrics(metrics);
-        setMarketIntel(intel);
-        setLastSync(new Date().toLocaleTimeString());
-      } catch (e) {
-        if (!simMode) {
-          setFounderMetrics({
-            arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%"
-          });
-        }
-        setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
-      }
-    };
-    syncFoundryData();
-    const interval = setInterval(syncFoundryData, 10000);
-    return () => clearInterval(interval);
-  }, [simMode]);
-
-  // --- DATA: CORTEX ---
-  const currentAura = useMemo(() => {
-    const ctx = contexts.find(c => c.id === activeContext);
-    return ctx?.aura || "rgba(99, 102, 241, 0.4)";
-  }, [activeContext]);
-
   const graphData = useMemo(() => ({
     nodes: [
       { id: "FOUNDRY CORE", group: "core", val: 20 }, 
@@ -201,12 +170,37 @@ export default function App() {
     }
   };
 
+  // --- SYNC: BRIDGE ---
+  useEffect(() => {
+    const syncFoundryData = async () => {
+      try {
+        const metrics = await invoke("get_venture_metrics") as any;
+        const intel = await invoke("get_market_intelligence") as any;
+        if (!simMode) setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
+        setMarketIntel(intel);
+        setLastSync(new Date().toLocaleTimeString());
+      } catch (e) {
+        if (!simMode) {
+          setFounderMetrics({
+            arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#6366f1"
+          });
+        }
+        setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
+      }
+    };
+    syncFoundryData();
+    const interval = setInterval(syncFoundryData, 10000);
+    return () => clearInterval(interval);
+  }, [simMode]);
+
+
+
   return (
     <div className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30">
       {/* Background Substrate */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
-          animate={{ background: simMode ? '#f59e0b' : currentAura, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
+          animate={{ background: simMode ? '#f59e0b' : founderMetrics.stress_color, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
         />
         <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
@@ -219,7 +213,7 @@ export default function App() {
             graphData={graphData}
             backgroundColor="#00000000"
             nodeRelSize={simMode ? 10 : 6}
-            nodeColor={getNodeColor}
+            nodeColor={() => simMode ? "#f59e0b" : founderMetrics.stress_color}
             nodeLabel="id"
             linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.1)"}
             showNavInfo={false}
