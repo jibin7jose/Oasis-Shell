@@ -5,7 +5,7 @@ import {
   Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
   Activity, Settings, Zap, Shield, Terminal, 
   Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck,
-  Globe, Cpu
+  Globe, Cpu, RotateCcw
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -52,6 +52,7 @@ export default function App() {
   const [activeGolem, setActiveGolem] = useState<any>(null);
   const [economicNews, setEconomicNews] = useState<string[]>([]);
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
+  const [manifestHistory, setManifestHistory] = useState<string[]>([]);
 
   const handleCommitSim = () => {
     setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
@@ -275,6 +276,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, [founderMetrics.stress_color]);
 
+  const handleRewind = async () => {
+    try {
+      const res = await invoke("restore_venture_state", { files: manifestHistory }) as string;
+      setNotification(res);
+      setManifestHistory([]);
+      setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }));
+    } catch (e) {}
+  };
+
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
@@ -475,7 +485,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.4.0-SENTIENT (SYMBIOSIS)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.5.0-SENTIENT (REWIND)</span>
                  {hardwareStatus && (
                     <span className="ml-4 text-[8px] font-black text-red-500/40 uppercase tracking-[0.25em] animate-pulse border-l border-white/5 pl-4">
                         {hardwareStatus.focus_mode}
@@ -679,6 +689,7 @@ export default function App() {
                        <button onClick={() => {
                           invoke('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
                             setNotification(res);
+                            setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").to_lowercase()}.ts`]);
                             setActiveGolem(null);
                             setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
                           });
@@ -696,11 +707,18 @@ export default function App() {
         {showVault && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
              <div className="flex items-center justify-between mb-12">
-                <div className="flex flex-col">
-                   <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Protocol</span>
-                   <h2 className="text-4xl font-bold text-white tracking-tighter flex items-center gap-4"><FolderOpen className="w-10 h-10 text-indigo-500" /> Sentient Venture Vault</h2>
+                <div>
+                   <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">Sentient Vault</h2>
+                   <p className="text-sm text-slate-500 font-medium">Internal Strategic Archive & File Ledger</p>
                 </div>
-                <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+                <div className="flex gap-4">
+                   {manifestHistory.length > 0 && (
+                      <button onClick={handleRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
+                         <RotateCcw className="w-4 h-4" /> Rewind Strategy
+                      </button>
+                   )}
+                   <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+                </div>
              </div>
              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
                 {[
@@ -800,7 +818,6 @@ export default function App() {
               {showAI && (
                  <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
                     <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable</span>
                        <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable ({hardwareStatus.focus_mode})</span>
                        <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
                     </header>
@@ -808,7 +825,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.4.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.5.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)

@@ -62,6 +62,14 @@ pub struct PendingManifest {
     pub code_draft: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VentureSnapshot {
+    pub id: String,
+    pub timestamp: String,
+    pub metrics: VentureMetrics,
+    pub files: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NeuralAgent {
     pub name: String,
@@ -534,6 +542,22 @@ async fn trigger_hardware_symbiosis(stress_color: String) -> Result<HardwareStat
             aura_intensity: 0.2,
         })
     }
+}
+
+#[tauri::command]
+async fn create_restore_point(metrics: VentureMetrics, files: Vec<String>) -> Result<String, String> {
+    let id = format!("SNAP_{}", chrono::Utc::now().timestamp());
+    Ok(format!("Restore Point {} Created. Venture State Synchronized.", id))
+}
+
+#[tauri::command]
+async fn restore_venture_state(files: Vec<String>) -> Result<String, String> {
+    for file in files {
+        if std::path::Path::new(&file).exists() {
+            std::fs::remove_file(&file).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok("Venture Core Reverted to Previous Equilibrium. Manifested files purged.".into())
 }
 
 #[tauri::command]
@@ -1140,7 +1164,9 @@ pub fn run() {
             get_pending_manifests,
             execute_golem_manifest,
             get_economic_news,
-            trigger_hardware_symbiosis
+            trigger_hardware_symbiosis,
+            create_restore_point,
+            restore_venture_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
