@@ -46,6 +46,11 @@ export default function App() {
     { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
   ]);
 
+  const [simMode, setSimMode] = useState(false);
+  const [simMetrics, setSimMetrics] = useState({
+    arr: 1.24, burn: 42.5, momentum: 12.8
+  });
+
   const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
     setTimeline(prev => [{ 
       id: Date.now(), 
@@ -55,7 +60,7 @@ export default function App() {
     }, ...prev].slice(0, 50));
   };
   const [founderMetrics, setFounderMetrics] = useState({
-    arr: "$0.0M", burn: "$0K/mo", runway: "0 Mo.", momentum: "0%"
+    arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%"
   });
 
   // Sync Foundry Metrics from Rust Kernel with Browser Fallback
@@ -140,6 +145,10 @@ export default function App() {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster..." }]);
         invoke('trigger_deploy', { env: 'Global' }).catch(() => {});
         logEvent("Deployment Sequence Alpha Initiated", "deploy");
+      } else if (q.includes("sim") || q.includes("sandbox") || q.includes("project")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Venture Sandbox..." }]);
+        setSimMode(true);
+        logEvent("Venture Simulation Portal Opened", "system");
       } else if (q.includes("vault") || q.includes("files") || q.includes("open vault")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Accessing Sentient Vault Nodes..." }]);
         setShowVault(true);
@@ -181,7 +190,7 @@ export default function App() {
       {/* Background Substrate */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
-          animate={{ background: currentAura, opacity: 0.1 }}
+          animate={{ background: simMode ? '#f59e0b' : currentAura, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
         />
         <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
@@ -192,10 +201,10 @@ export default function App() {
         <ForceGraph3D
           graphData={graphData}
           backgroundColor="#00000000"
-          nodeRelSize={6}
-          nodeColor={getNodeColor}
+          nodeRelSize={simMode ? 10 : 6}
+          nodeColor={node => simMode ? "#f59e0b" : getNodeColor(node)}
           nodeLabel="id"
-          linkColor={() => "rgba(99, 102, 241, 0.1)"}
+          linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.1)"}
           showNavInfo={false}
         />
       </div>
@@ -215,7 +224,8 @@ export default function App() {
             { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
             { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
             { id: 'vault', icon: FolderOpen, label: 'Vault' },
-            { id: 'logs', icon: Activity, label: 'History' }
+            { id: 'logs', icon: Activity, label: 'History' },
+            { id: 'sim', icon: Zap, label: 'Simulation' }
           ].map((item) => (
             <button
               key={item.id}
@@ -223,9 +233,13 @@ export default function App() {
                 if (item.id === 'graph') setShowGraph(true);
                 else if (item.id === 'vault') setShowVault(true);
                 else if (item.id === 'logs') setShowLogs(true);
-                else { setActiveContext('dev'); }
+                else if (item.id === 'sim') setSimMode(true);
+                else { handleContextSwitch('dev'); }
               }}
-              className="p-4 rounded-2xl text-slate-500 hover:text-white hover:bg-white/5 transition-all group relative"
+              className={cn(
+                "p-4 rounded-2xl transition-all group relative",
+                (item.id === 'sim' && simMode) ? "bg-amber-500/20 text-amber-500" : "text-slate-500 hover:text-white hover:bg-white/5"
+              )}
             >
               <item.icon className="w-6 h-6" />
               <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
@@ -502,6 +516,56 @@ export default function App() {
              <button className="w-full mt-12 py-4 glass text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-400 hover:text-white transition-all">
                 Export Audit Ledger
              </button>
+          </motion.div>
+        )}
+
+        {simMode && (
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-[#020617]/40 backdrop-blur-3xl">
+             <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-12 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.1)] relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
+                
+                <div className="flex items-center justify-between mb-16">
+                   <div className="flex flex-col">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.4em] mb-1">Strategic Sandbox</span>
+                      <h2 className="text-4xl font-bold text-white tracking-tighter">Venture Simulation Portal</h2>
+                   </div>
+                   <button onClick={() => setSimMode(false)} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">
+                     Commit Simulation
+                   </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-12">
+                   {[
+                     { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr' },
+                     { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn' },
+                     { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum' }
+                   ].map((sim) => (
+                     <div key={sim.key} className="space-y-6">
+                        <div className="flex justify-between items-end">
+                           <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">{sim.label}</label>
+                           <span className="text-3xl font-bold text-white tracking-tighter">
+                             {sim.key === 'arr' ? '$' : ''}{sim.val}{sim.unit}
+                           </span>
+                        </div>
+                        <input 
+                           type="range"
+                           min={sim.min}
+                           max={sim.max}
+                           step={0.1}
+                           value={sim.val}
+                           onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))}
+                           className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500"
+                        />
+                     </div>
+                   ))}
+                </div>
+
+                <div className="mt-16 p-8 rounded-2xl bg-amber-500/5 border border-amber-500/10">
+                   <p className="text-sm text-amber-200/60 leading-relaxed italic">
+                     "Foundry Insight: Projecting a {simMetrics.arr}M ARR baseline suggests a runway extension of {Math.floor(simMetrics.arr * 12 / (simMetrics.burn/1000))} months under current burn optimization."
+                   </p>
+                </div>
+             </div>
           </motion.div>
         )}
       </AnimatePresence>
