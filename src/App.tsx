@@ -29,6 +29,7 @@ export default function App() {
   const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
   
   const [mounted, setMounted] = useState(false);
+  const [presentationMode, setPresentationMode] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   // --- FEATURE STATE ---
@@ -83,6 +84,10 @@ export default function App() {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster..." }]);
         invoke('trigger_deploy', { env: 'Global' }).catch(() => {});
         logEvent("Deployment Sequence Alpha Initiated", "deploy");
+      } else if (q.includes("presentation") || q.includes("vision") || q.includes("portal")) {
+        setPresentationMode(true);
+        setMessages(prev => [...prev, { role: "assistant", content: "Visionary Portal Activated: Launching Stakeholder Mode..." }]);
+        logEvent("Visionary Portal Initialized (Stakeholder Mode)", "system");
       } else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
         const title = query.replace(/create|architect|build module/gi, "").trim() || "New Dynamic Module";
         setDynamicModules(prev => [
@@ -223,60 +228,62 @@ export default function App() {
       </div>
 
       {/* Level 9 Executive Sidebar */}
-      <motion.aside 
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
-      >
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-12">
-          <Bot className="w-7 h-7 text-white" />
-        </div>
+      {!presentationMode && (
+        <motion.aside 
+          initial={{ x: -100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-12">
+            <Bot className="w-7 h-7 text-white" />
+          </div>
 
-        <nav className="flex-1 flex flex-col gap-6 items-center">
-          {[
-            { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
-            { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
-            { id: 'vault', icon: FolderOpen, label: 'Vault' },
-            { id: 'logs', icon: Activity, label: 'History' },
-            { id: 'sim', icon: Zap, label: 'Simulation' }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (item.id === 'graph') setShowGraph(true);
-                else if (item.id === 'vault') setShowVault(true);
-                else if (item.id === 'logs') setShowLogs(true);
-                else if (item.id === 'sim') setSimMode(true);
-                else { handleContextSwitch('dev'); }
-              }}
+          <nav className="flex-1 flex flex-col gap-6 items-center">
+            {[
+              { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
+              { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
+              { id: 'vault', icon: FolderOpen, label: 'Vault' },
+              { id: 'logs', icon: Activity, label: 'History' },
+              { id: 'sim', icon: Zap, label: 'Simulation' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.id === 'graph') setShowGraph(true);
+                  else if (item.id === 'vault') setShowVault(true);
+                  else if (item.id === 'logs') setShowLogs(true);
+                  else if (item.id === 'sim') setSimMode(true);
+                  else { handleContextSwitch('dev'); }
+                }}
+                className={cn(
+                  "p-4 rounded-2xl transition-all group relative",
+                  (item.id === 'sim' && simMode) ? "bg-amber-500/20 text-amber-500" : "text-slate-500 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <item.icon className="w-6 h-6" />
+                <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
+                  {item.label}
+                </span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex flex-col gap-6 items-center mt-auto">
+            <button 
+              onClick={() => setSimMode(!simMode)}
               className={cn(
-                "p-4 rounded-2xl transition-all group relative",
-                (item.id === 'sim' && simMode) ? "bg-amber-500/20 text-amber-500" : "text-slate-500 hover:text-white hover:bg-white/5"
+                "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
+                simMode ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
               )}
             >
-              <item.icon className="w-6 h-6" />
-              <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
-                {item.label}
-              </span>
+              <Zap className={cn("w-6 h-6", simMode && "animate-pulse")} />
             </button>
-          ))}
-        </nav>
-
-        <div className="flex flex-col gap-6 items-center mt-auto">
-          <button 
-            onClick={() => setSimMode(!simMode)}
-            className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
-              simMode ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
-            )}
-          >
-            <Zap className={cn("w-6 h-6", simMode && "animate-pulse")} />
-          </button>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
-            <Settings className="w-6 h-6" />
-          </button>
-        </div>
-      </motion.aside>
+            <button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
+        </motion.aside>
+      )}
 
       {/* Main Command Stage */}
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
@@ -307,32 +314,34 @@ export default function App() {
                 <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.change}</span>
               </div>
             ))}
-            <div className="h-8 w-[1px] bg-white/5 mx-2" />
-            <button onClick={() => resolveNeuralIntent("Sync Metrics")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-              Neural Sync
+            <div className="h-8 w-[1px] bg-white/5 shadow-[0_0_10px_rgba(255,255,255,0.05)]" />
+            <button onClick={() => setPresentationMode(!presentationMode)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+              {presentationMode ? "Exit Portal" : "Neural Sync"}
             </button>
           </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
             {/* Neural Intent Bar */}
-            <motion.div 
-               initial={{ y: 20, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
-            >
-                <div className="flex items-center gap-5 px-4 py-2">
-                  <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
-                  <input 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchIntent}
-                    placeholder="Detecting Neural Intent..."
-                    className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
-                  />
-                  <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
-                </div>
-            </motion.div>
+            {!presentationMode && (
+              <motion.div 
+                 initial={{ y: 20, opacity: 0 }}
+                 animate={{ y: 0, opacity: 1 }}
+                 className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
+              >
+                  <div className="flex items-center gap-5 px-4 py-2">
+                    <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
+                    <input 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={handleSearchIntent}
+                      placeholder="Detecting Neural Intent..."
+                      className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
+                    />
+                    <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
+                  </div>
+              </motion.div>
+            )}
 
             {/* Metrics Ribbon */}
             <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
@@ -568,33 +577,35 @@ export default function App() {
       </AnimatePresence>
 
       {/* Floating Chat Robot */}
-      <div className="fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600]">
-         <AnimatePresence>
-            {showAI && (
-               <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
-                  <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                     <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable</span>
-                     <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
-                  </header>
-                  <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
-                     {messages.map((m, i) => (
-                       <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
-                     ))}
-                     {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
-                  </div>
-                  <div className="p-6 bg-black/20">
-                     <div className="flex items-center glass rounded-2xl px-5 py-3 border-white/10">
-                        <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white" />
-                        <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-white transition-colors"><Zap size={18} /></button>
-                     </div>
-                  </div>
-               </motion.div>
-            )}
-         </AnimatePresence>
-         <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
-           <Bot className="w-9 h-9" />
-         </button>
-      </div>
+      {!presentationMode && (
+        <div className="fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600]">
+           <AnimatePresence>
+              {showAI && (
+                 <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
+                    <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
+                       <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable</span>
+                       <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
+                    </header>
+                    <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
+                       {messages.map((m, i) => (
+                         <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
+                       ))}
+                       {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
+                    </div>
+                    <div className="p-6 bg-black/20">
+                       <div className="flex items-center glass rounded-2xl px-5 py-3 border-white/10">
+                          <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white" />
+                          <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-white transition-colors"><Zap size={18} /></button>
+                       </div>
+                    </div>
+                 </motion.div>
+              )}
+           </AnimatePresence>
+           <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
+             <Bot className="w-9 h-9" />
+           </button>
+        </div>
+      )}
     </div>
   );
 }
