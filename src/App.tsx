@@ -51,6 +51,12 @@ export default function App() {
   const [pendingManifests, setPendingManifests] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
 
+  const handleCommitSim = () => {
+    setFounderMetrics(prev => ({ ...prev, arr: `$${simMetrics.arr}M` }));
+    setSimMode(false);
+    setNotification(`Simulation Committed: Venture Reality Re-forecasted to $${simMetrics.arr}M ARR.`);
+  };
+
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 4000);
@@ -435,7 +441,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.6-PRO</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V2.2.1-SENTIENT</span>
                </h1>
             </div>
             
@@ -589,7 +595,7 @@ export default function App() {
         {showGraph && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
              <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
-             <div className="w-full h-full">
+             <div className="w-full h-full pointer-events-auto">
                 {mounted && (
                   <ForceGraph3D 
                     graphData={graphData} 
@@ -709,7 +715,7 @@ export default function App() {
                       <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.4em] mb-1">Strategic Sandbox</span>
                       <h2 className="text-4xl font-bold text-white tracking-tighter">Venture Simulation Portal</h2>
                    </div>
-                   <button onClick={() => setSimMode(false)} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">Commit Simulation</button>
+                   <button onClick={handleCommitSim} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">Commit Simulation</button>
                 </div>
                 <div className="grid grid-cols-1 gap-12">
                    {[
@@ -745,7 +751,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.2.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.2.1-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
