@@ -355,6 +355,16 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleAuthorizeBranch = async (agentId: string, tag: string) => {
+    try {
+      const res = await invoke("authorize_branch", { agentId, branchTag: tag }) as string;
+      setNotification(res);
+      // Refresh workforce status
+      const wf = await invoke("get_neural_workforce") as any[];
+      setWorkforce(wf);
+    } catch (e) {}
+  };
+
   const handleCLICommand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cliInput) return;
@@ -580,7 +590,7 @@ export default function App() {
                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.5.0-PRO (IMMORTAL)</span>
+                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V3.6.0-PARTNER (AGENTIC)</span>
                  <button onClick={() => setShowCLI(!showCLI)} className="ml-4 p-2 glass rounded-lg text-emerald-400 group relative">
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
@@ -1018,12 +1028,45 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.5.0-PRO</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V3.6.0-PARTNER (AGENTIC)</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                              <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
+                               <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center gap-3">
+                                     <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                        <Bot className="w-4 h-4 text-emerald-400" />
+                                     </div>
+                                     <div>
+                                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">{neuralWisdom.agent?.name}</h4>
+                                        <p className="text-[9px] text-white/40 font-mono tracking-widest">{neuralWisdom.agent?.status}</p>
+                                     </div>
+                                  </div>
+                               </div>
+                               <p className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</p>
+                               
+                               {/* STRATEGIC BRANCHES */}
+                               <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
+                                 {neuralWisdom.agent?.branches?.map((branch: any) => (
+                                   <button 
+                                     key={branch.tag}
+                                     onClick={() => handleAuthorizeBranch(neuralWisdom.agent.id, branch.tag)}
+                                     className={cn(
+                                       "p-3 rounded-xl border flex flex-col gap-1 transition-all text-left group",
+                                       branch.tag === "emerald" || branch.tag === "organic" 
+                                         ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10" 
+                                         : "bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10"
+                                     )}
+                                   >
+                                     <span className={cn(
+                                       "text-[8px] font-black uppercase tracking-[0.2em]",
+                                       branch.tag === "emerald" || branch.tag === "organic" ? "text-emerald-400" : "text-rose-400"
+                                     )}>{branch.title}</span>
+                                     <span className="text-[9px] text-white/60 leading-tight">{branch.description}</span>
+                                     <span className="mt-2 text-[7px] text-white/30 uppercase font-mono group-hover:text-white transition-colors">AUTHORIZE PATH →</span>
+                                   </button>
+                                 ))}
+                               </div>
                             </h5>
-                            <p className="text-xs text-indigo-100 font-bold leading-relaxed mb-3">{neuralWisdom.recommendation}</p>
                             <p className="text-[10px] text-indigo-300 italic opacity-80">{neuralWisdom.insight}</p>
                             <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
                                Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%

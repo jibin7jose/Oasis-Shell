@@ -105,12 +105,22 @@ pub struct VentureSnapshot {
     pub files: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentBranch {
+    pub tag: String,
+    pub title: String,
+    pub description: String,
+    pub risk_level: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NeuralAgent {
+    pub id: String,
     pub name: String,
     pub role: String,
     pub status: String,
     pub recommendation: String,
+    pub branches: Vec<AgentBranch>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -400,7 +410,7 @@ fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
 }
 
@@ -488,6 +498,14 @@ async fn manifest_code_module(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn authorize_branch(agent_id: String, branch_tag: String) -> Result<String, String> {
+    let path = format!("manifested/{}_branch_{}.ts", agent_id, branch_tag);
+    let manifest = format!("// FOUNDER AUTHORIZED MANIFEST\n// Agent: {}\n// Branch: {}\n// OS Pulse: Realified\n", agent_id, branch_tag);
+    std::fs::write(&path, manifest).map_err(|e| e.to_string())?;
+    Ok(format!("Strategic Branch [{}] Manifested to Filesystem. Golem active.", branch_tag))
+}
+
+#[tauri::command]
 async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String> {
     if stress_color == "#ef4444" || stress_color == "#f59e0b" {
         Ok(NeuralWisdom {
@@ -508,19 +526,6 @@ async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String>
 async fn get_neural_workforce() -> Result<Vec<NeuralAgent>, String> {
     Ok(vec![
         NeuralAgent {
-            name: "Growth Operative".into(),
-            role: "Market & Metrics Scalability".into(),
-            status: "Monitoring OASIS_INDEX".into(),
-            recommendation: "Internal momentum divergence detected. Recommend manifestating the 'Growth Engine' module.".into(),
-        },
-        NeuralAgent {
-            name: "Technical Architect".into(),
-            role: "FS Manifest & Core Stability".into(),
-            status: "Auditing 'manifested/' node integrity".into(),
-            recommendation: "System core stable. Ready for new Strat-Module infusion.".into(),
-        },
-        NeuralAgent {
-            name: "Stakeholder IR".into(),
             role: "Portal & Audit Readiness".into(),
             status: "Verifying Visionary Portal access".into(),
             recommendation: "Monthly Audit manifested. Ready for stakeholder relay.".into(),
@@ -1352,7 +1357,8 @@ pub fn run() {
             install_oas_binary,
             run_system_diagnostic,
             save_venture_state,
-            load_venture_state
+            load_venture_state,
+            authorize_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
