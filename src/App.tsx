@@ -18,9 +18,17 @@ const contexts = [
   { id: 'growth', name: 'Capital Matrix', icon: Activity, aura: 'rgba(16, 185, 129, 0.4)' }
 ];
 
+interface FounderMetrics {
+  arr: string;
+  burn: string;
+  runway: string;
+  momentum: string;
+  stress_color: string;
+}
+
 export default function App() {
   // --- CORE STATE ---
-  const [founderMetrics, setFounderMetrics] = useState({
+  const [founderMetrics, setFounderMetrics] = useState<FounderMetrics>({
     arr: "$1.24M",
     burn: "$0.85M",
     runway: "14.2 Mo",
@@ -460,7 +468,7 @@ export default function App() {
       } catch (e) {
         if (!simMode) {
           setFounderMetrics({
-            arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#6366f1"
+            arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#10b981"
           });
         }
         setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
