@@ -43,6 +43,14 @@ pub struct VentureStress {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct NeuralAgent {
+    pub name: String,
+    pub role: String,
+    pub status: String,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NeuralWisdom {
     pub recommendation: String,
     pub insight: String,
@@ -430,6 +438,30 @@ async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String>
             confidence: 0.98,
         })
     }
+}
+
+#[tauri::command]
+async fn get_neural_workforce() -> Result<Vec<NeuralAgent>, String> {
+    Ok(vec![
+        NeuralAgent {
+            name: "Growth Operative".into(),
+            role: "Market & Metrics Scalability".into(),
+            status: "Monitoring OASIS_INDEX".into(),
+            recommendation: "Internal momentum divergence detected. Recommend manifestating the 'Growth Engine' module.".into(),
+        },
+        NeuralAgent {
+            name: "Technical Architect".into(),
+            role: "FS Manifest & Core Stability".into(),
+            status: "Auditing 'manifested/' node integrity".into(),
+            recommendation: "System core stable. Ready for new Strat-Module infusion.".into(),
+        },
+        NeuralAgent {
+            name: "Stakeholder IR".into(),
+            role: "Portal & Audit Readiness".into(),
+            status: "Verifying Visionary Portal access".into(),
+            recommendation: "Monthly Audit manifested. Ready for stakeholder relay.".into(),
+        }
+    ])
 }
 
 #[tauri::command]
@@ -1031,7 +1063,8 @@ pub fn run() {
             manifest_code_module,
             generate_venture_audit,
             get_neural_wisdom,
-            trigger_oracle_audit
+            trigger_oracle_audit,
+            get_neural_workforce
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

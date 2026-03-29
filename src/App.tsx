@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bot, Search, LayoutDashboard, BrainCircuit, FolderOpen, 
   Activity, Settings, Zap, Shield, Terminal, 
-  Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck
+  Plus, Activity as PulseIcon, AlertCircle, X, ShieldCheck,
+  Globe, Cpu
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -46,6 +47,7 @@ export default function App() {
   const [oracleAlert, setOracleAlert] = useState<any>(null);
   const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [workforce, setWorkforce] = useState<any[]>([]);
 
   useEffect(() => {
     if (notification) {
@@ -205,6 +207,18 @@ export default function App() {
     };
     checkOracle();
     const interval = setInterval(checkOracle, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const syncWorkforceData = async () => {
+      try {
+        const wf = await invoke("get_neural_workforce") as any[];
+        setWorkforce(wf);
+      } catch (e) {}
+    };
+    syncWorkforceData();
+    const interval = setInterval(syncWorkforceData, 20000);
     return () => clearInterval(interval);
   }, []);
 
@@ -467,9 +481,36 @@ export default function App() {
                ))}
             </div>
 
-            {/* Strategic Command Hub: Dynamic Architect Modules (Disabled for Audit Phase) */}
-            <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                {/* Modules Manifest via Neural Intent 'audit' or 'manifest' */}
+            {/* Neural Corporate Suite (Phase 21) */}
+            <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                {workforce.map((agent, i) => (
+                   <motion.div 
+                     key={agent.name}
+                     initial={{ opacity: 0, scale: 0.95 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     transition={{ delay: i * 0.1 }}
+                     className="glass-bright rounded-3xl p-8 border border-white/5 relative overflow-hidden group hover:border-indigo-500/30 transition-all shadow-xl"
+                   >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-[40px]" />
+                      <div className="flex items-center gap-4 mb-6">
+                         <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/20 transition-all">
+                            {agent.name.includes("Growth") ? <Globe className="w-5 h-5 text-indigo-400" /> : agent.name.includes("Architect") ? <Cpu className="w-5 h-5 text-purple-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+                         </div>
+                         <div>
+                            <h4 className="text-sm font-black text-white uppercase tracking-wider">{agent.name}</h4>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{agent.status}</span>
+                         </div>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-black/20 border border-white/5 mb-4 min-h-[100px] flex items-center">
+                         <p className="text-[11px] text-slate-400 font-medium leading-relaxed italic line-clamp-4">
+                            "{agent.recommendation}"
+                         </p>
+                      </div>
+                      <button className="w-full py-3 bg-white/5 hover:bg-white/10 text-[9px] font-black text-slate-500 hover:text-white uppercase tracking-widest rounded-xl transition-all border border-white/5">
+                         Sync With Agent
+                      </button>
+                   </motion.div>
+                ))}
             </div>
 
             {/* Deployment Messenger Hub (Simplified) */}
@@ -656,7 +697,7 @@ export default function App() {
                        {neuralWisdom && (
                          <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4">
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-4">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.0.0-SENTIENT</span>
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V2.1.0-SENTIENT</span>
                             </div>
                             <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                               <BrainCircuit className="w-4 h-4" /> Neural Wisdom (Mirror)
