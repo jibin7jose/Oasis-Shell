@@ -67,6 +67,10 @@ export default function App() {
   const [voiceActive, setVoiceActive] = useState(false);
   const [crossWisdom, setCrossWisdom] = useState<any[]>([]);
   const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
+  const [aegisLedger, setAegisLedger] = useState<any>(null);
+  const [activeOracle, setActiveOracle] = useState<any>(null);
+  const [showNexus, setShowNexus] = useState(false);
+  const [activeVenture, setActiveVenture] = useState("Oasis Core (Alpha)");
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -440,13 +444,46 @@ export default function App() {
     setCliInput("");
   };
 
-  const handleMirrorVenture = async (id: string) => {
+  const handleAegisSync = async () => {
     try {
-      const wis = await invoke("get_cross_venture_wisdom", { targetId: id }) as string[];
-      setCrossWisdom(wis);
-      setNotification(`Neural Mirror Connected: Knowledge transfer initiated from Venture ${id}.`);
+      const res = await invoke("sync_venture_to_aegis", { 
+        ventureId: activeVenture.replace(" ", "_").toLowerCase(),
+        name: activeVenture,
+        metrics: founderMetrics,
+        market: marketIntel
+      }) as string;
+      setNotification(res);
+      const ledger = await invoke("get_aegis_ledger") as any;
+      setAegisLedger(ledger);
     } catch (e) {}
   };
+
+  const handleNeuralMirror = async (sourceId: string) => {
+    try {
+      const wisdom = await invoke("mirror_venture_intelligence", { sourceId }) as string[];
+      setCrossWisdom(wisdom);
+      setNotification(`Neural Mirror Connected: Knowledge transfer from ${sourceId} successful.`);
+      setShowNexus(false);
+    } catch (e) {}
+  };
+
+  const handleOracleVision = async (ventureId: string) => {
+    try {
+      const forecast = await invoke("invoke_oracle_prediction", { ventureId }) as any;
+      setActiveOracle(forecast);
+      setNotification(`Oracle Sigil Detected: 12-Month Projection manifested for ${ventureId}.`);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    const syncAegisData = async () => {
+      try {
+        const ledger = await invoke("get_aegis_ledger") as any;
+        setAegisLedger(ledger);
+      } catch (e) {}
+    };
+    syncAegisData();
+  }, []);
 
   // --- SYNC: BRIDGE ---
   useEffect(() => {
@@ -714,8 +751,11 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-8">
-            <button onClick={() => setPresentationMode(!presentationMode)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-              {presentationMode ? "Exit Portal" : "Neural Sync"}
+            <button onClick={handleAegisSync} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+               <Shield className="w-4 h-4" /> Aegis Sync
+            </button>
+            <button onClick={() => setShowNexus(true)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+               Nexus View
             </button>
           </div>
         </header>
@@ -967,7 +1007,7 @@ export default function App() {
                             </div>
                             <span className="text-xs font-black text-indigo-400">{v.peak_arr} PEAK</span>
                          </div>
-                         <button onClick={() => handleMirrorVenture(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
+                         <button onClick={() => handleNeuralMirror(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
                       </div>
                     ))}
                  </div>
@@ -1120,6 +1160,122 @@ export default function App() {
                    ))}
                 </div>
              </div>
+          </motion.div>
+        )}
+
+        {showNexus && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[5000] bg-[#020617]/95 backdrop-blur-4xl p-20 flex flex-col pt-10">
+              <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 blur-[150px] rounded-full animate-pulse" />
+              </div>
+              <div className="relative z-10 flex items-center justify-between mb-16 px-12">
+                 <div>
+                    <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2">Aegis Nexus Portal</h2>
+                    <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-3">
+                       <Globe className="w-5 h-5" /> Portfolio Integrity: {aegisLedger?.global_integrity?.toFixed(1) || '0.0'} Index
+                    </p>
+                 </div>
+                 <button onClick={() => setShowNexus(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+              </div>
+
+              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar">
+                 {Object.values(aegisLedger?.ventures || {}).map((ven: any, i: number) => (
+                    <motion.div 
+                      key={ven.id}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="glass-bright p-8 rounded-[3rem] border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer shadow-3xl"
+                    >
+                       <div className="flex justify-between items-start mb-10">
+                          <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
+                             <Globe className="w-7 h-7 text-indigo-400" />
+                          </div>
+                          <div className="text-right">
+                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Peaked ARR</span>
+                             <span className="text-lg font-black text-white">{ven.metrics.arr}</span>
+                          </div>
+                       </div>
+                       <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{ven.name}</h3>
+                       <p className="text-[10px] font-mono text-slate-500 mb-8">{ven.id}</p>
+                       
+                       <div className="grid grid-cols-2 gap-4 mb-8">
+                          <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Dominance</span>
+                             <span className="text-sm font-black text-indigo-400">{ven.dominance_index.toFixed(1)}</span>
+                          </div>
+                          <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Sentiment</span>
+                             <span className="text-[10px] font-bold text-emerald-400">{ven.market.sentiment}</span>
+                          </div>
+                       </div>
+
+                       <div className="flex gap-4">
+                          <button onClick={() => handleNeuralMirror(ven.id)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-white/5">Mirror Intelligence</button>
+                          <button onClick={() => handleOracleVision(ven.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
+                             <Zap className="w-3 h-3" /> Oracle Vision
+                          </button>
+                       </div>
+                    </motion.div>
+                 ))}
+              </div>
+          </motion.div>
+        )}
+
+        {activeOracle && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-black/90 backdrop-blur-5xl flex items-center justify-center p-20">
+              <div className="w-full max-w-5xl glass-bright rounded-[4rem] border border-amber-500/30 p-16 relative overflow-hidden flex flex-col h-[700px]">
+                 <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-amber-500/5 to-transparent pointer-events-none" />
+                 
+                 <div className="relative z-10 flex justify-between items-start mb-16">
+                    <div>
+                       <span className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mb-2 block">Neural Oracle Prediction</span>
+                       <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-4">{activeOracle.venture_id} / 2027</h2>
+                       <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                             <span className="text-[10px] font-black text-amber-500 uppercase">Confidence: {(activeOracle.prediction_confidence * 100).toFixed(1)}%</span>
+                          </div>
+                          <span className="text-sm font-bold text-slate-400 italic">"Recommendation: {activeOracle.recommendation}"</span>
+                       </div>
+                    </div>
+                    <button onClick={() => setActiveOracle(null)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
+                 </div>
+
+                 <div className="relative z-10 flex-1 grid grid-cols-12 gap-12">
+                    <div className="col-span-8 flex flex-col justify-end">
+                       <div className="flex items-end gap-x-2 h-64 mb-4">
+                          {activeOracle.trend_points.map((p: number, i: number) => (
+                             <motion.div 
+                                key={i} 
+                                initial={{ height: 0 }} 
+                                animate={{ height: `${(p / Math.max(...activeOracle.trend_points)) * 100}%` }}
+                                transition={{ delay: i * 0.05 }}
+                                className="flex-1 bg-gradient-to-t from-amber-600/20 to-amber-500 rounded-t-lg relative group"
+                             >
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all text-[8px] font-bold text-white bg-black/80 px-2 py-1 rounded border border-white/10 whitespace-nowrap">${p.toFixed(2)}M</div>
+                             </motion.div>
+                          ))}
+                       </div>
+                       <div className="flex justify-between px-2">
+                          {['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'].map(m => (
+                             <span key={m} className="text-[8px] font-black text-slate-600 tracking-widest">{m}</span>
+                          ))}
+                       </div>
+                    </div>
+
+                    <div className="col-span-4 space-y-8 flex flex-col justify-center">
+                       <div className="p-8 rounded-[2.5rem] bg-amber-500/5 border border-amber-500/10">
+                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-2 text-center">Projected ARR (12M)</span>
+                          <h4 className="text-4xl font-black text-white tracking-tighter text-center">{activeOracle.projected_arr}</h4>
+                       </div>
+                       <div className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 text-center">Reference Burn</span>
+                          <h4 className="text-2xl font-black text-white tracking-tighter text-center">{activeOracle.projected_burn}</h4>
+                       </div>
+                    </div>
+                 </div>
+              </div>
           </motion.div>
         )}
       </AnimatePresence>

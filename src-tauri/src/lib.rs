@@ -100,10 +100,60 @@ pub struct SystemStats {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VentureSnapshot {
     pub id: String,
+    pub name: String,
     pub timestamp: String,
     pub metrics: VentureMetrics,
     pub market: MarketIntelligence,
-    pub strategic_debt: f32,
+    pub dominance_index: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AegisLedger {
+    pub ventures: std::collections::HashMap<String, VentureSnapshot>,
+    pub global_integrity: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OracleForecast {
+    pub venture_id: String,
+    pub projected_arr: String,
+    pub projected_burn: String,
+    pub prediction_confidence: f32,
+    pub trend_points: Vec<f32>,
+    pub recommendation: String,
+}
+
+#[tauri::command]
+async fn invoke_oracle_prediction(venture_id: String) -> Result<OracleForecast, String> {
+    let ledger = get_aegis_ledger().await?;
+    if let Some(venture) = ledger.ventures.get(&venture_id) {
+        // SAVING METRICS FOR THE PYTHON ORACLE
+        let cache_path = std::path::PathBuf::from(".oracle_cache.json");
+        let cache_data = serde_json::to_string(&venture).map_err(|e| e.to_string())?;
+        std::fs::write(&cache_path, cache_data).map_err(|e| e.to_string())?;
+
+        // MOCK ORACLE CALCULATION
+        let current_arr = venture.metrics.arr.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(1.0);
+        let momentum = venture.metrics.momentum.replace('+', "").replace('%', "").parse::<f32>().unwrap_or(10.0) / 100.0;
+        
+        let mut trend_points = Vec::new();
+        let mut projected = current_arr;
+        for _ in 0..12 {
+            projected *= 1.0 + (momentum / 12.0);
+            trend_points.push(projected);
+        }
+
+        Ok(OracleForecast {
+            venture_id,
+            projected_arr: format!("${:.2}M", projected),
+            projected_burn: venture.metrics.burn.clone(),
+            prediction_confidence: 0.85 + (momentum * 0.1).min(0.14),
+            trend_points,
+            recommendation: if momentum > 0.15 { "Hypergrowth Detected: Aggressive Capital Injection Recommended.".to_string() } else { "Steady Trajectory: Maintain Current Strategic Burn.".to_string() }
+        })
+    } else {
+        Err("Venture not found in Aegis Ledger for Oracle prediction.".to_string())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -139,7 +189,7 @@ pub struct OracleAlert {
     pub economic_signal: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MarketIntelligence {
     pub sentiment: String,
     pub index_change: String,
@@ -576,6 +626,53 @@ async fn delete_golem(id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn get_aegis_ledger() -> Result<AegisLedger, String> {
+    let path = std::path::PathBuf::from(".aegis_ledger.json");
+    if !path.exists() {
+        return Ok(AegisLedger { ventures: std::collections::HashMap::new(), global_integrity: 100.0 });
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn sync_venture_to_aegis(venture_id: String, name: String, metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
+    let mut ledger = get_aegis_ledger().await?;
+    let dominance = (metrics.arr.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(1.0) * 10.0) - (metrics.burn.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(0.5) * 2.0);
+    
+    ledger.ventures.insert(venture_id.clone(), VentureSnapshot {
+        id: venture_id,
+        name,
+        metrics,
+        market,
+        timestamp: chrono::Local::now().to_rfc3339(),
+        dominance_index: dominance,
+    });
+    
+    ledger.global_integrity = ledger.ventures.values().map(|v| v.dominance_index).sum::<f32>() / (ledger.ventures.len() as f32).max(1.0);
+    
+    let path = std::path::PathBuf::from(".aegis_ledger.json");
+    let content = serde_json::to_string_pretty(&ledger).map_err(|e| e.to_string())?;
+    std::fs::write(path, content).map_err(|e| e.to_string())?;
+    Ok("Venture State Synchronized with Aegis Bridge.".to_string())
+}
+
+#[tauri::command]
+async fn mirror_venture_intelligence(source_id: String) -> Result<Vec<String>, String> {
+    let ledger = get_aegis_ledger().await?;
+    if let Some(venture) = ledger.ventures.get(&source_id) {
+        let wisdom = vec![
+            format!("Mirroring Capital Strategy from {}: ARR Focus @ {}", venture.name, venture.metrics.arr),
+            format!("Integrating Market Hedging: {} Logic Applied.", venture.market.sentiment),
+            "Aegis Encryption Tunnel: Knowledge Transfer Complete.".to_string(),
+        ];
+        Ok(wisdom)
+    } else {
+        Err("Target Venture not found in Aegis Ledger.".to_string())
+    }
+}
+
+#[tauri::command]
 async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, String> {
     let market_bias = if market_index < 90.0 { "EMERALD_BIAS (Safe)" } else { "RUBY_BIAS (Aggressive)" };
     let mut workforce = vec![
@@ -767,6 +864,7 @@ async fn load_venture_state() -> Result<VentureMetrics, String> {
             arr: "$1.24M".into(),
             burn: "$0.85M".into(),
             runway: "14.2 Mo".into(),
+            momentum: "+12.8%".into(),
             stress_color: "#10b981".into(),
         })
     }
@@ -784,10 +882,11 @@ async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntellig
 
     snapshots.push(VentureSnapshot {
         id: format!("S_{}", snapshots.len()),
+        name: "Chronos Snapshot".to_string(),
         timestamp: chrono::Local::now().to_rfc3339(),
         metrics,
         market,
-        strategic_debt: 12.5, // Seed value
+        dominance_index: 85.0, // Seed value
     });
 
     let data = serde_json::to_string(&snapshots).map_err(|e| e.to_string())?;
@@ -804,10 +903,6 @@ async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
     } else {
         Ok(Vec::new())
     }
-}
-    // REAL COMMAND: Registering the binary into the system path for 'oas' command access
-    // This provides the 'System-Level Power' requested
-    Ok("Oas Binary Registered to System PATH. Restart terminal to invoke 'oas' commands globally.".into())
 }
 
 #[tauri::command]
@@ -1098,7 +1193,7 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                 
                 // CORS Preflight
                 if request.method() == &tiny_http::Method::Options {
-                    let response = Response::empty(204)
+                    let response = tiny_http::Response::empty(204)
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]).unwrap())
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type"[..]).unwrap());
@@ -1114,13 +1209,13 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                         }
                     }
                 } else if url == "/heartbeat" {
-                    let response = Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
+                    let response = tiny_http::Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                     let _ = request.respond(response);
                     continue;
                 }
                 
-                let response = Response::from_string("OK")
+                let response = tiny_http::Response::from_string("OK")
                     .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                 let _ = request.respond(response);
             }
@@ -1143,9 +1238,9 @@ fn get_logic_path(aura: String) -> String {
 #[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_secs(5)); 
+        std::thread::sleep(std::time::Duration::from_secs(5)); 
 
-        let mut sys = System::new(); 
+        let mut sys = sysinfo::System::new(); 
         loop {
             sys.refresh_memory();
             sys.refresh_all();
@@ -1205,7 +1300,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 
             // NEURAL GIT SCOUT (Level 16)
             #[cfg(target_os = "windows")]
-            let git_check = Command::new("powershell")
+            let git_check = std::process::Command::new("powershell")
                 .args(["-Command", "git status --short"])
                 .output();
 
@@ -1220,7 +1315,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            std::thread::sleep(Duration::from_secs(120)); // Pulsing every 2 minutes
+            std::thread::sleep(std::time::Duration::from_secs(120)); // Pulsing every 2 minutes
         }
     });
     Ok(())
@@ -1234,7 +1329,7 @@ fn sync_hardware_aura(aura: String) -> Result<(), String> {
         _ => "echo 'Aura Parity Nominal'",
     };
 
-    let _ = Command::new("powershell")
+    let _ = std::process::Command::new("powershell")
         .args(["-Command", ps_cmd])
         .spawn();
 
@@ -1321,13 +1416,13 @@ fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
 
 #[tauri::command]
 async fn capture_screenshot() -> Result<String, String> {
-    let screens = Screen::all().map_err(|e| e.to_string())?;
+    let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
     if let Some(screen) = screens.first() {
         let image = screen.capture().map_err(|e| e.to_string())?;
-        let mut buffer = Cursor::new(Vec::new());
+        let mut buffer = std::io::Cursor::new(Vec::new());
         // Use PNG for high fidelity visual reasoning
-        image.write_to(&mut buffer, ImageFormat::Png).map_err(|e| e.to_string())?;
-        Ok(general_purpose::STANDARD.encode(buffer.get_ref()))
+        image.write_to(&mut buffer, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()))
     } else {
         Err("No screen found".to_string())
     }
@@ -1357,7 +1452,7 @@ async fn query_vision(image_base64: String, prompt: String) -> Result<String, St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let conn = Connection::open("oasis_crates.db").expect("failed to open database");
+    let conn = rusqlite::Connection::open("oasis_crates.db").expect("failed to open database");
     
     conn.execute(
         "CREATE TABLE IF NOT EXISTS context_crates (
@@ -1402,7 +1497,7 @@ pub fn run() {
 
 
     tauri::Builder::default()
-        .manage(DbState(Mutex::new(conn)))
+        .manage(DbState(std::sync::Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
@@ -1473,6 +1568,10 @@ pub fn run() {
             authorize_branch,
             create_chronos_snapshot,
             get_chronos_ledger,
+            get_aegis_ledger,
+            sync_venture_to_aegis,
+            mirror_venture_intelligence,
+            invoke_oracle_prediction,
             register_new_golem,
             delete_golem
         ])
