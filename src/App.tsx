@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Eye, Mic, MicOff,
   Bot, BrainCircuit, Settings, Terminal, Search, Trash2, Plus,
-  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -69,7 +69,9 @@ export default function App() {
   const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
   const [aegisLedger, setAegisLedger] = useState<any>(null);
   const [activeOracle, setActiveOracle] = useState<any>(null);
+  const [sentinelVault, setSentinelVault] = useState<any>(null);
   const [showNexus, setShowNexus] = useState(false);
+  const [showSentinel, setShowSentinel] = useState(false);
   const [activeVenture, setActiveVenture] = useState("Oasis Core (Alpha)");
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
@@ -475,11 +477,31 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleSealAsset = async (path: string, title: string) => {
+    try {
+      const res = await invoke("seal_strategic_asset", { filePath: path, title }) as string;
+      setNotification(res);
+      const vault = await invoke("get_sentinel_ledger") as any;
+      setSentinelVault(vault);
+    } catch (e) {}
+  };
+
+  const handleUnsealAsset = async (id: string) => {
+    try {
+      const res = await invoke("unseal_strategic_asset", { blobId: id }) as string;
+      setNotification(res);
+      const vault = await invoke("get_sentinel_ledger") as any;
+      setSentinelVault(vault);
+    } catch (e) {}
+  };
+
   useEffect(() => {
     const syncAegisData = async () => {
       try {
         const ledger = await invoke("get_aegis_ledger") as any;
         setAegisLedger(ledger);
+        const vault = await invoke("get_sentinel_ledger") as any;
+        setSentinelVault(vault);
       } catch (e) {}
     };
     syncAegisData();
@@ -715,7 +737,7 @@ export default function App() {
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                  {contexts.find(c => c.id === activeContext)?.name} Context
-                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V4.1.2-STABLE</span>
+                 <span className="ml-4 text-[9px] font-mono text-amber-500/50 border border-amber-500/20 px-2 py-0.5 rounded font-black tracking-widest uppercase">V4.4.1-SENTINEL (ENCRYPTED CORE)</span><button onClick={() => setShowSentinel(true)} className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"><Shield className="w-4 h-4" /> Sentinel Archive</button>
                  <button onClick={handleVoiceIntent} className={cn("ml-8 p-2 glass rounded-lg transition-all", voiceActive ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]" : "text-slate-400")}>
                     {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
                  </button>
@@ -1041,8 +1063,7 @@ export default function App() {
               </div>
            </motion.div>
         )}
-
-        {showVault && (
+         {showVault && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
              <div className="flex items-center justify-between mb-12">
                 <div>
@@ -1050,6 +1071,9 @@ export default function App() {
                    <p className="text-sm text-slate-500 font-medium">Internal Strategic Archive & File Ledger</p>
                 </div>
                 <div className="flex gap-4">
+                   <button onClick={() => setShowSentinel(true)} className="px-8 py-3 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3">
+                      <Shield className="w-4 h-4" /> Sentinel Archive
+                   </button>
                    {manifestHistory.length > 0 && (
                       <button onClick={handleRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
                          <RotateCcw className="w-4 h-4" /> Rewind Strategy
@@ -1058,6 +1082,7 @@ export default function App() {
                    <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
                 </div>
              </div>
+
              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
                 {strategicInventory.map((asset: any, i: number) => (
                    <motion.div 
@@ -1089,10 +1114,13 @@ export default function App() {
                          </div>
                          <div className="text-right">
                             <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Authorized By</span>
-                            <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
-                         </div>
-                      </div>
-                   </motion.div>
+                             <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
+                          </div>
+                       </div>
+                       <button onClick={() => handleSealAsset(asset.file_path, asset.file_path.split("/").pop() || "Strategic Asset")} className="w-full mt-6 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
+                          <Lock className="w-3 h-3" /> Seal within Sentinel
+                       </button>
+                    </motion.div>
                 ))}
              </div>
           </motion.div>
@@ -1275,6 +1303,56 @@ export default function App() {
                        </div>
                     </div>
                  </div>
+              </div>
+          </motion.div>
+        )}
+        {showSentinel && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[7000] bg-[#020617]/98 backdrop-blur-5xl p-20 flex flex-col pt-10">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
+              <div className="relative z-10 flex items-center justify-between mb-16 px-12">
+                 <div>
+                    <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 font-mono">Sentinel Archive</h2>
+                    <p className="text-sm font-bold text-amber-500 uppercase tracking-widest flex items-center gap-3">
+                       <ShieldCheck className="w-5 h-5" /> Security Resonance: {sentinelVault?.security_resonance?.toFixed(2) || '1.00'} Index
+                    </p>
+                 </div>
+                 <button onClick={() => setShowSentinel(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
+              </div>
+
+              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar pr-4">
+                 {Object.values(sentinelVault?.blobs || {}).map((blob: any, i: number) => (
+                    <motion.div 
+                      key={blob.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="bg-[#0f172a]/80 p-8 rounded-[3rem] border border-amber-500/10 relative group hover:border-amber-500/40 transition-all shadow-3xl"
+                    >
+                       <div className="flex justify-between items-start mb-10">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-500/5 flex items-center justify-center border border-amber-500/10 group-hover:bg-amber-600/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+                             <Lock className="w-7 h-7 text-amber-400" />
+                          </div>
+                          <div className="text-right">
+                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Encrypted Blob</span>
+                             <span className="text-[10px] font-mono text-amber-500/60 font-bold">{blob.id}</span>
+                          </div>
+                       </div>
+                       <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{blob.title}</h3>
+                       <p className="text-[10px] font-mono text-slate-500 mb-8 truncate">{blob.original_path}</p>
+                       
+                       <div className="pt-6 border-t border-white/5 flex gap-4">
+                          <button onClick={() => handleUnsealAsset(blob.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20">Unseal Blueprint</button>
+                       </div>
+                    </motion.div>
+                 ))}
+                 
+                 {/* EMPTY STATE */}
+                 {(!sentinelVault?.blobs || Object.keys(sentinelVault.blobs).length === 0) && (
+                   <div className="col-span-full flex flex-col items-center justify-center py-40 opacity-20 text-center">
+                      <ShieldAlert className="w-20 h-20 text-white mb-6 mx-auto" />
+                      <span className="text-sm font-black uppercase tracking-[0.4em] text-white">Vault Empty / Awaiting Seal</span>
+                   </div>
+                 )}
               </div>
           </motion.div>
         )}

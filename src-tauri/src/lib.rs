@@ -15,6 +15,8 @@ use screenshots::Screen;
 use base64::{Engine as _, engine::general_purpose};
 use std::io::Cursor;
 use image::ImageFormat;
+use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
+use std::collections::HashMap;
 
 
 struct DbState(Mutex<Connection>);
@@ -153,6 +155,111 @@ async fn invoke_oracle_prediction(venture_id: String) -> Result<OracleForecast, 
         })
     } else {
         Err("Venture not found in Aegis Ledger for Oracle prediction.".to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EncryptedBlob {
+    pub id: String,
+    pub title: String,
+    pub original_path: String,
+    pub encrypted_path: String,
+    pub timestamp: String,
+    pub aura_intensity: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SentinelVault {
+    pub blobs: HashMap<String, EncryptedBlob>,
+    pub security_resonance: f32,
+}
+
+#[tauri::command]
+async fn seal_strategic_asset(file_path: String, title: String) -> Result<String, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    if !path.exists() {
+        return Err("Strategic Target Not Found for Sealing.".into());
+    }
+
+    let data = std::fs::read(&path).map_err(|e| e.to_string())?;
+    
+    // Master Cipher: In V4.4.1 we establish neural key derivation
+    let key = Key::<Aes256Gcm>::from_slice(b"FOUNDER_PROTO_44_SECRET_KEY_PROV"); 
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(b"UNIQUE_SALT_44"); // In production use random salt per file
+
+    let ciphertext = cipher.encrypt(nonce, data.as_ref()).map_err(|e| e.to_string())?;
+    
+    let vault_dir = std::path::Path::new(".sentinel_vault");
+    if !vault_dir.exists() {
+        std::fs::create_dir(vault_dir).map_err(|e| e.to_string())?;
+    }
+    
+    let blob_id = format!("BLOB_{}", chrono::Local::now().timestamp());
+    let enc_path = vault_dir.join(format!("{}.enc", blob_id));
+    std::fs::write(&enc_path, ciphertext).map_err(|e| e.to_string())?;
+
+    // UPDATE SENTINEL LEDGER
+    let ledger_path = ".sentinel_vault.json";
+    let mut vault = if std::path::Path::new(ledger_path).exists() {
+        let content = std::fs::read_to_string(ledger_path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<SentinelVault>(&content).unwrap_or(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 })
+    } else {
+        SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 }
+    };
+
+    vault.blobs.insert(blob_id.clone(), EncryptedBlob {
+        id: blob_id,
+        title,
+        original_path: file_path,
+        encrypted_path: enc_path.to_string_lossy().into(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+        aura_intensity: 0.95,
+    });
+    vault.security_resonance += 0.05;
+
+    let vault_data = serde_json::to_string(&vault).map_err(|e| e.to_string())?;
+    std::fs::write(ledger_path, vault_data).map_err(|e| e.to_string())?;
+
+    Ok("Strategic Asset Sealed within the Sentinel Vault.".into())
+}
+
+#[tauri::command]
+async fn unseal_strategic_asset(blob_id: String) -> Result<String, String> {
+    let ledger_path = ".sentinel_vault.json";
+    let content = std::fs::read_to_string(ledger_path).map_err(|e| e.to_string())?;
+    let mut vault: SentinelVault = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    if let Some(blob) = vault.blobs.get(&blob_id) {
+        let ciphertext = std::fs::read(&blob.encrypted_path).map_err(|e| e.to_string())?;
+        
+        // Master Cipher Key (Must match seal command)
+        let key = Key::<Aes256Gcm>::from_slice(b"FOUNDER_PROTO_44_SECRET_KEY_PROV");
+        let cipher = Aes256Gcm::new(key);
+        let nonce = Nonce::from_slice(b"UNIQUE_SALT_44");
+
+        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|e| e.to_string())?;
+        
+        std::fs::write(&blob.original_path, plaintext).map_err(|e| e.to_string())?;
+        
+        vault.blobs.remove(&blob_id); // Remove from vault on unseal
+        let vault_data = serde_json::to_string(&vault).map_err(|e| e.to_string())?;
+        std::fs::write(ledger_path, vault_data).map_err(|e| e.to_string())?;
+
+        Ok(format!("Asset Unsealed and Restored to {}.", blob.original_path))
+    } else {
+        Err("Spectral Target not found in the Sentinel Ledger.".into())
+    }
+}
+
+#[tauri::command]
+async fn get_sentinel_ledger() -> Result<SentinelVault, String> {
+    let path = ".sentinel_vault.json";
+    if std::path::Path::new(path).exists() {
+        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        Ok(serde_json::from_str(&content).unwrap_or(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 }))
+    } else {
+        Ok(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 })
     }
 }
 
@@ -1572,6 +1679,9 @@ pub fn run() {
             sync_venture_to_aegis,
             mirror_venture_intelligence,
             invoke_oracle_prediction,
+            seal_strategic_asset,
+            unseal_strategic_asset,
+            get_sentinel_ledger,
             register_new_golem,
             delete_golem
         ])
