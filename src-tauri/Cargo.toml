@@ -36,4 +36,7 @@ base64 = "0.22.1"
 image = "0.25.5"
 aes-gcm = "0.10.3"
 aead = "0.5.2"
+pbkdf2 = { version = "0.12.2", features = ["simple"] }
+hmac = "0.12.1"
+sha2 = "0.10.6"
 

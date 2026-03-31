@@ -72,6 +72,8 @@ export default function App() {
   const [sentinelVault, setSentinelVault] = useState<any>(null);
   const [showNexus, setShowNexus] = useState(false);
   const [showSentinel, setShowSentinel] = useState(false);
+  const [isVaultLocked, setIsVaultLocked] = useState(true);
+  const [founderSecret, setFounderSecret] = useState("");
   const [activeVenture, setActiveVenture] = useState("Oasis Core (Alpha)");
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
@@ -475,6 +477,19 @@ export default function App() {
       setActiveOracle(forecast);
       setNotification(`Oracle Sigil Detected: 12-Month Projection manifested for ${ventureId}.`);
     } catch (e) {}
+  };
+
+  const handleAuthenticateFounder = async () => {
+    if (!founderSecret) return;
+    try {
+      const res = await invoke("authenticate_founder", { secret: founderSecret }) as string;
+      setIsVaultLocked(false);
+      setNotification(res);
+      const vault = await invoke("get_sentinel_ledger") as any;
+      setSentinelVault(vault);
+    } catch (e: any) {
+      setNotification(`Neural Authentication Failure: ${e}`);
+    }
   };
 
   const handleSealAsset = async (path: string, title: string) => {
@@ -1309,17 +1324,42 @@ export default function App() {
         {showSentinel && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[7000] bg-[#020617]/98 backdrop-blur-5xl p-20 flex flex-col pt-10">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
-              <div className="relative z-10 flex items-center justify-between mb-16 px-12">
-                 <div>
-                    <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 font-mono">Sentinel Archive</h2>
-                    <p className="text-sm font-bold text-amber-500 uppercase tracking-widest flex items-center gap-3">
-                       <ShieldCheck className="w-5 h-5" /> Security Resonance: {sentinelVault?.security_resonance?.toFixed(2) || '1.00'} Index
-                    </p>
-                 </div>
-                 <button onClick={() => setShowSentinel(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
-              </div>
+               <div className="relative z-10 flex items-center justify-between mb-16 px-12">
+                  <div>
+                     <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 font-mono">Sentinel Archive</h2>
+                     <p className="text-sm font-bold text-amber-500 uppercase tracking-widest flex items-center gap-3">
+                        <ShieldCheck className="w-5 h-5" /> {isVaultLocked ? "Vault Locked / Neural Cipher Required" : `Security Resonance: ${sentinelVault?.security_resonance?.toFixed(2) || '1.00'} Index`}
+                     </p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                     {isVaultLocked && (
+                        <div className="flex items-center glass rounded-2xl px-6 py-3 border-amber-500/30 gap-4">
+                           <Lock className="w-4 h-4 text-amber-500" />
+                           <input 
+                              type="password"
+                              value={founderSecret} 
+                              onChange={(e) => setFounderSecret(e.target.value)} 
+                              onKeyDown={(e) => e.key === 'Enter' && handleAuthenticateFounder()}
+                              placeholder="Input Founder Secret..." 
+                              className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest w-48 text-white placeholder:text-amber-500/20" 
+                           />
+                           <button onClick={handleAuthenticateFounder} className="text-amber-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest">Unlock</button>
+                        </div>
+                     )}
+                     <button onClick={() => { setShowSentinel(false); setFounderSecret(""); }} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
+                  </div>
+               </div>
 
-              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar pr-4">
+               {isVaultLocked ? (
+                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center py-40">
+                     <div className="w-32 h-32 rounded-[2.5rem] bg-amber-500/5 flex items-center justify-center border border-amber-500/20 mb-8 animate-pulse shadow-[0_0_50px_rgba(245,158,11,0.1)]">
+                        <ShieldAlert className="w-12 h-12 text-amber-500" />
+                     </div>
+                     <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-4">Awaiting Founder Secret</h3>
+                     <p className="text-sm text-slate-500 max-w-md text-center leading-relaxed">Pulse your unique neural identifier to derive the master cipher and unseal the Sentinel Archive.</p>
+                  </div>
+               ) : (
+                  <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar pr-4">
                  {Object.values(sentinelVault?.blobs || {}).map((blob: any, i: number) => (
                     <motion.div 
                       key={blob.id}
@@ -1354,6 +1394,7 @@ export default function App() {
                    </div>
                  )}
               </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

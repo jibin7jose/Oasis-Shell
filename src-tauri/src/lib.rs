@@ -16,7 +16,11 @@ use base64::{Engine as _, engine::general_purpose};
 use std::io::Cursor;
 use image::ImageFormat;
 use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
+use pbkdf2::pbkdf2_hmac;
+use sha2::Sha256;
 use std::collections::HashMap;
+
+static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
 
 struct DbState(Mutex<Connection>);
@@ -175,6 +179,19 @@ pub struct SentinelVault {
 }
 
 #[tauri::command]
+async fn authenticate_founder(secret: String) -> Result<String, String> {
+    let mut password_key = [0u8; 32];
+    let salt = b"OASIS_NEURAL_SALT_45_LEX_FOUNDRY"; // Consistent salt for the primary cipher
+    
+    pbkdf2_hmac::<Sha256>(secret.as_bytes(), salt, 100_000, &mut password_key);
+    
+    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+    *state = Some(password_key);
+    
+    Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
+}
+
+#[tauri::command]
 async fn seal_strategic_asset(file_path: String, title: String) -> Result<String, String> {
     let path = std::path::PathBuf::from(&file_path);
     if !path.exists() {
@@ -183,10 +200,15 @@ async fn seal_strategic_asset(file_path: String, title: String) -> Result<String
 
     let data = std::fs::read(&path).map_err(|e| e.to_string())?;
     
-    // Master Cipher: In V4.4.1 we establish neural key derivation
-    let key = Key::<Aes256Gcm>::from_slice(b"FOUNDER_PROTO_44_SECRET_KEY_PROV"); 
+    // Neural Key Derivation: In V4.5.1 we pull the session key from memory
+    let session_key = {
+        let state = FOUNDER_KEY_STATE.lock().unwrap();
+        state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?
+    };
+    
+    let key = Key::<Aes256Gcm>::from_slice(&session_key); 
     let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(b"UNIQUE_SALT_44"); // In production use random salt per file
+    let nonce = Nonce::from_slice(b"UNIQUE_SALT_44"); 
 
     let ciphertext = cipher.encrypt(nonce, data.as_ref()).map_err(|e| e.to_string())?;
     
@@ -233,8 +255,13 @@ async fn unseal_strategic_asset(blob_id: String) -> Result<String, String> {
     if let Some(blob) = vault.blobs.get(&blob_id) {
         let ciphertext = std::fs::read(&blob.encrypted_path).map_err(|e| e.to_string())?;
         
-        // Master Cipher Key (Must match seal command)
-        let key = Key::<Aes256Gcm>::from_slice(b"FOUNDER_PROTO_44_SECRET_KEY_PROV");
+        // Session Key Derivation (V4.5.1)
+        let session_key = {
+            let state = FOUNDER_KEY_STATE.lock().unwrap();
+            state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?
+        };
+        
+        let key = Key::<Aes256Gcm>::from_slice(&session_key);
         let cipher = Aes256Gcm::new(key);
         let nonce = Nonce::from_slice(b"UNIQUE_SALT_44");
 
@@ -1679,6 +1706,7 @@ pub fn run() {
             sync_venture_to_aegis,
             mirror_venture_intelligence,
             invoke_oracle_prediction,
+            authenticate_founder,
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,
