@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Eye, Mic, MicOff,
@@ -194,6 +195,26 @@ export default function App() {
       } else if (q.includes("intel") || q.includes("market") || q.includes("competitors")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Retrieving Global Market Intelligence..." }]);
         logEvent("Market Intelligence Bridge Synced", "system");
+      } else if (q.includes("sync") || q.includes("push") || q.includes("pulse")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Oasis Pulse Sync with GitHub..." }]);
+        invoke('sync_project', { message: query }).then(() => {
+          setNotification("Oasis Pulse: Neural Sync Complete.");
+        }).catch((err) => setNotification(`Sync Failure: ${err}`));
+        logEvent("Neural Project Sync Triggered", "system");
+      } else if (q.includes("forecast") || q.includes("predict") || q.includes("oracle")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Invoking Oracle Harmonic Vision..." }]);
+        invoke('invoke_oracle_prediction', { ventureId: 'oasis_core_alpha' }).then((res: any) => {
+          setActiveOracle(res);
+          setNotification("Oracle Vision: 12-Month Projection Received.");
+        }).catch(() => {});
+        logEvent("Oracle Forecasting Sequence Initiated", "neural");
+      } else if (q.includes("status") || q.includes("diagnostic") || q.includes("health")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Running Deep System Diagnostic..." }]);
+        invoke('run_system_diagnostic').then((res: any) => {
+          setSystemStats(res);
+          setNotification("System Diagnostic Complete. Health 98%.");
+        }).catch(() => {});
+        logEvent("System Health Diagnostic Executed", "system");
       } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
         setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
         logEvent("Executive Metrics Audit Completed", "neural");
@@ -401,6 +422,30 @@ export default function App() {
     : founderMetrics;
   
   if (displayedMetrics) console.log("Current Metrics Context Restored.");
+
+  useEffect(() => {
+    const setupDragDrop = async () => {
+      const unlisten = await listen("tauri://drag-drop", (event: any) => {
+        const paths = event.payload.paths;
+        if (paths && paths.length > 0) {
+          if (showSentinel && !isVaultLocked) {
+            setNotification(`Sentinel: Sealing ${paths.length} targeted assets...`);
+            paths.forEach((p: string) => {
+               const title = p.split(/[\\/]/).pop() || "Strategic Asset";
+               handleSealAsset(p, title);
+            });
+          } else {
+            setNotification(`Neural Intent: Drag-drop detected. Open Sentinel to seal files.`);
+          }
+        }
+      });
+      return unlisten;
+    };
+    
+    let unlistenFn: any;
+    setupDragDrop().then(u => unlistenFn = u);
+    return () => { if (unlistenFn) unlistenFn(); };
+  }, [showSentinel, isVaultLocked]);
 
   const displayedMarket = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
     ? chronosLedger[chronosIndex].market 
@@ -645,7 +690,7 @@ export default function App() {
           animate={{ background: simMode ? '#f59e0b' : founderMetrics.stress_color, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
         />
-        <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+        <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("/noise.svg")' }} />
       </div>
 
       {/* 3D Nebula Layer */}
@@ -751,7 +796,8 @@ export default function App() {
                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
                <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                 {contexts.find(c => c.id === activeContext)?.name} Context
+                 {activeVenture} 
+                 <span className="text-slate-500 text-xs font-normal">[{contexts.find(c => c.id === activeContext)?.name}]</span>
                  <span className="ml-4 text-[9px] font-mono text-amber-500/50 border border-amber-500/20 px-2 py-0.5 rounded font-black tracking-widest uppercase">V4.4.1-SENTINEL (ENCRYPTED CORE)</span><button onClick={() => setShowSentinel(true)} className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"><Shield className="w-4 h-4" /> Sentinel Archive</button>
                  <button onClick={handleVoiceIntent} className={cn("ml-8 p-2 glass rounded-lg transition-all", voiceActive ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]" : "text-slate-400")}>
                     {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
@@ -784,6 +830,7 @@ export default function App() {
                   <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">{(displayedMarket as any)?.market_index?.toFixed(1) || '0.0'}</span>
                   <span className="text-[9px] text-rose-500/50 font-bold">{(displayedMarket as any)?.index_change}</span>
                </div>
+               <span className="text-[7px] text-slate-600 font-mono mt-1">L_SYNC: {lastSync || 'N/A'}</span>
             </div>
           </div>
 

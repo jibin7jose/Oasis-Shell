@@ -120,12 +120,20 @@ pub struct AegisLedger {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Scenarios {
+    pub pessimistic: Vec<f32>,
+    pub baseline: Vec<f32>,
+    pub optimistic: Vec<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OracleForecast {
     pub venture_id: String,
     pub projected_arr: String,
     pub projected_burn: String,
     pub prediction_confidence: f32,
     pub trend_points: Vec<f32>,
+    pub scenarios: Option<Scenarios>,
     pub recommendation: String,
 }
 
@@ -138,25 +146,23 @@ async fn invoke_oracle_prediction(venture_id: String) -> Result<OracleForecast, 
         let cache_data = serde_json::to_string(&venture).map_err(|e| e.to_string())?;
         std::fs::write(&cache_path, cache_data).map_err(|e| e.to_string())?;
 
-        // MOCK ORACLE CALCULATION
-        let current_arr = venture.metrics.arr.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(1.0);
-        let momentum = venture.metrics.momentum.replace('+', "").replace('%', "").parse::<f32>().unwrap_or(10.0) / 100.0;
-        
-        let mut trend_points = Vec::new();
-        let mut projected = current_arr;
-        for _ in 0..12 {
-            projected *= 1.0 + (momentum / 12.0);
-            trend_points.push(projected);
+        // EXECUTE PYTHON ORACLE ENGINE
+        let output = std::process::Command::new("python")
+            .arg("oracle_engine.py")
+            .output()
+            .map_err(|e| format!("Failed to execute oracle_engine.py: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!("Oracle engine execution failed: {}", String::from_utf8_lossy(&output.stderr)));
         }
 
-        Ok(OracleForecast {
-            venture_id,
-            projected_arr: format!("${:.2}M", projected),
-            projected_burn: venture.metrics.burn.clone(),
-            prediction_confidence: 0.85 + (momentum * 0.1).min(0.14),
-            trend_points,
-            recommendation: if momentum > 0.15 { "Hypergrowth Detected: Aggressive Capital Injection Recommended.".to_string() } else { "Steady Trajectory: Maintain Current Strategic Burn.".to_string() }
-        })
+        let mut forecast: OracleForecast = serde_json::from_slice(&output.stdout)
+            .map_err(|e| format!("Failed to parse oracle output: {}. Output: {}", e, String::from_utf8_lossy(&output.stdout)))?;
+
+        // Re-inject the current burn rate as the Python script might skip it for now
+        forecast.projected_burn = venture.metrics.burn.clone();
+
+        Ok(forecast)
     } else {
         Err("Venture not found in Aegis Ledger for Oracle prediction.".to_string())
     }
