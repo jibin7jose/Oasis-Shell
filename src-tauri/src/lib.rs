@@ -607,6 +607,64 @@ fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json
 }
 
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub filename: String,
+    pub filepath: String,
+    pub score: f32,
+    pub preview: String,
+}
+
+#[tauri::command]
+async fn search_semantic_nodes(state: tauri::State<'_, DbState>, query: String) -> Result<Vec<SearchResult>, String> {
+    let client = reqwest::Client::new();
+    let req_body = serde_json::json!({
+        "model": "nomic-embed-text",
+        "prompt": query
+    });
+    
+    let res = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let embedding_val = json["embedding"].as_array().ok_or("No embedding in response")?;
+    let query_vector: Vec<f32> = embedding_val.iter().map(|v| v.as_f64().unwrap() as f32).collect();
+    
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT filename, filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        let filename: String = row.get(0)?;
+        let filepath: String = row.get(1)?;
+        let content: String = row.get(2)?;
+        let vector_str: String = row.get(3)?;
+        let vector: Vec<f32> = serde_json::from_str(&vector_str).unwrap();
+        
+        let mut dot: f32 = 0.0;
+        let mut norm_a: f32 = 0.0;
+        let mut norm_b: f32 = 0.0;
+        
+        for (a, b) in query_vector.iter().zip(vector.iter()) {
+            dot += a * b;
+            norm_a += a * a;
+            norm_b += b * b;
+        }
+        
+        let score = if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a.sqrt() * norm_b.sqrt()) };
+        
+        Ok(SearchResult {
+            filename,
+            filepath,
+            score,
+            preview: if content.len() > 150 { format!("{}...", &content[..150]) } else { content },
+        })
+    }).map_err(|e| e.to_string())?;
+    
+    let mut results: Vec<SearchResult> = rows.filter_map(|r| r.ok()).collect();
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    
+    Ok(results.into_iter().take(8).collect())
+}
+
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -1717,7 +1775,8 @@ pub fn run() {
             unseal_strategic_asset,
             get_sentinel_ledger,
             register_new_golem,
-            delete_golem
+            delete_golem,
+            search_semantic_nodes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

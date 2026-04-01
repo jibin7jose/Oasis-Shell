@@ -83,10 +83,17 @@ export default function App() {
   const [oracleAlert, setOracleAlert] = useState<any>(null);
   const [showGraph, setShowGraph] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [showCortex, setShowCortex] = useState(false);
+  const [cortexResults, setCortexResults] = useState<any[]>([]);
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [manifestHistory, setManifestHistory] = useState<string[]>([]);
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
   const [activeGolem, setActiveGolem] = useState<any>(null);
+  const [activeTasks, setActiveTasks] = useState<any[]>([
+    { id: 'edge', name: 'Edge Cluster', status: 'Deployed', prog: 100, color: 'emerald' },
+    { id: 'core', name: 'Core Stable', status: 'Active', prog: 100, color: 'indigo' },
+    { id: 'arch', name: 'Architecture', status: 'Manifesting', prog: 65, color: 'purple' }
+  ]);
   const [economicNews, setEconomicNews] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
 
@@ -102,10 +109,7 @@ export default function App() {
     recognition.onresult = (event: any) => {
        const transcript = event.results[0][0].transcript.toLowerCase();
        setNotification(`Oasis Resonating: "${transcript}"`);
-       if (transcript.includes("zen mode")) setZenMode(true);
-       if (transcript.includes("normal mode")) setZenMode(false);
-       if (transcript.includes("shell") || transcript.includes("terminal")) setShowCLI(prev => !prev);
-       if (transcript.includes("restore reality")) setChronosIndex(chronosLedger.length - 1);
+       resolveNeuralIntent(transcript);
     };
     recognition.start();
   };
@@ -195,6 +199,15 @@ export default function App() {
       } else if (q.includes("intel") || q.includes("market") || q.includes("competitors")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Retrieving Global Market Intelligence..." }]);
         logEvent("Market Intelligence Bridge Synced", "system");
+      } else if (q.includes("find") || q.includes("search") || q.includes("where is")) {
+        const term = query.replace(/find|search|where is/gi, "").trim();
+        setMessages(prev => [...prev, { role: "assistant", content: `Neural Intent: Initiating Cortex Semantic Search for '${term}'...` }]);
+        invoke('search_semantic_nodes', { query: term }).then((res: any) => {
+          setCortexResults(res);
+          setShowCortex(true);
+          setNotification(`Cortex: Found ${res.length} Semantic Nodes.`);
+        }).catch(() => {});
+        logEvent(`Cortex Semantic Search: ${term}`, "neural");
       } else if (q.includes("sync") || q.includes("push") || q.includes("pulse")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Oasis Pulse Sync with GitHub..." }]);
         invoke('sync_project', { message: query }).then(() => {
@@ -215,6 +228,35 @@ export default function App() {
           setNotification("System Diagnostic Complete. Health 98%.");
         }).catch(() => {});
         logEvent("System Health Diagnostic Executed", "system");
+      } else if (q.includes("commission") || q.includes("task") || q.includes("build")) {
+        const taskName = query.replace(/commission|task|build/gi, "").trim() || "Dynamic Golem Task";
+        setMessages(prev => [...prev, { role: "assistant", content: `Neural Intent: Commissioning Neural Architect for '${taskName}'...` }]);
+        
+        const newTask = { id: Date.now().toString(), name: taskName, status: 'Initializing', prog: 10, color: 'purple' };
+        setActiveTasks(prev => [...prev.filter(t => t.id !== 'arch'), newTask]);
+        
+        // Simulate background progress
+        let p = 10;
+        const interval = setInterval(() => {
+           p += Math.floor(Math.random() * 15);
+           if (p >= 100) {
+              p = 100;
+              clearInterval(interval);
+              setNotification(`Foundry: Task '${taskName}' Manifested Successfully.`);
+              setActiveTasks(prev => prev.map(t => t.id === newTask.id ? { ...t, status: 'Completed', prog: 100, color: 'emerald' } : t));
+           } else {
+              setActiveTasks(prev => prev.map(t => t.id === newTask.id ? { ...t, status: 'Manifesting', prog: p } : t));
+           }
+        }, 3000);
+
+        logEvent(`Neural Task Commissioned: ${taskName}`, "neural");
+      } else if (q.includes("presentation") || q.includes("executive") || q.includes("pitch")) {
+        setPresentationMode(true);
+        setNotification("Visionary Portal: Strategic Presentation Mode Active.");
+        logEvent("Executive Visionary Portal Manifested", "system");
+      } else if (q.includes("exit") || q.includes("dashboard") || q.includes("developer")) {
+        setPresentationMode(false);
+        setNotification("Developer Interface: Full System Access Restored.");
       } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
         setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
         logEvent("Executive Metrics Audit Completed", "neural");
@@ -809,7 +851,10 @@ export default function App() {
                     <Terminal className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
                  </button>
-                 <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
+                  <button onClick={() => setPresentationMode(!presentationMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400")}>
+                     <LayoutDashboard className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
                     <Globe className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
                  </button>
@@ -965,19 +1010,19 @@ export default function App() {
                    </div>
                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Systems Level Access</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                   {[
-                     { name: 'Edge Cluster', status: 'Deployed', prog: 100, color: 'emerald' },
-                     { name: 'Core Stable', status: 'Active', prog: 100, color: 'indigo' },
-                     { name: 'Architecture', status: 'Manifesting', prog: 65, color: 'purple' }
-                   ].map((env) => (
-                     <div key={env.name} className="space-y-3">
-                        <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500">
-                           <span>{env.name}</span>
-                           <span>{env.status}</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                   {activeTasks.map((env) => (
+                     <div key={env.id} className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group">
+                        <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500 mb-1">
+                           <span className="group-hover:text-indigo-400 transition-colors">{env.name}</span>
+                           <span className={cn(env.prog < 100 ? "animate-pulse" : "", env.color === 'emerald' ? "text-emerald-500" : "text-indigo-400")}>{env.status}</span>
                         </div>
-                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                           <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : "bg-purple-500")} />
+                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden flex items-center">
+                           <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full transition-all duration-1000", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : "bg-purple-500")} />
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                           <span className="text-[7px] font-mono text-slate-700 tracking-tighter">OAS_NODE_{env.id.slice(-4).toUpperCase()}</span>
+                           <span className="text-[8px] font-black text-slate-600">{env.prog}%</span>
                         </div>
                      </div>
                    ))}
@@ -1524,6 +1569,85 @@ export default function App() {
            </button>
         </div>
       )}
+      {/* Directive: Cortex Semantic HUD (Pillar 21) */}
+      <AnimatePresence>
+        {showCortex && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[3000] bg-indigo-950/40 backdrop-blur-3xl flex items-center justify-center p-24"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="max-w-6xl w-full h-[85vh] glass-bright border border-indigo-500/30 rounded-[4rem] flex flex-col overflow-hidden shadow-5xl relative"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent animate-pulse" />
+              
+              <header className="px-16 pt-16 pb-12 border-b border-white/5 flex items-center justify-between">
+                <div>
+                   <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-3 block animate-pulse">Neural Cortex Scan Active</span>
+                   <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Semantic Intelligence HUD</h2>
+                </div>
+                <button 
+                  onClick={() => setShowCortex(false)}
+                  className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
+                >
+                   <X className="w-8 h-8 text-slate-500 group-hover:text-white transition-colors" />
+                </button>
+              </header>
+
+              <div className="flex-1 overflow-y-auto px-16 py-12 custom-scrollbar">
+                <div className="grid grid-cols-1 gap-8">
+                  {cortexResults.map((res: any, i: number) => (
+                    <motion.div 
+                      key={res.filepath}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="bg-white/[0.02] p-10 rounded-[3rem] border border-white/5 hover:border-indigo-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 p-8">
+                         <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Aura Relevance: {(res.score * 100).toFixed(1)}%</span>
+                         </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-10">
+                         <div className="w-20 h-20 rounded-3xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-all">
+                            <BrainCircuit className="w-10 h-10 text-indigo-500" />
+                         </div>
+                         <div className="flex-1">
+                            <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-3 group-hover:text-indigo-400 transition-colors">{res.filename}</h3>
+                            <p className="text-xs font-mono text-slate-500 mb-8 border-l-2 border-indigo-500/20 pl-4">{res.filepath}</p>
+                            <p className="text-sm text-slate-300 leading-relaxed font-medium bg-white/5 p-6 rounded-2xl italic">"{res.preview}"</p>
+                         </div>
+                      </div>
+                      
+                      <div className="mt-8 pt-8 border-t border-white/5 flex gap-4">
+                         <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">Open Neural Node</button>
+                         <button className="px-8 py-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">Index Core</button>
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {cortexResults.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-40 opacity-20 text-center">
+                       <BrainCircuit className="w-24 h-24 text-white mb-8 mx-auto animate-pulse" />
+                       <span className="text-xl font-black uppercase tracking-[0.5em] text-white">No Semantic Matches In Cohort</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <footer className="p-10 border-t border-white/5 bg-black/20 text-center">
+                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
+              </footer>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
