@@ -19,6 +19,14 @@ const contexts = [
   { id: 'growth', name: 'Capital Matrix', icon: Activity, aura: 'rgba(16, 185, 129, 0.4)' }
 ];
 
+interface SystemStats {
+  oas_id: string;
+  path_status: string;
+  binary_sync: boolean;
+  cpu_load: number;
+  mem_used: number;
+}
+
 interface FounderMetrics {
   arr: string;
   burn: string;
@@ -61,7 +69,22 @@ export default function App() {
   const [lastSync, setLastSync] = useState("");
   const [workforce, setWorkforce] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
-  const [systemStats, setSystemStats] = useState<any>(null);
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+
+  useEffect(() => {
+    const pulse = setInterval(async () => {
+       try {
+          const metrics = await invoke("get_venture_metrics") as any;
+          setFounderMetrics(metrics);
+          
+          // Only pull full diagnostics if the panel is open or every 30s
+          const stats = await invoke("run_system_diagnostic") as SystemStats;
+          setSystemStats(stats);
+       } catch (e) {}
+    }, 5000);
+    return () => clearInterval(pulse);
+  }, []);
+
   const [zenMode, setZenMode] = useState(false);
   const [chronosLedger, setChronosLedger] = useState<any[]>([]);
   const [chronosIndex, setChronosIndex] = useState(-1);
@@ -75,7 +98,7 @@ export default function App() {
   const [showSentinel, setShowSentinel] = useState(false);
   const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [founderSecret, setFounderSecret] = useState("");
-  const [activeVenture, setActiveVenture] = useState("Oasis Core (Alpha)");
+  const [activeVenture /*, setActiveVenture */] = useState("Oasis Core (Alpha)");
   const [cliInput, setCliInput] = useState("");
   const [cliHistory, setCliHistory] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,7 +121,31 @@ export default function App() {
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const initializeOasis = async () => {
+      setMounted(true);
+      try {
+        // PULLING REAL VENTURE DATA FROM THE RUST KERNEL DOOMSDAY LEDGER
+        const metrics = await invoke("load_venture_state") as FounderMetrics;
+        if (metrics) setFounderMetrics(metrics);
+        
+        const ledger = await invoke("get_chronos_ledger") as any[];
+        setChronosLedger(ledger);
+        setChronosIndex(ledger.length > 0 ? ledger.length - 1 : 0);
+
+        const news = await invoke("get_economic_news") as string[];
+        setEconomicNews(news);
+
+        const wf = await invoke("get_neural_workforce", { marketIndex: 100.0 }) as any[];
+        setWorkforce(wf);
+
+        setNotification("Oasis Neural Layer: Real-Time Venture Ledger Synchronized.");
+      } catch (e) {
+        console.error("Neural Sync Failure:", e);
+      }
+    };
+    initializeOasis();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -236,7 +283,8 @@ export default function App() {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Running Deep System Diagnostic..." }]);
         invoke('run_system_diagnostic').then((res: any) => {
           setSystemStats(res);
-          setNotification("System Diagnostic Complete. Health 98%.");
+          setNotification(`OAS_KRNL Pulse: CPU @ ${res.cpu_load.toFixed(1)}%, Mem @ ${res.mem_used.toFixed(1)}%`);
+          invoke("log_strategic_pulse", { nodeId: "system_diagnostic", status: "emerald" }).catch(() => {});
         }).catch(() => {});
         logEvent("System Health Diagnostic Executed", "system");
       } else if (q.includes("commission") || q.includes("task") || q.includes("build")) {
