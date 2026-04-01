@@ -1423,6 +1423,32 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn log_strategic_pulse(state: tauri::State<'_, DbState>, node_id: String, status: String) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let timestamp = chrono::Local::now().to_rfc3339();
+    let _ = conn.execute(
+        "INSERT INTO strategic_pulses (node_id, status, timestamp) VALUES (?1, ?2, ?3)",
+        rusqlite::params![node_id, status, timestamp],
+    );
+    Ok(())
+}
+
+#[tauri::command]
+fn get_venture_integrity(state: tauri::State<'_, DbState>) -> Result<f32, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = match conn.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
+        Ok(s) => s,
+        Err(_) => return Ok(100.0),
+    };
+    let statuses: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().flatten().collect();
+    
+    if statuses.is_empty() { return Ok(100.0); }
+    
+    let healthy = statuses.iter().filter(|s| s.as_str() == "emerald").count() as f32;
+    Ok((healthy / statuses.len() as f32) * 100.0)
+}
+
+#[tauri::command]
 fn get_logic_path(aura: String) -> String {
     match aura.as_str() {
         "dev" => "Native Logic > Cargo Link > Build Cycle > Pulse".into(),
@@ -1694,6 +1720,16 @@ pub fn run() {
     ).expect("failed to create vector table");
 
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS strategic_pulses (
+            id INTEGER PRIMARY KEY,
+            node_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create strategic_pulses table");
+
     tauri::Builder::default()
         .manage(DbState(std::sync::Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
@@ -1776,7 +1812,9 @@ pub fn run() {
             get_sentinel_ledger,
             register_new_golem,
             delete_golem,
-            search_semantic_nodes
+            search_semantic_nodes,
+            log_strategic_pulse,
+            get_venture_integrity
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

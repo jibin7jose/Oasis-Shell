@@ -95,9 +95,20 @@ export default function App() {
     { id: 'arch', name: 'Architecture', status: 'Manifesting', prog: 65, color: 'purple' }
   ]);
   const [economicNews, setEconomicNews] = useState<string[]>([]);
+  const [ventureIntegrity, setVentureIntegrity] = useState(100);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+       try {
+         const integrity = await invoke("get_venture_integrity") as number;
+         setVentureIntegrity(integrity);
+       } catch(e) {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleVoiceIntent = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -569,11 +580,14 @@ export default function App() {
   const handleAuthenticateFounder = async () => {
     if (!founderSecret) return;
     try {
-      const res = await invoke("authenticate_founder", { secret: founderSecret }) as string;
-      setIsVaultLocked(false);
-      setNotification(res);
-      const vault = await invoke("get_sentinel_ledger") as any;
-      setSentinelVault(vault);
+      const success = await invoke("authenticate_founder", { secret: founderSecret });
+      if (success) {
+        setIsVaultLocked(false);
+        setNotification("Vocal Resonance: Founder Identity Verified. Vault Unsealed.");
+        invoke("log_strategic_pulse", { nodeId: "sentinel_auth", status: "emerald" }).catch(() => {});
+        const vault = await invoke("get_sentinel_ledger") as any;
+        setSentinelVault(vault);
+      }
     } catch (e: any) {
       setNotification(`Neural Authentication Failure: ${e}`);
     }
@@ -809,7 +823,7 @@ export default function App() {
                   )}
                   {chronosLedger.length > 0 && (
                      <div className="flex flex-col items-end gap-2 p-4 glass rounded-2xl border-white/5">
-                        <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em]">Neural Chronos Scrubber</span>
+                        <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em] mb-1">Neural Chronos Scrubber</span>
                         <input 
                            type="range" 
                            min="0" 
@@ -853,11 +867,34 @@ export default function App() {
                  </button>
                   <button onClick={() => setPresentationMode(!presentationMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400")}>
                      <LayoutDashboard className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
+                  </button>                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
                     <Globe className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
-                 </button>
+                  </button>
+                  <div className="ml-12 flex items-center gap-4 border-l border-white/5 pl-12 hidden xl:flex">
+                     <div className="flex flex-col items-end mr-4">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Foundry Reactor</span>
+                        <span className={cn("text-[8px] font-black uppercase tracking-widest", ventureIntegrity < 50 ? "text-red-500" : ventureIntegrity < 80 ? "text-amber-500" : "text-emerald-500")}>
+                           {ventureIntegrity < 50 ? "Integrity Critical" : ventureIntegrity < 80 ? "Integrity Divergent" : "Nominal Stability"}
+                        </span>
+                     </div>
+                     <div className="flex gap-1.5">
+                        {[...Array(8)].map((_, i) => (
+                           <motion.div 
+                              key={i} 
+                              animate={{ 
+                                opacity: i < Math.ceil(ventureIntegrity / 12.5) ? [0.4, 1, 0.4] : 0.1 
+                              }}
+                              transition={{ 
+                                repeat: Infinity, 
+                                duration: 2, 
+                                delay: i * 0.1 
+                              }}
+                              className={cn("w-2 h-4 rounded-[1px]", i < Math.ceil(ventureIntegrity / 12.5) ? (ventureIntegrity < 40 ? "bg-red-500" : ventureIntegrity < 80 ? "bg-amber-500" : "bg-emerald-500 shadow-[0_0_10px_#10b981]") : "bg-white/5")} 
+                           />
+                        ))}
+                     </div>
+                  </div>
                  {hardwareStatus && (
                     <span className="ml-4 text-[8px] font-black text-red-500/40 uppercase tracking-[0.25em] animate-pulse border-l border-white/5 pl-4">
                         {hardwareStatus.focus_mode}
