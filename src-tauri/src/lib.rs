@@ -106,6 +106,13 @@ pub struct SystemStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FiscalReport {
+    pub total_burn: f32,
+    pub token_load: i64,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VentureSnapshot {
     pub id: String,
     pub name: String,
@@ -1440,6 +1447,51 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn execute_neural_commission(state: tauri::State<'_, DbState>, task: String, agent_id: String) -> Result<PendingManifest, String> {
+   // 1. Log the starting pulse of the Neural Workhorse
+   let _ = log_strategic_pulse(state.clone(), format!("task_start_{}", agent_id), "amber".into());
+   
+   // 2. Invoke Neural RAG (Retrieval Augmented Golem) context search
+   let context = match rag_query(state.clone(), task.clone()).await {
+       Ok(ctx) => ctx,
+       Err(_) => "Local context search yielded null results. Proceeding on base weights.".into()
+   };
+   
+   // 3. Construct the Neural Instruction for the Golem Engine
+   let prompt = format!(
+       "System Identity: Oasis Neural Golem (ID: {}). Strategic Objective: {}. Domain Context: {}. Respond ONLY in a JSON format: {{ \"rationale\": \"EXPLAIN STRATEGY\", \"code\": \"MARKDOWN CODE BLOCK\" }}",
+       agent_id, task, context
+   );
+   
+   let client = reqwest::Client::new();
+   let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+   let res = client.post("http://localhost:11434/api/generate").json(&body).send().await.map_err(|e| e.to_string())?;
+   let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+   
+   let resp_str = json["response"].as_str().unwrap_or("{}");
+   
+   // Extract JSON from potential Markdown formatting in the model's output
+   let clean_json = if resp_str.contains("```json") {
+       resp_str.split("```json").nth(1).unwrap().split("```").next().unwrap().trim()
+   } else { resp_str };
+
+   let parsed: serde_json::Value = serde_json::from_str(clean_json).unwrap_or(serde_json::json!({
+       "rationale": format!("Neural Golem {} initiated an autonomous strategic refactor sequence.", agent_id),
+       "code": resp_str
+   }));
+
+   // 4. Log the Manifest Manifestation Pulse
+   let _ = log_strategic_pulse(state.clone(), format!("manifest_ready_{}", agent_id), "emerald".into());
+
+   Ok(PendingManifest {
+       id: format!("MNFST_{}", chrono::Local::now().timestamp()),
+       title: task,
+       rationale: parsed["rationale"].as_str().unwrap_or("Autonomous Neural Manifestation").to_string(),
+       code_draft: parsed["code"].as_str().unwrap_or(resp_str).to_string(),
+   })
+}
+
+#[tauri::command]
 fn log_strategic_pulse(state: tauri::State<'_, DbState>, node_id: String, status: String) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
@@ -1463,6 +1515,40 @@ fn get_venture_integrity(state: tauri::State<'_, DbState>) -> Result<f32, String
     
     let healthy = statuses.iter().filter(|s| s.as_str() == "emerald").count() as f32;
     Ok((healthy / statuses.len() as f32) * 100.0)
+}
+
+#[tauri::command]
+fn get_fiscal_report(state: tauri::State<'_, DbState>) -> Result<FiscalReport, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = match conn.prepare("SELECT SUM(cost), SUM(tokens) FROM compute_ledger") {
+        Ok(s) => s,
+        Err(_) => return Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() }),
+    };
+    
+    let mut rows = stmt.query([]).unwrap();
+    if let Some(row) = rows.next().unwrap() {
+        let burn: f32 = row.get(0).unwrap_or(0.0);
+        let load: i64 = row.get(1).unwrap_or(0);
+        let status = if burn > 10.0 { "CRITICAL" } else if burn > 5.0 { "HIGH" } else { "OPTIMAL" };
+        Ok(FiscalReport { total_burn: burn, token_load: load, status: status.into() })
+    } else {
+        Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() })
+    }
+}
+
+fn internal_log_compute(conn: &rusqlite::Connection, tokens: i64, cost: f32) {
+    let ts = chrono::Local::now().to_rfc3339();
+    let _ = conn.execute(
+        "INSERT INTO compute_ledger (tokens, cost, timestamp) VALUES (?1, ?2, ?3)",
+        rusqlite::params![tokens, cost, ts],
+    );
+}
+
+#[tauri::command]
+fn log_compute_pulse(state: tauri::State<'_, DbState>, tokens: i64, cost: f32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    internal_log_compute(&conn, tokens, cost);
+    Ok(())
 }
 
 #[tauri::command]
@@ -1747,6 +1833,16 @@ pub fn run() {
         [],
     ).expect("failed to create strategic_pulses table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS compute_ledger (
+            id INTEGER PRIMARY KEY,
+            tokens INTEGER NOT NULL,
+            cost REAL NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create compute_ledger table");
+
     tauri::Builder::default()
         .manage(DbState(std::sync::Mutex::new(conn)))
         .plugin(tauri_plugin_opener::init())
@@ -1831,7 +1927,10 @@ pub fn run() {
             delete_golem,
             search_semantic_nodes,
             log_strategic_pulse,
-            get_venture_integrity
+            get_venture_integrity,
+            log_compute_pulse,
+            get_fiscal_report,
+            execute_neural_commission
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
