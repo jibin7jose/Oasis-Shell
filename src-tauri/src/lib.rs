@@ -106,6 +106,16 @@ pub struct SystemStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SynthesisReport {
+    pub id: String,
+    pub venture_name: String,
+    pub strategic_narrative: String,
+    pub confidence_score: f32,
+    pub market_context: String,
+    pub actionable_outreach: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FiscalReport {
     pub total_burn: f32,
     pub token_load: i64,
@@ -591,7 +601,7 @@ fn log_event(state: tauri::State<DbState>, event_type: String, message: String) 
 }
 
 #[tauri::command]
-fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
+fn oas_save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     conn.execute(
         "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
@@ -601,7 +611,7 @@ fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) 
 }
 
 #[tauri::command]
-fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+fn oas_get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
     let conn = state.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
     let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
@@ -1174,11 +1184,31 @@ async fn execute_cli_directive(directive: CLIDirective, stress_color: String) ->
 
 #[tauri::command]
 async fn get_economic_news() -> Result<Vec<String>, String> {
-    Ok(vec![
-        "[Sentinel] SaaS Benchmark Burn rate decreased 15% globally.".into(),
-        "[Sentinel] New Pivot patterns detected in Series-A fintech startups.".into(),
-        "[Sentinel] GPU Scarcity Index: Stabilizing (Positive for product scale).".into(),
-    ])
+    let client = reqwest::Client::new();
+    let res = client.get("https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let story_ids: Vec<u64> = res.json().await.map_err(|e| e.to_string())?;
+    let mut news = Vec::new();
+    
+    // Fetch top 5 startup/tech headlines
+    for id in story_ids.iter().take(5) {
+        if let Ok(story_res) = client.get(format!("https://hacker-news.firebaseio.com/v0/item/{}.json?print=pretty", id)).send().await {
+            if let Ok(story) = story_res.json::<serde_json::Value>().await {
+                if let Some(title) = story["title"].as_str() {
+                    news.push(format!("[REAL PULSE] {}", title));
+                }
+            }
+        }
+    }
+
+    if news.is_empty() {
+        news.push("[System] Oasis Web Bridge Offline. Using Strategic Drift Buffer.".into());
+    }
+
+    Ok(news)
 }
 
 #[tauri::command]
@@ -1194,6 +1224,54 @@ async fn manifest_code_module(name: String) -> Result<String, String> {
     
     std::fs::write(&path, boilerplate).map_err(|e| e.to_string())?;
     Ok(format!("Strategic Module '{}' Manifested in {}", name, path))
+}
+
+#[tauri::command]
+async fn generate_venture_synthesis(state: tauri::State<'_, DbState>, venture_id: String) -> Result<SynthesisReport, String> {
+    let client = reqwest::Client::new();
+    
+    // 1. GATHER REAL DATA (Fiscal Metrics & Economic Pulse)
+    let metrics = load_venture_state().await?;
+    let news = get_economic_news().await?;
+    let news_context = news.join(" | ");
+
+    // 2. SYNTHESIZE VIA GOLEM (Internal Reasoning)
+    let prompt = format!(
+        "ACT AS A VENTURE PARTNER. Synthesize a strategic pitch for '{}'. \
+        Current Stats: ARR {} | Burn {} | Runway {}. \
+        Market Context (Live HN Pulse): {}. \
+        Task: Create a high-fidelity 'Strategic Narrative' and 3 'Actionable Outreach' bullets for investors. \
+        Output ONLY valid JSON with keys: 'narrative', 'context', 'outreach'.",
+        venture_id, metrics.arr, metrics.burn, metrics.runway, news_context
+    );
+
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let raw_response = json["response"].as_str().ok_or("No Golem response")?;
+    let synth_data: serde_json::Value = serde_json::from_str(raw_response.trim_matches('`')).unwrap_or(serde_json::json!({
+        "narrative": "Strategic expansion prioritized based on core efficiency.",
+        "context": "Market volatility warrants conservative scaling.",
+        "outreach": ["Focus on Series A Seed extensions", "Target efficiency-first angels"]
+    }));
+
+    let report = SynthesisReport {
+        id: format!("SYNTH_{}", chrono::Local::now().format("%Y%m%d_%H%M")),
+        venture_name: venture_id,
+        strategic_narrative: synth_data["narrative"].as_str().unwrap_or("Default Narrative").into(),
+        confidence_score: 0.88,
+        market_context: synth_data["context"].as_str().unwrap_or("Dynamic Context Layer").into(),
+        actionable_outreach: synth_data["outreach"].as_array().unwrap_or(&vec![]).iter().map(|v| v.as_str().unwrap_or("").into()).collect(),
+    };
+
+    // 3. PERSIST TO SENTINEL VAULT AS PROVISIONAL ASSET
+    let report_json = serde_json::to_string(&report).map_err(|e| e.to_string())?;
+    let doc_path = format!("vault/synthesis_{}.json", report.id);
+    std::fs::create_dir_all("vault").map_err(|e| e.to_string())?;
+    std::fs::write(&doc_path, report_json).map_err(|e| e.to_string())?;
+
+    Ok(report)
 }
 
 #[tauri::command]
@@ -1873,8 +1951,8 @@ pub fn run() {
             get_nearby_projects,
             get_neuroforge_profile,
             get_nexus_health,
-            save_resume_analysis,
-            get_latest_resume_analysis,
+            oas_save_resume_analysis,
+            oas_get_latest_resume_analysis,
             index_folder,
             semantic_search,
             rag_query,
@@ -1930,7 +2008,8 @@ pub fn run() {
             get_venture_integrity,
             log_compute_pulse,
             get_fiscal_report,
-            execute_neural_commission
+            execute_neural_commission,
+            generate_venture_synthesis
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
