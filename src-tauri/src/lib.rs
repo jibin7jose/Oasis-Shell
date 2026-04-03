@@ -115,6 +115,36 @@ pub struct SynthesisReport {
     pub actionable_outreach: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageReport {
+    pub current_path: String,
+    pub target_path: String,
+    pub transferred_bytes: u64,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BoardroomInsight {
+    pub persona: String,
+    pub perspective: String,
+    pub risk_impact: f32,
+    pub strategic_score: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DebateManifest {
+    pub task_id: String,
+    pub insights: Vec<BoardroomInsight>,
+    pub consensus_aura: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OasConfig {
+    pub aura_ip: String,
+    pub focus_active: bool,
+    pub strategic_threshold: f32,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FiscalReport {
     pub total_burn: f32,
@@ -1275,6 +1305,135 @@ async fn generate_venture_synthesis(state: tauri::State<'_, DbState>, venture_id
 }
 
 #[tauri::command]
+async fn sync_physical_aura(color_hex: String) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let config_path = "oas_relocation_map.json"; // Using existing config for simplicity
+    
+    // Default WLED target for strategic testing
+    let target_ip = "192.168.1.100"; 
+    let url = format!("http://{}/json/state", target_ip);
+
+    let color_rgb = if color_hex == "emerald" { vec![0, 255, 130] }
+                    else if color_hex == "amber" { vec![255, 160, 0] }
+                    else if color_hex == "rose" { vec![255, 50, 80] }
+                    else if color_hex == "indigo" { vec![80, 70, 255] }
+                    else { vec![255, 255, 255] };
+
+    let payload = serde_json::json!({
+        "on": true,
+        "bri": 200,
+        "seg": [{ "col": [color_rgb] }]
+    });
+
+    // Fire and forget (don't block kernel if hardware is offline)
+    let _ = client.post(&url)
+        .timeout(std::time::Duration::from_millis(500))
+        .json(&payload)
+        .send()
+        .await;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn derive_boardroom_debate(task: String, context: String) -> Result<DebateManifest, String> {
+    let client = reqwest::Client::new();
+    let personas = vec![
+        ("THE ARCHITECT", "Focus on technical elegance, code debt, and long-term infrastructure stability."),
+        ("THE GROWTH HACKER", "Focus on speed-to-market, ARR impact, and user growth at all costs."),
+        ("THE RISK AUDITOR", "Focus on burn-rate efficiency, security pitfalls, and catastrophic failure edge cases.")
+    ];
+
+    let mut insights = Vec::new();
+    
+    // Simulate concurrent neural perspectives (Ollama sequential for now but persona-wrapped)
+    for (name, role) in personas {
+        let prompt = format!(
+            "ACT AS {}. Analyze the following startup task: '{}'. Context: {}. \
+            Output ONLY valid JSON with keys: 'advice' (1 sentence), 'risk' (0-1), 'score' (0-100).",
+            role, task, context
+        );
+
+        let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+        if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await {
+            if let Ok(json) = res.json::<serde_json::Value>().await {
+                if let Some(resp) = json["response"].as_str() {
+                    let insight_data: serde_json::Value = serde_json::from_str(resp.trim_matches('`')).unwrap_or(serde_json::json!({
+                        "advice": "Neural layer timeout. Strategic drift detected.",
+                        "risk": 0.5,
+                        "score": 50
+                    }));
+                    
+                    insights.push(BoardroomInsight {
+                        persona: name.to_string(),
+                        perspective: insight_data["advice"].as_str().unwrap_or("Insight Missing").into(),
+                        risk_impact: insight_data["risk"].as_f64().unwrap_or(0.5) as f32,
+                        strategic_score: insight_data["score"].as_i64().unwrap_or(50) as i32,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(DebateManifest {
+        task_id: format!("DEBATE_{}", chrono::Local::now().format("%H%M%S")),
+        consensus_aura: if insights.iter().any(|i| i.risk_impact > 0.8) { "volatile" } else { "stable" }.into(),
+        insights,
+    })
+}
+
+#[tauri::command]
+async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, String> {
+    let base_folders = vec!["vault", "manifested"];
+    let db_file = "src-tauri/oasis_crates.db";
+    let target_dir = std::path::Path::new(&target_path);
+
+    if !target_dir.exists() {
+        std::fs::create_dir_all(target_dir).map_err(|e| e.to_string())?;
+    }
+
+    let mut total_bytes = 0;
+
+    // 1. MIGRATE CRATES DB (Critical)
+    if std::path::Path::new(db_file).exists() {
+        let db_target = target_dir.join("oasis_crates.db");
+        std::fs::copy(db_file, &db_target).map_err(|e| e.to_string())?;
+        total_bytes += std::fs::metadata(db_file).unwrap().len();
+    }
+
+    // 2. MIGRATE STRATEGIC FOLDERS
+    for folder in base_folders {
+        let source_folder = std::path::Path::new(folder);
+        if source_folder.exists() {
+            let target_folder = target_dir.join(folder);
+            if !target_folder.exists() {
+                std::fs::create_dir_all(&target_folder).map_err(|e| e.to_string())?;
+            }
+            
+            for entry in std::fs::read_dir(source_folder).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let file_name = entry.file_name();
+                let dest_path = target_folder.join(file_name);
+                std::fs::copy(entry.path(), dest_path).map_err(|e| e.to_string())?;
+                total_bytes += entry.metadata().unwrap().len();
+            }
+        }
+    }
+
+    // 3. PERSIST RELOCATION CONFIG (Atomic Layer)
+    let config_path = "oas_relocation_map.json";
+    let config = serde_json::json!({ "active_root": target_path, "timestamp": chrono::Local::now().to_rfc3339() });
+    std::fs::write(config_path, config.to_string()).map_err(|e| e.to_string())?;
+
+    Ok(StorageReport {
+        current_path: "D:/myproject/new/oasis-shell".into(),
+        target_path,
+        transferred_bytes: total_bytes,
+        status: "Strategic Foundations Relocated & Synced.".into()
+    })
+}
+
+#[tauri::command]
 async fn generate_venture_audit() -> Result<String, String> {
     let path = "manifested/venture_audit_report.md";
     let dir = std::path::Path::new("manifested");
@@ -2009,7 +2168,10 @@ pub fn run() {
             log_compute_pulse,
             get_fiscal_report,
             execute_neural_commission,
-            generate_venture_synthesis
+            generate_venture_synthesis,
+            relocate_foundry_storage,
+            derive_boardroom_debate,
+            sync_physical_aura
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

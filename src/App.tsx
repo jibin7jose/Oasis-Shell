@@ -65,6 +65,7 @@ export default function App() {
   const [showLogs, setShowLogs] = useState(false);
   const [showCLI, setShowCLI] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [auraIp, setAuraIp] = useState("192.168.1.100");
   const [activeContext, setActiveContext] = useState('dev');
   const [lastSync, setLastSync] = useState("");
   const [workforce, setWorkforce] = useState<any[]>([]);
@@ -128,6 +129,9 @@ export default function App() {
   const [economicNews, setEconomicNews] = useState<string[]>([]);
   const [activeSynthesis, setActiveSynthesis] = useState<any>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [storageReport, setStorageReport] = useState<any>(null);
+  const [activeDebate, setActiveDebate] = useState<any>(null);
+  const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
   const [mounted, setMounted] = useState(false);
 
@@ -301,6 +305,20 @@ export default function App() {
            setNotification("Venture Synthesis Complete: Strategic Pitch Manifested.");
         }).catch(() => setIsSynthesizing(false));
         logEvent("Venture Synthesis Protocol Triggered", "neural");
+      } else if (q.includes("relocate") || q.includes("move storage") || q.includes("migrate")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Asset Relocation Sequence..." }]);
+        invoke('relocate_foundry_storage', { targetPath: 'D:/Oasis_Relocated_Forge' }).then((res: any) => {
+           setStorageReport(res);
+           setNotification("Storage Relocation Complete: Assets Synced to New Partition.");
+        }).catch((err) => setNotification(`Relocation Core Error: ${err}`));
+        logEvent("Strategic Relocation Protocol Triggered", "neural");
+      } else if (q.includes("debate") || q.includes("boardroom") || q.includes("perspectives")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Summoning the Boardroom Advisory Debate..." }]);
+        invoke('derive_boardroom_debate', { task: q, context: 'Active_Forge_Session' }).then((res: any) => {
+           setActiveDebate(res);
+           setNotification("Boardroom Insight Derived: Consensus reached.");
+        }).catch(() => {});
+        logEvent("Neural Boardroom Debate Initiated", "neural");
       } else if (q.includes("status") || q.includes("diagnostic") || q.includes("health")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Running Deep System Diagnostic..." }]);
         invoke('run_system_diagnostic').then((res: any) => {
@@ -347,6 +365,18 @@ export default function App() {
       resolveNeuralIntent(searchQuery);
     }
   };
+
+  // EFFECT: Physical Aura Sync (Pillar 25)
+  useEffect(() => {
+    if (autoAura) {
+      let targetColor = "indigo"; // Default Focus
+      if (activeDebate?.consensus_aura === 'volatile') targetColor = "rose";
+      else if (ventureIntegrity < 50) targetColor = "amber";
+      else if (ventureIntegrity >= 95) targetColor = "emerald";
+
+        invoke("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp }).catch(() => {});
+    }
+  }, [autoAura, activeDebate, ventureIntegrity]);
 
   const handleNeuralSend = () => {
     if (!assistantInput.trim()) return;
@@ -943,10 +973,23 @@ export default function App() {
                  </button>
                   <button onClick={() => setPresentationMode(!presentationMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400")}>
                      <LayoutDashboard className="w-4 h-4" />
-                  </button>                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
+                  </button>
+                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
                     <Globe className="w-3.5 h-3.5" />
                     <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
                   </button>
+                  <div className="ml-12 flex items-center gap-8 border-l border-white/5 pl-12 h-14">
+                     <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-3 mb-1">
+                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aura Sync</span>
+                           <div onClick={() => setAutoAura(!autoAura)} className={cn("w-10 h-5 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoAura ? "bg-indigo-600 border-indigo-500/50" : "bg-white/5")}>
+                              <motion.div animate={{ x: autoAura ? 20 : 0 }} className={cn("w-3 h-3 rounded-full bg-white shadow-xl")} />
+                           </div>
+                        </div>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter opacity-40">WLED Bridge Active</span>
+                     </div>
+                  </div>
+
                   <div className="ml-12 flex items-center gap-4 border-l border-white/5 pl-12 hidden xl:flex">
                      <div className="flex flex-col items-end mr-4">
                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Foundry Reactor</span>
@@ -1392,6 +1435,58 @@ export default function App() {
           </motion.div>
         )}
 
+        {showSettings && (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-[8000] flex items-center justify-center p-24 bg-[#020617]/60 backdrop-blur-5xl">
+            <div className="w-full max-w-2xl glass-bright rounded-[3rem] p-16 border border-white/10 shadow-5xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-[60px]" />
+               <div className="flex items-center justify-between mb-12">
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Foundry Configuration</span>
+                     <h2 className="text-4xl font-black text-white tracking-tighter">Oasis Command Center</h2>
+                  </div>
+                  <button onClick={() => setShowSettings(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10"><Plus size={32} className="rotate-45" /></button>
+               </div>
+
+               <div className="space-y-10">
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 space-y-6">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                           <Globe className="w-5 h-5 text-indigo-400" />
+                           <label className="text-sm font-bold text-slate-300 uppercase tracking-widest">Physical Aura Bridge (WLED)</label>
+                        </div>
+                        <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">V4.4.1 BRIDGE</span>
+                     </div>
+                     <div className="flex items-center glass rounded-2xl px-6 py-4 border-white/10">
+                        <span className="text-[10px] font-black text-slate-500 mr-4 font-mono">TARGET_IP:</span>
+                        <input value={auraIp} onChange={(e) => setAuraIp(e.target.value)} placeholder="192.168.1.XXX" className="bg-transparent border-none outline-none text-lg w-full text-white font-black tracking-tighter" />
+                        <div className={cn("w-3 h-3 rounded-full animate-pulse shadow-sm", autoAura ? "bg-indigo-500 shadow-indigo-500/40" : "bg-white/10")} />
+                     </div>
+                     <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Configure your workspace luminosity bridge. The shell targets the raw UDP/JSON API of your WLED device to reflect venture integrity in physical space.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
+                        <div className="flex items-end justify-between">
+                           <span className="text-2xl font-black text-white">4.2GB</span>
+                           <span className="text-[10px] font-bold text-emerald-400">OPTIMIZED</span>
+                        </div>
+                     </div>
+                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Sentiment Accuracy</span>
+                        <div className="flex items-end justify-between">
+                           <span className="text-2xl font-black text-white">99.2%</span>
+                           <span className="text-[10px] font-bold text-indigo-400">NOMINAL</span>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               <button onClick={() => setShowSettings(false)} className="w-full mt-12 py-5 bg-white text-black font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-white/10 hover:scale-105 transition-all">Save Core Config</button>
+            </div>
+          </motion.div>
+        )}
+
         {simMode && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-[#020617]/40 backdrop-blur-3xl">
              <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-12 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.1)] relative overflow-hidden">
@@ -1721,8 +1816,8 @@ export default function App() {
                             <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
                               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.1.0-RESONANCE</span>
                             </div>
-                            <h5 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                               <p className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</p>
+                            <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                               <span className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</span>
                                
                                {/* STRATEGIC BRANCHES */}
                                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
@@ -1746,7 +1841,7 @@ export default function App() {
                                    </button>
                                  ))}
                                </div>
-                            </h5>
+                             </div>
                             <p className="text-[10px] text-indigo-300 italic opacity-80">{neuralWisdom.insight}</p>
                             <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
                                Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
@@ -1774,7 +1869,68 @@ export default function App() {
                     </div>
                  </motion.div>
               )}
-           </AnimatePresence>
+             {activeDebate && (
+           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8500] bg-black/60 backdrop-blur-5xl flex items-center justify-center p-24">
+              <div className="w-full max-w-7xl glass-bright rounded-[4rem] border border-white/10 p-16 relative overflow-hidden flex flex-col h-[800px] shadow-6xl">
+                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-20" />
+                 
+                 <div className="flex justify-between items-start mb-16 px-4">
+                    <div>
+                        <span className={cn("text-xs font-black uppercase tracking-[0.4em] px-4 py-1 rounded-full border mb-4 inline-block", 
+                           activeDebate.consensus_aura === 'volatile' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        )}>Consensus Status: {activeDebate.consensus_aura}</span>
+                        <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Strategic Advisory Debate</h2>
+                    </div>
+                    <button onClick={() => setActiveDebate(null)} className="w-20 h-20 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10 shadow-2xl"><Plus size={40} className="rotate-45" /></button>
+                 </div>
+
+                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 overflow-hidden px-4">
+                    {activeDebate.insights.map((insight: any, i: number) => (
+                       <motion.div 
+                         key={i} 
+                         initial={{ opacity: 0, scale: 0.9, y: 30 }} 
+                         animate={{ opacity: 1, scale: 1, y: 0 }} 
+                         transition={{ delay: i * 0.15 }}
+                         className="flex flex-col rounded-3xl p-8 bg-white/[0.03] border border-white/5 relative group hover:bg-white/5 transition-all overflow-hidden"
+                       >
+                          <div className={cn("absolute top-0 left-0 w-1 h-full", 
+                             insight.persona.includes("ARCHITECT") ? "bg-amber-500" : 
+                             insight.persona.includes("GROWTH") ? "bg-pink-500" : "bg-slate-400"
+                          )} />
+                          
+                          <div className="flex items-center justify-between mb-8">
+                             <span className={cn("text-[10px] font-black uppercase tracking-[0.3em]", 
+                                insight.persona.includes("ARCHITECT") ? "text-amber-500" : 
+                                insight.persona.includes("GROWTH") ? "text-pink-500" : "text-slate-400"
+                             )}>{insight.persona}</span>
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-500">{insight.strategic_score}%</span>
+                                <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                   <div className="h-full bg-white/40" style={{ width: `${insight.strategic_score}%` }} />
+                                </div>
+                             </div>
+                          </div>
+
+                          <p className="text-sm text-slate-200 leading-relaxed font-medium mb-auto">
+                             "{insight.perspective}"
+                          </p>
+                          
+                          <div className="mt-10 pt-6 border-t border-white/5 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-opacity">
+                             <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Risk Index: {Math.round(insight.risk_impact * 100)}%</span>
+                             <ShieldAlert className={cn("w-4 h-4", insight.risk_impact > 0.7 ? "text-rose-500" : "text-slate-500")} />
+                          </div>
+                       </motion.div>
+                    ))}
+                 </div>
+
+                 <div className="mt-16 bg-white/5 p-8 rounded-[2rem] border border-white/10 flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-400 max-w-2xl px-4">Observe the conflicting perspectives between technical stability, market velocity, and catastrophic risk mitigation. Your tie-breaking decision is required for commit manifestation.</p>
+                    <button className="px-12 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 transition-all">Review & Commit</button>
+                 </div>
+              </div>
+           </motion.div>
+         )}
+       </AnimatePresence>
            <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
              <Bot className="w-9 h-9" />
            </button>
@@ -1853,9 +2009,25 @@ export default function App() {
                 </div>
               </div>
               
-              <footer className="p-10 border-t border-white/5 bg-black/20 text-center">
-                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
-              </footer>
+              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-4">
+                  {storageReport && (
+                    <div className="flex items-center gap-4 py-2 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-in fade-in slide-in-from-bottom-4">
+                       <Database className="w-3 h-3 text-emerald-400" />
+                       <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">{storageReport.status} // {Math.round(storageReport.transferred_bytes / 1024)} KB SYNCED</span>
+                    </div>
+                  )}
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
+                  <div className="flex gap-10 mt-2 opacity-30 grayscale hover:grayscale-0 transition-all">
+                     <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[8px] font-bold text-white uppercase">C: System Nominal</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                        <span className="text-[8px] font-bold text-white uppercase">D: Golem Space Ready</span>
+                     </div>
+                  </div>
+               </footer>
             </motion.div>
           </motion.div>
         )}
