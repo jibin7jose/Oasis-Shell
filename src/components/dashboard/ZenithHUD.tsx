@@ -1,6 +1,5 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Zap, Activity, Brain } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Shield, Zap, Brain } from 'lucide-react';
 import { cn } from "../../lib/utils";
 
 interface ZenithHUDProps {

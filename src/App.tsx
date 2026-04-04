@@ -77,8 +77,10 @@ export default function App() {
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
   const appliedPriorityPids = useRef<Set<number>>(new Set());
-  const [priorityCache, setPriorityCache] = useState<Record<string, { priority: string; lastApplied: number }>>({});
+  const [priorityCache, setPriorityCache] = useState<Record<string, { priority: string; lastApplied: number; source: "Manual" | "Auto-Applied"; ignore?: boolean; ttlDays?: number }>>({});
   const [autoApplyPriorities, setAutoApplyPriorities] = useState(true);
+  const [priorityAudit, setPriorityAudit] = useState<{ id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[]>([]);
+  const [defaultTtlDays, setDefaultTtlDays] = useState(7);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
     system_control: false
@@ -603,10 +605,14 @@ export default function App() {
 
         // Apply cached priorities for restarted processes when allowed
         if (permissions.process_control && autoApplyPriorities) {
+          const now = Date.now();
           for (const proc of procList) {
             const cached = priorityCache[proc.name];
-            if (!cached) continue;
+            if (!cached || cached.ignore) continue;
             const cachedPriority = cached.priority || "NORMAL";
+            const ttlDays = cached.ttlDays ?? defaultTtlDays;
+            const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+            if (cached.lastApplied > 0 && now - cached.lastApplied > ttlMs) continue;
             const current = (priorityMap[proc.pid] || "Normal").toString().toLowerCase();
             if (current !== cachedPriority.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
               appliedPriorityPids.current.add(proc.pid);
@@ -614,8 +620,15 @@ export default function App() {
                 .then(() => {
                   setPriorityCache((prev) => ({
                     ...prev,
-                    [proc.name]: { priority: cachedPriority, lastApplied: Date.now() }
+                    [proc.name]: {
+                      priority: cachedPriority,
+                      lastApplied: Date.now(),
+                      source: "Auto-Applied",
+                      ignore: prev[proc.name]?.ignore,
+                      ttlDays: prev[proc.name]?.ttlDays ?? defaultTtlDays
+                    }
                   }));
+                  logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
                 })
                 .catch(() => {});
             }
@@ -675,27 +688,47 @@ export default function App() {
       const saved = localStorage.getItem("oas_priority_cache");
       if (saved) {
         const parsed = JSON.parse(saved) as Record<string, any>;
-        const normalized: Record<string, { priority: string; lastApplied: number }> = {};
+        const normalized: Record<string, { priority: string; lastApplied: number; source: "Manual" | "Auto-Applied"; ignore?: boolean; ttlDays?: number }> = {};
         Object.keys(parsed).forEach((key) => {
           const val = parsed[key];
           if (typeof val === "string") {
-            normalized[key] = { priority: val, lastApplied: 0 };
+            normalized[key] = { priority: val, lastApplied: 0, source: "Manual", ignore: false, ttlDays: defaultTtlDays };
           } else if (val && typeof val === "object") {
             normalized[key] = {
               priority: String(val.priority || "NORMAL"),
-              lastApplied: typeof val.lastApplied === "number" ? val.lastApplied : 0
+              lastApplied: typeof val.lastApplied === "number" ? val.lastApplied : 0,
+              source: val.source === "Auto-Applied" ? "Auto-Applied" : "Manual",
+              ignore: !!val.ignore,
+              ttlDays: typeof val.ttlDays === "number" ? val.ttlDays : defaultTtlDays
             };
           }
+        });
+        const now = Date.now();
+        Object.keys(normalized).forEach((k) => {
+          const last = normalized[k].lastApplied || 0;
+          const ttlDays = normalized[k].ttlDays ?? defaultTtlDays;
+          const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+          if (last > 0 && now - last > ttlMs) delete normalized[k];
         });
         setPriorityCache(normalized);
       }
     } catch (e) {}
-  }, []);
+  }, [defaultTtlDays]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oas_auto_apply_priorities");
       if (saved !== null) setAutoApplyPriorities(saved === "true");
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("oas_default_ttl_days");
+      if (saved) {
+        const n = parseInt(saved, 10);
+        if (Number.isFinite(n) && n > 0) setDefaultTtlDays(n);
+      }
     } catch (e) {}
   }, []);
 
@@ -717,6 +750,12 @@ export default function App() {
     } catch (e) {}
   }, [autoApplyPriorities]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_default_ttl_days", String(defaultTtlDays));
+    } catch (e) {}
+  }, [defaultTtlDays]);
+
   const withPermission = (key: CommandPermission, label: string, action: () => void) => {
     if (permissions[key]) {
       action();
@@ -730,6 +769,13 @@ export default function App() {
     await resolveNeuralIntent(query);
     setCommandQuery("");
     setCommandOpen(false);
+  };
+
+  const logPriorityChange = (pid: number, name: string, priority: string, source: "Manual" | "Auto-Applied" | "Reset") => {
+    setPriorityAudit((prev) => [
+      { id: Date.now() + Math.floor(Math.random() * 1000), pid, name, priority, source, time: Date.now() },
+      ...prev
+    ].slice(0, 50));
   };
 
   const handleCommandPermissionRequest = (permission: CommandPermission, label: string, action?: () => void) => {
@@ -826,12 +872,189 @@ export default function App() {
           if (procName) {
             setPriorityCache((prev) => ({
               ...prev,
-              [procName]: { priority: priority.toUpperCase(), lastApplied: Date.now() }
+              [procName]: {
+                priority: priority.toUpperCase(),
+                lastApplied: Date.now(),
+                source: "Manual",
+                ignore: prev[procName]?.ignore,
+                ttlDays: prev[procName]?.ttlDays ?? defaultTtlDays
+              }
             }));
+            logPriorityChange(pid, procName, priority.toUpperCase(), "Manual");
           }
           setNotification(res);
         })
         .catch((e: any) => setNotification(`Priority change failed: ${e}`));
+    });
+  };
+
+  const handleClearCacheReset = (pid: number, name: string) => {
+    withPermission("process_control", "Process Control", () => {
+      invoke("set_process_priority", { pid, priority: "normal" })
+        .then(() => {
+          setProcessPriorities((prev) => ({ ...prev, [pid]: "NORMAL" }));
+          setPriorityCache((prev) => {
+            const next = { ...prev };
+            delete next[name];
+            return next;
+          });
+          logPriorityChange(pid, name, "NORMAL", "Reset");
+          setNotification(`Priority reset for ${name} (PID ${pid}).`);
+        })
+        .catch((e: any) => setNotification(`Priority reset failed: ${e}`));
+    });
+  };
+
+  const handleToggleIgnoreProcess = (name: string, ignore: boolean) => {
+    setPriorityCache((prev) => ({
+      ...prev,
+      [name]: {
+        priority: prev[name]?.priority || "NORMAL",
+        lastApplied: prev[name]?.lastApplied || 0,
+        source: prev[name]?.source || "Manual",
+        ignore,
+        ttlDays: prev[name]?.ttlDays ?? defaultTtlDays
+      }
+    }));
+  };
+
+  const handleSetProcessTtl = (name: string, ttlDays: number) => {
+    setPriorityCache((prev) => ({
+      ...prev,
+      [name]: {
+        priority: prev[name]?.priority || "NORMAL",
+        lastApplied: prev[name]?.lastApplied || 0,
+        source: prev[name]?.source || "Manual",
+        ignore: prev[name]?.ignore,
+        ttlDays
+      }
+    }));
+  };
+
+  const handleToggleIgnoreAll = (ignore: boolean) => {
+    setPriorityCache((prev) => {
+      const next: Record<string, typeof prev[string]> = { ...prev };
+      Object.keys(next).forEach((key) => {
+        next[key] = { ...next[key], ignore };
+      });
+      return next;
+    });
+  };
+
+  const handleExportAudit = (format: "json" | "csv", columns: string[], filter: string) => {
+    const rows = priorityAudit
+      .filter((e) => {
+        if (filter === "all") return true;
+        return e.source.toLowerCase() === filter;
+      })
+      .map((e) => ({
+      time: new Date(e.time).toISOString(),
+      pid: e.pid,
+      name: e.name,
+      priority: e.priority,
+      source: e.source
+    }));
+
+    let content = "";
+    let mime = "text/plain";
+    let filename = `priority_audit_${new Date().toISOString().replace(/[:.]/g, "-")}.${format}`;
+    if (format === "json") {
+      const filtered = rows.map((r) => {
+        const obj: any = {};
+        columns.forEach((c) => {
+          obj[c] = (r as any)[c];
+        });
+        return obj;
+      });
+      content = JSON.stringify(filtered, null, 2);
+      mime = "application/json";
+    } else {
+      const header = columns.join(",");
+      const lines = rows.map((r) =>
+        columns
+          .map((c) => {
+            const val = (r as any)[c];
+            if (typeof val === "string") return `"${val.replace(/\"/g, '\"\"')}"`;
+            return String(val);
+          })
+          .join(",")
+      );
+      content = [header, ...lines].join("\n");
+      mime = "text/csv";
+    }
+
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearAllCache = () => {
+    setPriorityCache({});
+    try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
+    setNotification("Priority cache cleared.");
+  };
+
+  const handleResetAllPrioritiesAndClear = () => {
+    withPermission("process_control", "Process Control", () => {
+      processes.forEach((proc) => {
+        invoke("set_process_priority", { pid: proc.pid, priority: "normal" })
+          .then(() => {
+            setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
+            logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
+          })
+          .catch(() => {});
+      });
+      setPriorityCache({});
+      try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
+      setNotification("Priority reset + cache clear initiated.");
+    });
+  };
+
+  const handleResetAllPriorities = () => {
+    withPermission("process_control", "Process Control", () => {
+      processes.forEach((proc) => {
+        invoke("set_process_priority", { pid: proc.pid, priority: "normal" })
+          .then(() => {
+            setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
+            logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
+          })
+          .catch(() => {});
+      });
+      setNotification("Priority reset initiated for active processes.");
+    });
+  };
+
+  const handleReapplyAll = () => {
+    withPermission("process_control", "Process Control", () => {
+      const now = Date.now();
+      processes.forEach((proc) => {
+        const cached = priorityCache[proc.name];
+        if (!cached || cached.ignore) return;
+        const ttlDays = cached.ttlDays ?? defaultTtlDays;
+        const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+        if (cached.lastApplied > 0 && now - cached.lastApplied > ttlMs) return;
+        const cachedPriority = cached.priority || "NORMAL";
+        invoke("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
+          .then(() => {
+            setPriorityCache((prev) => ({
+              ...prev,
+              [proc.name]: {
+                priority: cachedPriority,
+                lastApplied: Date.now(),
+                source: "Auto-Applied",
+                ignore: prev[proc.name]?.ignore,
+                ttlDays: prev[proc.name]?.ttlDays ?? defaultTtlDays
+              }
+            }));
+            logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
+          })
+          .catch(() => {});
+      });
+      setNotification("Reapply sequence initiated.");
     });
   };
 
@@ -987,38 +1210,47 @@ export default function App() {
   };
 
   const handlePinContext = async (name: string) => {
-    const stateBlob = JSON.stringify({
-      view: activeView,
-      venture: activeVenture,
-      zen: zenMode,
-      sim: simMode,
-      aura: activeContext,
-      integrity: ventureIntegrity,
-      timestamp: new Date().toISOString()
-    });
-
     try {
+      const windowLayout = await invoke("get_active_windows");
+      const stateBlob = JSON.stringify({
+        view: activeView,
+        venture: activeVenture,
+        zen: zenMode,
+        sim: simMode,
+        aura: activeContext,
+        windowLayout,
+        timestamp: new Date().toISOString()
+      });
+
       await invoke("pin_context", { 
         name: name || `Snapshot ${new Date().toLocaleTimeString()}`, 
         stateBlob, 
         aura: activeContext 
       });
+      
       const pins = await invoke("get_pinned_contexts") as any[];
-        setPinnedContexts(pins);
-        const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
-        setNeuralLogs(logs);
+      setPinnedContexts(pins);
+      const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
+      setNeuralLogs(logs);
       setNotification(`Chronos Snapshot Pin Manifested: [${name || 'System'}]`);
     } catch (e) {
       setNotification(`State Freeze Failed: ${e}`);
     }
   };
 
-  const handleRestoreContext = (pin: any) => {
+  const handleRestoreContext = async (pin: any) => {
     try {
       const state = JSON.parse(pin.state_blob);
       if (state.view) setActiveView(state.view);
       if (state.zen !== undefined) setZenMode(state.zen);
       if (state.sim !== undefined) setSimMode(state.sim);
+      if (state.venture) setActiveVenture(state.venture);
+      
+      // OS Parallel Restoration
+      if (state.windowLayout) {
+        await invoke("set_window_layout", { layout: state.windowLayout });
+      }
+
       setNotification(`Chronos Restored: ${pin.name}`);
     } catch (e) {
       setNotification("Temporal Drift detected. Snapshot Corrupted.");
@@ -1082,8 +1314,8 @@ export default function App() {
                    <span className="text-indigo-400">{(disk.total / (1024**3)).toFixed(1)}GB Total</span>
                 </div>
                 <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
-                   <motion.div initial={{ width: 0 }} animate={{ width: `${100 - disk.health_score}%` }}
-                    className={cn("h-full", disk.health_score < 20 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
+                   <motion.div initial={{ width: 0 }} animate={{ width: `${((disk.total - disk.available) / disk.total * 100).toFixed(1)}%` }}
+                     className={cn("h-full", (disk.available / disk.total) < 0.1 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
                 </div>
              </div>
           </div>
@@ -1168,20 +1400,32 @@ export default function App() {
     >
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
-        {commandOpen && (
-          <AnimatePresence>{zenithActive && <ZenithHUD cpuLoad={systemStats?.cpu_load??0} integrity={ventureIntegrity} burn={fiscalBurn.total_burn} activeVenture={activeVenture} onExit={() => setZenithActive(false)} />}</AnimatePresence>
-      <CommandPalette 
-            open={commandOpen}
-            query={commandQuery}
-            onQueryChange={setCommandQuery}
-            onClose={() => setCommandOpen(false)}
-            onExecute={handlePaletteAction}
-            permissions={permissions}
-            onRequestPermission={handleCommandPermissionRequest}
-            onQuarantinePid={handleQuarantinePid}
-            processes={processes}
-            onPinContext={(name) => handlePinContext(name)}
+        {zenithActive && (
+          <ZenithHUD 
+            cpuLoad={systemStats?.cpu_load??0} 
+            integrity={ventureIntegrity} 
+            burn={fiscalBurn.total_burn} 
+            activeVenture={activeVenture} 
+            onExit={() => setZenithActive(false)} 
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {commandOpen && (
+           <CommandPalette 
+              open={commandOpen}
+              query={commandQuery}
+              onQueryChange={setCommandQuery}
+              onClose={() => setCommandOpen(false)}
+              onExecute={handlePaletteAction}
+              permissions={permissions}
+              onRequestPermission={handleCommandPermissionRequest}
+              onQuarantinePid={handleQuarantinePid}
+              processes={processes}
+              onPinContext={(name) => handlePinContext(name)}
+              onZenithPulse={handleZenithPulse}
+            />
         )}
       </AnimatePresence>
 
@@ -1351,80 +1595,68 @@ export default function App() {
                </div>
             )}
 
-            {activeView === 'dash' && <>
+            {activeView === 'dash' && (
+              <>
+                {!presentationMode && (
+                  <motion.div 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
+                  >
+                    <div className="flex items-center gap-5 px-4 py-2">
+                      <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
+                      <input 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearchIntent}
+                        placeholder="Detecting Neural Intent..."
+                        className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
+                      />
+                      <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
+                    </div>
+                  </motion.div>
+                )}
 
-            {/* Neural Intent Bar */}
-            {!presentationMode && (
-              <motion.div 
-                 initial={{ y: 20, opacity: 0 }}
-                 animate={{ y: 0, opacity: 1 }}
-                 className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
-              >
-                  <div className="flex items-center gap-5 px-4 py-2">
-                    <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
-                    <input 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={handleSearchIntent}
-                      placeholder="Detecting Neural Intent..."
-                      className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
-                    />
-                    <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
-                  </div>
-              </motion.div>
-            )}
-
-            {/* Global Venture Pulse Ticker (Enhanced with Economic Sentinel Pillar 25) */}
-            <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
-               <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#020617] to-transparent z-10" />
-               <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#020617] to-transparent z-10" />
-               <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                  {marketIntel.map((m: any, i: number) => (
-                    <div key={i} className="flex gap-4 items-center">
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
-                       <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
-                       <span className={cn("text-[10px] font-black tracking-widest uppercase", m.change.startsWith('+') ? "text-emerald-500" : "text-red-500")}>
+                <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
+                  <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
+                    {marketIntel.map((m: any, i: number) => (
+                      <div key={i} className="flex gap-4 items-center">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
+                        <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
+                        <span className={cn("text-[10px] font-black tracking-widest uppercase", m.change.startsWith('+') ? "text-emerald-500" : "text-red-500")}>
                           {m.change}
-                       </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                  {[
+                    { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
+                    { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
+                    { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
+                    { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
+                  ].map((m, i) => (
+                    <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
+                      <m.icon className="w-5 h-5 text-indigo-400" />
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
+                        <div className="text-xl font-bold text-white">{m.val}</div>
+                      </div>
                     </div>
                   ))}
-                  {economicNews.map((n: string, i: number) => (
-                    <div key={i} className="flex gap-4 items-center pl-12 border-l border-white/10">
-                       <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                          <Globe className="w-4 h-4" /> Sentinel Insight
-                       </span>
-                       <span className="text-sm font-medium text-slate-400">{n}</span>
-                    </div>
-                  ))}
-               </div>
-            </div>
+                </div>
 
-            {/* Metrics Ribbon */}
-            <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-               {[
-                 { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
-                 { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
-                 { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-                 { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
-               ].map((m, i) => (
-                 <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
-                    <m.icon className="w-5 h-5 text-indigo-400" />
-                    <div>
-                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                       <div className="text-xl font-bold text-white">{m.val}</div>
-                    </div>
-                 </div>
-               ))}
-            </div>
-
-            <SystemPanel
-              stats={systemStats}
-              windows={runningWindows}
-              processes={processes}
-              storage={storageMap}
-              devices={devices}
+                <SystemPanel
+                  stats={systemStats}
+                  windows={runningWindows}
+                  processes={processes}
+                  storage={storageMap}
+                  devices={devices}
               processPriorities={processPriorities}
               priorityCache={priorityCache}
+              priorityAudit={priorityAudit}
               batteryHealth={batteryHealth}
               lastSync={systemLastSync}
               onRefresh={refreshSystemSnapshot}
@@ -1432,89 +1664,27 @@ export default function App() {
               onSuspendProcess={handleSuspendProcess}
               onResumeProcess={handleResumeProcess}
               onSetPriority={handleSetPriority}
+              onClearCacheReset={handleClearCacheReset}
+              onToggleIgnoreProcess={handleToggleIgnoreProcess}
+              onExportAudit={handleExportAudit}
+              onClearAllCache={handleClearAllCache}
+              onReapplyAll={handleReapplyAll}
+              onResetAllPriorities={handleResetAllPriorities}
+              onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
+              onToggleIgnoreAll={handleToggleIgnoreAll}
+              onSetProcessTtl={handleSetProcessTtl}
+              defaultTtlDays={defaultTtlDays}
+              autoApplyPriorities={autoApplyPriorities}
             />
-          )}
+              </>
+            )}
 
-          {activeView === 'timeline' && (
-            <CortexLog 
-              logs={neuralLogs} 
-              onRefresh={refreshSystemSnapshot}
-            />
-
-            {/* Neural Corporate Suite (Phase 21) */}
-            <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                {workforce.map((agent, i) => (
-                   <motion.div 
-                     key={agent.name}
-                     initial={{ opacity: 0, scale: 0.95 }}
-                     animate={{ opacity: 1, scale: 1 }}
-                     transition={{ delay: i * 0.1 }}
-                     className="glass-bright rounded-3xl p-8 border border-white/5 relative overflow-hidden group hover:border-indigo-500/30 transition-all shadow-xl"
-                   >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-[40px]" />
-                      <div className="flex items-center justify-between mb-6">
-                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-500/20 transition-all">
-                               {agent.name.includes("Growth") ? <Globe className="w-5 h-5 text-indigo-400" /> : agent.name.includes("Architect") ? <Cpu className="w-5 h-5 text-purple-400" /> : <ShieldCheck className="w-5 h-5 text-emerald-400" />}
-                            </div>
-                            <div>
-                               <h4 className="text-sm font-black text-white uppercase tracking-wider">{agent.name}</h4>
-                               <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{agent.status}</span>
-                            </div>
-                         </div>
-                         {agent.id !== "auditor" && agent.id !== "growth" && (
-                            <button 
-                              onClick={async () => {
-                                await invoke("delete_golem", { id: agent.id });
-                                setNotification(`Agent ${agent.name} Purged from Universe.`);
-                                const wf = await invoke("get_neural_workforce", { marketIndex: 100 }) as any;
-                                setWorkforce(wf);
-                              }}
-                              className="p-2 glass text-rose-400 hover:text-rose-500 transition-colors"
-                            >
-                               <Trash2 className="w-4 h-4" />
-                            </button>
-                         )}
-                      </div>
-                      <div className="p-4 rounded-2xl bg-black/20 border border-white/5 mb-4 min-h-[100px] flex items-center">
-                         <p className="text-[11px] text-slate-400 font-medium leading-relaxed italic line-clamp-4">
-                            "{agent.recommendation}"
-                         </p>
-                      </div>
-                      <button className="w-full py-3 bg-white/5 hover:bg-white/10 text-[9px] font-black text-slate-500 hover:text-white uppercase tracking-widest rounded-xl transition-all border border-white/5">
-                         Sync With Agent
-                      </button>
-                   </motion.div>
-                ))}
-            </div>
-
-            {/* Deployment Messenger Hub (Simplified) */}
-            <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
-                <div className="flex items-center justify-between mb-8">
-                   <div className="flex items-center gap-4">
-                      <Terminal className="w-6 h-6 text-indigo-400" />
-                      <h3 className="text-lg font-bold tracking-tight text-white">Foundry Pipeline</h3>
-                   </div>
-                   <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Systems Level Access</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                   {activeTasks.map((env) => (
-                     <div key={env.id} className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group">
-                        <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500 mb-1">
-                           <span className="group-hover:text-indigo-400 transition-colors">{env.name}</span>
-                           <span className={cn(env.prog < 100 ? "animate-pulse" : "", env.color === 'emerald' ? "text-emerald-500" : "text-indigo-400")}>{env.status}</span>
-                        </div>
-                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden flex items-center">
-                           <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full transition-all duration-1000", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : "bg-purple-500")} />
-                        </div>
-                        <div className="flex justify-between items-center mt-2">
-                           <span className="text-[7px] font-mono text-slate-700 tracking-tighter">OAS_NODE_{env.id.slice(-4).toUpperCase()}</span>
-                           <span className="text-[8px] font-black text-slate-600">{env.prog}%</span>
-                        </div>
-                     </div>
-                   ))}
-                </div>
-            </div>
+            {activeView === 'timeline' && (
+              <CortexLog 
+                logs={neuralLogs} 
+                onRefresh={refreshSystemSnapshot}
+              />
+            )}
 
             <div className="flex gap-8 pb-12">
               {contexts.map((ctx) => {
@@ -1535,7 +1705,6 @@ export default function App() {
                 );
               })}
             </div>
-            </>}
         </div>
       </main>
 
@@ -1786,6 +1955,32 @@ export default function App() {
                   </div>
 
                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                             <Shield className="w-5 h-5 text-indigo-400" />
+                             <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Default Priority TTL</span>
+                                <span className="text-[10px] text-slate-500">Applies to new cache entries</span>
+                             </div>
+                          </div>
+                          <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">CACHE POLICY</span>
+                       </div>
+                       <div className="mt-5 flex items-center gap-4">
+                          <select
+                             value={defaultTtlDays}
+                             onChange={(e) => setDefaultTtlDays(parseInt(e.target.value, 10))}
+                             className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] text-white font-black uppercase tracking-widest"
+                          >
+                             <option value="1">1 day</option>
+                             <option value="3">3 days</option>
+                             <option value="7">7 days</option>
+                             <option value="14">14 days</option>
+                             <option value="30">30 days</option>
+                          </select>
+                          <span className="text-[9px] text-slate-500">Current default: {defaultTtlDays}d</span>
+                       </div>
+                    </div>
                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
                        <div className="flex items-end justify-between">
@@ -1959,6 +2154,21 @@ export default function App() {
                        <div onClick={() => setAutoApplyPriorities(!autoApplyPriorities)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoApplyPriorities ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
                           <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", autoApplyPriorities ? "translate-x-6" : "translate-x-0")} />
                        </div>
+                    </div>
+                    <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                       <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Priority Cache</span>
+                          <span className="text-[10px] text-slate-500">Entries: {Object.keys(priorityCache).length}</span>
+                       </div>
+                       <button
+                         onClick={() => {
+                           setPriorityCache({});
+                           try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
+                         }}
+                         className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl text-rose-300 border border-rose-500/20"
+                       >
+                         Clear Cache
+                       </button>
                     </div>
                  </div>
               </div>

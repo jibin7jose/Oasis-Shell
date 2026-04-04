@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed};
-use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
+use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE};
+use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL, PWSTR};
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
@@ -2388,21 +2388,6 @@ async fn update_golem_task(id: String, status: String, progress: f32) -> Result<
 }
 
 #[tauri::command]
-async fn complete_golem_task(db: tauri::State<'_, DbState>, id: String) -> Result<(), String> {
-    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    if let Some(task) = registry.remove(&id) {
-        // Neural Continuity: Record Completion
-        let conn = db.0.lock().unwrap();
-        let timestamp = chrono::Local::now().to_rfc3339();
-        let _ = conn.execute(
-            "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
-            rusqlite::params!["GOLEM_RETIRAL", format!("Autonomous Agent retired: {}", task.name), timestamp],
-        );
-    }
-    Ok(())
-}", task.name), timestamp],
-        );
-    }
     Ok(())
 }
 
@@ -2462,6 +2447,53 @@ async fn delete_pinned_context(state: tauri::State<'_, DbState>, id: i64) -> Res
 }
 
 #[tauri::command]
+async fn seek_chronos(state: tauri::State<'_, DbState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
+    let conn = state.0.lock().unwrap();
+    // High-Fidelity Neural Search across logs and contexts
+    let mut results = Vec::new();
+    
+    // 1. Search Neural Logs
+    let mut log_stmt = conn.prepare(
+        "SELECT id, event_type, message, timestamp FROM neural_logs 
+         WHERE message LIKE ?1 OR event_type LIKE ?1 
+         ORDER BY id DESC LIMIT ?2"
+    ).map_err(|e| e.to_string())?;
+    
+    let log_rows = log_stmt.query_map([format!("%{}%", query), limit.to_string()], |row| {
+        Ok(serde_json::json!({
+            "source": "NEURAL_LOG",
+            "id": row.get::<_, i64>(0)?,
+            "type": row.get::<_, String>(1)?,
+            "message": row.get::<_, String>(2)?,
+            "timestamp": row.get::<_, String>(3)?
+        }))
+    }).map_err(|e| e.to_string())?;
+
+    for r in log_rows { results.push(r.unwrap()); }
+
+    // 2. Search Pinned Contexts
+    let mut pin_stmt = conn.prepare(
+        "SELECT id, name, aura_color, timestamp FROM pinned_contexts 
+         WHERE name LIKE ?1 
+         ORDER BY id DESC LIMIT ?2"
+    ).map_err(|e| e.to_string())?;
+    
+    let pin_rows = pin_stmt.query_map([format!("%{}%", query), limit.to_string()], |row| {
+        Ok(serde_json::json!({
+            "source": "PINNED_CONTEXT",
+            "id": row.get::<_, i64>(0)?,
+            "title": row.get::<_, String>(1)?,
+            "aura": row.get::<_, String>(2)?,
+            "timestamp": row.get::<_, String>(3)?
+        }))
+    }).map_err(|e| e.to_string())?;
+
+    for r in pin_rows { results.push(r.unwrap()); }
+
+    Ok(results)
+}
+
+#[tauri::command]
 async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
@@ -2481,6 +2513,80 @@ async fn query_vision(image_base64: String, prompt: String) -> Result<String, St
         .map_err(|e| e.to_string())?;
 
     Ok(res["response"].as_str().unwrap_or("Vision Failure").to_string())
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WindowSnapshot {
+    pub title: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[tauri::command]
+async fn get_active_windows() -> Result<Vec<WindowSnapshot>, String> {
+    let mut windows: Vec<WindowSnapshot> = Vec::new();
+    
+    extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let windows_ptr = lparam.0 as *mut Vec<WindowSnapshot>;
+        let windows = unsafe { &mut *windows_ptr };
+        
+        unsafe {
+            if IsWindowVisible(hwnd).as_bool() {
+                let mut text = [0u16; 512];
+                let len = GetWindowTextW(hwnd, &mut text);
+                if len > 0 {
+                    let title = String::from_utf16_lossy(&text[..len as usize]);
+                    let mut rect = RECT::default();
+                    if GetWindowRect(hwnd, &mut rect).is_ok() {
+                        windows.push(WindowSnapshot {
+                            title,
+                            x: rect.left,
+                            y: rect.top,
+                            width: rect.right - rect.left,
+                            height: rect.bottom - rect.top,
+                        });
+                    }
+                }
+            }
+        }
+        BOOL::from(true)
+    }
+
+    unsafe {
+        let lparam = LPARAM(&mut windows as *mut Vec<WindowSnapshot> as isize);
+        let _ = EnumWindows(Some(enum_window_callback), lparam);
+    }
+
+    Ok(windows)
+}
+
+#[tauri::command]
+async fn set_window_layout(layout: Vec<WindowSnapshot>) -> Result<(), String> {
+    extern "system" fn set_layout_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let layout_ptr = lparam.0 as *const Vec<WindowSnapshot>;
+        let layout = unsafe { &*layout_ptr };
+        
+        unsafe {
+            let mut text = [0u16; 512];
+            let len = GetWindowTextW(hwnd, &mut text);
+            if len > 0 {
+                let title = String::from_utf16_lossy(&text[..len as usize]);
+                if let Some(target) = layout.iter().find(|w| w.title == title) {
+                   let _ = ShowWindow(hwnd, SW_RESTORE);
+                   let _ = SetWindowPos(hwnd, HWND::default(), target.x, target.y, target.width, target.height, SWP_NOZORDER | SWP_SHOWWINDOW);
+                }
+            }
+        }
+        BOOL::from(true)
+    }
+
+    unsafe {
+        let lparam = LPARAM(&layout as *const Vec<WindowSnapshot> as isize);
+        let _ = EnumWindows(Some(set_layout_callback), lparam);
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2669,7 +2775,10 @@ pub fn run() {
             pin_context,
             get_pinned_contexts,
             delete_pinned_context,
-            get_neural_logs
+            get_neural_logs,
+            seek_chronos,
+            get_active_windows,
+            set_window_layout
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

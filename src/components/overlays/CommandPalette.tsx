@@ -90,30 +90,30 @@ export default function CommandPalette({
   const [pidMode, setPidMode] = useState(false);
   const [pidValue, setPidValue] = useState("");
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
+  const [chronosResults, setChronosResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => inputRef.current?.focus(), 50);
-      return () => clearTimeout(id);
-    }
-    setPidMode(false);
-    setPidValue("");
-    return undefined;
-  }, [open]);
 
   useEffect(() => {
     const q = query.trim();
     if (q.length < 3) {
       setSemanticResults([]);
+      setChronosResults([]);
       return;
     }
 
     const handler = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const results = await invoke<SearchResult[]>("search_semantic_nodes", { query: q });
-        setSemanticResults(results);
+        if (q.startsWith('/seek ')) {
+          const seekQ = q.slice(6).trim();
+          if (seekQ.length >= 2) {
+            const results = await invoke<any[]>("seek_chronos", { query: seekQ, limit: 10 });
+            setChronosResults(results);
+          }
+        } else {
+          const results = await invoke<SearchResult[]>("search_semantic_nodes", { query: q });
+          setSemanticResults(results);
+        }
       } catch (e) {
         console.error("Cortex Search Failed", e);
       } finally {
@@ -307,7 +307,34 @@ export default function CommandPalette({
               )}
 
               {/* SEMANTIC DISCOVERY RESULTS */}
-              {semanticResults.length > 0 && (
+    {chronosResults.length > 0 && (
+            <div className="mt-8 pt-8 border-t border-white/5">
+              <div className="flex items-center gap-3 mb-6 px-4">
+                <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Chronos ledger Insights</h3>
+              </div>
+              <div className="space-y-4">
+                {chronosResults.map((res, i) => (
+                  <div key={i} className="group flex items-center justify-between p-6 rounded-[2rem] bg-white/5 border border-white/5 hover:border-amber-500/30 transition-all cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-2xl flex items-center justify-center border",
+                        res.source === 'PINNED_CONTEXT' ? "bg-amber-500/10 border-amber-500/20" : "bg-indigo-500/10 border-indigo-500/20"
+                      )}>
+                        <Activity className={cn("w-5 h-5", res.source === 'PINNED_CONTEXT' ? "text-amber-400" : "text-indigo-400")} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{res.source}</span>
+                        <h4 className="text-sm font-bold text-white transition-colors group-hover:text-amber-400">{res.title || res.message}</h4>
+                        <span className="text-[9px] font-mono text-slate-600 mt-0.5">{res.timestamp}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {semanticResults.length > 0 && (
                  <div className="px-6 py-6 flex flex-col gap-2 border-t border-white/5 bg-white/[0.01]">
                     <span className="text-[9px] font-black text-indigo-400/60 uppercase tracking-[0.4em] px-2 mb-4 flex items-center gap-4">
                        Neural Knowledge Discovery
