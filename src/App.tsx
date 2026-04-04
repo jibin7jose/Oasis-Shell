@@ -758,62 +758,27 @@ export default function App() {
   }, [simMode, simMetrics.arr, simMetrics.burn]);
 
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
-  const CommandPalette = () => {
-    const [search, setSearch] = useState("");
-    const actions = [
-      { id: 'dash', label: 'Tactical Workspace: Dashboard', icon: LayoutDashboard },
-      { id: 'processes', label: 'Neural Watch: Process HUD', icon: Cpu },
-      { id: 'storage', label: 'Atlas: Storage Mapping', icon: Shield },
-      { id: 'vault', label: 'Archive: Sentinel Vault', icon: Lock },
-      { id: 'sync', label: 'Pulse: GitHub Workspace Sync', icon: RotateCcw },
-    ];
-    const filtered = actions.filter(a => a.label.toLowerCase().includes(search.toLowerCase()));
 
-    return (
-      <motion.div 
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[5000] flex items-start justify-center pt-32 bg-black/60 backdrop-blur-md p-4"
-        onClick={() => setShowCommandPalette(false)}
-      >
-        <motion.div 
-          initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }}
-          className="w-full max-w-2xl glass-bright border border-white/10 rounded-[2.5rem] overflow-hidden shadow-6xl"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="p-8 border-b border-white/5 flex items-center gap-6">
-            <Search className="w-6 h-6 text-indigo-400" />
-            <input 
-              autoFocus placeholder="Neural Directive..."
-              className="bg-transparent border-none outline-none text-2xl font-black w-full text-white placeholder:text-slate-700"
-              value={search} onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && filtered[0] && handlePaletteAction(filtered[0].id)}
-            />
-          </div>
-          <div className="p-4 max-h-[450px] overflow-y-auto custom-scrollbar">
-            {filtered.map(action => (
-              <button key={action.id} onClick={() => handlePaletteAction(action.id)}
-                className="w-full text-left p-5 hover:bg-white/5 rounded-3xl flex items-center gap-6 group transition-all"
-              >
-                <div className="p-3 rounded-2xl bg-white/5 group-hover:bg-indigo-500/20 text-slate-500 group-hover:text-indigo-400 transition-colors">
-                  <action.icon className="w-6 h-6" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-black text-slate-300 group-hover:text-white transition-colors">{action.label}</span>
-                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{action.id === 'dash' ? 'Primary Directive' : 'System Authority'}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
-    );
-  };
 
-  const handlePaletteAction = (id: string) => {
+  const handlePaletteAction = async (id: string) => {
     setShowCommandPalette(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowVault(true);
     else if (id === 'sync') resolveNeuralIntent("sync to github");
+    else if (id === 'scan') refreshSystemData();
+    else if (id === 'index') {
+      setNotification("Neural Indexing Initiated...");
+      await invoke("index_folder", { path: "." });
+      setNotification("Cortex Successfully Index.");
+    }
+    else if (id === 'graph') setShowGraph(true);
+    else if (id === 'logs') setShowLogs(true);
+    else if (id === 'presentation') setPresentationMode(true);
+    else if (id.startsWith('open ')) {
+       const path = id.replace('open ', '');
+       setNotification(`Opening Strategic Asset: ${path.split('\\').pop()}`);
+       // Triggering open logic would go here
+    }
   };
 
   const SystemHUD = () => (
@@ -921,7 +886,13 @@ export default function App() {
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
         {showCommandPalette && (
-          <CommandPalette />
+          <CommandPalette 
+            open={showCommandPalette}
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            onClose={() => setShowCommandPalette(false)}
+            onExecute={handlePaletteAction}
+          />
         )}
       </AnimatePresence>
 
