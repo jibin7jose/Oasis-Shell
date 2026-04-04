@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
-  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
@@ -15,6 +15,61 @@ import CommandPalette, { CommandPermission } from "./components/overlays/Command
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
+
+const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+const TAURI_DEFAULTS: Record<string, any> = {
+  get_venture_metrics: { arr: "$0M", burn: "$0K", runway: "0mo", momentum: "0%", stress_color: "#6366f1" },
+  run_system_diagnostic: { cpu_load: 0, mem_used: 0, battery_level: 100, is_charging: true, battery_health: 100, time_remaining_min: 120 },
+  get_venture_integrity: 100,
+  get_fiscal_report: { total_burn: 0, token_load: 0, status: 'NOMINAL' },
+  load_venture_state: { arr: "$0M", burn: "$0K", runway: "0mo", momentum: "0%", stress_color: "#6366f1" },
+  get_market_intelligence: {
+    market_index: 100.0,
+    index_change: "+2.4%",
+    ticker: [
+      { symbol: "OASIS_INDEX", price: "$1,442.20", change: "+2.4%" },
+      { symbol: "RUST_FOUNDRY", price: "0.14s", change: "-0.2%" },
+      { symbol: "GOLEM_NODES", price: "1.4k", change: "+12.8%" },
+      { symbol: "SENTINEL_YIELD", price: "99.2%", change: "+0.1%" }
+    ]
+  },
+  get_neural_wisdom: { recommendation: "Oasis Dev: Kernel simulation active." },
+  get_sentinel_ledger: [],
+  get_aegis_ledger: [],
+  seek_chronos: [],
+  search_semantic_nodes: [],
+  get_process_list: [
+    { pid: 1420, name: "oasis-shell.exe", cpu_usage: 2.4, mem_usage: 149422080, status: "Running", user: "Founder" },
+    { pid: 8842, name: "Code.exe", cpu_usage: 12.8, mem_usage: 882999296, status: "Running", user: "Founder" },
+    { pid: 4421, name: "chrome.exe", cpu_usage: 8.2, mem_usage: 1300500480, status: "Running", user: "Founder" },
+    { pid: 9924, name: "rust-foundry-kernel", cpu_usage: 0.1, mem_usage: 44892160, status: "Background", user: "System" }
+  ],
+  get_running_windows: [
+    { pid: 8842, title: "Oasis Shell - Visual Studio Code", exe_path: "C:\\Program Files\\VSCode\\Code.exe", x: 0, y: 0, width: 1920, height: 1080, is_maximized: true },
+    { pid: 4421, title: "Oasis Foundry Dashboard - Chrome", exe_path: "C:\\Program Files\\Google\\Chrome.exe", x: 100, y: 100, width: 1280, height: 720, is_maximized: false }
+  ],
+  save_venture_state: null,
+  execute_neural_intent: { content: "Neural Intent Handled.", tool: "NONE" },
+  get_chronos_ledger: [],
+  get_neural_logs: [],
+  get_neural_workforce: [],
+  get_active_golems: [],
+  get_pinned_contexts: [],
+  get_economic_news: [],
+  get_pending_manifests: [],
+  get_strategic_inventory: [],
+  get_available_ventures: [],
+  get_storage_map: [],
+  get_system_devices: [],
+};
+const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>) => {
+  if (!isTauri) return (TAURI_DEFAULTS[cmd] ?? null) as T;
+  return invoke(cmd, payload as any) as Promise<T>;
+};
+const listenSafe = async (event: string, handler: any) => {
+  if (!isTauri) return () => {};
+  return listen(event, handler);
+};
 
 // Context Library
 const contexts = [
@@ -81,6 +136,12 @@ export default function App() {
   const [autoApplyPriorities, setAutoApplyPriorities] = useState(true);
   const [priorityAudit, setPriorityAudit] = useState<{ id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[]>([]);
   const [defaultTtlDays, setDefaultTtlDays] = useState(7);
+  const [sparklinesEnabled, setSparklinesEnabled] = useState(true);
+  const [performanceMode, setPerformanceMode] = useState(false);
+  const [resetConfirmAction, setResetConfirmAction] = useState<"reset" | "reset_clear" | null>(null);
+  const [fpsThreshold, setFpsThreshold] = useState(22);
+  const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
+  const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
     system_control: false
@@ -96,17 +157,17 @@ export default function App() {
   useEffect(() => {
     const pulse = setInterval(async () => {
        try {
-          const metrics = await invoke("get_venture_metrics") as any;
+          const metrics = await invokeSafe("get_venture_metrics") as any;
           setFounderMetrics(metrics);
           
           // Only pull full diagnostics if the panel is open or every 30s
-          const stats = await invoke("run_system_diagnostic") as SystemStats;
+          const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
           setSystemStats(stats);
 
-          const integrity = await invoke("get_venture_integrity") as number;
+          const integrity = await invokeSafe("get_venture_integrity") as number;
           setVentureIntegrity(integrity);
 
-          const fiscal = await invoke("get_fiscal_report") as any;
+          const fiscal = await invokeSafe("get_fiscal_report") as any;
           setFiscalBurn(fiscal);
        } catch (e) {}
     }, 5000);
@@ -165,11 +226,11 @@ export default function App() {
   useEffect(() => {
     const syncGolems = async () => {
       try {
-        const active = await invoke("get_active_golems") as any[];
+        const active = await invokeSafe("get_active_golems") as any[];
         setGolems(active);
-        const pins = await invoke("get_pinned_contexts") as any[];
+        const pins = await invokeSafe("get_pinned_contexts") as any[];
         setPinnedContexts(pins);
-        const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
+        const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
         setNeuralLogs(logs);
       } catch (err) {}
     };
@@ -182,20 +243,20 @@ export default function App() {
       setMounted(true);
       try {
         // PULLING REAL VENTURE DATA FROM THE RUST KERNEL DOOMSDAY LEDGER
-        const metrics = await invoke("load_venture_state") as FounderMetrics;
+        const metrics = await invokeSafe("load_venture_state") as FounderMetrics;
         if (metrics) setFounderMetrics(metrics);
         
-        const ledger = await invoke("get_chronos_ledger") as any[];
+        const ledger = await invokeSafe("get_chronos_ledger") as any[];
         setChronosLedger(ledger);
         setChronosIndex(ledger.length > 0 ? ledger.length - 1 : 0);
 
-        const news = await invoke("get_economic_news") as string[];
+        const news = await invokeSafe("get_economic_news") as string[];
         setEconomicNews(news);
 
-        const wf = await invoke("get_neural_workforce", { marketIndex: 100.0 }) as any[];
+        const wf = await invokeSafe("get_neural_workforce", { marketIndex: 100.0 }) as any[];
         setWorkforce(wf);
 
-        const initialFiscal = await invoke("get_fiscal_report") as any;
+        const initialFiscal = await invokeSafe("get_fiscal_report") as any;
         setFiscalBurn(initialFiscal);
 
         setNotification("Oasis Neural Layer: Real-Time Venture Ledger Synchronized.");
@@ -209,7 +270,7 @@ export default function App() {
   useEffect(() => {
     const interval = setInterval(async () => {
        try {
-         const integrity = await invoke("get_venture_integrity") as number;
+         const integrity = await invokeSafe("get_venture_integrity") as number;
          setVentureIntegrity(integrity);
        } catch(e) {}
     }, 5000);
@@ -237,9 +298,9 @@ export default function App() {
     setSimMode(false);
     
     // PERSIST & SNAPSHOT
-    await invoke("save_venture_state", { metrics: newMetrics });
-    await invoke("create_chronos_snapshot", { metrics: newMetrics, market: marketIntel });
-    const ledger = await invoke("get_chronos_ledger") as any[];
+    await invokeSafe("save_venture_state", { metrics: newMetrics });
+    await invokeSafe("create_chronos_snapshot", { metrics: newMetrics, market: marketIntel });
+    const ledger = await invokeSafe("get_chronos_ledger") as any[];
     setChronosLedger(ledger);
     setChronosIndex(ledger.length - 1);
     setNotification("Venture State Etched to Chronos Ledger.");
@@ -248,7 +309,7 @@ export default function App() {
   useEffect(() => {
     const syncInventoryData = async () => {
       try {
-        const inv = await invoke("get_strategic_inventory") as any[];
+        const inv = await invokeSafe("get_strategic_inventory") as any[];
         setStrategicInventory(inv);
       } catch (e) {}
     };
@@ -279,7 +340,7 @@ export default function App() {
     logEvent(`Neural Intent Captured: "${query}"`, 'neural');
 
     try {
-      const res = await invoke("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
+      const res = await invokeSafe("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
       setIsThinking(false);
       
       setMessages(prev => [...prev, { role: "assistant", content: res.content }]);
@@ -287,12 +348,12 @@ export default function App() {
       // Secondary UI Reactions based on Tool Execution
       if (res.tool === "VAULT_SEAL") {
         setShowVault(true);
-        const vault = await invoke("get_sentinel_ledger") as any;
+        const vault = await invokeSafe("get_sentinel_ledger") as any;
         setSentinelVault(vault);
         logEvent("Sentinel Seal Sequence Complete", "system");
-      } else if (res.tool === "SYSTEM_SCAN") {
+      } else if (res.tool === "SYSTEM_SCAN" && res.data) {
         setSystemStats(res.data);
-        setNotification(`Neural Pulse: CPU @ ${res.data.cpu_load.toFixed(1)}%`);
+        setNotification(`Neural Pulse: CPU @ ${res.data.cpu_load?.toFixed(1) || "0.0"}%`);
         logEvent("Global System Scan Executed", "system");
       } else if (res.tool === "SYNC_GITHUB") {
         setNotification("Oasis Pulse: Workspace Sync Successful.");
@@ -334,7 +395,7 @@ export default function App() {
       else if (ventureIntegrity < 50) targetColor = "amber";
       else if (ventureIntegrity >= 95) targetColor = "emerald";
 
-        invoke("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp }).catch(() => {});
+        invokeSafe("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp }).catch(() => {});
     }
   }, [autoAura, activeDebate, ventureIntegrity]);
 
@@ -347,7 +408,7 @@ export default function App() {
   const handleExecuteManifest = async (m: any) => {
     try {
       setNotification(`Foundry: Committing Neural Manifest '${m.title}' to Kernel...`);
-      await invoke("execute_golem_manifest", { id: m.id, title: m.title, code: m.code_draft });
+      await invokeSafe("execute_golem_manifest", { id: m.id, title: m.title, code: m.code_draft });
       setNotification(`Strategic Sync Success: Module '${m.title}' is now LIVE.`);
       setPendingManifests(prev => prev.filter(p => p.id !== m.id));
       logEvent(`Autonomous Manifest '${m.title}' Deployed`, "deploy");
@@ -405,9 +466,11 @@ export default function App() {
   // --- V2 COGNITION EFFECTORS ---
   useEffect(() => {
     if (founderMetrics.stress_color !== "#6366f1") {
-       invoke('get_neural_wisdom', { stressColor: founderMetrics.stress_color }).then((res: any) => {
+       invokeSafe('get_neural_wisdom', { stressColor: founderMetrics.stress_color }).then((res: any) => {
           setNeuralWisdom(res);
-          setMessages(prev => [...prev, { role: "assistant", content: `Neural Wisdom: ${res.recommendation}` }]);
+          if (res?.recommendation) {
+            setMessages(prev => [...prev, { role: "assistant", content: `Neural Wisdom: ${res.recommendation}` }]);
+          }
        }).catch(() => {});
     } else {
        setNeuralWisdom(null);
@@ -417,7 +480,7 @@ export default function App() {
   useEffect(() => {
     const triggerAudit = async () => {
       try {
-        const alert = await invoke("trigger_oracle_audit", { arr: simMetrics.arr, burn: simMetrics.burn }) as any;
+        const alert = await invokeSafe("trigger_oracle_audit", { arr: simMetrics.arr, burn: simMetrics.burn }) as any;
         setOracleAlert(alert);
         setNotification(`Neural Oracle Audit Complete: ${alert.title}`);
       } catch (e) {}
@@ -430,7 +493,7 @@ export default function App() {
   useEffect(() => {
     const syncWorkforceData = async () => {
       try {
-        const wf = await invoke("get_neural_workforce") as any[];
+        const wf = await invokeSafe("get_neural_workforce") as any[];
         setWorkforce(wf);
       } catch (e) {}
     };
@@ -442,7 +505,7 @@ export default function App() {
   useEffect(() => {
     const syncGolems = async () => {
       try {
-        const pmd = await invoke("get_pending_manifests", { stressColor: founderMetrics.stress_color }) as any[];
+        const pmd = await invokeSafe("get_pending_manifests", { stressColor: founderMetrics.stress_color }) as any[];
         setPendingManifests(pmd);
       } catch (e) {}
     };
@@ -454,7 +517,7 @@ export default function App() {
   useEffect(() => {
     const syncNewsData = async () => {
       try {
-        const news = await invoke("get_economic_news") as string[];
+        const news = await invokeSafe("get_economic_news") as string[];
         setEconomicNews(news);
       } catch (e) {}
     };
@@ -466,7 +529,7 @@ export default function App() {
   useEffect(() => {
     const syncHardwareData = async () => {
       try {
-        const hs = await invoke("trigger_hardware_symbiosis", { stressColor: founderMetrics.stress_color }) as any;
+        const hs = await invokeSafe("trigger_hardware_symbiosis", { stressColor: founderMetrics.stress_color }) as any;
         setHardwareStatus(hs);
       } catch (e) {}
     };
@@ -477,7 +540,7 @@ export default function App() {
 
   const handleRewind = async () => {
     try {
-      const res = await invoke("restore_venture_state", { files: manifestHistory }) as string;
+      const res = await invokeSafe("restore_venture_state", { files: manifestHistory }) as string;
       setNotification(res);
       setManifestHistory([]);
       setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }));
@@ -487,7 +550,7 @@ export default function App() {
   useEffect(() => {
     const syncNetworkData = async () => {
       try {
-        const net = await invoke("get_available_ventures") as any[];
+        const net = await invokeSafe("get_available_ventures") as any[];
         setVentureNetwork(net);
       } catch (e) {}
     };
@@ -499,7 +562,7 @@ export default function App() {
   useEffect(() => {
     const restoreState = async () => {
       try {
-        const met = await invoke("load_venture_state") as any;
+        const met = await invokeSafe("load_venture_state") as any;
         setFounderMetrics(met);
         // Normalize simulation inputs to persisted state
         const arrVal = parseFloat(met.arr.replace('$', '').replace('M', ''));
@@ -513,7 +576,7 @@ export default function App() {
   useEffect(() => {
     const syncInventoryData = async () => {
       try {
-        const inv = await invoke("get_strategic_inventory") as any[];
+        const inv = await invokeSafe("get_strategic_inventory") as any[];
         setStrategicInventory(inv);
       } catch (e) {}
     };
@@ -525,10 +588,10 @@ export default function App() {
   useEffect(() => {
     const syncSystemData = async () => {
       try {
-        const stats = await invoke("run_system_diagnostic") as any;
+        const stats = await invokeSafe("run_system_diagnostic") as any;
         setSystemStats(stats);
         
-        const ledger = await invoke("get_chronos_ledger") as any[];
+        const ledger = await invokeSafe("get_chronos_ledger") as any[];
         setChronosLedger(ledger);
         setChronosIndex(ledger.length - 1);
       } catch (e) {}
@@ -538,16 +601,16 @@ export default function App() {
 
   const refreshSystemSnapshot = async () => {
     try {
-      const stats = await invoke("run_system_diagnostic") as SystemStats;
+      const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
       setSystemStats(stats);
-      const windows = await invoke("get_running_windows") as WindowInfo[];
+      const windows = await invokeSafe("get_running_windows") as WindowInfo[];
       setRunningWindows(windows);
-      const procList = await invoke("get_process_list") as ProcessInfo[];
+      const procList = await invokeSafe("get_process_list") as ProcessInfo[];
       setProcesses(procList);
       const priorities = await Promise.all(
         procList.map(async (proc) => {
           try {
-            const p = await invoke("get_process_priority", { pid: proc.pid }) as string;
+            const p = await invokeSafe("get_process_priority", { pid: proc.pid }) as string;
             return [proc.pid, p || "Normal"] as const;
           } catch (e) {
             return [proc.pid, "Normal"] as const;
@@ -559,12 +622,12 @@ export default function App() {
         [...appliedPriorityPids.current].filter((pid) => procList.some((p) => p.pid === pid))
       );
       try {
-        const health = await invoke("get_battery_health_wmi") as any;
+        const health = await invokeSafe("get_battery_health_wmi") as any;
         setBatteryHealth(health);
       } catch (e) {}
-      const disks = await invoke("get_storage_map") as StorageInfo[];
+      const disks = await invokeSafe("get_storage_map") as StorageInfo[];
       setStorageMap(disks);
-      const devs = await invoke("get_system_devices") as DeviceInfo[];
+      const devs = await invokeSafe("get_system_devices") as DeviceInfo[];
       setDevices(devs);
       setSystemLastSync(new Date().toLocaleTimeString());
     } catch (e) {}
@@ -573,7 +636,7 @@ export default function App() {
   useEffect(() => {
     const syncWindows = async () => {
       try {
-        const windows = await invoke("get_running_windows") as WindowInfo[];
+        const windows = await invokeSafe("get_running_windows") as WindowInfo[];
         setRunningWindows(windows);
       } catch (e) {}
     };
@@ -585,12 +648,12 @@ export default function App() {
   useEffect(() => {
     const syncProcesses = async () => {
       try {
-        const procList = await invoke("get_process_list") as ProcessInfo[];
+        const procList = await invokeSafe("get_process_list") as ProcessInfo[];
         setProcesses(procList);
         const priorities = await Promise.all(
           procList.map(async (proc) => {
             try {
-              const p = await invoke("get_process_priority", { pid: proc.pid }) as string;
+              const p = await invokeSafe("get_process_priority", { pid: proc.pid }) as string;
               return [proc.pid, p || "Normal"] as const;
             } catch (e) {
               return [proc.pid, "Normal"] as const;
@@ -616,7 +679,7 @@ export default function App() {
             const current = (priorityMap[proc.pid] || "Normal").toString().toLowerCase();
             if (current !== cachedPriority.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
               appliedPriorityPids.current.add(proc.pid);
-              invoke("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
+              invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
                 .then(() => {
                   setPriorityCache((prev) => ({
                     ...prev,
@@ -644,11 +707,11 @@ export default function App() {
   useEffect(() => {
     const syncStorageDevices = async () => {
       try {
-        const disks = await invoke("get_storage_map") as StorageInfo[];
+        const disks = await invokeSafe("get_storage_map") as StorageInfo[];
         setStorageMap(disks);
-        const devs = await invoke("get_system_devices") as DeviceInfo[];
+        const devs = await invokeSafe("get_system_devices") as DeviceInfo[];
         setDevices(devs);
-        const health = await invoke("get_battery_health_wmi") as any;
+        const health = await invokeSafe("get_battery_health_wmi") as any;
         setBatteryHealth(health);
       } catch (e) {}
     };
@@ -729,6 +792,15 @@ export default function App() {
         const n = parseInt(saved, 10);
         if (Number.isFinite(n) && n > 0) setDefaultTtlDays(n);
       }
+      const spark = localStorage.getItem("oas_sparklines_enabled");
+      if (spark !== null) setSparklinesEnabled(spark === "true");
+      const perf = localStorage.getItem("oas_performance_mode");
+      if (perf !== null) setPerformanceMode(perf === "true");
+      const fps = localStorage.getItem("oas_fps_threshold");
+      if (fps !== null) {
+        const n = parseInt(fps, 10);
+        if (Number.isFinite(n) && n > 0) setFpsThreshold(n);
+      }
     } catch (e) {}
   }, []);
 
@@ -755,6 +827,75 @@ export default function App() {
       localStorage.setItem("oas_default_ttl_days", String(defaultTtlDays));
     } catch (e) {}
   }, [defaultTtlDays]);
+
+  useEffect(() => {
+    if (performanceMode) {
+      setSparklinesEnabled(false);
+      setSparklinesAutoDisabled(false);
+      setShowGraph(false);
+      setShowNetwork(false);
+    }
+  }, [performanceMode]);
+
+  useEffect(() => {
+    if (performanceMode) return;
+    let frame = 0;
+    let last = performance.now();
+    let raf = 0;
+    let recoverStart: number | null = null;
+    const samples: number[] = [];
+    const tick = (now: number) => {
+      frame += 1;
+      const delta = now - last;
+      if (delta >= 1000) {
+        const fps = (frame * 1000) / delta;
+        samples.push(fps);
+        if (samples.length > 3) samples.shift();
+        const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+        if (sparklinesEnabled && avg < fpsThreshold) {
+          setSparklinesEnabled(false);
+          setSparklinesAutoDisabled(true);
+          setNotification("Sparklines disabled: low FPS detected.");
+        } else if (!sparklinesEnabled && sparklinesAutoDisabled) {
+          if (avg >= fpsThreshold + 5) {
+            if (recoverStart === null) recoverStart = now;
+            if (now - recoverStart >= 10000) {
+              setSparklinesEnabled(true);
+              setSparklinesAutoDisabled(false);
+              setNotification("Sparklines re-enabled: FPS recovered.");
+            }
+          } else {
+            recoverStart = null;
+          }
+        }
+        frame = 0;
+        last = now;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [sparklinesEnabled, sparklinesAutoDisabled, fpsThreshold, performanceMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_sparklines_enabled", sparklinesEnabled ? "true" : "false");
+    } catch (e) {}
+  }, [sparklinesEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_performance_mode", performanceMode ? "true" : "false");
+    } catch (e) {}
+  }, [performanceMode]);
+
+  useEffect(() => {
+    if (!resetProgress || resetProgress.total === 0) return;
+    if (resetProgress.done >= resetProgress.total) {
+      const timer = setTimeout(() => setResetProgress(null), 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [resetProgress]);
 
   const withPermission = (key: CommandPermission, label: string, action: () => void) => {
     if (permissions[key]) {
@@ -794,7 +935,7 @@ export default function App() {
 
   useEffect(() => {
     const setupDragDrop = async () => {
-      const unlisten = await listen("tauri://drag-drop", (event: any) => {
+      const unlisten = await listenSafe("tauri://drag-drop", (event: any) => {
         const paths = event.payload.paths;
         if (paths && paths.length > 0) {
           if (showSentinel && !isVaultLocked) {
@@ -822,16 +963,16 @@ export default function App() {
 
   const handleInstallShell = async () => {
     try {
-      const res = await invoke("install_oas_binary") as string;
+      const res = await invokeSafe("install_oas_binary") as string;
       setNotification(res);
-      const stats = await invoke("run_system_diagnostic") as any;
+      const stats = await invokeSafe("run_system_diagnostic") as any;
       setSystemStats(stats);
     } catch (e) {}
   };
 
   const handleKillProcess = (pid: number) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("kill_quarantine_process", { pid })
+      invokeSafe("kill_quarantine_process", { pid })
         .then((res: any) => setNotification(res))
         .catch((e: any) => setNotification(`Process kill failed: ${e}`));
     });
@@ -839,7 +980,7 @@ export default function App() {
 
   const handleSuspendProcess = (pid: number) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("suspend_process", { pid })
+      invokeSafe("suspend_process", { pid })
         .then((res: any) => setNotification(res))
         .catch((e: any) => setNotification(`Process suspend failed: ${e}`));
     });
@@ -847,7 +988,7 @@ export default function App() {
 
   const handleResumeProcess = (pid: number) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("resume_process", { pid })
+      invokeSafe("resume_process", { pid })
         .then((res: any) => setNotification(res))
         .catch((e: any) => setNotification(`Process resume failed: ${e}`));
     });
@@ -855,7 +996,7 @@ export default function App() {
 
   const handleQuarantinePid = (pid: number) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("kill_quarantine_process", { pid })
+      invokeSafe("kill_quarantine_process", { pid })
         .then((res: any) => setNotification(res))
         .catch((e: any) => setNotification(`Process quarantine failed: ${e}`));
     });
@@ -863,9 +1004,9 @@ export default function App() {
 
   const handleSetPriority = (pid: number, priority: string) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("set_process_priority", { pid, priority })
+      invokeSafe("set_process_priority", { pid, priority })
         .then((res: any) => {
-          invoke("get_process_priority", { pid })
+          invokeSafe("get_process_priority", { pid })
             .then((p: any) => setProcessPriorities((prev) => ({ ...prev, [pid]: String(p || priority).toUpperCase() })))
             .catch(() => setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() })));
           const procName = processes.find((p) => p.pid === pid)?.name;
@@ -890,7 +1031,7 @@ export default function App() {
 
   const handleClearCacheReset = (pid: number, name: string) => {
     withPermission("process_control", "Process Control", () => {
-      invoke("set_process_priority", { pid, priority: "normal" })
+      invokeSafe("set_process_priority", { pid, priority: "normal" })
         .then(() => {
           setProcessPriorities((prev) => ({ ...prev, [pid]: "NORMAL" }));
           setPriorityCache((prev) => {
@@ -992,6 +1133,15 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const advanceResetProgress = () => {
+    setResetProgress((prev) => {
+      if (!prev) return prev;
+      const done = prev.done + 1;
+      const active = done < prev.total;
+      return { ...prev, done, active };
+    });
+  };
+
   const handleClearAllCache = () => {
     setPriorityCache({});
     try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
@@ -1000,13 +1150,18 @@ export default function App() {
 
   const handleResetAllPrioritiesAndClear = () => {
     withPermission("process_control", "Process Control", () => {
+      const total = processes.length || 0;
+      setResetProgress({ active: true, total, done: 0, mode: "reset_clear" });
       processes.forEach((proc) => {
-        invoke("set_process_priority", { pid: proc.pid, priority: "normal" })
+        invokeSafe("set_process_priority", { pid: proc.pid, priority: "normal" })
           .then(() => {
             setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => {
+            advanceResetProgress();
+          });
       });
       setPriorityCache({});
       try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
@@ -1016,13 +1171,18 @@ export default function App() {
 
   const handleResetAllPriorities = () => {
     withPermission("process_control", "Process Control", () => {
+      const total = processes.length || 0;
+      setResetProgress({ active: true, total, done: 0, mode: "reset" });
       processes.forEach((proc) => {
-        invoke("set_process_priority", { pid: proc.pid, priority: "normal" })
+        invokeSafe("set_process_priority", { pid: proc.pid, priority: "normal" })
           .then(() => {
             setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => {
+            advanceResetProgress();
+          });
       });
       setNotification("Priority reset initiated for active processes.");
     });
@@ -1038,7 +1198,7 @@ export default function App() {
         const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
         if (cached.lastApplied > 0 && now - cached.lastApplied > ttlMs) return;
         const cachedPriority = cached.priority || "NORMAL";
-        invoke("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
+        invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
           .then(() => {
             setPriorityCache((prev) => ({
               ...prev,
@@ -1060,10 +1220,10 @@ export default function App() {
 
   const handleAuthorizeBranch = async (agentId: string, tag: string) => {
     try {
-      const res = await invoke("authorize_branch", { agentId, branchTag: tag }) as string;
+      const res = await invokeSafe("authorize_branch", { agentId, branchTag: tag }) as string;
       setNotification(res);
       // Refresh workforce status
-      const wf = await invoke("get_neural_workforce") as any[];
+      const wf = await invokeSafe("get_neural_workforce") as any[];
       setWorkforce(wf);
     } catch (e) {}
   };
@@ -1079,10 +1239,10 @@ export default function App() {
     const [cmd, ...args] = cliInput.split(" ");
     try {
       if (cmd === "manifest" && args[0] === "golem") {
-        await invoke("register_new_golem", { name: "DummyGolem", status: "Active" });
+        await invokeSafe("register_new_golem", { name: "DummyGolem", status: "Active" });
         setNotification("New Golem Registered.");
       }
-      const res = await invoke("execute_cli_directive", { directive: { cmd, args }, stressColor: founderMetrics.stress_color }) as any;
+      const res = await invokeSafe("execute_cli_directive", { directive: { cmd, args }, stressColor: founderMetrics.stress_color }) as any;
       setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: res.output, color: res.aura_color }]);
       setNotification(`Oas Directive Executed: ${cmd.toUpperCase()}`);
     } catch (e: any) {
@@ -1093,21 +1253,21 @@ export default function App() {
 
   const handleAegisSync = async () => {
     try {
-      const res = await invoke("sync_venture_to_aegis", { 
+      const res = await invokeSafe("sync_venture_to_aegis", { 
         ventureId: activeVenture.replace(" ", "_").toLowerCase(),
         name: activeVenture,
         metrics: founderMetrics,
         market: marketIntel
       }) as string;
       setNotification(res);
-      const ledger = await invoke("get_aegis_ledger") as any;
+      const ledger = await invokeSafe("get_aegis_ledger") as any;
       setAegisLedger(ledger);
     } catch (e) {}
   };
 
   const handleNeuralMirror = async (sourceId: string) => {
     try {
-      const wisdom = await invoke("mirror_venture_intelligence", { sourceId }) as string[];
+      const wisdom = await invokeSafe("mirror_venture_intelligence", { sourceId }) as string[];
       setCrossWisdom(wisdom);
       setNotification(`Neural Mirror Connected: Knowledge transfer from ${sourceId} successful.`);
       setShowNexus(false);
@@ -1116,7 +1276,7 @@ export default function App() {
 
   const handleOracleVision = async (ventureId: string) => {
     try {
-      const forecast = await invoke("invoke_oracle_prediction", { ventureId }) as any;
+      const forecast = await invokeSafe("invoke_oracle_prediction", { ventureId }) as any;
       setActiveOracle(forecast);
       setNotification(`Oracle Sigil Detected: 12-Month Projection manifested for ${ventureId}.`);
     } catch (e) {}
@@ -1125,12 +1285,12 @@ export default function App() {
   const handleAuthenticateFounder = async () => {
     if (!founderSecret) return;
     try {
-      const success = await invoke("authenticate_founder", { secret: founderSecret });
+      const success = await invokeSafe("authenticate_founder", { secret: founderSecret });
       if (success) {
         setIsVaultLocked(false);
         setNotification("Vocal Resonance: Founder Identity Verified. Vault Unsealed.");
-        invoke("log_strategic_pulse", { nodeId: "sentinel_auth", status: "emerald" }).catch(() => {});
-        const vault = await invoke("get_sentinel_ledger") as any;
+        invokeSafe("log_strategic_pulse", { nodeId: "sentinel_auth", status: "emerald" }).catch(() => {});
+        const vault = await invokeSafe("get_sentinel_ledger") as any;
         setSentinelVault(vault);
       }
     } catch (e: any) {
@@ -1140,18 +1300,18 @@ export default function App() {
 
   const handleSealAsset = async (path: string, title: string) => {
     try {
-      const res = await invoke("seal_strategic_asset", { filePath: path, title }) as string;
+      const res = await invokeSafe("seal_strategic_asset", { filePath: path, title }) as string;
       setNotification(res);
-      const vault = await invoke("get_sentinel_ledger") as any;
+      const vault = await invokeSafe("get_sentinel_ledger") as any;
       setSentinelVault(vault);
     } catch (e) {}
   };
 
   const handleUnsealAsset = async (id: string) => {
     try {
-      const res = await invoke("unseal_strategic_asset", { blobId: id }) as string;
+      const res = await invokeSafe("unseal_strategic_asset", { blobId: id }) as string;
       setNotification(res);
-      const vault = await invoke("get_sentinel_ledger") as any;
+      const vault = await invokeSafe("get_sentinel_ledger") as any;
       setSentinelVault(vault);
     } catch (e) {}
   };
@@ -1159,9 +1319,9 @@ export default function App() {
   useEffect(() => {
     const syncAegisData = async () => {
       try {
-        const ledger = await invoke("get_aegis_ledger") as any;
+        const ledger = await invokeSafe("get_aegis_ledger") as any;
         setAegisLedger(ledger);
-        const vault = await invoke("get_sentinel_ledger") as any;
+        const vault = await invokeSafe("get_sentinel_ledger") as any;
         setSentinelVault(vault);
       } catch (e) {}
     };
@@ -1172,17 +1332,18 @@ export default function App() {
   useEffect(() => {
     const syncFoundryData = async () => {
       try {
-        const metrics = await invoke("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
-        const intel = await invoke("get_market_intelligence") as any;
-        setMarketIntel(intel);
+        const metrics = await invokeSafe("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
+        const intel = await invokeSafe("get_market_intelligence") as any;
+        setMarketIntel(intel.ticker || []);
+        setDisplayedMarket({ market_index: intel.market_index, index_change: intel.index_change });
         
         // Pass market index to workforce for reactor logic
-        const wf = await invoke("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
+        const wf = await invokeSafe("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
         setWorkforce(wf);
 
         if (!simMode) {
             setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
-            invoke("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
+            invokeSafe("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
         }
         setLastSync(new Date().toLocaleTimeString());
       } catch (e) {
@@ -1211,7 +1372,7 @@ export default function App() {
 
   const handlePinContext = async (name: string) => {
     try {
-      const windowLayout = await invoke("get_active_windows");
+      const windowLayout = await invokeSafe("get_active_windows");
       const stateBlob = JSON.stringify({
         view: activeView,
         venture: activeVenture,
@@ -1222,15 +1383,15 @@ export default function App() {
         timestamp: new Date().toISOString()
       });
 
-      await invoke("pin_context", { 
+      await invokeSafe("pin_context", { 
         name: name || `Snapshot ${new Date().toLocaleTimeString()}`, 
         stateBlob, 
         aura: activeContext 
       });
       
-      const pins = await invoke("get_pinned_contexts") as any[];
+      const pins = await invokeSafe("get_pinned_contexts") as any[];
       setPinnedContexts(pins);
-      const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
+      const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
       setNeuralLogs(logs);
       setNotification(`Chronos Snapshot Pin Manifested: [${name || 'System'}]`);
     } catch (e) {
@@ -1248,7 +1409,7 @@ export default function App() {
       
       // OS Parallel Restoration
       if (state.windowLayout) {
-        await invoke("set_window_layout", { layout: state.windowLayout });
+        await invokeSafe("set_window_layout", { layout: state.windowLayout });
       }
 
       setNotification(`Chronos Restored: ${pin.name}`);
@@ -1265,16 +1426,16 @@ export default function App() {
     else if (id === 'system_scan') {
       const taskId = "SCAN_" + Date.now();
       const triggerScan = async () => {
-        await invoke("register_golem_task", { id: taskId, name: "Neural Diagnostic", aura: "amber" });
+        await invokeSafe("register_golem_task", { id: taskId, name: "Neural Diagnostic", aura: "amber" });
         let p = 0;
         const itv = setInterval(async () => {
           p += 0.1;
           if (p >= 1.0) {
             clearInterval(itv);
-            await invoke("complete_golem_task", { id: taskId });
+            await invokeSafe("complete_golem_task", { id: taskId });
             setNotification("Neural Diagnostic Complete: Sentinel Foundations Nominal.");
           } else {
-            await invoke("update_golem_task", { id: taskId, status: `Probing Kernel Layers... ${Math.round(p * 100)}%`, progress: p });
+            await invokeSafe("update_golem_task", { id: taskId, status: `Probing Kernel Layers... ${Math.round(p * 100)}%`, progress: p });
           }
         }, 1200);
       };
@@ -1283,10 +1444,22 @@ export default function App() {
     }
     else if (id === 'index') {
       setNotification("Neural Indexing Initiated...");
-      await invoke("index_folder", { path: "." });
+      await invokeSafe("index_folder", { path: "." });
       setNotification("Cortex Successfully Index.");
     }
-    else if (id === 'graph') setShowGraph(true);
+    else if (id === 'graph') {
+      if (!performanceMode) setShowGraph(true);
+    }
+    else if (id === 'reset_priorities') {
+      setActiveView('processes');
+      setResetConfirmAction('reset');
+    }
+    else if (id === 'clear_priority_cache') {
+      handleClearAllCache();
+    }
+    else if (id === 'toggle_performance') {
+      setPerformanceMode((prev) => !prev);
+    }
     else if (id === 'logs') setShowLogs(true);
     else if (id === 'presentation') setPresentationMode(true);
     else if (id.startsWith('open ')) {
@@ -1372,7 +1545,7 @@ export default function App() {
                       </td>
                       <td className="px-10 py-6 text-right rounded-r-[2rem]">
                          <button onClick={async () => {
-                            await invoke("kill_quarantine_process", { pid: proc.pid });
+                            await invokeSafe("kill_quarantine_process", { pid: proc.pid });
                             setNotification(`Sentinel: Quarantined ${proc.name}`);
                             refreshSystemSnapshot();
                           }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
@@ -1398,6 +1571,11 @@ export default function App() {
             hardwareStatus?.focus_mode.includes("Survival") ? "grayscale-lockdown" : ""
         )}
     >
+      {!isTauri && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2600] px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-black uppercase tracking-widest text-amber-300">
+          Browser Dev Mode: Tauri Disabled
+        </div>
+      )}
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
         {zenithActive && (
@@ -1490,21 +1668,58 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Global Success Notification */}
+
       <AnimatePresence>
-        {notification && (
-          <motion.div 
-            initial={{ x: 300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 300, opacity: 0 }}
-            className="fixed bottom-12 left-12 z-[2500] glass-bright border-emerald-500/30 rounded-2xl p-6 shadow-4xl flex items-center gap-5"
-          >
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
-              <ShieldCheck className="w-6 h-6 text-emerald-500" />
-            </div>
-            <p className="text-xs font-bold text-emerald-100 uppercase tracking-wider">{notification}</p>
-          </motion.div>
-        )}
+        {(resetProgress && resetProgress.total > 0 && resetProgress.done < resetProgress.total) || notification ? (
+          <div className="fixed bottom-12 left-12 z-[2500] flex flex-col gap-3">
+            {resetProgress && resetProgress.total > 0 && resetProgress.done < resetProgress.total && (
+              <motion.div
+                initial={{ x: 300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 300, opacity: 0 }}
+                className="glass-bright border-amber-500/30 rounded-2xl p-5 shadow-4xl flex items-center gap-5 relative"
+              >
+                <button
+                  onClick={() => setResetProgress(null)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full glass flex items-center justify-center text-slate-300 hover:text-white"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/40">
+                  <RotateCcw className="w-5 h-5 text-amber-400 animate-spin" />
+                </div>
+                <div className="flex flex-col gap-2 min-w-[220px]">
+                  <div className="text-[10px] font-black text-amber-200 uppercase tracking-widest">
+                    {resetProgress.mode === "reset_clear" ? "Reset + Clear" : "Reset Priorities"}
+                  </div>
+                  <div className="text-[10px] text-slate-300">{resetProgress.done} / {resetProgress.total} processes</div>
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full bg-amber-400" style={{ width: `${Math.min(100, (resetProgress.done / resetProgress.total) * 100)}%` }} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            {notification && (
+              <motion.div 
+                initial={{ x: 300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 300, opacity: 0 }}
+                className="glass-bright border-emerald-500/30 rounded-2xl p-6 shadow-4xl flex items-center gap-5 relative"
+              >
+                <button
+                  onClick={() => setNotification("")}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full glass flex items-center justify-center text-slate-300 hover:text-white"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
+                  <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                </div>
+                <p className="text-xs font-bold text-emerald-100 uppercase tracking-wider">{notification}</p>
+              </motion.div>
+            )}
+          </div>
+        ) : null}
       </AnimatePresence>
 
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -1517,7 +1732,7 @@ export default function App() {
 
       {/* 3D Nebula Layer */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
-        {mounted && (
+        {mounted && !performanceMode && (
           <ForceGraph3D
             graphData={graphData}
             backgroundColor="#00000000"
@@ -1533,6 +1748,7 @@ export default function App() {
             {/* Level 9 Executive Sidebar */}
       <LeftRail
         activeView={activeView}
+        performanceMode={performanceMode}
         onViewChange={(v: any) => setActiveView(v)}
         presentationMode={presentationMode}
         simMode={simMode}
@@ -1569,6 +1785,7 @@ export default function App() {
           displayedMarket={displayedMarket}
           lastSync={lastSync}
           presentationMode={presentationMode}
+          performanceMode={performanceMode}
           onOpenSentinel={() => setShowSentinel(true)}
           onVoiceIntent={handleVoiceIntent}
           onToggleZen={() => setZenMode(!zenMode)}
@@ -1619,7 +1836,7 @@ export default function App() {
 
                 <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
                   <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                    {marketIntel.map((m: any, i: number) => (
+                    {(Array.isArray(marketIntel) ? marketIntel : []).map((m: any, i: number) => (
                       <div key={i} className="flex gap-4 items-center">
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
                         <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
@@ -1675,6 +1892,9 @@ export default function App() {
               onSetProcessTtl={handleSetProcessTtl}
               defaultTtlDays={defaultTtlDays}
               autoApplyPriorities={autoApplyPriorities}
+              sparklinesEnabled={sparklinesEnabled}
+              externalConfirmAction={resetConfirmAction}
+              onClearExternalConfirm={() => setResetConfirmAction(null)}
             />
               </>
             )}
@@ -1710,7 +1930,7 @@ export default function App() {
 
       {/* OVERLAYS */}
       <AnimatePresence>
-        {showGraph && (
+        {showGraph && !performanceMode && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
              <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
              <div className="w-full h-full pointer-events-auto">
@@ -1811,7 +2031,7 @@ export default function App() {
                     </div>
                     <div className="flex flex-col gap-4">
                        <button onClick={() => {
-                          invoke('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
+                          invokeSafe('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
                             setNotification(res);
                             setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
                             setActiveGolem(null);
@@ -1955,6 +2175,51 @@ export default function App() {
                   </div>
 
                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                       <div className="flex items-center gap-3">
+                          <Cpu className="w-5 h-5 text-emerald-400" />
+                          <div className="flex flex-col">
+                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sparkline Previews</span>
+                             <span className="text-[10px] text-slate-500">Disable for low-end devices</span>
+                          </div>
+                       </div>
+                       <div onClick={() => { setSparklinesAutoDisabled(false); setSparklinesEnabled(!sparklinesEnabled); }} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", sparklinesEnabled ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
+                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", sparklinesEnabled ? "translate-x-6" : "translate-x-0")} />
+                       </div>
+                    </div>
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                       <div className="flex items-center gap-3">
+                          <Gauge className="w-5 h-5 text-amber-400" />
+                          <div className="flex flex-col">
+                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Performance Mode</span>
+                             <span className="text-[10px] text-slate-500">Disable heavy visuals + effects</span>
+                          </div>
+                       </div>
+                       <div onClick={() => setPerformanceMode(!performanceMode)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", performanceMode ? "bg-amber-600 border-amber-500/50" : "bg-white/5")}>
+                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", performanceMode ? "translate-x-6" : "translate-x-0")} />
+                       </div>
+                    </div>
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                             <Activity className="w-5 h-5 text-amber-400" />
+                             <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">FPS Threshold</span>
+                                <span className="text-[10px] text-slate-500">Auto-disable sparklines below this FPS</span>
+                             </div>
+                          </div>
+                          <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">{fpsThreshold} FPS</span>
+                       </div>
+                       <input
+                          type="range"
+                          min="12"
+                          max="45"
+                          step="1"
+                          value={fpsThreshold}
+                          onChange={(e) => setFpsThreshold(parseInt(e.target.value, 10))}
+                          className="mt-6 w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500"
+                       />
+                    </div>
                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">

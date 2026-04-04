@@ -36,6 +36,7 @@ interface TopBarProps {
   displayedMarket: any;
   lastSync: string;
   presentationMode: boolean;
+  performanceMode: boolean;
   onOpenSentinel: () => void;
   onVoiceIntent: () => void;
   onToggleZen: () => void;
@@ -62,6 +63,7 @@ export default function TopBar({
   displayedMarket,
   lastSync,
   presentationMode,
+  performanceMode,
   onOpenSentinel,
   onVoiceIntent,
   onToggleZen,
@@ -125,6 +127,12 @@ export default function TopBar({
             <span className="text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-3 py-1 rounded-lg font-black tracking-widest uppercase bg-indigo-500/5">
               OAS_KRNL_4.5 // SENTINEL CORE
             </span>
+
+            {performanceMode && (
+              <span className="text-[9px] font-black text-amber-300 border border-amber-500/40 px-3 py-1 rounded-lg uppercase tracking-widest bg-amber-500/10">
+                Performance Mode
+              </span>
+            )}
 
             {golems && golems.length > 0 && (
               <div className="flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 animate-in fade-in slide-in-from-left-4">

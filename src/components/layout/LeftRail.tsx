@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 interface LeftRailProps {
   presentationMode: boolean;
   simMode: boolean;
+  performanceMode: boolean;
   activeView: string;
   onViewChange: (view: string) => void;
   onDash: () => void;
@@ -26,6 +27,7 @@ interface LeftRailProps {
 export default function LeftRail({
   presentationMode,
   simMode,
+  performanceMode,
   activeView,
   onViewChange,
   onDash,
@@ -51,9 +53,14 @@ export default function LeftRail({
       animate={{ x: 0, opacity: 1 }}
       className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
     >
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-12">
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-3">
         <Bot className="w-7 h-7 text-white" />
       </div>
+      {performanceMode && (
+        <div className="mt-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[8px] font-black uppercase tracking-widest text-amber-300">
+          Perf Mode
+        </div>
+      )}
 
       <nav className="flex-1 flex flex-col gap-6 items-center">
         {[

@@ -44,8 +44,21 @@ const BASE_COMMANDS: CommandItem[] = [
   { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },
   { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" },
   { id: "pin_context", label: "Pin Context Snapshot", hint: "Freeze current workspace metrics", permission: "system_control" },
-  { id: "zenith_pulse", label: "Activate Zenith Pulse", hint: "Deep focus: shroud non-mission telemetry" }
+  { id: "zenith_pulse", label: "Activate Zenith Pulse", hint: "Deep focus: shroud non-mission telemetry" },
+  { id: "reset_priorities", label: "Reset All Priorities", hint: "Return active processes to normal", permission: "process_control" },
+  { id: "clear_priority_cache", label: "Clear Priority Cache", hint: "Drop all cached priority rules" },
+  { id: "toggle_performance", label: "Toggle Performance Mode", hint: "Disable heavy visuals for low-end devices" }
 ];
+
+const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+const TAURI_DEFAULTS: Record<string, any> = {
+  seek_chronos: [],
+  search_semantic_nodes: []
+};
+const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>) => {
+  if (!isTauri) return (TAURI_DEFAULTS[cmd] ?? null) as T;
+  return invoke(cmd, payload as any) as Promise<T>;
+};
 
 const scoreMatch = (query: string, text: string) => {
   if (!query) return 1;
@@ -95,6 +108,11 @@ export default function CommandPalette({
 
   useEffect(() => {
     const q = query.trim();
+    if (!isTauri) {
+      setSemanticResults([]);
+      setChronosResults([]);
+      return;
+    }
     if (q.length < 3) {
       setSemanticResults([]);
       setChronosResults([]);
@@ -107,11 +125,11 @@ export default function CommandPalette({
         if (q.startsWith('/seek ')) {
           const seekQ = q.slice(6).trim();
           if (seekQ.length >= 2) {
-            const results = await invoke<any[]>("seek_chronos", { query: seekQ, limit: 10 });
+            const results = await invokeSafe<any[]>("seek_chronos",  { query: seekQ, limit: 10 });
             setChronosResults(results);
           }
         } else {
-          const results = await invoke<SearchResult[]>("search_semantic_nodes", { query: q });
+          const results = await invokeSafe<SearchResult[]>("search_semantic_nodes",  { query: q });
           setSemanticResults(results);
         }
       } catch (e) {

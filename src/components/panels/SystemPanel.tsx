@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Gauge, Usb, Filter, ArrowUpDown, History, Download, RefreshCcw, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -59,6 +59,9 @@ interface SystemPanelProps {
   batteryHealth: { health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null;
   defaultTtlDays: number;
   autoApplyPriorities: boolean;
+  sparklinesEnabled: boolean;
+  externalConfirmAction?: "reset" | "reset_clear" | null;
+  onClearExternalConfirm?: () => void;
   lastSync: string;
   onRefresh: () => void;
   onKillProcess: (pid: number) => void;
@@ -91,6 +94,28 @@ const formatTime = (ts: number) => {
   return new Date(ts).toLocaleTimeString();
 };
 
+const sparkValues = (base: number, pid: number, count = 12) => {
+  const values = [];
+  for (let i = 0; i < count; i += 1) {
+    const wiggle = Math.sin(pid * 0.7 + i * 0.9) * 8 + Math.cos(pid * 1.3 + i * 0.6) * 5;
+    const v = Math.max(0, Math.min(100, base + wiggle));
+    values.push(v);
+  }
+  return values;
+};
+
+const sparkPoints = (values: number[], width = 80, height = 24) => {
+  if (values.length === 0) return "";
+  const step = width / (values.length - 1);
+  return values
+    .map((v, i) => {
+      const x = (i * step).toFixed(2);
+      const y = (height - (v / 100) * height).toFixed(2);
+      return `${x},${y}`;
+    })
+    .join(" " );
+};
+
 const normalizePriority = (value: string) => {
   const v = value.toLowerCase();
   if (v.includes("low")) return "low";
@@ -112,6 +137,9 @@ export default function SystemPanel({
   batteryHealth,
   defaultTtlDays,
   autoApplyPriorities,
+  sparklinesEnabled,
+  externalConfirmAction,
+  onClearExternalConfirm,
   lastSync,
   onRefresh,
   onKillProcess,
@@ -146,6 +174,7 @@ export default function SystemPanel({
   const [processListHeight, setProcessListHeight] = useState(0);
   const [processScrollTop, setProcessScrollTop] = useState(0);
   const [auditQuery, setAuditQuery] = useState("");
+  const [hoverPid, setHoverPid] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -163,6 +192,29 @@ export default function SystemPanel({
       localStorage.setItem("oas_process_sort", JSON.stringify({ sortBy, sortDir }));
     } catch (e) {}
   }, [sortBy, sortDir]);
+
+  useEffect(() => {
+    try {
+      const q = localStorage.getItem("oas_audit_query");
+      if (q !== null) setAuditQuery(q);
+      const from = localStorage.getItem("oas_audit_from");
+      if (from !== null) setAuditFrom(from);
+      const to = localStorage.getItem("oas_audit_to");
+      if (to !== null) setAuditTo(to);
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("oas_audit_query", auditQuery); } catch (e) {}
+  }, [auditQuery]);
+
+  useEffect(() => {
+    try { localStorage.setItem("oas_audit_from", auditFrom); } catch (e) {}
+  }, [auditFrom]);
+
+  useEffect(() => {
+    try { localStorage.setItem("oas_audit_to", auditTo); } catch (e) {}
+  }, [auditTo]);
 
   useEffect(() => {
     try {
@@ -227,6 +279,14 @@ export default function SystemPanel({
     setIgnoreAll(anyIgnore);
   }, [priorityCache]);
 
+  useEffect(() => {
+    if (externalConfirmAction) setConfirmAction(externalConfirmAction);
+  }, [externalConfirmAction]);
+
+  useEffect(() => {
+    if (!sparklinesEnabled) setHoverPid(null);
+  }, [sparklinesEnabled]);
+
   const thermalReadings = devices
     .filter((d) => d.kind === "component")
     .map((d) => parseFloat(d.detail.replace("°C", "")))
@@ -269,7 +329,7 @@ export default function SystemPanel({
     return true;
   };
 
-  const visibleProcesses = processes
+  const visibleProcesses = (processes ?? [])
     .filter((p) => matchesSearch(p) && matchesFilter(p))
     .sort((a, b) => {
       let aVal = 0;
@@ -295,7 +355,7 @@ export default function SystemPanel({
   const q = auditQuery.trim().toLowerCase();
   const startMs = auditFrom ? new Date(auditFrom).setHours(0, 0, 0, 0) : null;
   const endMs = auditTo ? new Date(auditTo).setHours(23, 59, 59, 999) : null;
-  const filteredAudit = priorityAudit.filter((e) => {
+  const filteredAudit = (priorityAudit ?? []).filter((e) => {
     if (auditFilter !== "all" && e.source.toLowerCase() !== auditFilter) return false;
     if (q && !e.name.toLowerCase().includes(q) && !String(e.pid).includes(q)) return false;
     if (startMs !== null && e.time < startMs) return false;
@@ -432,15 +492,15 @@ export default function SystemPanel({
               <HardDrive className="w-4 h-4 text-indigo-400" />
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Storage & Disk Health</span>
             </div>
-            <span className="text-[9px] font-mono text-slate-500">{storage.length} volumes</span>
+            <span className="text-[9px] font-mono text-slate-500">{(storage ?? []).length} volumes</span>
           </div>
           <div className="space-y-3">
-            {storage.length === 0 && (
+            {(storage ?? []).length === 0 && (
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-[10px] text-slate-500">
                 Storage map unavailable.
               </div>
             )}
-            {storage.map((disk) => {
+            {(storage ?? []).map((disk) => {
               const used = disk.total - disk.available;
               const usedPct = disk.total > 0 ? (used / disk.total) * 100 : 0;
               return (
@@ -473,17 +533,17 @@ export default function SystemPanel({
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">System Devices</span>
             </div>
             <div className="flex items-center gap-3 text-[9px] font-mono text-slate-500">
-              <span>{devices.length} signals</span>
+              <span>{(devices ?? []).length} signals</span>
               {avgTemp !== null && <span>Thermal Avg {avgTemp.toFixed(1)}°C</span>}
             </div>
           </div>
           <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar">
-            {devices.length === 0 && (
+            {(devices ?? []).length === 0 && (
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 text-[10px] text-slate-500">
                 Device telemetry unavailable.
               </div>
             )}
-            {devices.map((dev, i) => (
+            {(devices ?? []).map((dev, i) => (
               <div key={`${dev.kind}-${dev.name}-${i}`} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -619,7 +679,9 @@ export default function SystemPanel({
                     <div
                       key={proc.pid}
                       style={{ position: "absolute", top: absoluteIndex * rowHeight, left: 0, right: 0, height: rowHeight }}
-                      className="p-4 rounded-2xl bg-white/[0.02] border border-white/5"
+                      className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 relative"
+                      onMouseEnter={() => sparklinesEnabled && setHoverPid(proc.pid)}
+                      onMouseLeave={() => sparklinesEnabled && setHoverPid((prev) => (prev === proc.pid ? null : prev))}
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
@@ -639,6 +701,30 @@ export default function SystemPanel({
                           </div>
                         </div>
                       </div>
+                      {sparklinesEnabled && hoverPid === proc.pid && (
+                        <div className="absolute top-3 right-3 p-3 rounded-xl bg-black/60 border border-white/10 backdrop-blur-md">
+                          <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">CPU / RAM</div>
+                          <div className="flex items-center gap-3">
+                            <svg width="80" height="24" className="overflow-visible">
+                              <polyline
+                                fill="none"
+                                stroke="#34d399"
+                                strokeWidth="1.5"
+                                points={sparkPoints(sparkValues(Math.min(100, proc.cpu_usage), proc.pid))}
+                              />
+                            </svg>
+                            <svg width="80" height="24" className="overflow-visible">
+                              <polyline
+                                fill="none"
+                                stroke="#60a5fa"
+                                strokeWidth="1.5"
+                                points={sparkPoints(sparkValues(Math.min(100, Math.log10((proc.mem_usage / 1024 / 1024) + 1) * 20), proc.pid + 17))}
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-3 flex flex-wrap gap-2 items-center">
                         <select
                           value={normalizePriority(processPriorities[proc.pid] || "NORMAL")}
@@ -799,10 +885,10 @@ export default function SystemPanel({
             </div>
           </div>
           <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-            {filteredAudit.length === 0 && (
+            {((filteredAudit ?? [])).length === 0 && (
               <div className="text-[10px] text-slate-500">No priority changes yet.</div>
             )}
-            {filteredAudit
+            {(filteredAudit ?? [])
               .slice(auditPageSafe * auditPageSize, auditPageSafe * auditPageSize + auditPageSize)
               .map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between text-[10px] text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
@@ -827,19 +913,19 @@ export default function SystemPanel({
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Running Windows</span>
             <span className="text-[9px] font-black text-indigo-400 bg-indigo-400/10 px-2 py-1 rounded-full">
-              {windows.length}
+              {(windows ?? []).length}
             </span>
           </div>
           <span className="text-[9px] font-mono text-slate-500">Live Process Surface</span>
         </div>
 
         <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-3">
-          {windows.length === 0 && (
+          {(windows ?? []).length === 0 && (
             <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 text-[10px] text-slate-500">
               No visible windows detected.
             </div>
           )}
-          {windows.map((win) => (
+          {(windows ?? []).map((win) => (
             <div key={`${win.pid}-${win.title}`} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -865,7 +951,7 @@ export default function SystemPanel({
                 <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2">System Confirmation</div>
                 <h3 className="text-2xl font-black text-white tracking-tight">Priority Reset</h3>
               </div>
-              <button onClick={() => setConfirmAction(null)} className="w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:bg-white/10">
+              <button onClick={() => { setConfirmAction(null); onClearExternalConfirm?.(); }} className="w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:bg-white/10">
                 <RotateCcw className="w-4 h-4" />
               </button>
             </div>
@@ -876,7 +962,7 @@ export default function SystemPanel({
             </p>
             <div className="flex items-center gap-4 justify-end">
               <button
-                onClick={() => setConfirmAction(null)}
+                onClick={() => { setConfirmAction(null); onClearExternalConfirm?.(); }}
                 className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
               >
                 Cancel
@@ -886,6 +972,7 @@ export default function SystemPanel({
                   if (confirmAction === "reset") onResetAllPriorities();
                   if (confirmAction === "reset_clear") onResetAllPrioritiesAndClear();
                   setConfirmAction(null);
+                  onClearExternalConfirm?.();
                 }}
                 className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30"
               >
