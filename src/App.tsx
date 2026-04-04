@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
-  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge,
+  Mic, MicOff
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
@@ -138,6 +139,9 @@ export default function App() {
   const [defaultTtlDays, setDefaultTtlDays] = useState(7);
   const [sparklinesEnabled, setSparklinesEnabled] = useState(true);
   const [performanceMode, setPerformanceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [resetConfirmAction, setResetConfirmAction] = useState<"reset" | "reset_clear" | null>(null);
   const [fpsThreshold, setFpsThreshold] = useState(22);
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
@@ -385,6 +389,48 @@ export default function App() {
     if (e.key === "Enter" && searchQuery.trim()) {
       resolveNeuralIntent(searchQuery);
     }
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+        
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+        
+        recorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          transcribeAndResolve(audioBlob);
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        recorder.start();
+        setIsRecording(true);
+      } catch (err) {
+        setNotification("Oasis Core: Mic Access Denied. Voice intent blocked.");
+        console.error("Mic Error:", err);
+      }
+    }
+  };
+
+  const transcribeAndResolve = async (blob: Blob) => {
+    setIsThinking(true);
+    setNotification("Neural Transcribing Voice Intent...");
+    setIsRecording(false);
+    
+    // Phase 7.1: Placeholder for OpenAI Whisper orchestration
+    setTimeout(() => {
+        setIsThinking(false);
+        setNotification("Oasis Pulse: Voice intent captured (Simulation Mode).");
+        // Future: resolveNeuralIntent(transcribedText);
+    }, 2000);
   };
 
   // EFFECT: Physical Aura Sync (Pillar 25)
@@ -1826,9 +1872,24 @@ export default function App() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchIntent}
-                        placeholder="Detecting Neural Intent..."
+                        placeholder={isRecording ? "Listening to Neural Intent..." : "Detecting Neural Intent..."}
                         className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
                       />
+                      <button 
+                        onClick={toggleVoiceRecording}
+                        className={cn(
+                          "p-4 rounded-full transition-all relative group overflow-hidden",
+                          isRecording ? "bg-rose-500/20 text-rose-500 shadow-[0_0_25px_-5px_var(--rose-500)]" : "bg-white/5 text-slate-500 hover:bg-white/10"
+                        )}
+                      >
+                        {isRecording ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />}
+                        {isRecording && (
+                          <motion.div 
+                            layoutId="voice-ping"
+                            className="absolute inset-0 bg-rose-500/20 rounded-full animate-ping"
+                          />
+                        )}
+                      </button>
                       <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
                     </div>
                   </motion.div>
@@ -2884,5 +2945,7 @@ export default function App() {
     </div>
   );
 }
+
+
 
 
