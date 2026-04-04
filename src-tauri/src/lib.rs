@@ -1565,6 +1565,71 @@ async fn check_ai_status() -> Result<serde_json::Value, String> {
     }))
 }
 
+#[tauri::command]
+async fn execute_neural_intent(state: tauri::State<'_, DbState>, query: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    
+    // 1. Semantic Intent Retrieval (RAG)
+    let context = rag_query(state.clone(), query.clone()).await.unwrap_or_else(|_| "No local context found.".into());
+    
+    // 2. Directive Synthesis
+    let prompt = format!(
+        "System: Oasis Agentic Shell. You are a tool-use expert. 
+        Analyze the query and decide which internal tool to use.
+        Tools: [VAULT_SEAL, SYSTEM_SCAN, SYNC_GITHUB, ORACLE_FORECAST].
+        If a tool matches, output ONLY the tool tag and parameters: [TOOL] tool_name [PARAM] value [/TOOL].
+        
+        Examples:
+        - 'Seal /my/file.ts' -> [TOOL] VAULT_SEAL [PARAM] /my/file.ts [/TOOL]
+        - 'Run diagnostic' -> [TOOL] SYSTEM_SCAN [PARAM] null [/TOOL]
+        
+        If no tool matches, respond naturally as an AI assistant.
+        
+        Context: {}
+        User Request: {}", 
+        context, query
+    );
+    
+    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let ai_response = json["response"].as_str().unwrap_or("Thinking...").to_string();
+
+    // 3. Tool Execution Engine
+    if ai_response.contains("[TOOL]") {
+        let tool_part = ai_response.split("[TOOL]").nth(1).unwrap().split("[/TOOL]").next().unwrap().trim();
+        let mut split = tool_part.split("[PARAM]");
+        let name = split.next().unwrap().trim();
+        let param = split.next().unwrap_or("").trim();
+
+        match name {
+            "VAULT_SEAL" => {
+                let _ = seal_strategic_asset(param.to_string(), "Autonomous Seal".into()).await.map_err(|e| format!("Vault Seal Failure: {}", e))?;
+                return Ok(serde_json::json!({ "content": format!("Neural Intent: Asset successfully sealed in the Sentinel Vault: {}.", param), "tool": "VAULT_SEAL" }));
+            },
+            "SYSTEM_SCAN" => {
+                let stats = run_system_diagnostic().await.map_err(|e| format!("Diagnostic failure: {}", e))?;
+                // Correctly mapping for UI consistency
+                let mut data = serde_json::to_value(stats).unwrap();
+                data["cpu_load"] = data["cpu_load"].clone();
+                return Ok(serde_json::json!({ "content": format!("Neural Intent: System Scan Complete. CPU @ {}%, Mem @ {}%. Health: Optimal.", data["cpu_load"], data["mem_used"]), "tool": "SYSTEM_SCAN", "data": data }));
+            },
+            "SYNC_GITHUB" => {
+                let _ = sync_project(Some(query)).map_err(|e| format!("GitHub Sync Failure: {}", e))?;
+                return Ok(serde_json::json!({ "content": "Neural Intent: Initiating Oasis Pulse. Sync with GitHub successful.", "tool": "SYNC_GITHUB" }));
+            },
+            "ORACLE_FORECAST" => {
+                let forecast = invoke_oracle_prediction("oasis_core_alpha".into()).await.map_err(|e| format!("Oracle Vision Failure: {}", e))?;
+                return Ok(serde_json::json!({ "content": format!("Neural Intent: Oracle Vision: 12-Mo Projection received. Forecast: {}.", forecast.projected_arr), "tool": "ORACLE_FORECAST", "data": forecast }));
+            },
+            _ => {}
+        }
+    }
+
+    Ok(serde_json::json!({ "content": ai_response, "tool": "NONE" }))
+}
+
+
 
 #[tauri::command]
 fn execute_neural_command(command: String) -> Result<String, String> {
@@ -2171,7 +2236,8 @@ pub fn run() {
             generate_venture_synthesis,
             relocate_foundry_storage,
             derive_boardroom_debate,
-            sync_physical_aura
+            sync_physical_aura,
+            execute_neural_intent
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -24,7 +24,7 @@ git commit -m "$commitMessage"
 # If origin is not set, this will fail gracefully or skip the push.
 if ((git remote) -ne $null) {
     Write-Host ">>> Synchronizing with GitHub Remote..." -ForegroundColor Yellow
-    git push origin main
+    git push origin master
 } else {
     Write-Host ">>> No GitHub Remote set! Link your repository to enable Auto-Push." -ForegroundColor Red
     Write-Host ">>> Run: git remote add origin <GITHUB_URL>"

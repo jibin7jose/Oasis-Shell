@@ -230,135 +230,53 @@ export default function App() {
     }, ...prev].slice(0, 50));
   };
 
-  const resolveNeuralIntent = (query: string) => {
+  const resolveNeuralIntent = async (query: string) => {
     const q = query.toLowerCase();
     setMessages(prev => [...prev, { role: "user", content: query }]);
     setIsThinking(true);
     logEvent(`Neural Intent Captured: "${query}"`, 'neural');
 
-    setTimeout(() => {
+    try {
+      const res = await invoke("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
       setIsThinking(false);
-      if (q.includes("deploy") || q.includes("launch")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster..." }]);
-        invoke('trigger_deploy', { env: 'Global' }).catch(() => {});
-        logEvent("Deployment Sequence Alpha Initiated", "deploy");
-      } else if (q.includes("presentation") || q.includes("vision") || q.includes("portal")) {
-        setPresentationMode(true);
-        setMessages(prev => [...prev, { role: "assistant", content: "Visionary Portal Activated: Launching Stakeholder Mode..." }]);
-        logEvent("Visionary Portal Initialized (Stakeholder Mode)", "system");
-      } else if (q.includes("audit") || q.includes("report")) {
-        invoke('generate_venture_audit').then((res: any) => {
-           setMessages(prev => [...prev, { role: "assistant", content: `Auditor: ${res}` }]);
-           setNotification("Venture Health Audit Manifested Successfully.");
-           logEvent("Executive Venture Audit Generated", "system");
-        }).catch(() => {});
-      } else if (q.includes("manifest") || q.includes("build code") || q.includes("write module")) {
-        const title = query.replace(/manifest|build code|write module/gi, "").trim() || "NewStrategy";
-        invoke('manifest_code_module', { name: title }).then((res: any) => {
-           setMessages(prev => [...prev, { role: "assistant", content: `Architect: ${res}` }]);
-           setNotification(`Strategic Module '${title}' Successfully Architected.`);
-           logEvent(`Strategic Code '${title}' Manifested to Disk`, "deploy");
-        }).catch(() => {});
-      } else if (q.includes("create") || q.includes("architect")) {
-        setSimMode(true);
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Venture Sandbox..." }]);
-        logEvent("Venture Simulation Portal Opened", "system");
-      } else if (q.includes("vault") || q.includes("files") || q.includes("open vault")) {
+      
+      setMessages(prev => [...prev, { role: "assistant", content: res.content }]);
+      
+      // Secondary UI Reactions based on Tool Execution
+      if (res.tool === "VAULT_SEAL") {
         setShowVault(true);
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Accessing Sentient Vault Nodes..." }]);
-        logEvent("Sentient Vault Portal Opened", "system");
-      } else if (q.includes("graph") || q.includes("cortex") || q.includes("3d")) {
-        setShowGraph(true);
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating 3D Strategic Cortex..." }]);
-        logEvent("Strategic Cortex Visualization Launched", "system");
-      } else if (q.includes("intel") || q.includes("market") || q.includes("competitors")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Retrieving Global Market Intelligence..." }]);
-        logEvent("Market Intelligence Bridge Synced", "system");
-      } else if (q.includes("find") || q.includes("search") || q.includes("where is")) {
-        const term = query.replace(/find|search|where is/gi, "").trim();
-        setMessages(prev => [...prev, { role: "assistant", content: `Neural Intent: Initiating Cortex Semantic Search for '${term}'...` }]);
-        invoke('search_semantic_nodes', { query: term }).then((res: any) => {
-          setCortexResults(res);
-          setShowCortex(true);
-          setNotification(`Cortex: Found ${res.length} Semantic Nodes.`);
-        }).catch(() => {});
-        logEvent(`Cortex Semantic Search: ${term}`, "neural");
-      } else if (q.includes("sync") || q.includes("push") || q.includes("pulse")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Oasis Pulse Sync with GitHub..." }]);
-        invoke('sync_project', { message: query }).then(() => {
-          setNotification("Oasis Pulse: Neural Sync Complete.");
-        }).catch((err) => setNotification(`Sync Failure: ${err}`));
-        logEvent("Neural Project Sync Triggered", "system");
-      } else if (q.includes("forecast") || q.includes("predict") || q.includes("oracle")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Invoking Oracle Harmonic Vision..." }]);
-        invoke('invoke_oracle_prediction', { ventureId: 'oasis_core_alpha' }).then((res: any) => {
-          setActiveOracle(res);
-          setNotification("Oracle Vision: 12-Month Projection Received.");
-        }).catch(() => {});
-        logEvent("Oracle Forecasting Sequence Initiated", "neural");
-      } else if (q.includes("pitch") || q.includes("outreach") || q.includes("synthesis")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Venture Synthesis & Outreach Architecture..." }]);
-        setIsSynthesizing(true);
-        invoke('generate_venture_synthesis', { ventureId: 'Oasis_Core_V5' }).then((res: any) => {
-           setActiveSynthesis(res);
-           setIsSynthesizing(false);
-           setNotification("Venture Synthesis Complete: Strategic Pitch Manifested.");
-        }).catch(() => setIsSynthesizing(false));
-        logEvent("Venture Synthesis Protocol Triggered", "neural");
-      } else if (q.includes("relocate") || q.includes("move storage") || q.includes("migrate")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Asset Relocation Sequence..." }]);
-        invoke('relocate_foundry_storage', { targetPath: 'D:/Oasis_Relocated_Forge' }).then((res: any) => {
-           setStorageReport(res);
-           setNotification("Storage Relocation Complete: Assets Synced to New Partition.");
-        }).catch((err) => setNotification(`Relocation Core Error: ${err}`));
-        logEvent("Strategic Relocation Protocol Triggered", "neural");
-      } else if (q.includes("debate") || q.includes("boardroom") || q.includes("perspectives")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Summoning the Boardroom Advisory Debate..." }]);
-        invoke('derive_boardroom_debate', { task: q, context: 'Active_Forge_Session' }).then((res: any) => {
-           setActiveDebate(res);
-           setNotification("Boardroom Insight Derived: Consensus reached.");
-        }).catch(() => {});
-        logEvent("Neural Boardroom Debate Initiated", "neural");
-      } else if (q.includes("status") || q.includes("diagnostic") || q.includes("health")) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Running Deep System Diagnostic..." }]);
-        invoke('run_system_diagnostic').then((res: any) => {
-          setSystemStats(res);
-          setNotification(`OAS_KRNL Pulse: CPU @ ${res.cpu_load.toFixed(1)}%, Mem @ ${res.mem_used.toFixed(1)}%`);
-          invoke("log_strategic_pulse", { nodeId: "system_diagnostic", status: "emerald" }).catch(() => {});
-        }).catch(() => {});
-        logEvent("System Health Diagnostic Executed", "system");
-      } else if (q.includes("commission") || q.includes("task") || q.includes("build")) {
-        const taskName = query.replace(/commission|task|build/gi, "").trim() || "Strategic Refactor";
-        setMessages(prev => [...prev, { role: "assistant", content: `Neural Intent: Commissioning REAL Neural Agent for '${taskName}'...` }]);
-        
-        const newTask = { id: Date.now().toString(), name: taskName, status: 'Nerve-Sync', prog: 20, color: 'purple' };
-        setActiveTasks(prev => [...prev.filter(t => t.id !== 'arch'), newTask]);
-        
-        invoke("execute_neural_commission", { task: taskName, agentId: "GOLEM_A1" }).then((res: any) => {
-           setPendingManifests(prev => [...prev, res]);
-           setNotification(`Foundry: REAL Manifest '${taskName}' Drafted in Golem Pipeline.`);
-           setActiveTasks(prev => prev.map(t => t.id === newTask.id ? { ...t, status: 'Ready', prog: 100, color: 'emerald' } : t));
-        }).catch((e) => {
-           setNotification(`Golem Error: ${e}`);
-           setActiveTasks(prev => prev.filter(t => t.id !== newTask.id));
-        });
-        logEvent(`Autonomous Golem Task Commisioned: ${taskName}`, "system");
-      } else if (q.includes("presentation") || q.includes("executive") || q.includes("pitch")) {
-        setPresentationMode(true);
-        setNotification("Visionary Portal: Strategic Presentation Mode Active.");
-        logEvent("Executive Visionary Portal Manifested", "system");
-      } else if (q.includes("exit") || q.includes("dashboard") || q.includes("developer")) {
-        setPresentationMode(false);
-        setNotification("Developer Interface: Full System Access Restored.");
-      } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
-        setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
-        logEvent("Executive Metrics Audit Completed", "neural");
-      } else {
-        setMessages(prev => [...prev, { role: "assistant", content: `Foundry Logic: Directive '${query}' acknowledged but currently unmapped.` }]);
+        const vault = await invoke("get_sentinel_ledger") as any;
+        setSentinelVault(vault);
+        logEvent("Sentinel Seal Sequence Complete", "system");
+      } else if (res.tool === "SYSTEM_SCAN") {
+        setSystemStats(res.data);
+        setNotification(`Neural Pulse: CPU @ ${res.data.cpu_load.toFixed(1)}%`);
+        logEvent("Global System Scan Executed", "system");
+      } else if (res.tool === "SYNC_GITHUB") {
+        setNotification("Oasis Pulse: Workspace Sync Successful.");
+        logEvent("GitHub Neural Sync Complete", "deploy");
+      } else if (res.tool === "ORACLE_FORECAST") {
+        setActiveOracle(res.data);
+        logEvent("Oracle Vision: Projection Synchronized", "neural");
+      } else if (res.tool === "NONE") {
+        // Fallback for custom logic not yet in the backend router
+        if (q.includes("presentation") || q.includes("vision")) {
+           setPresentationMode(true);
+           logEvent("Visionary Portal Activated", "system");
+        } else if (q.includes("graph") || q.includes("3d")) {
+           setShowGraph(true);
+           logEvent("Strategic Cortex Multi-Node Analysis", "system");
+        }
       }
-    }, 800);
+    } catch (e: any) {
+      setIsThinking(false);
+      setMessages(prev => [...prev, { role: "assistant", content: `Neural Error: ${e}` }]);
+      setNotification(`Neural Intent Failure: ${e}`);
+    }
+    
     setSearchQuery("");
   };
+
 
   const handleSearchIntent = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && searchQuery.trim()) {
