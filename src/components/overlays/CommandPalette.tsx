@@ -15,6 +15,8 @@ interface CommandPaletteProps {
   permissions: Record<CommandPermission, boolean>;
   onRequestPermission: (permission: CommandPermission, label: string, action?: () => void) => void;
   onQuarantinePid: (pid: number) => void;
+  processes: { pid: number; name: string }[];
+  onPinContext: (name: string) => void;
 }
 
 interface CommandItem {
@@ -39,7 +41,8 @@ const BASE_COMMANDS: CommandItem[] = [
   { id: "presentation", label: "Start Presentation Mode", hint: "Full-screen executive view" },
   { id: "sync_workspace", label: "Sync Workspace", hint: "Git sync + status", permission: "system_control" },
   { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },
-  { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" }
+  { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" },
+  { id: "pin_context", label: "Pin Context Snapshot", hint: "Freeze current workspace metrics", permission: "system_control" }
 ];
 
 const scoreMatch = (query: string, text: string) => {
@@ -76,7 +79,9 @@ export default function CommandPalette({
   onExecute,
   permissions,
   onRequestPermission,
-  onQuarantinePid
+  onQuarantinePid,
+  processes,
+  onPinContext
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [pidMode, setPidMode] = useState(false);
@@ -127,6 +132,14 @@ export default function CommandPalette({
       .sort((a, b) => b.score - a.score);
     return ranked.map((r) => r.cmd);
   }, [query]);
+
+  const processMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return processes
+      .filter((p) => p.name.toLowerCase().includes(q) || String(p.pid).includes(q))
+      .slice(0, 6);
+  }, [query, processes]);
 
   const handleExecute = (cmd: CommandItem, raw: string) => {
     if (cmd.permission && !permissions[cmd.permission]) {
@@ -263,6 +276,30 @@ export default function CommandPalette({
                       </button>
                     );
                   })}
+                </div>
+              )}
+
+              {processMatches.length > 0 && (
+                <div className="px-6 py-6 flex flex-col gap-2 border-t border-white/5 bg-black/10">
+                  <span className="text-[9px] font-black text-amber-400/70 uppercase tracking-[0.4em] px-2 mb-2">
+                    Process Targets
+                  </span>
+                  {processMatches.map((proc) => (
+                    <button
+                      key={proc.pid}
+                      onClick={() => {
+                        setPidMode(true);
+                        setPidValue(String(proc.pid));
+                      }}
+                      className="w-full text-left px-5 py-4 rounded-2xl hover:bg-white/5 transition-all flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="text-[12px] font-bold text-white">{proc.name}</div>
+                        <div className="text-[10px] font-mono text-slate-500">PID {proc.pid}</div>
+                      </div>
+                      <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Target</span>
+                    </button>
+                  ))}
                 </div>
               )}
 

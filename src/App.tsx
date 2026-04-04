@@ -144,6 +144,7 @@ export default function App() {
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [storageReport, setStorageReport] = useState<any>(null);
   const [golems, setGolems] = useState<any[]>([]);
+  const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
@@ -158,6 +159,8 @@ export default function App() {
       try {
         const active = await invoke("get_active_golems") as any[];
         setGolems(active);
+        const pins = await invoke("get_pinned_contexts") as any[];
+        setPinnedContexts(pins);
       } catch (err) {}
     };
     const itv = setInterval(syncGolems, 2000);
@@ -531,6 +534,17 @@ export default function App() {
       setRunningWindows(windows);
       const procList = await invoke("get_process_list") as ProcessInfo[];
       setProcesses(procList);
+      const priorities = await Promise.all(
+        procList.map(async (proc) => {
+          try {
+            const p = await invoke("get_process_priority", { pid: proc.pid }) as string;
+            return [proc.pid, p || "Normal"] as const;
+          } catch (e) {
+            return [proc.pid, "Normal"] as const;
+          }
+        })
+      );
+      setProcessPriorities(Object.fromEntries(priorities));
       const disks = await invoke("get_storage_map") as StorageInfo[];
       setStorageMap(disks);
       const devs = await invoke("get_system_devices") as DeviceInfo[];
@@ -556,6 +570,17 @@ export default function App() {
       try {
         const procList = await invoke("get_process_list") as ProcessInfo[];
         setProcesses(procList);
+        const priorities = await Promise.all(
+          procList.map(async (proc) => {
+            try {
+              const p = await invoke("get_process_priority", { pid: proc.pid }) as string;
+              return [proc.pid, p || "Normal"] as const;
+            } catch (e) {
+              return [proc.pid, "Normal"] as const;
+            }
+          })
+        );
+        setProcessPriorities(Object.fromEntries(priorities));
       } catch (e) {}
     };
     syncProcesses();
@@ -700,9 +725,11 @@ export default function App() {
   };
 
   const handleQuarantinePid = (pid: number) => {
-    invoke("kill_quarantine_process", { pid })
-      .then((res: any) => setNotification(res))
-      .catch((e: any) => setNotification(`Process quarantine failed: ${e}`));
+    withPermission("process_control", "Process Control", () => {
+      invoke("kill_quarantine_process", { pid })
+        .then((res: any) => setNotification(res))
+        .catch((e: any) => setNotification(`Process quarantine failed: ${e}`));
+    });
   };
 
   const handleSetPriority = (pid: number, priority: string) => {
@@ -862,6 +889,43 @@ export default function App() {
 
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
+  const handlePinContext = async (name: string) => {
+    const stateBlob = JSON.stringify({
+      view: activeView,
+      venture: activeVenture,
+      zen: zenMode,
+      sim: simMode,
+      aura: activeContext,
+      integrity: ventureIntegrity,
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      await invoke("pin_context", { 
+        name: name || `Snapshot ${new Date().toLocaleTimeString()}`, 
+        stateBlob, 
+        aura: activeContext 
+      });
+      const pins = await invoke("get_pinned_contexts") as any[];
+      setPinnedContexts(pins);
+      setNotification(`Chronos Snapshot Pin Manifested: [${name || 'System'}]`);
+    } catch (e) {
+      setNotification(`State Freeze Failed: ${e}`);
+    }
+  };
+
+  const handleRestoreContext = (pin: any) => {
+    try {
+      const state = JSON.parse(pin.state_blob);
+      if (state.view) setActiveView(state.view);
+      if (state.zen !== undefined) setZenMode(state.zen);
+      if (state.sim !== undefined) setSimMode(state.sim);
+      setNotification(`Chronos Restored: ${pin.name}`);
+    } catch (e) {
+      setNotification("Temporal Drift detected. Snapshot Corrupted.");
+    }
+  };
+
   const handlePaletteAction = async (id: string) => {
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
@@ -1015,6 +1079,8 @@ export default function App() {
             permissions={permissions}
             onRequestPermission={handleCommandPermissionRequest}
             onQuarantinePid={handleQuarantinePid}
+            processes={processes}
+            onPinContext={(name) => handlePinContext(name)}
           />
         )}
       </AnimatePresence>
@@ -1134,10 +1200,12 @@ export default function App() {
         onToggleSim={() => setSimMode(!simMode)}
         onOpenSettings={() => setShowSettings(!showSettings)}
         chronosIndex={chronosIndex}
-        chronosCount={chronosLedger.length}
-        chronosLabel={(chronosLedger[chronosIndex] as any)?.timestamp?.split("T")[1]?.split(".")[0]}
+        chronosCount={pinnedContexts.length}
+        chronosLabel={chronosIndex >= 0 ? pinnedContexts[chronosIndex]?.name : undefined}
         onChronosChange={handleChronosSliderChange}
-        onJumpToPresent={() => setChronosIndex(chronosLedger.length - 1)}
+        onJumpToPresent={() => setChronosIndex(-1)}
+        pinnedContexts={pinnedContexts}
+        onRestoreContext={handleRestoreContext}
       />
 
       {/* Main Command Stage */}

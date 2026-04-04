@@ -9,6 +9,8 @@ export interface SystemStats {
   mem_used: number;
   battery_level: number;
   is_charging: boolean;
+  battery_health: number;
+  time_remaining_min: number;
 }
 
 export interface WindowInfo {
@@ -163,6 +165,12 @@ export default function SystemPanel({
           </div>
           <div className="mt-2 text-[9px] font-mono text-slate-500">
             {stats ? (stats.is_charging ? "Charging" : "On Battery") : "Power telemetry unavailable"}
+          </div>
+          <div className="mt-2 text-[9px] font-mono text-slate-500 flex items-center gap-3">
+            <span>Health: {stats ? (stats.battery_health >= 0 ? `${stats.battery_health}%` : "Unknown") : "Unknown"}</span>
+            <span>
+              ETA: {stats ? (stats.time_remaining_min >= 0 ? `${stats.time_remaining_min} min` : "Unknown") : "Unknown"}
+            </span>
           </div>
         </div>
       </div>

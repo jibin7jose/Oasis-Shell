@@ -19,6 +19,8 @@ interface LeftRailProps {
   chronosLabel?: string;
   onChronosChange: (index: number) => void;
   onJumpToPresent: () => void;
+  pinnedContexts: any[];
+  onRestoreContext: (pin: any) => void;
 }
 
 export default function LeftRail({
@@ -37,7 +39,9 @@ export default function LeftRail({
   chronosCount,
   chronosLabel,
   onChronosChange,
-  onJumpToPresent
+  onJumpToPresent,
+  pinnedContexts,
+  onRestoreContext
 }: LeftRailProps) {
   if (presentationMode) return null;
 
@@ -114,8 +118,31 @@ export default function LeftRail({
                 className="w-64 accent-indigo-500"
               />
               <span className="text-[9px] font-mono text-indigo-400/60 uppercase">
-                {chronosLabel || `L_${chronosIndex}`}
+                {chronosLabel || (chronosIndex >= 0 ? `L_${chronosIndex}` : "Present")}
               </span>
+            </div>
+          )}
+
+          {pinnedContexts.length > 0 && (
+            <div className="flex flex-col items-center gap-4 py-8 border-t border-white/5 w-full">
+              <span className="text-[8px] font-black text-indigo-500/40 uppercase tracking-[0.4em] mb-2">Saved Contexts</span>
+              {pinnedContexts.map((pin) => (
+                <button
+                  key={pin.id}
+                  onClick={() => onRestoreContext(pin)}
+                  className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center transition-all border group relative",
+                    pin.aura_color === 'emerald' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                    pin.aura_color === 'rose' ? "bg-rose-500/10 border-rose-500/20 text-rose-400" :
+                    "bg-indigo-500/10 border-indigo-500/20 text-indigo-400"
+                  )}
+                >
+                  <Activity className="w-5 h-5" />
+                  <span className="absolute left-full ml-4 px-3 py-2 glass rounded-xl text-[9px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100] shadow-2xl">
+                    {pin.name}
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </div>

@@ -11,6 +11,7 @@ use tauri::Emitter;
 use tauri::Manager;
 use tiny_http::{Server, Response};
 use sysinfo::System;
+use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use screenshots::Screen;
 use base64::{Engine as _, engine::general_purpose};
 use std::io::Cursor;
@@ -21,6 +22,15 @@ use sha2::Sha256;
 use std::collections::HashMap;
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PinnedContext {
+    pub id: i64,
+    pub name: String,
+    pub state_blob: String,
+    pub aura_color: String,
+    pub timestamp: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GolemTask {
@@ -116,6 +126,8 @@ pub struct SystemStats {
     pub mem_used: f32,
     pub battery_level: u32,
     pub is_charging: bool,
+    pub battery_health: i32,
+    pub time_remaining_min: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1205,9 +1217,29 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
     let cpu_load = sys.global_cpu_usage();
     let mem_used = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
-    // Battery telemetry (Static for now, can be updated with platform-specific crates)
-    let battery_level = 95; 
-    let is_charging = true;
+    // Battery telemetry via Windows Power API
+    let mut battery_level = 100u32;
+    let mut is_charging = false;
+    let mut battery_health = -1;
+    let mut time_remaining_min = -1;
+
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let mut status = SYSTEM_POWER_STATUS::default();
+        if GetSystemPowerStatus(&mut status).as_bool() {
+            if status.BatteryLifePercent != 255 {
+                battery_level = status.BatteryLifePercent as u32;
+            }
+            is_charging = status.ACLineStatus == 1;
+            if status.BatteryLifeTime != u32::MAX {
+                time_remaining_min = (status.BatteryLifeTime / 60) as i32;
+            }
+            // Battery health isn't exposed; keep -1 unless unknown battery
+            if status.BatteryFlag != 255 {
+                battery_health = 100;
+            }
+        }
+    }
 
     Ok(SystemStats {
         oas_id: "OAS_KRNL_4.5-SENTINEL".into(),
@@ -1217,6 +1249,8 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
         mem_used,
         battery_level,
         is_charging,
+        battery_health,
+        time_remaining_min,
     })
 }
 
@@ -1308,6 +1342,29 @@ async fn kill_quarantine_process(pid: u32) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
         Ok("Quarantine only available on Windows for now.".into())
+    }
+}
+
+#[tauri::command]
+async fn get_process_priority(pid: u32) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let cmd = format!("(Get-Process -Id {}).PriorityClass", pid);
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &cmd])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(format!("Priority readback failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("UNKNOWN".into())
     }
 }
 
@@ -2305,6 +2362,43 @@ async fn complete_golem_task(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn pin_context(state: tauri::State<'_, DbState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
+    let conn = state.0.lock().unwrap();
+    let timestamp = chrono::Local::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![name, state_blob, aura, timestamp],
+    ).map_err(|e| e.to_string())?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[tauri::command]
+async fn get_pinned_contexts(state: tauri::State<'_, DbState>) -> Result<Vec<PinnedContext>, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC").map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| {
+        Ok(PinnedContext {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            state_blob: row.get(2)?,
+            aura_color: row.get(3)?,
+            timestamp: row.get(4)?,
+        })
+    }).map_err(|e| e.to_string())?;
+    
+    let mut entries = Vec::new();
+    for r in rows { entries.push(r.unwrap()); }
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn delete_pinned_context(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
@@ -2391,6 +2485,17 @@ pub fn run() {
         )",
         [],
     ).expect("failed to create compute_ledger table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS pinned_contexts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            state_blob TEXT NOT NULL,
+            aura_color TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create pinned_contexts table");
 
     tauri::Builder::default()
         .manage(DbState(std::sync::Mutex::new(conn)))
@@ -2492,10 +2597,14 @@ pub fn run() {
             suspend_process,
             resume_process,
             set_process_priority,
+            get_process_priority,
             get_active_golems,
             register_golem_task,
             update_golem_task,
-            complete_golem_task
+            complete_golem_task,
+            pin_context,
+            get_pinned_contexts,
+            delete_pinned_context
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
