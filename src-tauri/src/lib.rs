@@ -131,6 +131,14 @@ pub struct SystemStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BatteryHealthInfo {
+    pub health_percent: i32,
+    pub design_capacity: i32,
+    pub full_charge_capacity: i32,
+    pub cycle_count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessInfo {
     pub pid: u32,
     pub name: String,
@@ -1369,6 +1377,31 @@ async fn get_process_priority(pid: u32) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn get_battery_health_wmi() -> Result<BatteryHealthInfo, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let cmd = "$b=Get-CimInstance -ClassName Win32_Battery | Select-Object -First 1; if ($null -eq $b) { @{health_percent=-1;design_capacity=-1;full_charge_capacity=-1;cycle_count=-1} | ConvertTo-Json -Compress } else { $design=$b.DesignCapacity; $full=$b.FullChargeCapacity; $cycles=$b.CycleCount; $health=if ($design -gt 0) { [math]::Round($full/$design*100) } else { -1 }; @{health_percent=$health;design_capacity=$design;full_charge_capacity=$full;cycle_count=$cycles} | ConvertTo-Json -Compress }";
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", cmd])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            let json = String::from_utf8_lossy(&output.stdout);
+            let info: BatteryHealthInfo = serde_json::from_str(json.trim()).map_err(|e| e.to_string())?;
+            Ok(info)
+        } else {
+            Err(format!("WMI battery query failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(BatteryHealthInfo { health_percent: -1, design_capacity: -1, full_charge_capacity: -1, cycle_count: -1 })
+    }
+}
+
+#[tauri::command]
 async fn suspend_process(pid: u32) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
@@ -2355,9 +2388,21 @@ async fn update_golem_task(id: String, status: String, progress: f32) -> Result<
 }
 
 #[tauri::command]
-async fn complete_golem_task(id: String) -> Result<(), String> {
+async fn complete_golem_task(db: tauri::State<'_, DbState>, id: String) -> Result<(), String> {
     let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    registry.remove(&id);
+    if let Some(task) = registry.remove(&id) {
+        // Neural Continuity: Record Completion
+        let conn = db.0.lock().unwrap();
+        let timestamp = chrono::Local::now().to_rfc3339();
+        let _ = conn.execute(
+            "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["GOLEM_RETIRAL", format!("Autonomous Agent retired: {}", task.name), timestamp],
+        );
+    }
+    Ok(())
+}", task.name), timestamp],
+        );
+    }
     Ok(())
 }
 
@@ -2384,6 +2429,24 @@ async fn get_pinned_contexts(state: tauri::State<'_, DbState>) -> Result<Vec<Pin
             aura_color: row.get(3)?,
             timestamp: row.get(4)?,
         })
+    }).map_err(|e| e.to_string())?;
+    
+    let mut entries = Vec::new();
+    for r in rows { entries.push(r.unwrap()); }
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn get_neural_logs(state: tauri::State<'_, DbState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT ?1").map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([limit], |row| {
+        Ok(serde_json::json!({
+            "id": row.get::<_, i64>(0)?,
+            "type": row.get::<_, String>(1)?,
+            "message": row.get::<_, String>(2)?,
+            "timestamp": row.get::<_, String>(3)?
+        }))
     }).map_err(|e| e.to_string())?;
     
     let mut entries = Vec::new();
@@ -2598,13 +2661,15 @@ pub fn run() {
             resume_process,
             set_process_priority,
             get_process_priority,
+            get_battery_health_wmi,
             get_active_golems,
             register_golem_task,
             update_golem_task,
             complete_golem_task,
             pin_context,
             get_pinned_contexts,
-            delete_pinned_context
+            delete_pinned_context,
+            get_neural_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

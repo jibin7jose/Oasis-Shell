@@ -97,11 +97,27 @@ export default function TopBar({
                 </div>
               </div>
 
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Power</span>
-                <div className="flex items-center gap-2">
-                  <Shield className={cn("w-3 h-3", systemStats?.is_charging ? "text-emerald-500 animate-pulse" : "text-amber-500")} />
-                  <span className="text-[10px] font-mono text-slate-300 font-bold">{systemStats? systemStats.battery_level : "0"}%</span>
+               <div className="flex flex-col">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Power Hub</span>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-6 h-6 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white/5" />
+                      <circle 
+                        cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5" 
+                        strokeDasharray="63" 
+                        strokeDashoffset={63 - (63 * Math.max(0, Math.min(100, systemStats?.battery_level ?? 0))) / 100}
+                        className={cn("transition-all duration-1000", systemStats?.is_charging ? "text-emerald-400" : "text-indigo-400")}
+                      />
+                    </svg>
+                    <span className="absolute text-[7px] font-black text-white">{systemStats?.battery_level ?? "0"}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={cn("text-[8px] font-black uppercase leading-none", systemStats?.is_charging ? "text-emerald-400 animate-pulse" : "text-slate-400")}>
+                      {systemStats?.is_charging ? "CHG" : "BAT"}
+                    </span>
+                    <span className="text-[7px] font-mono text-slate-600 mt-0.5">HEALTH {systemStats?.battery_health ?? "--"}%</span>
+                  </div>
                 </div>
               </div>
             </div>

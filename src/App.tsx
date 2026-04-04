@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
@@ -75,6 +75,9 @@ export default function App() {
   const [storageMap, setStorageMap] = useState<StorageInfo[]>([]);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
+  const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
+  const appliedPriorityPids = useRef<Set<number>>(new Set());
+  const [priorityCache, setPriorityCache] = useState<Record<string, string>>({});
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
     system_control: false
@@ -148,7 +151,8 @@ export default function App() {
   const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
-  const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage'>('dash');
+  const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
+  const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
 
 
@@ -161,6 +165,8 @@ export default function App() {
         setGolems(active);
         const pins = await invoke("get_pinned_contexts") as any[];
         setPinnedContexts(pins);
+        const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
+        setNeuralLogs(logs);
       } catch (err) {}
     };
     const itv = setInterval(syncGolems, 2000);
@@ -545,6 +551,13 @@ export default function App() {
         })
       );
       setProcessPriorities(Object.fromEntries(priorities));
+      appliedPriorityPids.current = new Set(
+        [...appliedPriorityPids.current].filter((pid) => procList.some((p) => p.pid === pid))
+      );
+      try {
+        const health = await invoke("get_battery_health_wmi") as any;
+        setBatteryHealth(health);
+      } catch (e) {}
       const disks = await invoke("get_storage_map") as StorageInfo[];
       setStorageMap(disks);
       const devs = await invoke("get_system_devices") as DeviceInfo[];
@@ -580,7 +593,24 @@ export default function App() {
             }
           })
         );
-        setProcessPriorities(Object.fromEntries(priorities));
+        const priorityMap = Object.fromEntries(priorities);
+        setProcessPriorities(priorityMap);
+        appliedPriorityPids.current = new Set(
+          [...appliedPriorityPids.current].filter((pid) => procList.some((p) => p.pid === pid))
+        );
+
+        // Apply cached priorities for restarted processes when allowed
+        if (permissions.process_control) {
+          for (const proc of procList) {
+            const cached = priorityCache[proc.name];
+            if (!cached) continue;
+            const current = (priorityMap[proc.pid] || "Normal").toString().toLowerCase();
+            if (current !== cached.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
+              appliedPriorityPids.current.add(proc.pid);
+              invoke("set_process_priority", { pid: proc.pid, priority: cached.toLowerCase() }).catch(() => {});
+            }
+          }
+        }
       } catch (e) {}
     };
     syncProcesses();
@@ -595,6 +625,8 @@ export default function App() {
         setStorageMap(disks);
         const devs = await invoke("get_system_devices") as DeviceInfo[];
         setDevices(devs);
+        const health = await invoke("get_battery_health_wmi") as any;
+        setBatteryHealth(health);
       } catch (e) {}
     };
     syncStorageDevices();
@@ -630,9 +662,25 @@ export default function App() {
 
   useEffect(() => {
     try {
+      const saved = localStorage.getItem("oas_priority_cache");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, string>;
+        setPriorityCache(parsed);
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
       localStorage.setItem("oas_permissions", JSON.stringify(permissions));
     } catch (e) {}
   }, [permissions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_priority_cache", JSON.stringify(priorityCache));
+    } catch (e) {}
+  }, [priorityCache]);
 
   const withPermission = (key: CommandPermission, label: string, action: () => void) => {
     if (permissions[key]) {
@@ -736,7 +784,13 @@ export default function App() {
     withPermission("process_control", "Process Control", () => {
       invoke("set_process_priority", { pid, priority })
         .then((res: any) => {
-          setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() }));
+          invoke("get_process_priority", { pid })
+            .then((p: any) => setProcessPriorities((prev) => ({ ...prev, [pid]: String(p || priority).toUpperCase() })))
+            .catch(() => setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() })));
+          const procName = processes.find((p) => p.pid === pid)?.name;
+          if (procName) {
+            setPriorityCache((prev) => ({ ...prev, [procName]: priority.toUpperCase() }));
+          }
           setNotification(res);
         })
         .catch((e: any) => setNotification(`Priority change failed: ${e}`));
@@ -907,7 +961,9 @@ export default function App() {
         aura: activeContext 
       });
       const pins = await invoke("get_pinned_contexts") as any[];
-      setPinnedContexts(pins);
+        setPinnedContexts(pins);
+        const logs = await invoke("get_neural_logs", { limit: 50 }) as any[];
+        setNeuralLogs(logs);
       setNotification(`Chronos Snapshot Pin Manifested: [${name || 'System'}]`);
     } catch (e) {
       setNotification(`State Freeze Failed: ${e}`);
@@ -1324,12 +1380,20 @@ export default function App() {
               storage={storageMap}
               devices={devices}
               processPriorities={processPriorities}
+              batteryHealth={batteryHealth}
               lastSync={systemLastSync}
               onRefresh={refreshSystemSnapshot}
               onKillProcess={handleKillProcess}
               onSuspendProcess={handleSuspendProcess}
               onResumeProcess={handleResumeProcess}
               onSetPriority={handleSetPriority}
+            />
+          )}
+
+          {activeView === 'timeline' && (
+            <CortexLog 
+              logs={neuralLogs} 
+              onRefresh={refreshSystemSnapshot}
             />
 
             {/* Neural Corporate Suite (Phase 21) */}

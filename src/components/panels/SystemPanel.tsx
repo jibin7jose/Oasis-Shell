@@ -1,4 +1,5 @@
-﻿import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Gauge, Usb } from "lucide-react";
+﻿import { useState } from "react";
+import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Gauge, Usb } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 export interface SystemStats {
@@ -53,6 +54,7 @@ interface SystemPanelProps {
   storage: StorageInfo[];
   devices: DeviceInfo[];
   processPriorities: Record<number, string>;
+  batteryHealth: { health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null;
   lastSync: string;
   onRefresh: () => void;
   onKillProcess: (pid: number) => void;
@@ -66,6 +68,11 @@ const formatBytes = (value: number) => {
   return `${gb.toFixed(1)} GB`;
 };
 
+const formatCapacity = (value: number) => {
+  if (value <= 0) return "Unknown";
+  return `${value} mWh`;
+};
+
 export default function SystemPanel({
   stats,
   windows,
@@ -73,6 +80,7 @@ export default function SystemPanel({
   storage,
   devices,
   processPriorities,
+  batteryHealth,
   lastSync,
   onRefresh,
   onKillProcess,
@@ -80,6 +88,9 @@ export default function SystemPanel({
   onResumeProcess,
   onSetPriority
 }: SystemPanelProps) {
+  const [pidInput, setPidInput] = useState("");
+  const [pidAction, setPidAction] = useState("pause");
+
   const thermalReadings = devices
     .filter((d) => d.kind === "component")
     .map((d) => parseFloat(d.detail.replace("°C", "")))
@@ -92,6 +103,19 @@ export default function SystemPanel({
     if (s.includes("sleep") || s.includes("idle")) return "text-amber-400";
     if (s.includes("stop") || s.includes("zombie")) return "text-rose-400";
     return "text-slate-400";
+  };
+
+  const healthPercent = batteryHealth?.health_percent ?? stats?.battery_health ?? -1;
+  const wearPercent = healthPercent >= 0 ? Math.max(0, 100 - healthPercent) : -1;
+
+  const runPidAction = () => {
+    const pid = parseInt(pidInput.trim(), 10);
+    if (!Number.isFinite(pid)) return;
+    if (pidAction === "pause") onSuspendProcess(pid);
+    if (pidAction === "resume") onResumeProcess(pid);
+    if (pidAction === "low") onSetPriority(pid, "low");
+    if (pidAction === "high") onSetPriority(pid, "high");
+    if (pidAction === "kill") onKillProcess(pid);
   };
 
   return (
@@ -166,11 +190,14 @@ export default function SystemPanel({
           <div className="mt-2 text-[9px] font-mono text-slate-500">
             {stats ? (stats.is_charging ? "Charging" : "On Battery") : "Power telemetry unavailable"}
           </div>
-          <div className="mt-2 text-[9px] font-mono text-slate-500 flex items-center gap-3">
-            <span>Health: {stats ? (stats.battery_health >= 0 ? `${stats.battery_health}%` : "Unknown") : "Unknown"}</span>
-            <span>
-              ETA: {stats ? (stats.time_remaining_min >= 0 ? `${stats.time_remaining_min} min` : "Unknown") : "Unknown"}
-            </span>
+          <div className="mt-2 text-[9px] font-mono text-slate-500 flex flex-wrap items-center gap-3">
+            <span>Health: {healthPercent >= 0 ? `${healthPercent}%` : "Unknown"}</span>
+            <span>Wear: {wearPercent >= 0 ? `${wearPercent}%` : "Unknown"}</span>
+            <span>Cycles: {batteryHealth?.cycle_count ?? "Unknown"}</span>
+            <span>ETA: {stats && stats.time_remaining_min >= 0 ? `${stats.time_remaining_min} min` : "Unknown"}</span>
+          </div>
+          <div className="mt-2 text-[9px] font-mono text-slate-500">
+            Design {formatCapacity(batteryHealth?.design_capacity ?? -1)} · Full {formatCapacity(batteryHealth?.full_charge_capacity ?? -1)}
           </div>
         </div>
       </div>
@@ -254,7 +281,31 @@ export default function SystemPanel({
             <Cpu className="w-4 h-4 text-amber-400" />
             <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Process Manager</span>
           </div>
-          <span className="text-[9px] font-mono text-slate-500">{processes.length} tracked</span>
+          <div className="flex items-center gap-3">
+            <input
+              value={pidInput}
+              onChange={(e) => setPidInput(e.target.value)}
+              placeholder="PID"
+              className="w-24 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white placeholder:text-slate-500"
+            />
+            <select
+              value={pidAction}
+              onChange={(e) => setPidAction(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-slate-200"
+            >
+              <option value="pause">Pause</option>
+              <option value="resume">Resume</option>
+              <option value="low">Priority Low</option>
+              <option value="high">Priority High</option>
+              <option value="kill">Kill</option>
+            </select>
+            <button
+              onClick={runPidAction}
+              className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200"
+            >
+              Execute
+            </button>
+          </div>
         </div>
         <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-3">
           {processes.length === 0 && (
@@ -279,7 +330,28 @@ export default function SystemPanel({
                   </div>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    if (val === "pause") onSuspendProcess(proc.pid);
+                    if (val === "resume") onResumeProcess(proc.pid);
+                    if (val === "low") onSetPriority(proc.pid, "low");
+                    if (val === "high") onSetPriority(proc.pid, "high");
+                    if (val === "kill") onKillProcess(proc.pid);
+                    e.currentTarget.value = "";
+                  }}
+                  defaultValue=""
+                  className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                >
+                  <option value="">Quick Action</option>
+                  <option value="pause">Pause</option>
+                  <option value="resume">Resume</option>
+                  <option value="low">Priority Low</option>
+                  <option value="high">Priority High</option>
+                  <option value="kill">Kill</option>
+                </select>
                 <button onClick={() => onSuspendProcess(proc.pid)} className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-2">
                   <Pause className="w-3 h-3" /> Pause
                 </button>
