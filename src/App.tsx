@@ -77,7 +77,8 @@ export default function App() {
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
   const appliedPriorityPids = useRef<Set<number>>(new Set());
-  const [priorityCache, setPriorityCache] = useState<Record<string, string>>({});
+  const [priorityCache, setPriorityCache] = useState<Record<string, { priority: string; lastApplied: number }>>({});
+  const [autoApplyPriorities, setAutoApplyPriorities] = useState(true);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
     system_control: false
@@ -154,6 +155,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [zenithActive, setZenithActive] = useState(false);
 
 
 
@@ -600,14 +602,22 @@ export default function App() {
         );
 
         // Apply cached priorities for restarted processes when allowed
-        if (permissions.process_control) {
+        if (permissions.process_control && autoApplyPriorities) {
           for (const proc of procList) {
             const cached = priorityCache[proc.name];
             if (!cached) continue;
+            const cachedPriority = cached.priority || "NORMAL";
             const current = (priorityMap[proc.pid] || "Normal").toString().toLowerCase();
-            if (current !== cached.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
+            if (current !== cachedPriority.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
               appliedPriorityPids.current.add(proc.pid);
-              invoke("set_process_priority", { pid: proc.pid, priority: cached.toLowerCase() }).catch(() => {});
+              invoke("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
+                .then(() => {
+                  setPriorityCache((prev) => ({
+                    ...prev,
+                    [proc.name]: { priority: cachedPriority, lastApplied: Date.now() }
+                  }));
+                })
+                .catch(() => {});
             }
           }
         }
@@ -664,9 +674,28 @@ export default function App() {
     try {
       const saved = localStorage.getItem("oas_priority_cache");
       if (saved) {
-        const parsed = JSON.parse(saved) as Record<string, string>;
-        setPriorityCache(parsed);
+        const parsed = JSON.parse(saved) as Record<string, any>;
+        const normalized: Record<string, { priority: string; lastApplied: number }> = {};
+        Object.keys(parsed).forEach((key) => {
+          const val = parsed[key];
+          if (typeof val === "string") {
+            normalized[key] = { priority: val, lastApplied: 0 };
+          } else if (val && typeof val === "object") {
+            normalized[key] = {
+              priority: String(val.priority || "NORMAL"),
+              lastApplied: typeof val.lastApplied === "number" ? val.lastApplied : 0
+            };
+          }
+        });
+        setPriorityCache(normalized);
       }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("oas_auto_apply_priorities");
+      if (saved !== null) setAutoApplyPriorities(saved === "true");
     } catch (e) {}
   }, []);
 
@@ -681,6 +710,12 @@ export default function App() {
       localStorage.setItem("oas_priority_cache", JSON.stringify(priorityCache));
     } catch (e) {}
   }, [priorityCache]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_auto_apply_priorities", autoApplyPriorities ? "true" : "false");
+    } catch (e) {}
+  }, [autoApplyPriorities]);
 
   const withPermission = (key: CommandPermission, label: string, action: () => void) => {
     if (permissions[key]) {
@@ -789,7 +824,10 @@ export default function App() {
             .catch(() => setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() })));
           const procName = processes.find((p) => p.pid === pid)?.name;
           if (procName) {
-            setPriorityCache((prev) => ({ ...prev, [procName]: priority.toUpperCase() }));
+            setPriorityCache((prev) => ({
+              ...prev,
+              [procName]: { priority: priority.toUpperCase(), lastApplied: Date.now() }
+            }));
           }
           setNotification(res);
         })
@@ -942,6 +980,11 @@ export default function App() {
 
 
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
+
+  const handleZenithPulse = () => {
+    setZenithActive(true);
+    setNotification("Zenith Pulse Manifested. Shrouding Telemetry.");
+  };
 
   const handlePinContext = async (name: string) => {
     const stateBlob = JSON.stringify({
@@ -1126,7 +1169,8 @@ export default function App() {
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
         {commandOpen && (
-          <CommandPalette 
+          <AnimatePresence>{zenithActive && <ZenithHUD cpuLoad={systemStats?.cpu_load??0} integrity={ventureIntegrity} burn={fiscalBurn.total_burn} activeVenture={activeVenture} onExit={() => setZenithActive(false)} />}</AnimatePresence>
+      <CommandPalette 
             open={commandOpen}
             query={commandQuery}
             onQueryChange={setCommandQuery}
@@ -1380,6 +1424,7 @@ export default function App() {
               storage={storageMap}
               devices={devices}
               processPriorities={processPriorities}
+              priorityCache={priorityCache}
               batteryHealth={batteryHealth}
               lastSync={systemLastSync}
               onRefresh={refreshSystemSnapshot}
@@ -1740,17 +1785,17 @@ export default function App() {
                      <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Configure your workspace luminosity bridge. The shell targets the raw UDP/JSON API of your WLED device to reflect venture integrity in physical space.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
-                        <div className="flex items-end justify-between">
+                 <div className="grid grid-cols-2 gap-6">
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
+                       <div className="flex items-end justify-between">
                            <span className="text-2xl font-black text-white">4.2GB</span>
                            <span className="text-[10px] font-bold text-emerald-400">OPTIMIZED</span>
-                        </div>
-                     </div>
-                     <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Sentiment Accuracy</span>
-                        <div className="flex items-end justify-between">
+                       </div>
+                    </div>
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Sentiment Accuracy</span>
+                       <div className="flex items-end justify-between">
                            <span className="text-2xl font-black text-white">99.2%</span>
                            <span className="text-[10px] font-bold text-indigo-400">NOMINAL</span>
                         </div>
@@ -1901,6 +1946,18 @@ export default function App() {
                        <div className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5">
                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 text-center">Reference Burn</span>
                           <h4 className="text-2xl font-black text-white tracking-tighter text-center">{activeOracle.projected_burn || "$42K/mo"}</h4>
+                       </div>
+                    </div>
+                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                       <div className="flex items-center gap-3">
+                          <Shield className="w-5 h-5 text-emerald-400" />
+                          <div className="flex flex-col">
+                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Auto-Apply Process Priorities</span>
+                             <span className="text-[10px] text-slate-500">Reapply cached priorities for restarted processes</span>
+                          </div>
+                       </div>
+                       <div onClick={() => setAutoApplyPriorities(!autoApplyPriorities)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoApplyPriorities ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
+                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", autoApplyPriorities ? "translate-x-6" : "translate-x-0")} />
                        </div>
                     </div>
                  </div>

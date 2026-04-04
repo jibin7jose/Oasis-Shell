@@ -17,6 +17,7 @@ interface CommandPaletteProps {
   onQuarantinePid: (pid: number) => void;
   processes: { pid: number; name: string }[];
   onPinContext: (name: string) => void;
+  onZenithPulse: () => void;
 }
 
 interface CommandItem {
@@ -42,7 +43,8 @@ const BASE_COMMANDS: CommandItem[] = [
   { id: "sync_workspace", label: "Sync Workspace", hint: "Git sync + status", permission: "system_control" },
   { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },
   { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" },
-  { id: "pin_context", label: "Pin Context Snapshot", hint: "Freeze current workspace metrics", permission: "system_control" }
+  { id: "pin_context", label: "Pin Context Snapshot", hint: "Freeze current workspace metrics", permission: "system_control" },
+  { id: "zenith_pulse", label: "Activate Zenith Pulse", hint: "Deep focus: shroud non-mission telemetry" }
 ];
 
 const scoreMatch = (query: string, text: string) => {
@@ -81,7 +83,8 @@ export default function CommandPalette({
   onRequestPermission,
   onQuarantinePid,
   processes,
-  onPinContext
+  onPinContext,
+  onZenithPulse
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [pidMode, setPidMode] = useState(false);

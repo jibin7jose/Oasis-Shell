@@ -54,6 +54,7 @@ interface SystemPanelProps {
   storage: StorageInfo[];
   devices: DeviceInfo[];
   processPriorities: Record<number, string>;
+  priorityCache: Record<string, { priority: string; lastApplied: number }>;
   batteryHealth: { health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null;
   lastSync: string;
   onRefresh: () => void;
@@ -73,6 +74,11 @@ const formatCapacity = (value: number) => {
   return `${value} mWh`;
 };
 
+const formatTime = (ts: number) => {
+  if (!ts || ts <= 0) return "Never";
+  return new Date(ts).toLocaleTimeString();
+};
+
 export default function SystemPanel({
   stats,
   windows,
@@ -80,6 +86,7 @@ export default function SystemPanel({
   storage,
   devices,
   processPriorities,
+  priorityCache,
   batteryHealth,
   lastSync,
   onRefresh,
@@ -327,6 +334,9 @@ export default function SystemPanel({
                   <div className="text-[9px] text-slate-500">{(proc.mem_usage / 1024 / 1024).toFixed(1)} MB</div>
                   <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">
                     {processPriorities[proc.pid] || "Normal"}
+                  </div>
+                  <div className="text-[8px] font-mono text-slate-500">
+                    Last Applied: {formatTime(priorityCache[proc.name]?.lastApplied || 0)}
                   </div>
                 </div>
               </div>
