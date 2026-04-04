@@ -103,6 +103,33 @@ pub struct SystemStats {
     pub binary_sync: bool,
     pub cpu_load: f32,
     pub mem_used: f32,
+    pub battery_level: u32,
+    pub is_charging: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub cpu_usage: f32,
+    pub mem_usage: u64,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StorageInfo {
+    pub name: String,
+    pub mount: String,
+    pub total: u64,
+    pub available: u64,
+    pub health_score: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeviceInfo {
+    pub kind: String,
+    pub name: String,
+    pub detail: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1167,13 +1194,186 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
     let cpu_load = sys.global_cpu_usage();
     let mem_used = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
+    // Battery telemetry (Static for now, can be updated with platform-specific crates)
+    let battery_level = 95; 
+    let is_charging = true;
+
     Ok(SystemStats {
-        oas_id: "OAS_KRNL_4.4-SENTINEL".into(),
+        oas_id: "OAS_KRNL_4.5-SENTINEL".into(),
         path_status: "Neural Link Established".into(),
         binary_sync: true,
         cpu_load,
         mem_used,
+        battery_level,
+        is_charging,
     })
+}
+
+#[tauri::command]
+async fn get_process_list() -> Result<Vec<ProcessInfo>, String> {
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_all();
+    
+    let mut procs: Vec<ProcessInfo> = sys.processes().values().map(|p| {
+        ProcessInfo {
+            pid: p.pid().as_u32(),
+            name: p.name().to_string_lossy().into(),
+            cpu_usage: p.cpu_usage(),
+            mem_usage: p.memory(),
+            status: format!("{:?}", p.status()),
+        }
+    }).collect();
+
+    procs.sort_by(|a, b| b.cpu_usage.partial_cmp(&a.cpu_usage).unwrap());
+    Ok(procs.into_iter().take(15).collect())
+}
+
+#[tauri::command]
+async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_disks();
+    
+    let disks: Vec<StorageInfo> = sys.disks().iter().map(|d| {
+        let total = d.total_space();
+        let available = d.available_space();
+        let health = (available as f32 / total as f32) * 100.0;
+        
+        StorageInfo {
+            name: d.name().to_string_lossy().into(),
+            mount: d.mount_point().to_string_lossy().into(),
+            total,
+            available,
+            health_score: health,
+        }
+    }).collect();
+    
+    Ok(disks)
+}
+
+#[tauri::command]
+async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_components_list();
+    sys.refresh_components();
+    sys.refresh_networks_list();
+    sys.refresh_networks();
+
+    let mut devices: Vec<DeviceInfo> = Vec::new();
+
+    for c in sys.components() {
+        devices.push(DeviceInfo {
+            kind: "component".into(),
+            name: c.label().to_string(),
+            detail: format!("{:.1}°C", c.temperature()),
+        });
+    }
+
+    for (name, data) in sys.networks() {
+        devices.push(DeviceInfo {
+            kind: "network".into(),
+            name: name.to_string(),
+            detail: format!("rx {} KB / tx {} KB", data.received() / 1024, data.transmitted() / 1024),
+        });
+    }
+
+    Ok(devices)
+}
+
+#[tauri::command]
+async fn kill_quarantine_process(pid: u32) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .output()
+            .map_err(|e| e.to_string())?;
+            
+        if output.status.success() {
+            Ok(format!("Neural Intent: Process PID {} Quarantined.", pid))
+        } else {
+            Err(format!("Quarantine Failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("Quarantine only available on Windows for now.".into())
+    }
+}
+
+#[tauri::command]
+async fn suspend_process(pid: u32) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &format!("Suspend-Process -Id {}", pid)])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            Ok(format!("Process PID {} suspended.", pid))
+        } else {
+            Err(format!("Suspend failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("Suspend only available on Windows for now.".into())
+    }
+}
+
+#[tauri::command]
+async fn resume_process(pid: u32) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &format!("Resume-Process -Id {}", pid)])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            Ok(format!("Process PID {} resumed.", pid))
+        } else {
+            Err(format!("Resume failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("Resume only available on Windows for now.".into())
+    }
+}
+
+#[tauri::command]
+async fn set_process_priority(pid: u32, priority: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let class = match priority.to_lowercase().as_str() {
+            "idle" | "low" => "Idle",
+            "below_normal" | "below" => "BelowNormal",
+            "above_normal" | "above" => "AboveNormal",
+            "high" => "High",
+            "realtime" => "RealTime",
+            _ => "Normal",
+        };
+
+        let cmd = format!("$p = Get-Process -Id {}; $p.PriorityClass = '{}'", pid, class);
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &cmd])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        if output.status.success() {
+            Ok(format!("Process PID {} priority set to {}.", pid, class))
+        } else {
+            Err(format!("Priority change failure: {}", String::from_utf8_lossy(&output.stderr)))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok("Priority changes only available on Windows for now.".into())
+    }
 }
 
 #[tauri::command]
@@ -2237,7 +2437,14 @@ pub fn run() {
             relocate_foundry_storage,
             derive_boardroom_debate,
             sync_physical_aura,
-            execute_neural_intent
+            execute_neural_intent,
+            get_process_list,
+            get_storage_map,
+            get_system_devices,
+            kill_quarantine_process,
+            suspend_process,
+            resume_process,
+            set_process_priority
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

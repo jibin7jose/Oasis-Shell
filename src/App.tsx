@@ -1,13 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Globe, Cpu, RotateCcw, Eye, Mic, MicOff,
-  Bot, BrainCircuit, Settings, Terminal, Search, Trash2, Plus,
+  Globe, Cpu, RotateCcw,
+  Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
+import SystemPanel, { SystemStats, WindowInfo } from "./components/panels/SystemPanel";
+import LeftRail from "./components/layout/LeftRail";
+import TopBar from "./components/layout/TopBar";
+import CommandPalette from "./components/overlays/CommandPalette";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -18,14 +22,6 @@ const contexts = [
   { id: 'design', name: 'Creative Forge', icon: Shield, aura: 'rgba(168, 85, 247, 0.4)' },
   { id: 'growth', name: 'Capital Matrix', icon: Activity, aura: 'rgba(16, 185, 129, 0.4)' }
 ];
-
-interface SystemStats {
-  oas_id: string;
-  path_status: string;
-  binary_sync: boolean;
-  cpu_load: number;
-  mem_used: number;
-}
 
 interface FounderMetrics {
   arr: string;
@@ -71,6 +67,10 @@ export default function App() {
   const [workforce, setWorkforce] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+  const [runningWindows, setRunningWindows] = useState<WindowInfo[]>([]);
+  const [systemLastSync, setSystemLastSync] = useState("");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
 
   const [fiscalBurn, setFiscalBurn] = useState({ total_burn: 0.0, token_load: 0, status: 'NOMINAL' });
 
@@ -133,7 +133,42 @@ export default function App() {
   const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
+    const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage'>('dash');
+  const [processes, setProcesses] = useState<any[]>([]);
+  const [storage, setStorage] = useState<any[]>([]);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Global Command Palette Key Listener
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(p => !p);
+      }
+      if (e.key === 'Escape') setShowCommandPalette(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
+
+  const refreshSystemData = async () => {
+    try {
+      const p = await invoke("get_process_list") as any[];
+      setProcesses(p);
+      const s = await invoke("get_storage_map") as any[];
+      setStorage(s);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (activeView === 'processes' || activeView === 'storage') {
+      const interval = setInterval(refreshSystemData, 3000);
+      refreshSystemData();
+      return () => clearInterval(interval);
+    }
+  }, [activeView]);
+
 
   useEffect(() => {
     const initializeOasis = async () => {
@@ -494,6 +529,50 @@ export default function App() {
     syncSystemData();
   }, []);
 
+  const refreshSystemSnapshot = async () => {
+    try {
+      const stats = await invoke("run_system_diagnostic") as SystemStats;
+      setSystemStats(stats);
+      const windows = await invoke("get_running_windows") as WindowInfo[];
+      setRunningWindows(windows);
+      setSystemLastSync(new Date().toLocaleTimeString());
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    const syncWindows = async () => {
+      try {
+        const windows = await invoke("get_running_windows") as WindowInfo[];
+        setRunningWindows(windows);
+      } catch (e) {}
+    };
+    syncWindows();
+    const interval = setInterval(syncWindows, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleHotkey = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "p") {
+        e.preventDefault();
+        setCommandOpen(true);
+      }
+      if (key === "escape") {
+        setCommandOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleHotkey);
+    return () => window.removeEventListener("keydown", handleHotkey);
+  }, []);
+
+  const handleCommandExecute = async (query: string) => {
+    if (!query.trim()) return;
+    await resolveNeuralIntent(query);
+    setCommandQuery("");
+    setCommandOpen(false);
+  };
+
   const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
     ? chronosLedger[chronosIndex].metrics 
     : founderMetrics;
@@ -678,6 +757,158 @@ export default function App() {
     return () => clearInterval(interval);
   }, [simMode, simMetrics.arr, simMetrics.burn]);
 
+  // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
+  const CommandPalette = () => {
+    const [search, setSearch] = useState("");
+    const actions = [
+      { id: 'dash', label: 'Tactical Workspace: Dashboard', icon: LayoutDashboard },
+      { id: 'processes', label: 'Neural Watch: Process HUD', icon: Cpu },
+      { id: 'storage', label: 'Atlas: Storage Mapping', icon: Shield },
+      { id: 'vault', label: 'Archive: Sentinel Vault', icon: Lock },
+      { id: 'sync', label: 'Pulse: GitHub Workspace Sync', icon: RotateCcw },
+    ];
+    const filtered = actions.filter(a => a.label.toLowerCase().includes(search.toLowerCase()));
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[5000] flex items-start justify-center pt-32 bg-black/60 backdrop-blur-md p-4"
+        onClick={() => setShowCommandPalette(false)}
+      >
+        <motion.div 
+          initial={{ scale: 0.95, y: -20 }} animate={{ scale: 1, y: 0 }}
+          className="w-full max-w-2xl glass-bright border border-white/10 rounded-[2.5rem] overflow-hidden shadow-6xl"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="p-8 border-b border-white/5 flex items-center gap-6">
+            <Search className="w-6 h-6 text-indigo-400" />
+            <input 
+              autoFocus placeholder="Neural Directive..."
+              className="bg-transparent border-none outline-none text-2xl font-black w-full text-white placeholder:text-slate-700"
+              value={search} onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && filtered[0] && handlePaletteAction(filtered[0].id)}
+            />
+          </div>
+          <div className="p-4 max-h-[450px] overflow-y-auto custom-scrollbar">
+            {filtered.map(action => (
+              <button key={action.id} onClick={() => handlePaletteAction(action.id)}
+                className="w-full text-left p-5 hover:bg-white/5 rounded-3xl flex items-center gap-6 group transition-all"
+              >
+                <div className="p-3 rounded-2xl bg-white/5 group-hover:bg-indigo-500/20 text-slate-500 group-hover:text-indigo-400 transition-colors">
+                  <action.icon className="w-6 h-6" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-black text-slate-300 group-hover:text-white transition-colors">{action.label}</span>
+                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{action.id === 'dash' ? 'Primary Directive' : 'System Authority'}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  const handlePaletteAction = (id: string) => {
+    setShowCommandPalette(false);
+    if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
+    else if (id === 'vault') setShowVault(true);
+    else if (id === 'sync') resolveNeuralIntent("sync to github");
+  };
+
+  const SystemHUD = () => (
+    <div className="w-full h-full flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {storage.map((disk, i) => (
+          <div key={i} className="glass p-10 rounded-[3rem] border border-white/5 relative overflow-hidden group">
+             <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h4 className="text-2xl font-black text-white mb-1 uppercase italic tracking-tighter">{disk.name || "PRIMARY HOST"}</h4>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">{disk.mount}</p>
+                </div>
+                <div className="p-3 rounded-2xl bg-white/5 text-indigo-400"><Shield className="w-7 h-7" /></div>
+             </div>
+             <div className="space-y-4">
+                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                   <span>Allocated: {((disk.total - disk.available) / (1024**3)).toFixed(1)}GB</span>
+                   <span className="text-indigo-400">{(disk.total / (1024**3)).toFixed(1)}GB Total</span>
+                </div>
+                <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
+                   <motion.div initial={{ width: 0 }} animate={{ width: `${100 - disk.health_score}%` }}
+                    className={cn("h-full", disk.health_score < 20 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
+                </div>
+             </div>
+          </div>
+        ))}
+      </div>
+      <div className="glass rounded-[4rem] border border-white/5 overflow-hidden flex-1 flex flex-col shadow-2xl">
+          <div className="p-10 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
+            <h3 className="text-xl font-black text-white uppercase tracking-[0.4em] flex items-center gap-6">
+              <Activity className="w-8 h-8 text-indigo-400 animate-pulse" />
+              OS Process Orchestrator
+            </h3>
+            <div className="flex gap-4">
+              <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                {processes.length} Active Nodes
+              </span>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar border-t border-white/5">
+            <table className="w-full text-left border-separate border-spacing-y-4">
+               <thead>
+                 <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">
+                    <th className="px-10">Neural PID</th>
+                    <th className="px-10">Application Identity</th>
+                    <th className="px-10">Load Sync</th>
+                    <th className="px-10 text-center">Memory Block</th>
+                    <th className="px-10 text-right">Directives</th>
+                 </tr>
+               </thead>
+               <tbody>
+                  {processes.map((proc, i) => (
+                    <tr key={i} className="hover:bg-white/[0.03] transition-all group bg-white/[0.01]">
+                      <td className="px-10 py-6 text-xs font-mono text-slate-500 rounded-l-[2rem]">{proc.pid}</td>
+                      <td className="px-10 py-6">
+                        <div className="flex items-center gap-6">
+                           <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-lg shadow-inner">
+                              {proc.name.charAt(0).toUpperCase()}
+                           </div>
+                           <div className="flex flex-col">
+                              <span className="font-black text-white text-lg tracking-tighter">{proc.name}</span>
+                              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Authenticated Host App</span>
+                           </div>
+                        </div>
+                      </td>
+                      <td className="px-10 py-6">
+                        <div className="flex items-center gap-4">
+                           <div className="h-2 w-24 bg-white/5 rounded-full overflow-hidden shadow-inner">
+                              <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(proc.cpu_usage, 100)}%` }} className="h-full bg-indigo-500" />
+                           </div>
+                           <span className="text-xs font-mono text-indigo-400 font-black">{proc.cpu_usage.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td className="px-10 py-6 text-center text-xs font-mono text-slate-400">
+                        {(proc.mem_usage / (1024**2)).toFixed(1)} <span className="text-[10px] text-slate-600">MB</span>
+                      </td>
+                      <td className="px-10 py-6 text-right rounded-r-[2rem]">
+                         <button onClick={async () => {
+                            await invoke("kill_quarantine_process", { pid: proc.pid });
+                            setNotification(`Sentinel: Quarantined ${proc.name}`);
+                            refreshSystemData();
+                          }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
+                           Quarantine
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
+          </div>
+      </div>
+    </div>
+  );
+
+
 
 
   return (
@@ -687,6 +918,13 @@ export default function App() {
             hardwareStatus?.focus_mode.includes("Survival") ? "grayscale-lockdown" : ""
         )}
     >
+      {/* Neural Command Palette (GLOBAL CORE) */}
+      <AnimatePresence>
+        {showCommandPalette && (
+          <CommandPalette />
+        )}
+      </AnimatePresence>
+
       {/* Oracle Alert Notification (Pillar 20) */}
       <AnimatePresence>
         {oracleAlert && (
@@ -788,193 +1026,67 @@ export default function App() {
         )}
       </div>
 
-      {/* Level 9 Executive Sidebar */}
-      {!presentationMode && (
-        <motion.aside 
-          initial={{ x: -100, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-12">
-            <Bot className="w-7 h-7 text-white" />
-          </div>
-
-          <nav className="flex-1 flex flex-col gap-6 items-center">
-            {[
-              { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
-              { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
-              { id: 'vault', icon: FolderOpen, label: 'Vault' },
-              { id: 'logs', icon: Activity, label: 'History' },
-              { id: 'sim', icon: Zap, label: 'Simulation' }
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.id === 'graph') setShowGraph(true);
-                  else if (item.id === 'vault') setShowVault(true);
-                  else if (item.id === 'logs') setShowLogs(true);
-                  else if (item.id === 'sim') setSimMode(true);
-                  else { handleContextSwitch('dev'); }
-                }}
-                className={cn(
-                  "p-4 rounded-2xl transition-all group relative",
-                  (item.id === 'sim' && simMode) ? "bg-amber-500/20 text-amber-500" : "text-slate-500 hover:text-white hover:bg-white/5"
-                )}
-              >
-                <item.icon className="w-6 h-6" />
-                <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
-                  {item.label}
-                </span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex flex-col gap-6 items-center mt-auto">
-            <button 
-              onClick={() => setSimMode(!simMode)}
-              className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
-                simMode ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
-              )}
-            >
-              <Zap className={cn("w-6 h-6", simMode && "animate-pulse")} />
-            </button>
-            <div className="absolute right-8 bottom-8 flex flex-col items-end gap-3 z-30 transition-all">
-                  {chronosIndex < chronosLedger.length - 1 && (
-                     <button onClick={() => setChronosIndex(chronosLedger.length - 1)} className="px-4 py-2 bg-indigo-600/40 hover:bg-indigo-600 text-[10px] font-black text-white rounded-xl border border-indigo-500/30 animate-pulse">
-                        JUMP TO PRESENT →
-                     </button>
-                  )}
-                  {chronosLedger.length > 0 && (
-                     <div className="flex flex-col items-end gap-2 p-4 glass rounded-2xl border-white/5">
-                        <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em] mb-1">Neural Chronos Scrubber</span>
-                        <input 
-                           type="range" 
-                           min="0" 
-                           max={chronosLedger.length - 1} 
-                           value={chronosIndex} 
-                           onChange={(e) => handleChronosSliderChange(parseInt(e.target.value))}
-                           className="w-64 accent-indigo-500"
-                        />
-                        <span className="text-[9px] font-mono text-indigo-400/60 uppercase">
-                           {(chronosLedger[chronosIndex] as any)?.timestamp?.split('T')[1].split('.')[0]}
-                        </span>
-                     </div>
-                  )}
-               </div><button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
-              <Settings className="w-6 h-6" />
-            </button>
-          </div>
-        </motion.aside>
-      )}
+            {/* Level 9 Executive Sidebar */}
+      <LeftRail
+        presentationMode={presentationMode}
+        simMode={simMode}
+        onDash={() => handleContextSwitch("dev")}
+        onOpenGraph={() => setShowGraph(true)}
+        onOpenVault={() => setShowVault(true)}
+        onOpenLogs={() => setShowLogs(true)}
+        onActivateSim={() => setSimMode(true)}
+        onToggleSim={() => setSimMode(!simMode)}
+        onOpenSettings={() => setShowSettings(!showSettings)}
+        chronosIndex={chronosIndex}
+        chronosCount={chronosLedger.length}
+        chronosLabel={(chronosLedger[chronosIndex] as any)?.timestamp?.split("T")[1]?.split(".")[0]}
+        onChronosChange={handleChronosSliderChange}
+        onJumpToPresent={() => setChronosIndex(chronosLedger.length - 1)}
+      />
 
       {/* Main Command Stage */}
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
-          <div className="flex items-center gap-12">
-            <div className="flex flex-col">
-               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
-               <h1 className={cn("text-xl font-bold tracking-tight text-white flex items-center gap-2 transition-all", zenMode && "opacity-0 translate-y-[-10px]")}>
-                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                 {activeVenture} 
-                 <span className="text-slate-500 text-xs font-normal">[{contexts.find(c => c.id === activeContext)?.name}]</span>
-                 <span className="ml-4 text-[9px] font-mono text-amber-500/50 border border-amber-500/20 px-2 py-0.5 rounded font-black tracking-widest uppercase">V4.4.1-SENTINEL (ENCRYPTED CORE)</span><button onClick={() => setShowSentinel(true)} className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"><Shield className="w-4 h-4" /> Sentinel Archive</button>
-                 <button onClick={handleVoiceIntent} className={cn("ml-8 p-2 glass rounded-lg transition-all", voiceActive ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]" : "text-slate-400")}>
-                    {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                 </button>
-                 <button onClick={() => setZenMode(!zenMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400")}>
-                    <Eye className="w-4 h-4" />
-                 </button>
-                 <button onClick={() => setShowCLI(!showCLI)} className={cn("ml-4 p-2 glass rounded-lg text-emerald-400 group relative", zenMode && "opacity-0 scale-90")}>
-                    <Terminal className="w-3.5 h-3.5" />
-                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Oasis Shell (CLI)</span>
-                 </button>
-                  <button onClick={() => setPresentationMode(!presentationMode)} className={cn("ml-4 p-2 glass rounded-lg transition-all", presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400")}>
-                     <LayoutDashboard className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setShowNetwork(!showNetwork)} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
-                    <Globe className="w-3.5 h-3.5" />
-                    <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Venture Network Registry</span>
-                  </button>
-                  <div className="ml-12 flex items-center gap-8 border-l border-white/5 pl-12 h-14">
-                     <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-3 mb-1">
-                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aura Sync</span>
-                           <div onClick={() => setAutoAura(!autoAura)} className={cn("w-10 h-5 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoAura ? "bg-indigo-600 border-indigo-500/50" : "bg-white/5")}>
-                              <motion.div animate={{ x: autoAura ? 20 : 0 }} className={cn("w-3 h-3 rounded-full bg-white shadow-xl")} />
-                           </div>
-                        </div>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter opacity-40">WLED Bridge Active</span>
-                     </div>
-                  </div>
-
-                  <div className="ml-12 flex items-center gap-4 border-l border-white/5 pl-12 hidden xl:flex">
-                     <div className="flex flex-col items-end mr-4">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Foundry Reactor</span>
-                        <span className={cn("text-[8px] font-black uppercase tracking-widest", ventureIntegrity < 50 ? "text-red-500" : ventureIntegrity < 80 ? "text-amber-500" : "text-emerald-500")}>
-                           {ventureIntegrity < 50 ? "Integrity Critical" : ventureIntegrity < 80 ? "Integrity Divergent" : "Nominal Stability"}
-                        </span>
-                     </div>
-                     <div className="flex gap-1.5">
-                        {[...Array(8)].map((_, i) => (
-                           <motion.div 
-                              key={i} 
-                              animate={{ 
-                                opacity: i < Math.ceil(ventureIntegrity / 12.5) ? [0.4, 1, 0.4] : 0.1 
-                              }}
-                              transition={{ 
-                                repeat: Infinity, 
-                                duration: 2, 
-                                delay: i * 0.1 
-                              }}
-                              className={cn("w-2 h-4 rounded-[1px]", i < Math.ceil(ventureIntegrity / 12.5) ? (ventureIntegrity < 40 ? "bg-red-500" : ventureIntegrity < 80 ? "bg-amber-500" : "bg-emerald-500 shadow-[0_0_10px_#10b981]") : "bg-white/5")} 
-                           />
-                        ))}
-                     </div>
-                  </div>
-
-                  {/* FISCAL KINETICS HUD */}
-                  <div className="ml-8 flex items-center gap-4 border-l border-white/5 pl-8 hidden lg:flex">
-                     <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Fiscal Burn</span>
-                        <span className={cn("text-[10px] font-black tracking-tight", fiscalBurn.status === 'CRITICAL' ? "text-red-500" : fiscalBurn.status === 'HIGH' ? "text-amber-500" : "text-emerald-500")}>
-                           ${fiscalBurn.total_burn.toFixed(2)}
-                        </span>
-                     </div>
-                     <span className="text-[7px] font-mono text-slate-600 bg-white/5 px-2 py-1 rounded">{(fiscalBurn.token_load / 1000).toFixed(1)}K ΤOKENS</span>
-                  </div>
-                 {hardwareStatus && (
-                    <span className="ml-4 text-[8px] font-black text-red-500/40 uppercase tracking-[0.25em] animate-pulse border-l border-white/5 pl-4">
-                        {hardwareStatus.focus_mode}
-                    </span>
-                 )}
-               </h1>
-            </div>
-            
-            <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
-
-            {/* MARKET INDEX PULSE */}
-            <div className="flex flex-col items-end">
-               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Oasis-X Index</span>
-               <div className="flex items-center gap-2">
-                  <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">{(displayedMarket as any)?.market_index?.toFixed(1) || '0.0'}</span>
-                  <span className="text-[9px] text-rose-500/50 font-bold">{(displayedMarket as any)?.index_change}</span>
-               </div>
-               <span className="text-[7px] text-slate-600 font-mono mt-1">L_SYNC: {lastSync || 'N/A'}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-8">
-            <button onClick={handleAegisSync} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2">
-               <Shield className="w-4 h-4" /> Aegis Sync
-            </button>
-            <button onClick={() => setShowNexus(true)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-               Nexus View
-            </button>
-          </div>
-        </header>
+                <TopBar
+          activeVenture={activeVenture}
+          activeContext={activeContext}
+          contexts={contexts}
+          zenMode={zenMode}
+          voiceActive={voiceActive}
+          autoAura={autoAura}
+          ventureIntegrity={ventureIntegrity}
+          fiscalBurn={fiscalBurn}
+          hardwareStatus={hardwareStatus}
+          displayedMarket={displayedMarket}
+          lastSync={lastSync}
+          presentationMode={presentationMode}
+          onOpenSentinel={() => setShowSentinel(true)}
+          onVoiceIntent={handleVoiceIntent}
+          onToggleZen={() => setZenMode(!zenMode)}
+          onToggleCLI={() => setShowCLI(!showCLI)}
+          onTogglePresentation={() => setPresentationMode(!presentationMode)}
+          onToggleNetwork={() => setShowNetwork(!showNetwork)}
+          onToggleAutoAura={() => setAutoAura(!autoAura)}
+          onAegisSync={handleAegisSync}
+          onOpenNexus={() => setShowNexus(true)}
+        />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
+            {activeView !== 'dash' && (
+               <div className="w-full max-w-7xl flex flex-col items-start gap-12">
+                  <div className="flex items-center gap-6">
+                     <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
+                        <RotateCcw className="w-6 h-6" />
+                     </button>
+                     <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+                        {activeView === 'processes' ? 'Strategic Process HUD' : 'Host Storage Atlas'}
+                     </h2>
+                  </div>
+                  <SystemHUD />
+               </div>
+            )}
+
+            {activeView === 'dash' && <>
+
             {/* Neural Intent Bar */}
             {!presentationMode && (
               <motion.div 
@@ -1038,6 +1150,13 @@ export default function App() {
                  </div>
                ))}
             </div>
+
+            <SystemPanel
+              stats={systemStats}
+              windows={runningWindows}
+              lastSync={systemLastSync}
+              onRefresh={refreshSystemSnapshot}
+            />
 
             {/* Neural Corporate Suite (Phase 21) */}
             <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
@@ -1133,6 +1252,7 @@ export default function App() {
                 );
               })}
             </div>
+            </>}
         </div>
       </main>
 
@@ -1492,7 +1612,8 @@ export default function App() {
                  ))}
               </div>
           </motion.div>
-        )}        {activeOracle && (
+        )}
+        {activeOracle && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-black/90 backdrop-blur-5xl flex items-center justify-center p-20">
               <div className="w-full max-w-5xl glass-bright rounded-[4rem] border border-amber-500/30 p-16 relative overflow-hidden flex flex-col h-[700px]">
                  <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-amber-500/5 to-transparent pointer-events-none" />
@@ -1755,7 +1876,7 @@ export default function App() {
                                        branch.tag === "emerald" || branch.tag === "organic" ? "text-emerald-400" : "text-rose-400"
                                      )}>{branch.title}</span>
                                      <span className="text-[9px] text-white/60 leading-tight">{branch.description}</span>
-                                     <span className="mt-2 text-[7px] text-white/30 uppercase font-mono group-hover:text-white transition-colors">AUTHORIZE PATH →</span>
+                                     <span className="mt-2 text-[7px] text-white/30 uppercase font-mono group-hover:text-white transition-colors">AUTHORIZE PATH â†’</span>
                                    </button>
                                  ))}
                                </div>
@@ -1950,6 +2071,15 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      <CommandPalette
+        open={commandOpen}
+        query={commandQuery}
+        onQueryChange={setCommandQuery}
+        onClose={() => setCommandOpen(false)}
+        onExecute={handleCommandExecute}
+      />
     </div>
   );
 }
+
+
