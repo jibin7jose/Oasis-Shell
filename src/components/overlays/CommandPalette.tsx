@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, FileText } from "lucide-react";
+import { Search, Lock, FileText } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
+
+export type CommandPermission = "process_control" | "system_control";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -10,6 +12,15 @@ interface CommandPaletteProps {
   onQueryChange: (value: string) => void;
   onClose: () => void;
   onExecute: (query: string) => void;
+  permissions: Record<CommandPermission, boolean>;
+  onRequestPermission: (permission: CommandPermission, label: string) => void;
+}
+
+interface CommandItem {
+  id: string;
+  label: string;
+  hint: string;
+  permission?: CommandPermission;
 }
 
 interface SearchResult {
@@ -19,17 +30,52 @@ interface SearchResult {
   preview: string;
 }
 
-const BASE_COMMANDS = [
-  { label: "System Scan", hint: "Run diagnostic + update status", id: 'scan' },
-  { label: "Open Sentinel Vault", hint: "Security & sealed assets", id: 'vault' },
-  { label: "Show Cortex Graph", hint: "3D knowledge map", id: 'graph' },
-  { label: "Open Logs", hint: "Event history timeline", id: 'logs' },
-  { label: "Start Presentation Mode", hint: "Full-screen executive view", id: 'presentation' },
-  { label: "Sync Workspace", hint: "Git sync + status", id: 'sync' },
-  { label: "Cortex Index: Full Project", hint: "Re-index semantic store", id: 'index' }
+const BASE_COMMANDS: CommandItem[] = [
+  { id: "system_scan", label: "System Scan", hint: "Run diagnostic + update status", permission: "system_control" },
+  { id: "open_vault", label: "Open Sentinel Vault", hint: "Security & sealed assets" },
+  { id: "show_graph", label: "Show Cortex Graph", hint: "3D knowledge map" },
+  { id: "open_logs", label: "Open Logs", hint: "Event history timeline" },
+  { id: "presentation", label: "Start Presentation Mode", hint: "Full-screen executive view" },
+  { id: "sync_workspace", label: "Sync Workspace", hint: "Git sync + status", permission: "system_control" },
+  { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },
+  { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" }
 ];
 
-export default function CommandPalette({ open, query, onQueryChange, onClose, onExecute }: CommandPaletteProps) {
+const scoreMatch = (query: string, text: string) => {
+  if (!query) return 1;
+  let score = 0;
+  let t = text.toLowerCase();
+  let q = query.toLowerCase();
+  let ti = 0;
+  let streak = 0;
+  for (let qi = 0; qi < q.length; qi += 1) {
+    const qc = q[qi];
+    let found = false;
+    while (ti < t.length) {
+      if (t[ti] === qc) {
+        found = true;
+        streak += 1;
+        score += 3 + streak;
+        ti += 1;
+        break;
+      }
+      streak = 0;
+      ti += 1;
+    }
+    if (!found) return 0;
+  }
+  return score;
+};
+
+export default function CommandPalette({
+  open,
+  query,
+  onQueryChange,
+  onClose,
+  onExecute,
+  permissions,
+  onRequestPermission
+}: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -39,6 +85,7 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
       const id = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(id);
     }
+    return undefined;
   }, [open]);
 
   useEffect(() => {
@@ -63,11 +110,25 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
     return () => clearTimeout(handler);
   }, [query]);
 
-  const filteredCommands = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    const q = query.trim();
     if (!q) return BASE_COMMANDS;
-    return BASE_COMMANDS.filter((c) => c.label.toLowerCase().includes(q) || c.hint.toLowerCase().includes(q));
+    const ranked = BASE_COMMANDS.map((cmd) => ({
+      cmd,
+      score: Math.max(scoreMatch(q, cmd.label), scoreMatch(q, cmd.hint) * 0.8)
+    }))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score);
+    return ranked.map((r) => r.cmd);
   }, [query]);
+
+  const handleExecute = (cmd: CommandItem, raw: string) => {
+    if (cmd.permission && !permissions[cmd.permission]) {
+      onRequestPermission(cmd.permission, cmd.label);
+      return;
+    }
+    onExecute(cmd.id || raw || cmd.label);
+  };
 
   return (
     <AnimatePresence>
@@ -100,7 +161,15 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
                 value={query}
                 onChange={(e) => onQueryChange(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") onExecute(query);
+                  if (e.key === "Enter") {
+                    const trimmed = query.trim();
+                    const match = BASE_COMMANDS.find((cmd) => cmd.label.toLowerCase() === trimmed.toLowerCase());
+                    if (match) {
+                      handleExecute(match, match.label);
+                    } else if (trimmed) {
+                      onExecute(trimmed);
+                    }
+                  }
                   if (e.key === "Escape") onClose();
                 }}
                 placeholder="Command the system…"
@@ -111,31 +180,38 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
 
             <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
               {/* PRIMARY COMMANDS */}
-              {filteredCommands.length > 0 && (
-                <div className="px-6 py-4 flex flex-col gap-2 bg-white/[0.01]">
+              {filtered.length > 0 && (
+                <div className="px-6 py-4 flex flex-col gap-2">
                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.4em] px-2 mb-2">Neural Directives</span>
-                   {filteredCommands.map((cmd) => (
-                    <button
-                      key={cmd.id}
-                      onClick={() => onExecute(cmd.id)}
-                      className={cn(
-                        "w-full text-left px-5 py-5 rounded-3xl hover:bg-white/5 transition-all group",
-                        "flex items-center justify-between gap-6"
-                      )}
-                    >
-                      <div className="flex flex-col">
-                        <div className="text-[13px] font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-tight">{cmd.label}</div>
-                        <div className="text-[10px] font-bold text-slate-600 group-hover:text-slate-400 transition-colors">{cmd.hint}</div>
-                      </div>
-                      <span className="text-[10px] font-black text-indigo-500/40 group-hover:text-indigo-400 uppercase tracking-widest transition-colors">Invoke</span>
-                    </button>
-                  ))}
+                   {filtered.map((cmd) => {
+                    const locked = cmd.permission && !permissions[cmd.permission];
+                    return (
+                      <button
+                        key={cmd.id}
+                        onClick={() => handleExecute(cmd, cmd.label)}
+                        className={cn(
+                          "w-full text-left px-5 py-5 rounded-3xl hover:bg-white/5 transition-all group",
+                          "flex items-center justify-between gap-6",
+                          locked && "opacity-70"
+                        )}
+                      >
+                        <div className="flex flex-col">
+                          <div className="text-[13px] font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-tight flex items-center gap-2">
+                             {cmd.label}
+                             {locked && <Lock className="w-3 h-3 text-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.2)]" />}
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-600 group-hover:text-slate-400 transition-colors">{cmd.hint}</div>
+                        </div>
+                        <span className="text-[10px] font-black text-indigo-500/40 group-hover:text-indigo-400 uppercase tracking-widest transition-colors">Invoke</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
               {/* SEMANTIC DISCOVERY RESULTS */}
               {semanticResults.length > 0 && (
-                 <div className="px-6 py-6 flex flex-col gap-2 border-t border-white/5">
+                 <div className="px-6 py-6 flex flex-col gap-2 border-t border-white/5 bg-white/[0.01]">
                     <span className="text-[9px] font-black text-indigo-400/60 uppercase tracking-[0.4em] px-2 mb-4 flex items-center gap-4">
                        Neural Knowledge Discovery
                        <div className="h-[1px] flex-1 bg-indigo-500/10" />
@@ -152,7 +228,7 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
                                 <div className="flex items-center gap-3 mb-2">
                                    <FileText className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" />
                                    <span className="text-sm font-black text-white tracking-tighter">{result.filename}</span>
-                                   <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">{result.filepath.split('\\').slice(-2).join(' / ')}</span>
+                                   <span className="text-[8px] font-bold text-slate-600 font-mono uppercase tracking-widest">{result.filepath.split('\\').slice(-2).join(' / ')}</span>
                                 </div>
                                 <div className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed opacity-60 group-hover:opacity-100 italic transition-all pr-12">
                                    "{result.preview}"
@@ -168,7 +244,7 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
                  </div>
               )}
 
-              {filteredCommands.length === 0 && semanticResults.length === 0 && !isSearching && query.length > 0 && (
+              {filtered.length === 0 && semanticResults.length === 0 && !isSearching && query.length > 0 && (
                 <div className="p-12 text-center">
                    <p className="text-sm text-slate-600 font-bold mb-4 uppercase tracking-widest italic opacity-40">"Neural search yield null vectors."</p>
                    <button onClick={() => onExecute(query)} className="px-8 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10">
@@ -182,4 +258,5 @@ export default function CommandPalette({ open, query, onQueryChange, onClose, on
       )}
     </AnimatePresence>
   );
+
 }

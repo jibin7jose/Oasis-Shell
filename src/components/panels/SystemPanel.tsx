@@ -1,4 +1,4 @@
-﻿import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, CpuIcon, Pause, Play, Skull, Gauge, Usb } from "lucide-react";
+﻿import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Gauge, Usb } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 export interface SystemStats {
@@ -209,7 +209,7 @@ export default function SystemPanel({
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <CpuIcon className="w-4 h-4 text-amber-400" />
+            <Cpu className="w-4 h-4 text-amber-400" />
             <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Process Manager</span>
           </div>
           <span className="text-[9px] font-mono text-slate-500">{processes.length} tracked</span>
@@ -294,3 +294,4 @@ export default function SystemPanel({
     </div>
   );
 }
+

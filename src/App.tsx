@@ -1,17 +1,17 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Globe, Cpu, RotateCcw,
+  Globe, Cpu, RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
-import SystemPanel, { SystemStats, WindowInfo } from "./components/panels/SystemPanel";
+import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
 import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
-import CommandPalette from "./components/overlays/CommandPalette";
+import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -71,6 +71,18 @@ export default function App() {
   const [systemLastSync, setSystemLastSync] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
+  const [storageMap, setStorageMap] = useState<StorageInfo[]>([]);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
+    process_control: false,
+    system_control: false
+  });
+  const [pendingPermission, setPendingPermission] = useState<{
+    key: CommandPermission;
+    label: string;
+    action: (() => void) | null;
+  } | null>(null);
 
   const [fiscalBurn, setFiscalBurn] = useState({ total_burn: 0.0, token_load: 0, status: 'NOMINAL' });
 
@@ -133,41 +145,10 @@ export default function App() {
   const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
-    const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage'>('dash');
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [storage, setStorage] = useState<any[]>([]);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage'>('dash');
   const [mounted, setMounted] = useState(false);
 
-  // Global Command Palette Key Listener
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(p => !p);
-      }
-      if (e.key === 'Escape') setShowCommandPalette(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
 
-  const refreshSystemData = async () => {
-    try {
-      const p = await invoke("get_process_list") as any[];
-      setProcesses(p);
-      const s = await invoke("get_storage_map") as any[];
-      setStorage(s);
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    if (activeView === 'processes' || activeView === 'storage') {
-      const interval = setInterval(refreshSystemData, 3000);
-      refreshSystemData();
-      return () => clearInterval(interval);
-    }
-  }, [activeView]);
 
 
   useEffect(() => {
@@ -535,6 +516,12 @@ export default function App() {
       setSystemStats(stats);
       const windows = await invoke("get_running_windows") as WindowInfo[];
       setRunningWindows(windows);
+      const procList = await invoke("get_process_list") as ProcessInfo[];
+      setProcesses(procList);
+      const disks = await invoke("get_storage_map") as StorageInfo[];
+      setStorageMap(disks);
+      const devs = await invoke("get_system_devices") as DeviceInfo[];
+      setDevices(devs);
       setSystemLastSync(new Date().toLocaleTimeString());
     } catch (e) {}
   };
@@ -552,11 +539,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const syncProcesses = async () => {
+      try {
+        const procList = await invoke("get_process_list") as ProcessInfo[];
+        setProcesses(procList);
+      } catch (e) {}
+    };
+    syncProcesses();
+    const interval = setInterval(syncProcesses, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const syncStorageDevices = async () => {
+      try {
+        const disks = await invoke("get_storage_map") as StorageInfo[];
+        setStorageMap(disks);
+        const devs = await invoke("get_system_devices") as DeviceInfo[];
+        setDevices(devs);
+      } catch (e) {}
+    };
+    syncStorageDevices();
+    const interval = setInterval(syncStorageDevices, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const handleHotkey = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "p") {
+      // CTRL+K or CTRL+SHIFT+P for Neural Command Palette
+      if ((e.ctrlKey || e.metaKey) && (key === 'k' || (e.shiftKey && key === "p"))) {
         e.preventDefault();
-        setCommandOpen(true);
+        setCommandOpen(prev => !prev);
       }
       if (key === "escape") {
         setCommandOpen(false);
@@ -566,11 +580,43 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleHotkey);
   }, []);
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("oas_permissions");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<CommandPermission, boolean>;
+        setPermissions((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("oas_permissions", JSON.stringify(permissions));
+    } catch (e) {}
+  }, [permissions]);
+
+  const withPermission = (key: CommandPermission, label: string, action: () => void) => {
+    if (permissions[key]) {
+      action();
+      return;
+    }
+    setPendingPermission({ key, label, action });
+  };
+
   const handleCommandExecute = async (query: string) => {
     if (!query.trim()) return;
     await resolveNeuralIntent(query);
     setCommandQuery("");
     setCommandOpen(false);
+  };
+
+  const handleCommandPermissionRequest = (permission: CommandPermission, label: string) => {
+    setPendingPermission({
+      key: permission,
+      label,
+      action: () => handleCommandExecute(label)
+    });
   };
 
   const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
@@ -614,6 +660,38 @@ export default function App() {
       const stats = await invoke("run_system_diagnostic") as any;
       setSystemStats(stats);
     } catch (e) {}
+  };
+
+  const handleKillProcess = (pid: number) => {
+    withPermission("process_control", "Process Control", () => {
+      invoke("kill_quarantine_process", { pid })
+        .then((res: any) => setNotification(res))
+        .catch((e: any) => setNotification(`Process kill failed: ${e}`));
+    });
+  };
+
+  const handleSuspendProcess = (pid: number) => {
+    withPermission("process_control", "Process Control", () => {
+      invoke("suspend_process", { pid })
+        .then((res: any) => setNotification(res))
+        .catch((e: any) => setNotification(`Process suspend failed: ${e}`));
+    });
+  };
+
+  const handleResumeProcess = (pid: number) => {
+    withPermission("process_control", "Process Control", () => {
+      invoke("resume_process", { pid })
+        .then((res: any) => setNotification(res))
+        .catch((e: any) => setNotification(`Process resume failed: ${e}`));
+    });
+  };
+
+  const handleSetPriority = (pid: number, priority: string) => {
+    withPermission("process_control", "Process Control", () => {
+      invoke("set_process_priority", { pid, priority })
+        .then((res: any) => setNotification(res))
+        .catch((e: any) => setNotification(`Priority change failed: ${e}`));
+    });
   };
 
   const handleAuthorizeBranch = async (agentId: string, tag: string) => {
@@ -760,12 +838,21 @@ export default function App() {
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
 
+  const handleRequestPermission = (perm: string, label: string) => {
+    setNotification(`Security: Elevated Access Required for [${label}]`);
+    // In a real scenario, this would trigger a biometric/passkey prompt
+    setTimeout(() => {
+      setPermissions(prev => ({ ...prev, [perm]: true }));
+      setNotification(`Authority Granted: ${perm} unlocked.`);
+    }, 1500);
+  };
+
   const handlePaletteAction = async (id: string) => {
-    setShowCommandPalette(false);
+    setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
-    else if (id === 'vault') setShowVault(true);
+    else if (id === 'vault') setShowSentinel(true);
     else if (id === 'sync') resolveNeuralIntent("sync to github");
-    else if (id === 'scan') refreshSystemData();
+    else if (id === 'scan') refreshSystemSnapshot();
     else if (id === 'index') {
       setNotification("Neural Indexing Initiated...");
       await invoke("index_folder", { path: "." });
@@ -784,7 +871,7 @@ export default function App() {
   const SystemHUD = () => (
     <div className="w-full h-full flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {storage.map((disk, i) => (
+        {storageMap.map((disk, i) => (
           <div key={i} className="glass p-10 rounded-[3rem] border border-white/5 relative overflow-hidden group">
              <div className="flex justify-between items-start mb-8">
                 <div>
@@ -859,7 +946,7 @@ export default function App() {
                          <button onClick={async () => {
                             await invoke("kill_quarantine_process", { pid: proc.pid });
                             setNotification(`Sentinel: Quarantined ${proc.name}`);
-                            refreshSystemData();
+                            refreshSystemSnapshot();
                           }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
                            Quarantine
                          </button>
@@ -885,13 +972,15 @@ export default function App() {
     >
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
-        {showCommandPalette && (
+        {commandOpen && (
           <CommandPalette 
-            open={showCommandPalette}
-            query={searchQuery}
-            onQueryChange={setSearchQuery}
-            onClose={() => setShowCommandPalette(false)}
+            open={commandOpen}
+            query={commandQuery}
+            onQueryChange={setCommandQuery}
+            onClose={() => setCommandOpen(false)}
             onExecute={handlePaletteAction}
+            permissions={permissions}
+            onRequestPermission={handleCommandPermissionRequest}
           />
         )}
       </AnimatePresence>
@@ -999,9 +1088,11 @@ export default function App() {
 
             {/* Level 9 Executive Sidebar */}
       <LeftRail
+        activeView={activeView}
+        onViewChange={(v: any) => setActiveView(v)}
         presentationMode={presentationMode}
         simMode={simMode}
-        onDash={() => handleContextSwitch("dev")}
+        onDash={() => setActiveView("dash")}
         onOpenGraph={() => setShowGraph(true)}
         onOpenVault={() => setShowVault(true)}
         onOpenLogs={() => setShowLogs(true)}
@@ -1021,6 +1112,7 @@ export default function App() {
           activeVenture={activeVenture}
           activeContext={activeContext}
           contexts={contexts}
+          systemStats={systemStats}
           zenMode={zenMode}
           voiceActive={voiceActive}
           autoAura={autoAura}
@@ -1125,8 +1217,15 @@ export default function App() {
             <SystemPanel
               stats={systemStats}
               windows={runningWindows}
+              processes={processes}
+              storage={storageMap}
+              devices={devices}
               lastSync={systemLastSync}
               onRefresh={refreshSystemSnapshot}
+              onKillProcess={handleKillProcess}
+              onSuspendProcess={handleSuspendProcess}
+              onResumeProcess={handleResumeProcess}
+              onSetPriority={handleSetPriority}
             />
 
             {/* Neural Corporate Suite (Phase 21) */}
@@ -2042,13 +2141,46 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      <CommandPalette
-        open={commandOpen}
-        query={commandQuery}
-        onQueryChange={setCommandQuery}
-        onClose={() => setCommandOpen(false)}
-        onExecute={handleCommandExecute}
-      />
+      {pendingPermission && (
+        <div className="fixed inset-0 z-[5000] bg-black/70 backdrop-blur-xl flex items-center justify-center p-8">
+          <div className="w-full max-w-lg glass-bright rounded-[2rem] border border-white/10 p-8 shadow-5xl">
+            <div className="flex items-center gap-3 mb-4">
+              <ShieldAlert className="w-6 h-6 text-amber-400" />
+              <h3 className="text-lg font-black text-white uppercase tracking-widest">Permission Required</h3>
+            </div>
+            <p className="text-sm text-slate-300 mb-6">
+              Allow Oasis to perform: <span className="font-bold text-white">{pendingPermission.label}</span>
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  pendingPermission.action?.();
+                  setPendingPermission(null);
+                }}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest rounded-xl border border-white/10"
+              >
+                Allow Once
+              </button>
+              <button
+                onClick={() => {
+                  setPermissions((prev) => ({ ...prev, [pendingPermission.key]: true }));
+                  pendingPermission.action?.();
+                  setPendingPermission(null);
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-xl"
+              >
+                Allow Always
+              </button>
+              <button
+                onClick={() => setPendingPermission(null)}
+                className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-[10px] font-black uppercase tracking-widest rounded-xl text-rose-300 border border-rose-500/20"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
