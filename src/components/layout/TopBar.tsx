@@ -1,4 +1,5 @@
 import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
 interface ContextItem {
@@ -12,11 +13,20 @@ interface FiscalBurn {
   status: string;
 }
 
+interface GolemTask {
+  id: string;
+  name: string;
+  status: string;
+  progress: number;
+  aura: string;
+}
+
 interface TopBarProps {
   activeVenture: string;
   activeContext: string;
   systemStats: any;
   contexts: ContextItem[];
+  golems: GolemTask[];
   zenMode: boolean;
   voiceActive: boolean;
   autoAura: boolean;
@@ -42,6 +52,7 @@ export default function TopBar({
   activeContext,
   systemStats,
   contexts,
+  golems,
   zenMode,
   voiceActive,
   autoAura,
@@ -98,6 +109,40 @@ export default function TopBar({
             <span className="text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-3 py-1 rounded-lg font-black tracking-widest uppercase bg-indigo-500/5">
               OAS_KRNL_4.5 // SENTINEL CORE
             </span>
+
+            {golems && golems.length > 0 && (
+              <div className="flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 animate-in fade-in slide-in-from-left-4">
+                {golems.map(g => (
+                  <div key={g.id} className="flex items-center gap-4 transition-all group">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full animate-pulse",
+                      g.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" :
+                      g.aura === 'amber' ? "bg-amber-500 shadow-[0_0_10px_#f59e0b]" :
+                      g.aura === 'rose' ? "bg-rose-500 shadow-[0_0_10px_#f43f5e]" :
+                      "bg-indigo-500 shadow-[0_0_10px_#6366f1]"
+                    )} />
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">{g.name}</span>
+                      <div className="flex items-center gap-3">
+                         <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${g.progress * 100}%` }}
+                              className={cn(
+                                "h-full transition-all duration-1000",
+                                g.aura === 'emerald' ? "bg-emerald-500" :
+                                g.aura === 'amber' ? "bg-amber-500" :
+                                g.aura === 'rose' ? "bg-rose-500" : "bg-indigo-500"
+                              )} 
+                            />
+                         </div>
+                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter truncate max-w-[120px]">{g.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               onClick={onOpenSentinel}
               className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"

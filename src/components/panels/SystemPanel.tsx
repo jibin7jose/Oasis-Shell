@@ -7,6 +7,8 @@ export interface SystemStats {
   binary_sync: boolean;
   cpu_load: number;
   mem_used: number;
+  battery_level: number;
+  is_charging: boolean;
 }
 
 export interface WindowInfo {
@@ -48,6 +50,7 @@ interface SystemPanelProps {
   processes: ProcessInfo[];
   storage: StorageInfo[];
   devices: DeviceInfo[];
+  processPriorities: Record<number, string>;
   lastSync: string;
   onRefresh: () => void;
   onKillProcess: (pid: number) => void;
@@ -67,6 +70,7 @@ export default function SystemPanel({
   processes,
   storage,
   devices,
+  processPriorities,
   lastSync,
   onRefresh,
   onKillProcess,
@@ -74,6 +78,20 @@ export default function SystemPanel({
   onResumeProcess,
   onSetPriority
 }: SystemPanelProps) {
+  const thermalReadings = devices
+    .filter((d) => d.kind === "component")
+    .map((d) => parseFloat(d.detail.replace("°C", "")))
+    .filter((v) => Number.isFinite(v));
+  const avgTemp = thermalReadings.length > 0 ? thermalReadings.reduce((a, b) => a + b, 0) / thermalReadings.length : null;
+
+  const statusClass = (status: string) => {
+    const s = status.toLowerCase();
+    if (s.includes("run")) return "text-emerald-400";
+    if (s.includes("sleep") || s.includes("idle")) return "text-amber-400";
+    if (s.includes("stop") || s.includes("zombie")) return "text-rose-400";
+    return "text-slate-400";
+  };
+
   return (
     <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
       <div className="flex items-center justify-between mb-6">
@@ -95,7 +113,7 @@ export default function SystemPanel({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">CPU Load</span>
@@ -133,6 +151,19 @@ export default function SystemPanel({
             {stats?.binary_sync ? "Verified" : "Desynced"}
           </div>
           <div className="mt-2 text-[9px] font-mono text-slate-500 line-clamp-2">{stats?.path_status || "No path status"}</div>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Battery</span>
+            <Activity className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div className="text-2xl font-black text-white">
+            {stats ? `${stats.battery_level}%` : "--"}
+          </div>
+          <div className="mt-2 text-[9px] font-mono text-slate-500">
+            {stats ? (stats.is_charging ? "Charging" : "On Battery") : "Power telemetry unavailable"}
+          </div>
         </div>
       </div>
 
@@ -183,7 +214,10 @@ export default function SystemPanel({
               <Usb className="w-4 h-4 text-emerald-400" />
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">System Devices</span>
             </div>
-            <span className="text-[9px] font-mono text-slate-500">{devices.length} signals</span>
+            <div className="flex items-center gap-3 text-[9px] font-mono text-slate-500">
+              <span>{devices.length} signals</span>
+              {avgTemp !== null && <span>Thermal Avg {avgTemp.toFixed(1)}°C</span>}
+            </div>
           </div>
           <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar">
             {devices.length === 0 && (
@@ -226,12 +260,15 @@ export default function SystemPanel({
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold text-white truncate">{proc.name}</div>
                   <div className="text-[9px] font-mono text-slate-500">
-                    PID {proc.pid} · {proc.status}
+                    PID {proc.pid} · <span className={statusClass(proc.status)}>{proc.status}</span>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] font-black text-slate-300">{proc.cpu_usage.toFixed(1)}% CPU</div>
                   <div className="text-[9px] text-slate-500">{(proc.mem_usage / 1024 / 1024).toFixed(1)} MB</div>
+                  <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">
+                    {processPriorities[proc.pid] || "Normal"}
+                  </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -294,4 +331,3 @@ export default function SystemPanel({
     </div>
   );
 }
-

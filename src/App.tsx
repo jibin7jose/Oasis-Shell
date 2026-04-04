@@ -74,6 +74,7 @@ export default function App() {
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [storageMap, setStorageMap] = useState<StorageInfo[]>([]);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
     system_control: false
@@ -142,6 +143,7 @@ export default function App() {
   const [activeSynthesis, setActiveSynthesis] = useState<any>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [storageReport, setStorageReport] = useState<any>(null);
+  const [golems, setGolems] = useState<any[]>([]);
   const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
@@ -150,6 +152,17 @@ export default function App() {
 
 
 
+
+  useEffect(() => {
+    const syncGolems = async () => {
+      try {
+        const active = await invoke("get_active_golems") as any[];
+        setGolems(active);
+      } catch (err) {}
+    };
+    const itv = setInterval(syncGolems, 2000);
+    return () => clearInterval(itv);
+  }, []);
 
   useEffect(() => {
     const initializeOasis = async () => {
@@ -611,11 +624,11 @@ export default function App() {
     setCommandOpen(false);
   };
 
-  const handleCommandPermissionRequest = (permission: CommandPermission, label: string) => {
+  const handleCommandPermissionRequest = (permission: CommandPermission, label: string, action?: () => void) => {
     setPendingPermission({
       key: permission,
       label,
-      action: () => handleCommandExecute(label)
+      action: action || (() => handleCommandExecute(label))
     });
   };
 
@@ -686,10 +699,19 @@ export default function App() {
     });
   };
 
+  const handleQuarantinePid = (pid: number) => {
+    invoke("kill_quarantine_process", { pid })
+      .then((res: any) => setNotification(res))
+      .catch((e: any) => setNotification(`Process quarantine failed: ${e}`));
+  };
+
   const handleSetPriority = (pid: number, priority: string) => {
     withPermission("process_control", "Process Control", () => {
       invoke("set_process_priority", { pid, priority })
-        .then((res: any) => setNotification(res))
+        .then((res: any) => {
+          setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() }));
+          setNotification(res);
+        })
         .catch((e: any) => setNotification(`Priority change failed: ${e}`));
     });
   };
@@ -838,21 +860,32 @@ export default function App() {
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
 
-  const handleRequestPermission = (perm: string, label: string) => {
-    setNotification(`Security: Elevated Access Required for [${label}]`);
-    // In a real scenario, this would trigger a biometric/passkey prompt
-    setTimeout(() => {
-      setPermissions(prev => ({ ...prev, [perm]: true }));
-      setNotification(`Authority Granted: ${perm} unlocked.`);
-    }, 1500);
-  };
+  // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
   const handlePaletteAction = async (id: string) => {
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
     else if (id === 'sync') resolveNeuralIntent("sync to github");
-    else if (id === 'scan') refreshSystemSnapshot();
+    else if (id === 'system_scan') {
+      const taskId = "SCAN_" + Date.now();
+      const triggerScan = async () => {
+        await invoke("register_golem_task", { id: taskId, name: "Neural Diagnostic", aura: "amber" });
+        let p = 0;
+        const itv = setInterval(async () => {
+          p += 0.1;
+          if (p >= 1.0) {
+            clearInterval(itv);
+            await invoke("complete_golem_task", { id: taskId });
+            setNotification("Neural Diagnostic Complete: Sentinel Foundations Nominal.");
+          } else {
+            await invoke("update_golem_task", { id: taskId, status: `Probing Kernel Layers... ${Math.round(p * 100)}%`, progress: p });
+          }
+        }, 1200);
+      };
+      triggerScan();
+      refreshSystemSnapshot();
+    }
     else if (id === 'index') {
       setNotification("Neural Indexing Initiated...");
       await invoke("index_folder", { path: "." });
@@ -981,6 +1014,7 @@ export default function App() {
             onExecute={handlePaletteAction}
             permissions={permissions}
             onRequestPermission={handleCommandPermissionRequest}
+            onQuarantinePid={handleQuarantinePid}
           />
         )}
       </AnimatePresence>
@@ -1112,6 +1146,7 @@ export default function App() {
           activeVenture={activeVenture}
           activeContext={activeContext}
           contexts={contexts}
+          golems={golems}
           systemStats={systemStats}
           zenMode={zenMode}
           voiceActive={voiceActive}
@@ -1220,6 +1255,7 @@ export default function App() {
               processes={processes}
               storage={storageMap}
               devices={devices}
+              processPriorities={processPriorities}
               lastSync={systemLastSync}
               onRefresh={refreshSystemSnapshot}
               onKillProcess={handleKillProcess}

@@ -13,7 +13,8 @@ interface CommandPaletteProps {
   onClose: () => void;
   onExecute: (query: string) => void;
   permissions: Record<CommandPermission, boolean>;
-  onRequestPermission: (permission: CommandPermission, label: string) => void;
+  onRequestPermission: (permission: CommandPermission, label: string, action?: () => void) => void;
+  onQuarantinePid: (pid: number) => void;
 }
 
 interface CommandItem {
@@ -74,9 +75,12 @@ export default function CommandPalette({
   onClose,
   onExecute,
   permissions,
-  onRequestPermission
+  onRequestPermission,
+  onQuarantinePid
 }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [pidMode, setPidMode] = useState(false);
+  const [pidValue, setPidValue] = useState("");
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -85,6 +89,8 @@ export default function CommandPalette({
       const id = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(id);
     }
+    setPidMode(false);
+    setPidValue("");
     return undefined;
   }, [open]);
 
@@ -130,6 +136,22 @@ export default function CommandPalette({
     onExecute(cmd.id || raw || cmd.label);
   };
 
+  const handleQuarantineSubmit = () => {
+    const pid = parseInt(pidValue.trim(), 10);
+    if (!Number.isFinite(pid)) return;
+    const run = () => {
+      onQuarantinePid(pid);
+      setPidValue("");
+      setPidMode(false);
+      onClose();
+    };
+    if (!permissions.process_control) {
+      onRequestPermission("process_control", "Quarantine Process", run);
+      return;
+    }
+    run();
+  };
+
   return (
     <AnimatePresence>
       {open && (
@@ -165,7 +187,11 @@ export default function CommandPalette({
                     const trimmed = query.trim();
                     const match = BASE_COMMANDS.find((cmd) => cmd.label.toLowerCase() === trimmed.toLowerCase());
                     if (match) {
-                      handleExecute(match, match.label);
+                      if (match.id === "process_quarantine") {
+                        setPidMode(true);
+                      } else {
+                        handleExecute(match, match.label);
+                      }
                     } else if (trimmed) {
                       onExecute(trimmed);
                     }
@@ -178,6 +204,31 @@ export default function CommandPalette({
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">ESC</span>
             </div>
 
+            {pidMode && (
+              <div className="px-6 py-4 border-b border-white/5 flex items-center gap-4">
+                <div className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Target PID</div>
+                <input
+                  value={pidValue}
+                  onChange={(e) => setPidValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleQuarantineSubmit();
+                    if (e.key === "Escape") {
+                      setPidMode(false);
+                      setPidValue("");
+                    }
+                  }}
+                  placeholder="e.g. 4321"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                />
+                <button
+                  onClick={handleQuarantineSubmit}
+                  className="px-3 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-[9px] font-black uppercase tracking-widest rounded-lg text-rose-200"
+                >
+                  Quarantine
+                </button>
+              </div>
+            )}
+
             <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
               {/* PRIMARY COMMANDS */}
               {filtered.length > 0 && (
@@ -188,7 +239,13 @@ export default function CommandPalette({
                     return (
                       <button
                         key={cmd.id}
-                        onClick={() => handleExecute(cmd, cmd.label)}
+                        onClick={() => {
+                          if (cmd.id === "process_quarantine") {
+                            setPidMode(true);
+                            return;
+                          }
+                          handleExecute(cmd, cmd.label);
+                        }}
                         className={cn(
                           "w-full text-left px-5 py-5 rounded-3xl hover:bg-white/5 transition-all group",
                           "flex items-center justify-between gap-6",

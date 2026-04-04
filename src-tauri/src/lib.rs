@@ -22,6 +22,17 @@ use std::collections::HashMap;
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GolemTask {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+    pub progress: f32, // 0.0 to 1.0
+    pub aura: String,   // emerald, amber, rose, indigo
+}
+
+static GOLEM_REGISTRY: Mutex<HashMap<String, GolemTask>> = Mutex::new(HashMap::new());
+
 
 struct DbState(Mutex<Connection>);
 
@@ -2258,6 +2269,42 @@ async fn capture_screenshot() -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
+    let registry = GOLEM_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
+async fn register_golem_task(id: String, name: String, aura: String) -> Result<(), String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    registry.insert(id.clone(), GolemTask {
+        id,
+        name,
+        status: "Neural Initialization...".into(),
+        progress: 0.0,
+        aura,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_golem_task(id: String, status: String, progress: f32) -> Result<(), String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    if let Some(task) = registry.get_mut(&id) {
+        task.status = status;
+        task.progress = progress;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn complete_golem_task(id: String) -> Result<(), String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    registry.remove(&id);
+    Ok(())
+}
+
+#[tauri::command]
 async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
@@ -2444,7 +2491,11 @@ pub fn run() {
             kill_quarantine_process,
             suspend_process,
             resume_process,
-            set_process_priority
+            set_process_priority,
+            get_active_golems,
+            register_golem_task,
+            update_golem_task,
+            complete_golem_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
