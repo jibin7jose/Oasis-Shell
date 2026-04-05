@@ -21,9 +21,10 @@ interface RightRailProps {
     isOpen: boolean;
     onClose: () => void;
     golem: GolemDetail | null;
+    className?: string;
 }
 
-export default function RightRail({ isOpen, onClose, golem }: RightRailProps) {
+export default function RightRail({ isOpen, onClose, golem, className }: RightRailProps) {
     if (!isOpen || !golem) return null;
 
     return (
@@ -32,7 +33,7 @@ export default function RightRail({ isOpen, onClose, golem }: RightRailProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-screen w-[400px] bg-black/40 backdrop-blur-3xl border-l border-white/5 z-[100] shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.5)] flex flex-col pt-24 p-8"
+            className={cn("fixed top-0 right-0 h-screen w-[400px] bg-black/40 backdrop-blur-3xl border-l border-white/5 z-[100] shadow-[-20px_0_40px_-10px_rgba(0,0,0,0.5)] flex flex-col pt-24 p-8 transition-all duration-700", className)}
         >
             <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">

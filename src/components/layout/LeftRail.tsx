@@ -23,6 +23,7 @@ interface LeftRailProps {
   pinnedContexts: any[];
   onRestoreContext: (pin: any) => void;
   onActivateZenith: () => void;
+  className?: string;
 }
 
 export default function LeftRail({
@@ -45,7 +46,8 @@ export default function LeftRail({
   onJumpToPresent,
   pinnedContexts,
   onRestoreContext,
-  onActivateZenith
+  onActivateZenith,
+  className
 }: LeftRailProps) {
   if (presentationMode) return null;
 
@@ -53,7 +55,7 @@ export default function LeftRail({
     <motion.aside
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
+      className={cn("relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10 transition-all duration-700", className)}
     >
       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-3">
         <Bot className="w-7 h-7 text-white" />

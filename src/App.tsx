@@ -2032,6 +2032,7 @@ export default function App() {
         pinnedContexts={pinnedContexts}
         onRestoreContext={handleRestoreContext}
         onActivateZenith={handleZenithPulse}
+        className={cn("transition-all duration-700", zenMode && "opacity-0 -translateX-24 pointer-events-none")}
       />
 
       {/* Main Command Stage */}
@@ -2115,7 +2116,7 @@ export default function App() {
                   </motion.div>
                 )}
 
-                <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
+                <div className={cn("flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative", zenMode && "zen-hide")}>
                   <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
                     {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
                       <div key={i} className="flex gap-4 items-center">
@@ -2129,7 +2130,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                <div className={cn("w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12", zenMode && "zen-hide")}>
                   {[
                     { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
                     { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
@@ -2147,7 +2148,7 @@ export default function App() {
                 </div>
 
                 {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
-                <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                <div className={cn("w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12", zenMode && "zen-hide")}>
                   <div className={cn("glass p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden transition-all duration-700", isVaultSealed && "border-rose-500/50 shadow-[0_0_50px_-20px_rgba(244,63,94,0.3)]")}>
                     {/* Phase 7.7: Sentinel Lockdown Overlay */}
                     <AnimatePresence>
@@ -2246,6 +2247,7 @@ export default function App() {
                     isOpen={!!selectedGolem} 
                     onClose={() => setSelectedGolem(null)} 
                     golem={selectedGolem} 
+                    className={cn("transition-all duration-700", zenMode && "opacity-0 translateX-24 pointer-events-none")}
                 />
 
                 <DocumentationPanel 

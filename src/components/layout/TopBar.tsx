@@ -81,8 +81,7 @@ export default function TopBar({
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
           <h1
             className={cn(
-              "text-xl font-bold tracking-tight text-white flex items-center gap-6 transition-all",
-              zenMode && "opacity-0 translate-y-[-10px]"
+              "text-xl font-bold tracking-tight text-white flex items-center gap-6 transition-all"
             )}
           >
             <div className="flex items-center gap-3">
@@ -90,7 +89,7 @@ export default function TopBar({
               <span className="uppercase tracking-tighter">{activeVenture}</span>
             </div>
 
-            <div className="flex items-center gap-6 border-l border-white/10 pl-6 h-8">
+            <div className={cn("flex items-center gap-6 border-l border-white/10 pl-6 h-8 transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
               <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Host Pulse</span>
                 <div className="flex items-center gap-3">
@@ -168,7 +167,7 @@ export default function TopBar({
               </div>
             )}
             
-            <div className="flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 hidden lg:flex animate-in fade-in slide-in-from-left-4">
+            <div className={cn("flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 hidden lg:flex animate-in fade-in slide-in-from-left-4 transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
               <div className="flex flex-col items-start mr-4">
                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Foundry Market Registry</span>
                  <div className="flex items-center gap-2">
@@ -195,7 +194,7 @@ export default function TopBar({
             </div>
             <button
               onClick={onOpenSentinel}
-              className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"
+              className={cn("ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3 duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}
             >
               <Shield className="w-4 h-4" /> Sentinel Archive
             </button>
@@ -231,13 +230,14 @@ export default function TopBar({
             <button
               onClick={onTogglePresentation}
               className={cn(
-                "ml-4 p-2 glass rounded-lg transition-all",
-                presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400"
+                "ml-4 p-2 glass rounded-lg transition-all duration-700",
+                presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400",
+                zenMode && "opacity-0 translate-y-[-10px] pointer-events-none"
               )}
             >
               <LayoutDashboard className="w-4 h-4" />
             </button>
-            <button onClick={onToggleNetwork} className="ml-4 p-2 glass rounded-lg text-indigo-400 group relative">
+            <button onClick={onToggleNetwork} className={cn("ml-4 p-2 glass rounded-lg text-indigo-400 group relative transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
               <Globe className="w-3.5 h-3.5" />
               <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                 Venture Network Registry
