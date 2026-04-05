@@ -46,6 +46,7 @@ interface TopBarProps {
   onToggleAutoAura: () => void;
   onAegisSync: () => void;
   onOpenNexus: () => void;
+  onDeepLink?: (target: string) => void;
 }
 
 export default function TopBar({
@@ -72,7 +73,8 @@ export default function TopBar({
   onToggleNetwork,
   onToggleAutoAura,
   onAegisSync,
-  onOpenNexus
+  onOpenNexus,
+  onDeepLink
 }: TopBarProps) {
   return (
     <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
@@ -180,7 +182,11 @@ export default function TopBar({
               <div className="h-8 w-[1px] bg-white/10" />
               <div className="flex items-center gap-8 pl-2">
                  {(displayedMarket?.ai_ticker || []).map((t: any) => (
-                    <div key={t.id} className="flex flex-col">
+                    <div 
+                      key={t.id} 
+                      onClick={() => onDeepLink && onDeepLink(t.name)}
+                      className="flex flex-col cursor-pointer hover:scale-110 transition-all duration-300"
+                    >
                        <div className="flex items-center gap-2">
                           <span className="text-[9px] font-black text-white uppercase tracking-widest">{t.id}</span>
                           <span className={cn("text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-sm", t.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : t.color === 'rose' ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400')}>

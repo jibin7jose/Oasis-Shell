@@ -433,6 +433,13 @@ export default function App() {
       } else if (res.tool === "ORACLE_FORECAST") {
         setActiveOracle(res.data);
         logEvent("Oracle Vision: Projection Synchronized", "neural");
+      } else if (res.tool === "EXEC_COMMAND") {
+        setNotification(`Oasis Pulse: ${res.content || "OS Command Executed"}`);
+        logEvent("System Shell Command Executed", "system");
+      } else if (res.tool === "CHRONOS_SCRUB") {
+        setNotification(`Chronos Scrub Active: Volatility point for ${res.data} located.`);
+        setActiveView('timeline');
+        logEvent(`Chronos Deep Link Synchronized: ${res.data}`, "neural");
       } else if (res.tool === "NONE") {
         // Fallback for custom logic not yet in the backend router
         if (q.includes("presentation") || q.includes("vision")) {
@@ -2062,6 +2069,7 @@ export default function App() {
           onToggleAutoAura={() => setAutoAura(!autoAura)}
           onAegisSync={handleAegisSync}
           onOpenNexus={() => setShowNexus(true)}
+          onDeepLink={(target: string) => resolveNeuralIntent(`Deep link Chronos timeline to market event for: ${target}`)}
         />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">

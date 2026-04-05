@@ -1898,12 +1898,15 @@ async fn execute_neural_intent(state: tauri::State<'_, DbState>, query: String) 
     let prompt = format!(
         "System: Oasis Agentic Shell. You are a tool-use expert. 
         Analyze the query and decide which internal tool to use.
-        Tools: [VAULT_SEAL, SYSTEM_SCAN, SYNC_GITHUB, ORACLE_FORECAST].
+        Tools: [VAULT_SEAL, SYSTEM_SCAN, SYNC_GITHUB, ORACLE_FORECAST, EXEC_COMMAND, CHRONOS_SCRUB].
         If a tool matches, output ONLY the tool tag and parameters: [TOOL] tool_name [PARAM] value [/TOOL].
         
         Examples:
         - 'Seal /my/file.ts' -> [TOOL] VAULT_SEAL [PARAM] /my/file.ts [/TOOL]
         - 'Run diagnostic' -> [TOOL] SYSTEM_SCAN [PARAM] null [/TOOL]
+        - 'Open VS Code', 'Start Notepad' -> [TOOL] EXEC_COMMAND [PARAM] Start-Process code [/TOOL]
+        - 'Check network' -> [TOOL] EXEC_COMMAND [PARAM] ping 8.8.8.8 -n 2 [/TOOL]
+        - 'Deep link Chronos timeline to market event for: NVIDIA' -> [TOOL] CHRONOS_SCRUB [PARAM] NVIDIA [/TOOL]
         
         If no tool matches, respond naturally as an AI assistant.
         
@@ -1943,6 +1946,13 @@ async fn execute_neural_intent(state: tauri::State<'_, DbState>, query: String) 
             "ORACLE_FORECAST" => {
                 let forecast = invoke_oracle_prediction("oasis_core_alpha".into()).await.map_err(|e| format!("Oracle Vision Failure: {}", e))?;
                 return Ok(serde_json::json!({ "content": format!("Neural Intent: Oracle Vision: 12-Mo Projection received. Forecast: {}.", forecast.projected_arr), "tool": "ORACLE_FORECAST", "data": forecast }));
+            },
+            "EXEC_COMMAND" => {
+                let exec_result = execute_neural_command(param.to_string()).unwrap_or_else(|e| format!("Error: {}", e));
+                return Ok(serde_json::json!({ "content": format!("Executed OS Command: {}\n\n{}", param, exec_result), "tool": "EXEC_COMMAND" }));
+            },
+            "CHRONOS_SCRUB" => {
+                return Ok(serde_json::json!({ "content": format!("Chronos Deep Link initiated. Scrubbing timeline to exact point of volatility for {}.", param), "tool": "CHRONOS_SCRUB", "data": param }));
             },
             _ => {}
         }
@@ -2611,6 +2621,39 @@ async fn set_window_layout(layout: Vec<WindowSnapshot>) -> Result<(), String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[tauri::command]
+async fn transcribe_audio(audio_data: Vec<u8>) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    
+    let part = reqwest::multipart::Part::bytes(audio_data)
+        .file_name("intent.webm")
+        .mime_str("audio/webm").map_err(|e| e.to_string())?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("model", "whisper-1")
+        .part("file", part);
+
+    let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
+    if api_key.is_empty() {
+        return Ok("System: Whisper logic mapped. Provide OPENAI_API_KEY for live streaming.".into())
+    }
+
+    let req = client.post("https://api.openai.com/v1/audio/transcriptions")
+        .bearer_auth(api_key)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let resp_json: serde_json::Value = req.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(text) = resp_json["text"].as_str() {
+        Ok(text.to_string())
+    } else {
+        Err("Whisper transcription failed to return text".into())
+    }
+}
+
 pub fn run() {
     let conn = rusqlite::Connection::open("oasis_crates.db").expect("failed to open database");
     
@@ -2722,6 +2765,7 @@ pub fn run() {
             index_folder,
             semantic_search,
             rag_query,
+            transcribe_audio,
             get_neural_graph,
             get_all_files,
             start_telemetry_server,

@@ -1,9 +1,7 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  X, Bot, Activity, Zap, Shield, 
-  Terminal, Cpu, HardDrive, BrainCircuit,
-  ChevronRight, AlertCircle, CheckCircle2
+  X, Bot, Activity,
+  Cpu, Terminal, ChevronRight
 } from "lucide-react";
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
