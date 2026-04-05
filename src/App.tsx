@@ -28,13 +28,13 @@ const TAURI_DEFAULTS: Record<string, any> = {
   get_fiscal_report: { total_burn: 0, token_load: 0, status: 'NOMINAL' },
   load_venture_state: { arr: "$0M", burn: "$0K", runway: "0mo", momentum: "0%", stress_color: "#6366f1" },
   get_market_intelligence: {
-    market_index: 100.0,
-    index_change: "+2.4%",
-    ticker: [
-      { symbol: "OASIS_INDEX", price: "$1,442.20", change: "+2.4%" },
-      { symbol: "RUST_FOUNDRY", price: "0.14s", change: "-0.2%" },
-      { symbol: "GOLEM_NODES", price: "1.4k", change: "+12.8%" },
-      { symbol: "SENTINEL_YIELD", price: "99.2%", change: "+0.1%" }
+    market_index: 142.8,
+    index_change: "-1.2%",
+    ai_ticker: [
+        { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
+        { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
+        { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
+        { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
     ]
   },
   get_neural_wisdom: { recommendation: "Oasis Dev: Kernel simulation active." },
@@ -126,11 +126,16 @@ export default function App() {
     momentum: "+12.8%",
     stress_color: "#10b981"
   });
-  const [marketIntel, setMarketIntel] = useState<any>([
-    { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
-    { symbol: "SAP_COMP", price: "$42.50", change: "-1.1%" },
-    { symbol: "GLOBAL_AI", price: "8,942.00", change: "+0.8%" }
-  ]);
+  const [marketIntel, setMarketIntel] = useState<any>({
+    market_index: 142.8,
+    index_change: "-1.2%",
+    ai_ticker: [
+        { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
+        { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
+        { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
+        { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
+    ]
+  });
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
   const [timeline, setTimeline] = useState<any[]>([
@@ -590,6 +595,16 @@ export default function App() {
                 }
                 return { ...g, progress: Float(newProgress.toFixed(1)) };
             }));
+
+            // Phase 7.9: Global Market Pulse
+            setMarketIntel(prev => prev && prev.ai_ticker ? {
+                ...prev,
+                market_index: Math.max(10, prev.market_index + (Math.random() - 0.5) * 0.5),
+                ai_ticker: (prev.ai_ticker ?? []).map((t: any) => ({
+                    ...t,
+                    price: t.price + (Math.random() - 0.5) * (t.price * 0.001)
+                }))
+            } : prev);
         }, 3000);
         return () => clearInterval(interval);
     }
@@ -1573,8 +1588,12 @@ export default function App() {
       try {
         const metrics = await invokeSafe("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
         const intel = await invokeSafe("get_market_intelligence") as any;
-        setMarketIntel(intel.ticker || []);
-        setDisplayedMarket({ market_index: intel.market_index, index_change: intel.index_change });
+        setMarketIntel(prev => ({
+            ...prev,
+            market_index: intel?.market_index || prev.market_index,
+            index_change: intel?.index_change || prev.index_change,
+            ai_ticker: intel?.ai_ticker || prev.ai_ticker
+        }));
         
         // Pass market index to workforce for reactor logic
         const wf = await invokeSafe("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
@@ -2098,11 +2117,11 @@ export default function App() {
 
                 <div className="flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative">
                   <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                    {(Array.isArray(marketIntel) ? marketIntel : []).map((m: any, i: number) => (
+                    {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
                       <div key={i} className="flex gap-4 items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.symbol}</span>
-                        <span className="text-sm font-bold text-white tracking-tight">{m.price}</span>
-                        <span className={cn("text-[10px] font-black tracking-widest uppercase", m.change.startsWith('+') ? "text-emerald-500" : "text-red-500")}>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
+                        <span className="text-sm font-bold text-white tracking-tight">${m.price?.toFixed(1)}</span>
+                        <span className={cn("text-[10px] font-black tracking-widest uppercase", m.color === 'emerald' ? "text-emerald-500" : "text-rose-500")}>
                           {m.change}
                         </span>
                       </div>

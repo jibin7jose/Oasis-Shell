@@ -167,6 +167,32 @@ export default function TopBar({
                 ))}
               </div>
             )}
+            
+            <div className="flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 hidden lg:flex animate-in fade-in slide-in-from-left-4">
+              <div className="flex flex-col items-start mr-4">
+                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Foundry Market Registry</span>
+                 <div className="flex items-center gap-2">
+                    <span className={cn("text-xs font-black font-mono tracking-tighter", (displayedMarket?.market_index || 0) > 140 ? "text-emerald-500" : "text-rose-500")}>
+                      {(displayedMarket?.market_index || 0).toFixed(1)}
+                    </span>
+                    <span className="text-[9px] text-slate-600 font-bold tracking-tighter">{displayedMarket?.index_change}</span>
+                 </div>
+              </div>
+              <div className="h-8 w-[1px] bg-white/10" />
+              <div className="flex items-center gap-8 pl-2">
+                 {(displayedMarket?.ai_ticker || []).map((t: any) => (
+                    <div key={t.id} className="flex flex-col">
+                       <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{t.id}</span>
+                          <span className={cn("text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-sm", t.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : t.color === 'rose' ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400')}>
+                            {t.change}
+                          </span>
+                       </div>
+                       <span className="text-[9px] font-mono font-bold text-slate-400 tracking-tighter">${t.price?.toFixed(1)}</span>
+                    </div>
+                 ))}
+              </div>
+            </div>
             <button
               onClick={onOpenSentinel}
               className="ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3"
@@ -292,17 +318,6 @@ export default function TopBar({
         </div>
 
         <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
-
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Oasis-X Index</span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-black text-rose-500 font-mono tracking-tighter">
-              {displayedMarket?.market_index?.toFixed(1) || "0.0"}
-            </span>
-            <span className="text-[9px] text-rose-500/50 font-bold">{displayedMarket?.index_change}</span>
-          </div>
-          <span className="text-[7px] text-slate-600 font-mono mt-1">L_SYNC: {lastSync || "N/A"}</span>
-        </div>
       </div>
 
       <div className="flex items-center gap-8">
