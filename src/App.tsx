@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
-  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge,
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge, ChevronRight,
   Mic, MicOff
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
@@ -13,6 +13,7 @@ import ZenithHUD from "./components/dashboard/ZenithHUD";
 import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
 import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
+import RightRail from "./components/layout/RightRail";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 
 // Design Utility
@@ -175,7 +176,9 @@ export default function App() {
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
+  const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -374,6 +377,18 @@ export default function App() {
     setIsThinking(true);
     logEvent(`Neural Intent Captured: "${query}"`, 'neural');
 
+    // Phase 7.3: Strategic Macro Routing
+    if (q.includes("scan") || q.includes("diagnostic")) {
+        triggerSystemScan();
+        return;
+    }
+    if (q.includes("inventory") || q.includes("vault") || q.includes("asset")) {
+        setNotification("Oasis Core: Highlighting Strategic Asset Vault coordinates.");
+        setIsThinking(false);
+        // Logic: Scroll to Inventory section can be added to a ref
+        return;
+    }
+
     try {
       const res = await invokeSafe("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
       setIsThinking(false);
@@ -454,6 +469,19 @@ export default function App() {
         }, 3000);
       }
     }
+  };
+
+  const triggerSystemScan = async () => {
+    setIsScanning(true);
+    setIsThinking(false);
+    setNotification("Oasis Core: Diagnostic sweep initialized. Scanning Strategic Nodes...");
+    logEvent("System Diagnostic Manifested", 'system');
+    
+    // High-fidelity scan simulation pulse
+    setTimeout(() => {
+        setIsScanning(false);
+        setNotification("Oasis Pulse: Strategic Diagnostic Complete. Registry Absolute.");
+    }, 5000);
   };
 
   const transcribeAndResolve = async (blob: Blob) => {
@@ -2081,16 +2109,34 @@ export default function App() {
                     </div>
                     <div className="flex flex-col gap-4">
                       {activeGolems.map((golem, i) => (
-                        <div key={i} className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-help">
+                        <div 
+                           key={i} 
+                           onClick={() => setSelectedGolem(golem)}
+                           className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
+                        >
                           <div className="flex justify-between items-center">
-                             <div className="text-sm font-bold text-white">{golem.name}</div>
-                             <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase", golem.aura === 'emerald' ? "bg-emerald-500/20 text-emerald-400" : golem.aura === 'rose' ? "bg-rose-500/20 text-rose-400" : "bg-indigo-500/20 text-indigo-400")}>{golem.status}</div>
+                             <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight flex items-center gap-2">
+                               {golem.name}
+                               <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
+                             </div>
+                             <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm flex items-center gap-1.5", 
+                                golem.aura === 'emerald' ? "bg-emerald-500/10 text-emerald-400" : 
+                                golem.aura === 'rose' ? "bg-rose-500/10 text-rose-400" : 
+                                "bg-indigo-500/10 text-indigo-400"
+                             )}>
+                               <span className={cn("w-1 h-1 rounded-full", golem.aura === 'emerald' ? "bg-emerald-400" : golem.aura === 'rose' ? "bg-rose-400" : "bg-indigo-400")} />
+                               {golem.status}
+                             </div>
                           </div>
-                          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                          <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
                              <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${golem.progress}%` }}
-                              className={cn("h-full", golem.aura === 'emerald' ? "bg-emerald-500" : golem.aura === 'rose' ? "bg-rose-500" : "bg-indigo-500")}
+                              className={cn("h-full relative overflow-hidden", 
+                                golem.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_8px_var(--emerald-500)]" : 
+                                golem.aura === 'rose' ? "bg-rose-500 shadow-[0_0_8px_var(--rose-500)]" : 
+                                "bg-indigo-500 shadow-[0_0_8px_var(--indigo-500)]"
+                              )}
                              />
                           </div>
                           <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-widest">
@@ -2103,10 +2149,17 @@ export default function App() {
                   </div>
                 </div>
 
+                <RightRail 
+                    isOpen={!!selectedGolem} 
+                    onClose={() => setSelectedGolem(null)} 
+                    golem={selectedGolem} 
+                />
+
                 <SystemPanel
                   stats={systemStats}
                   windows={runningWindows}
                   processes={processes}
+                  isScanning={isScanning}
                   storage={storageMap}
                   devices={devices}
               processPriorities={processPriorities}

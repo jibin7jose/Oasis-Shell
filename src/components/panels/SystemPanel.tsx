@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Gauge, Usb, Filter, ArrowUpDown, History, Download, RefreshCcw, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -59,6 +60,7 @@ interface SystemPanelProps {
   batteryHealth: { health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null;
   defaultTtlDays: number;
   autoApplyPriorities: boolean;
+  isScanning?: boolean;
   sparklinesEnabled: boolean;
   externalConfirmAction?: "reset" | "reset_clear" | null;
   onClearExternalConfirm?: () => void;
@@ -137,6 +139,7 @@ export default function SystemPanel({
   batteryHealth,
   defaultTtlDays,
   autoApplyPriorities,
+  isScanning = false,
   sparklinesEnabled,
   externalConfirmAction,
   onClearExternalConfirm,
@@ -374,7 +377,22 @@ export default function SystemPanel({
   }, [auditFilter, priorityAudit.length, auditPageSize, auditQuery, auditFrom, auditTo]);
 
   return (
-    <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
+    <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12 relative overflow-hidden">
+      {/* Phase 7.3: Scanning Sweep Manifestation */}
+      <AnimatePresence>
+        {isScanning && (
+          <motion.div 
+            initial={{ top: "-10%" }}
+            animate={{ top: "110%" }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-cyan-500/20 to-transparent z-[50] pointer-events-none"
+          >
+            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-cyan-400 shadow-[0_0_15px_var(--cyan-400)]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
