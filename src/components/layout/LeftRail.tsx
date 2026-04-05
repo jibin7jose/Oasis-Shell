@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History } from "lucide-react";
+import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -22,6 +22,7 @@ interface LeftRailProps {
   onJumpToPresent: () => void;
   pinnedContexts: any[];
   onRestoreContext: (pin: any) => void;
+  onActivateZenith: () => void;
 }
 
 export default function LeftRail({
@@ -43,7 +44,8 @@ export default function LeftRail({
   onChronosChange,
   onJumpToPresent,
   pinnedContexts,
-  onRestoreContext
+  onRestoreContext,
+  onActivateZenith
 }: LeftRailProps) {
   if (presentationMode) return null;
 
@@ -71,6 +73,7 @@ export default function LeftRail({
           { id: "graph", icon: BrainCircuit, label: "Cortex", action: onOpenGraph },
           { id: "vault", icon: FolderOpen, label: "Vault", action: onOpenVault },
           { id: "logs", icon: Activity, label: "Pulse", action: onOpenLogs },
+          { id: "zenith", icon: ShieldCheck, label: "Focus", action: onActivateZenith },
         ].map((item) => (
           <button
             key={item.id}

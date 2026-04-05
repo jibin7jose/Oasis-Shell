@@ -676,6 +676,27 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn launch_context_apps(apps: Vec<WindowInfo>) -> Result<Vec<String>, String> {
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_all();
+    let running_exes: Vec<String> = sys.processes().values()
+        .filter_map(|p| p.exe().map(|e| e.to_string_lossy().to_string()))
+        .collect();
+
+    let mut launched = Vec::new();
+    for app in apps {
+        if !app.exe_path.is_empty() {
+             if !running_exes.iter().any(|e| e.contains(&app.exe_path) || app.exe_path.contains(e)) {
+                 if std::process::Command::new(&app.exe_path).spawn().is_ok() {
+                    launched.push(app.title.clone());
+                 }
+             }
+        }
+    }
+    Ok(launched)
+}
+
+#[tauri::command]
 fn log_event(state: tauri::State<DbState>, event_type: String, message: String) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
@@ -2778,7 +2799,8 @@ pub fn run() {
             get_neural_logs,
             seek_chronos,
             get_active_windows,
-            set_window_layout
+            set_window_layout,
+            launch_context_apps
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
