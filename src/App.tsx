@@ -350,6 +350,12 @@ export default function App() {
         setFiscalBurn(initialFiscal);
 
         setNotification("Oasis Neural Layer: Real-Time Venture Ledger Synchronized.");
+
+        // LAUNCH DOOMSDAY WATCHER
+        const logicPath = await invokeSafe("get_logic_path") as string;
+        await invokeSafe("start_watcher", { path: logicPath });
+        await invokeSafe("start_proactive_sentience");
+        
       } catch (e) {
         console.error("Neural Sync Failure:", e);
       }
@@ -412,6 +418,38 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Phase 8.4: DOOMSDDAY SYNC EVENT LISTENERS
+  useEffect(() => {
+    const unlistenProactive = listenSafe('proactive-pulse', (event: any) => {
+      setNotification(`Neural Impulse: ${event.payload.suggestion}`);
+      logEvent(`Proactive Sentinel: ${event.payload.suggestion}`, 'system');
+    });
+
+    const unlistenCortexRefresh = listenSafe('cortex-refresh', (event: any) => {
+       setNotification(`Neural Node Manifested: ${event.payload.file}`);
+       if (showGraph) {
+          invokeSafe("get_neural_graph").then(data => setDynamicGraph(data));
+       }
+    });
+
+    const unlistenContextSync = listenSafe('cortex-context-sync', (event: any) => {
+       const counts: any = { dev: 0, growth: 0, design: 0 };
+       event.payload.contexts.forEach((c: string) => counts[c]++);
+       
+       const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) as any;
+       if (counts[winner] > 1 && winner !== activeContext && !showSettings && !showNexus) {
+          handleSetContext(winner);
+          setNotification(`Autonomous Sync: Context shifted to ${winner.toUpperCase()} via OS pattern matching.`);
+       }
+    });
+
+    return () => {
+      unlistenProactive.then(f => f());
+      unlistenCortexRefresh.then(f => f());
+      unlistenContextSync.then(f => f());
+    };
+  }, [showGraph, activeContext, showSettings, showNexus]);
 
   // --- LOGIC: MEMORY & INTENT ---
   const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {

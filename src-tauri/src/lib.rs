@@ -356,7 +356,12 @@ async fn seal_strategic_asset(file_path: String, title: String) -> Result<String
     let vault_data = serde_json::to_string(&vault).map_err(|e| e.to_string())?;
     std::fs::write(ledger_path, vault_data).map_err(|e| e.to_string())?;
 
-    Ok("Strategic Asset Sealed within the Sentinel Vault.".into())
+    // ZERO-KNOWLEDGE HARDENING: Erase original file after encryption verify
+    if std::path::Path::new(&enc_path).exists() {
+        let _ = std::fs::remove_file(&path);
+    }
+
+    Ok("Strategic Asset Sealed and Original Purged from Host OS.".into())
 }
 
 #[tauri::command]
@@ -546,7 +551,7 @@ fn sync_project(message: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_watcher(path: String) -> Result<(), String> {
+fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::RecommendedWatcher::new(move |res| {
@@ -590,6 +595,7 @@ fn start_watcher(path: String) -> Result<(), String> {
                                                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                                                 rusqlite::params![name, fp, safe_content, vector_str],
                                             );
+                                            let _ = app.emit("cortex-refresh", serde_json::json!({ "type": "file_updated", "file": name }));
                                         }
                                     }
                                 }
@@ -2244,11 +2250,19 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 
             sys.refresh_cpu_all();
             let cpu_usage = sys.global_cpu_usage();
-            if cpu_usage > 70.0 {
-                let _ = app.emit("proactive-pulse", serde_json::json!({
-                    "suggestion": format!("High CPU load detected ({}%). Should I optimize your active Aura for performance?", cpu_usage as i32),
-                    "action": "CPU_OPTIMIZE"
-                }));
+            }
+
+            // DOOMSDAY PROCESS SYNC: Detect context-shifting apps
+            let mut detected_contexts = Vec::new();
+            for process in sys.processes().values() {
+                let name = process.name().to_string_lossy().to_string().toLowerCase();
+                if name.contains("code") || name.contains("terminal") || name.contains("rust") || name.contains("studio") { detected_contexts.push("dev"); }
+                if name.contains("chart") || name.contains("trading") || name.contains("tradingview") || name.contains("binance") { detected_contexts.push("growth"); }
+                if name.contains("maya") || name.contains("blender") || name.contains("photoshop") || name.contains("figma") { detected_contexts.push("design"); }
+            }
+
+            if !detected_contexts.is_empty() {
+                let _ = app.emit("cortex-context-sync", serde_json::json!({ "contexts": detected_contexts }));
             }
 
             let now = chrono::Local::now();
