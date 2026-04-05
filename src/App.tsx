@@ -55,11 +55,19 @@ const TAURI_DEFAULTS: Record<string, any> = {
   get_chronos_ledger: [],
   get_neural_logs: [],
   get_neural_workforce: [],
-  get_active_golems: [],
+  get_active_golems: [
+    { id: "GLM-001", name: "Golem Alpha-9", mission: "Market Sync", progress: 82, aura: "emerald", status: "Active" },
+    { id: "GLM-002", name: "Golem Beta-4", mission: "Vault Seal", progress: 14, aura: "rose", status: "Latency" },
+    { id: "GLM-003", name: "Golem Sigma-1", mission: "Intent Parse", progress: 99, aura: "indigo", status: "Finalizing" }
+  ],
   get_pinned_contexts: [],
   get_economic_news: [],
   get_pending_manifests: [],
-  get_strategic_inventory: [],
+  get_strategic_inventory: [
+    { id: "AST-442", name: "Neural Logic Key v2", type: "Security", value: "$0.14M", aura: "indigo", health: 100 },
+    { id: "AST-821", name: "Foundry Dash Segment", type: "Interface", value: "$0.42M", aura: "emerald", health: 98 },
+    { id: "AST-994", name: "Oasis Kernel Runtime", type: "Core", value: "$1.24M", aura: "rose", health: 100 }
+  ],
   get_available_ventures: [],
   get_storage_map: [],
   get_system_devices: [],
@@ -167,6 +175,7 @@ export default function App() {
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
+  const [activeGolems, setActiveGolems] = useState<any[]>([]);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -602,6 +611,9 @@ export default function App() {
       } catch (e) {}
     };
     syncWorkforceData();
+    invokeSafe("get_active_golems").then(res => setActiveGolems(res ?? []));
+    invokeSafe("get_strategic_inventory").then(res => setStrategicInventory(res ?? []));
+    
     const interval = setInterval(syncWorkforceData, 20000);
     return () => clearInterval(interval);
   }, []);
@@ -2020,14 +2032,75 @@ export default function App() {
                     { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
                     { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
                   ].map((m, i) => (
-                    <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
-                      <m.icon className="w-5 h-5 text-indigo-400" />
+                    <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
+                      <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
                       <div>
                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
                         <div className="text-xl font-bold text-white">{m.val}</div>
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
+                <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                  <div className="glass p-8 rounded-[2.5rem] border border-white/5">
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="flex items-center gap-3">
+                        <Database className="w-5 h-5 text-emerald-400" />
+                        <h3 className="text-lg font-bold text-white">Strategic Inventory</h3>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Liquid: $1.8M</span>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      {strategicInventory.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
+                          <div className="flex items-center gap-4">
+                            <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
+                            <div>
+                              <div className="text-sm font-bold text-white">{item.name}</div>
+                              <div className="text-[10px] text-slate-500 uppercase font-black">{item.type}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                             <div className="text-sm font-black text-emerald-400">{item.value}</div>
+                             <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="glass p-8 rounded-[2.5rem] border border-white/5">
+                    <div className="flex justify-between items-center mb-6">
+                      <div className="flex items-center gap-3">
+                        <Bot className="w-5 h-5 text-indigo-400" />
+                        <h3 className="text-lg font-bold text-white">Active Golem Matrix</h3>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Units: {activeGolems.length}</span>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      {activeGolems.map((golem, i) => (
+                        <div key={i} className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-help">
+                          <div className="flex justify-between items-center">
+                             <div className="text-sm font-bold text-white">{golem.name}</div>
+                             <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase", golem.aura === 'emerald' ? "bg-emerald-500/20 text-emerald-400" : golem.aura === 'rose' ? "bg-rose-500/20 text-rose-400" : "bg-indigo-500/20 text-indigo-400")}>{golem.status}</div>
+                          </div>
+                          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                             <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${golem.progress}%` }}
+                              className={cn("h-full", golem.aura === 'emerald' ? "bg-emerald-500" : golem.aura === 'rose' ? "bg-rose-500" : "bg-indigo-500")}
+                             />
+                          </div>
+                          <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                             <span>{golem.mission}</span>
+                             <span>{golem.progress}% Complete</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <SystemPanel
