@@ -1,4 +1,4 @@
-import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe } from "lucide-react";
+import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -29,6 +29,7 @@ interface TopBarProps {
   golems: GolemTask[];
   zenMode: boolean;
   voiceActive: boolean;
+  visionActive: boolean;
   autoAura: boolean;
   ventureIntegrity: number;
   fiscalBurn: FiscalBurn;
@@ -39,6 +40,7 @@ interface TopBarProps {
   performanceMode: boolean;
   onOpenSentinel: () => void;
   onVoiceIntent: () => void;
+  onToggleVision: () => void;
   onToggleZen: () => void;
   onToggleCLI: () => void;
   onTogglePresentation: () => void;
@@ -57,6 +59,7 @@ export default function TopBar({
   golems,
   zenMode,
   voiceActive,
+  visionActive,
   autoAura,
   ventureIntegrity,
   fiscalBurn,
@@ -67,6 +70,7 @@ export default function TopBar({
   performanceMode,
   onOpenSentinel,
   onVoiceIntent,
+  onToggleVision,
   onToggleZen,
   onToggleCLI,
   onTogglePresentation,
@@ -214,6 +218,17 @@ export default function TopBar({
               )}
             >
               {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={onToggleVision}
+              className={cn(
+                "ml-4 p-2 glass rounded-lg transition-all",
+                visionActive
+                  ? "text-rose-400 scale-125 border-rose-500/50 shadow-[0_0_20px_#f43f5e]"
+                  : "text-slate-400"
+              )}
+            >
+              <Camera className="w-4 h-4" />
             </button>
             <button
               onClick={onToggleZen}

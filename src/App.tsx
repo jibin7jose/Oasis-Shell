@@ -221,6 +221,7 @@ export default function App() {
   }, []);
 
   const [zenMode, setZenMode] = useState(false);
+  const [visionActive, setVisionActive] = useState(false);
   const [chronosLedger, setChronosLedger] = useState<any[]>([]);
   const [chronosIndex, setChronosIndex] = useState(-1);
   const [voiceActive, setVoiceActive] = useState(false);
@@ -266,9 +267,37 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
 
+  // Phase 8.0: The Eye of the Golem
+  useEffect(() => {
+    if (!visionActive) return;
 
+    const performVisionPulse = async () => {
+      try {
+        const base64Img = await invokeSafe("capture_screenshot") as string;
+        const prompt = "What is the primary technical context of this screen? Provide a very terse 1-sentence strategic summary starting. Never start with 'the screen shows'. Be direct.";
+        const visionResult = await invokeSafe("query_vision", { imageBase64: base64Img, prompt }) as string;
+        
+        setNotification(`Eye of Golem: ${visionResult}`);
+        logEvent("Visual Context Pulse Successful", "neural");
 
+        const normalized = visionResult.toLowerCase();
+        if (normalized.includes("code") || normalized.includes("terminal") || normalized.includes("editor")) {
+           setActiveContext('dev');
+        } else if (normalized.includes("chart") || normalized.includes("trading") || normalized.includes("market")) {
+           setActiveContext('growth');
+        } else if (normalized.includes("game") || normalized.includes("video") || normalized.includes("design")) {
+           setActiveContext('design');
+        }
 
+      } catch (e) {
+        logEvent(`Vision Pulse Offline: ${e}`, "system");
+      }
+    };
+
+    performVisionPulse();
+    const interval = setInterval(performVisionPulse, 30000);
+    return () => clearInterval(interval);
+  }, [visionActive]);
   useEffect(() => {
     const syncGolems = async () => {
       try {
@@ -2052,6 +2081,7 @@ export default function App() {
           systemStats={systemStats}
           zenMode={zenMode}
           voiceActive={voiceActive}
+          visionActive={visionActive}
           autoAura={autoAura}
           ventureIntegrity={ventureIntegrity}
           fiscalBurn={fiscalBurn}
@@ -2062,6 +2092,7 @@ export default function App() {
           performanceMode={performanceMode}
           onOpenSentinel={() => setShowSentinel(true)}
           onVoiceIntent={handleVoiceIntent}
+          onToggleVision={() => setVisionActive(!visionActive)}
           onToggleZen={() => setZenMode(!zenMode)}
           onToggleCLI={() => setShowCLI(!showCLI)}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
