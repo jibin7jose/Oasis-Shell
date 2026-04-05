@@ -3,10 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Globe, Cpu, RotateCcw, Database,
+  RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff, Skull, Pause, FlaskConical, Filter, List, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle
+  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
@@ -183,6 +183,10 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [isVaultSealed, setIsVaultSealed] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
+  const [workforce, setWorkforce] = useState<any[]>([]);
+  const [chronosHistory, setChronosHistory] = useState<any[]>([]);
+  const [travelIndex, setTravelIndex] = useState(-1);
+  const [isTimeTraveling, setIsTimeTraveling] = useState(false);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
@@ -408,7 +412,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [notification]);
-
   // Phase 8.4: DOOMSDDAY SYNC EVENT LISTENERS
   useEffect(() => {
     const unlistenProactive = listenSafe('proactive-pulse', (event: any) => {
@@ -441,16 +444,16 @@ export default function App() {
     });
 
     return () => {
-      unlistenProactive.then(f => f());
-      unlistenCortexRefresh.then(f => f());
-      unlistenContextSync.then(f => f());
-      unlistenSpectral.then(f => f());
+      unlistenProactive.then((f: any) => f());
+      unlistenCortexRefresh.then((f: any) => f());
+      unlistenContextSync.then((f: any) => f());
+      unlistenSpectral.then((f: any) => f());
     };
   }, [showGraph, activeContext, showSettings, showNexus]);
 
   // --- LOGIC: MEMORY & INTENT ---
   const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
-    setTimeline(prev => [{ 
+    setTimeline((prev: any[]) => [{ 
       id: Date.now(), 
       type, 
       event, 
@@ -750,6 +753,39 @@ export default function App() {
     };
   }, [pendingManifests]);
 
+  const handleTimeTravel = (index: number) => {
+     if (index === -1) {
+        setIsTimeTraveling(false);
+        setTravelIndex(-1);
+        setDynamicGraph({ nodes: [], links: [] });
+        return;
+     }
+     setIsTimeTraveling(true);
+     setTravelIndex(index);
+     const snap = chronosHistory[index];
+     setDynamicGraph({ nodes: snap.nodes, links: snap.links });
+     setNotification(`Temporal Shift: System State @ ${new Date(snap.timestamp).toLocaleTimeString()}`);
+  };
+
+  const handleRewind = (seconds: number) => {
+     const index = Math.max(0, chronosHistory.length - Math.floor(seconds / 60) - 1);
+     handleTimeTravel(index);
+  };
+
+  useEffect(() => {
+     const unlistenChronos = listenSafe('chronos-pulse', async () => {
+        if (isTimeTraveling) return;
+        try {
+           const nodes = dynamicGraph.nodes.length > 0 ? dynamicGraph.nodes : graphData.nodes;
+           const links = dynamicGraph.links.length > 0 ? dynamicGraph.links : graphData.links;
+           await invokeSafe("capture_chronos_snapshot", { nodes, links });
+           const history = await invokeSafe("seek_chronos_history") as any[];
+           setChronosHistory(history);
+        } catch (e) {}
+     });
+     return () => { unlistenChronos.then(f => f()); };
+  }, [isTimeTraveling, dynamicGraph, graphData]);
+
   const getNodeColor = (node: any) => {
     if (simMode) return "#f59e0b";
     if (node.isAnomaly) return node.risk_level > 0.8 ? '#f43f5e' : '#a855f7';
@@ -824,7 +860,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [founderMetrics.stress_color]);
 
-  const handleRewind = async () => {
+  const handleVentureRewind = async () => {
     try {
       const res = await invokeSafe("restore_venture_state", { files: manifestHistory }) as string;
       setNotification(res);
@@ -2551,6 +2587,40 @@ export default function App() {
                 </div>
              </div>
 
+             {/* Phase 14: Chronos Temporal Scrubber */}
+             {showGraph && chronosHistory.length > 0 && (
+               <motion.div 
+                 initial={{ opacity: 0, y: 50 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[300] w-[600px] glass-bright rounded-full p-6 border border-indigo-500/20 shadow-6xl flex items-center gap-8"
+               >
+                  <div className="flex items-center gap-3">
+                     <History size={18} className={`${isTimeTraveling ? 'text-indigo-400 rotate-animation' : 'text-slate-500'}`} />
+                     <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Chronos Buffer</span>
+                        <span className="text-[10px] font-bold text-white leading-none mt-1">{isTimeTraveling ? 'TIME TRAVEL ACTIVE' : 'LIVE TELEMETRY'}</span>
+                     </div>
+                  </div>
+
+                  <div className="flex-1 px-4 relative flex items-center">
+                     <input 
+                       type="range"
+                       min="-1"
+                       max={chronosHistory.length - 1}
+                       value={travelIndex}
+                       onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
+                       className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                     />
+                  </div>
+
+                  <div className="text-right whitespace-nowrap min-w-[80px]">
+                     <p className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter">
+                        {travelIndex === -1 ? 'REAL-TIME' : `${chronosHistory.length - 1 - travelIndex}m ago`}
+                     </p>
+                  </div>
+               </motion.div>
+             )}
+
              <div className="absolute top-10 right-10 z-[210]">
                 <button onClick={() => setShowGraph(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all focus:outline-none shadow-xl shadow-black/40"><Plus className="w-8 h-8 rotate-45" /></button>
              </div>
@@ -2819,7 +2889,7 @@ export default function App() {
                       <Shield className="w-4 h-4" /> Sentinel Archive
                    </button>
                    {manifestHistory.length > 0 && (
-                      <button onClick={handleRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
+                      <button onClick={handleVentureRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
                          <RotateCcw className="w-4 h-4" /> Rewind Strategy
                       </button>
                    )}
@@ -3667,7 +3737,35 @@ export default function App() {
                 </div>
               </div>
               
-              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-4">
+              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-6">
+                  {chronosHistory.length > 0 && (
+                    <div className="w-full max-w-4xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
+                       <div className="flex items-center justify-between mb-4 px-2">
+                          <div className="flex items-center gap-3">
+                             <div className={cn("w-2 h-2 rounded-full", isTimeTraveling ? "bg-amber-500 animate-pulse" : "bg-emerald-500")} />
+                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                {isTimeTraveling ? "Chronos: Temporal View Active" : "Chronos: Real-Time Stream"}
+                             </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-500">
+                             {chronosHistory.length} Snapshots Archived
+                          </span>
+                       </div>
+                       <input 
+                         type="range" 
+                         min="-1" 
+                         max={chronosHistory.length - 1} 
+                         value={travelIndex}
+                         onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
+                         className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
+                       />
+                       <div className="flex justify-between mt-2 px-1">
+                          <span className="text-[9px] font-black text-slate-600 uppercase">Live</span>
+                          <span className="text-[9px] font-black text-slate-600 uppercase">Archival Origin</span>
+                       </div>
+                    </div>
+                  )}
+
                   {storageReport && (
                     <div className="flex items-center gap-4 py-2 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-in fade-in slide-in-from-bottom-4">
                        <Database className="w-3 h-3 text-emerald-400" />

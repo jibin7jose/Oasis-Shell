@@ -268,6 +268,40 @@ pub struct CollectiveNode {
     pub last_pulse: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChronosSnapshot {
+    pub timestamp: String,
+    pub nodes: Vec<serde_json::Value>,
+    pub links: Vec<serde_json::Value>,
+    pub entropy_index: f32,
+}
+
+static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
+
+#[tauri::command]
+async fn capture_chronos_snapshot(nodes: Vec<serde_json::Value>, links: Vec<serde_json::Value>) -> Result<String, String> {
+    let mut buffer = CHRONOS_BUFFER.lock().unwrap();
+    let snapshot = ChronosSnapshot {
+        timestamp: chrono::Local::now().to_rfc3339(),
+        nodes,
+        links,
+        entropy_index: 0.0, // Calculated later
+    };
+    
+    // Keep last 100 snapshots (rolling history)
+    if buffer.len() >= 100 {
+        buffer.remove(0);
+    }
+    buffer.push(snapshot);
+    Ok("Chronos Snapshot Captured.".into())
+}
+
+#[tauri::command]
+async fn seek_chronos_history() -> Result<Vec<ChronosSnapshot>, String> {
+    let buffer = CHRONOS_BUFFER.lock().unwrap();
+    Ok(buffer.clone())
+}
+
 static COLLECTIVE_REGISTRY: Mutex<Vec<CollectiveNode>> = Mutex::new(Vec::new());
 
 #[tauri::command]
@@ -3010,12 +3044,23 @@ pub fn run() {
             register_remote_node,
             get_collective_nodes,
             broadcast_distributed_aura,
+            capture_chronos_snapshot,
+            seek_chronos_history,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
             
+            // Phase 14: Chronos Pulse (Temporal Snapshotting)
+            // This thread signals the frontend to capture a 3D state snapshot every 60s
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(60));
+                    let _ = app_handle.emit("chronos-pulse", ());
+                }
+            });
+
             // Phase 9.1: The Spectral Observer Pulse
-            // This thread monitors system telemetry for "Entropy Anomalies"
+            let app_handle_spectral = app.handle().clone();
             std::thread::spawn(move || {
                 let mut sys = System::new_all();
                 loop {
@@ -3029,7 +3074,6 @@ pub fn run() {
                         let cpu = process.cpu_usage();
                         let exe_path = process.exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
                         
-                        // Rule 1: Thermal Anomaly (High CPU)
                         if cpu > 90.0 {
                             anomalies.push(SpectralAnomaly {
                                 id: format!("SN-THERM-{}", pid),
@@ -3041,7 +3085,6 @@ pub fn run() {
                             });
                         }
 
-                        // Rule 2: Shadow Process (No exe path but high PID - placeholder for actual deep check)
                         if pid.as_u32() > 30000 && exe_path.is_empty() {
                             anomalies.push(SpectralAnomaly {
                                 id: format!("SN-SHADOW-{}", pid),
@@ -3053,7 +3096,6 @@ pub fn run() {
                             });
                         }
 
-                        // Rule 3: Temp Execution Sentinel
                         if exe_path.contains("Temp") || exe_path.contains("AppData\\Local\\Temp") {
                             anomalies.push(SpectralAnomaly {
                                 id: format!("SN-TEMP-{}", pid),
@@ -3067,7 +3109,7 @@ pub fn run() {
                     }
 
                     if !anomalies.is_empty() {
-                        let _ = app_handle.emit("spectral-anomaly", &anomalies);
+                        let _ = app_handle_spectral.emit("spectral-anomaly", &anomalies);
                     }
                 }
             });
