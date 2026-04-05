@@ -4,8 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Globe, Cpu, RotateCcw, Database,
-  Bot, BrainCircuit, Terminal, Search, Trash2, Plus,
-  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, LayoutDashboard, ShieldAlert, Lock, Gauge, ChevronRight,
+  Bot, BrainCircuit, Terminal, Search, Plus,
+  Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
   Mic, MicOff
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
@@ -155,7 +155,6 @@ export default function App() {
   const [auraIp, setAuraIp] = useState("192.168.1.100");
   const [activeContext, setActiveContext] = useState('dev');
   const [lastSync, setLastSync] = useState("");
-  const [workforce, setWorkforce] = useState<any[]>([]);
   const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [runningWindows, setRunningWindows] = useState<WindowInfo[]>([]);
@@ -244,20 +243,13 @@ export default function App() {
   const [dynamicGraph, setDynamicGraph] = useState<any>({ nodes: [], links: [] });
   const [showNetwork, setShowNetwork] = useState(false);
   const [showCortex, setShowCortex] = useState(false);
-  const [cortexResults, setCortexResults] = useState<any[]>([]);
-  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
+  const [activeSynthesis, setActiveSynthesis] = useState<any>(null);
+  const [storageReport] = useState<any>(null);
   const [manifestHistory, setManifestHistory] = useState<string[]>([]);
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
+  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
-  const [activeTasks, setActiveTasks] = useState<any[]>([
-    { id: 'edge', name: 'Edge Cluster', status: 'Deployed', prog: 100, color: 'emerald' },
-    { id: 'core', name: 'Core Stable', status: 'Active', prog: 100, color: 'indigo' },
-    { id: 'arch', name: 'Architecture', status: 'Manifesting', prog: 65, color: 'purple' }
-  ]);
-  const [economicNews, setEconomicNews] = useState<string[]>([]);
-  const [activeSynthesis, setActiveSynthesis] = useState<any>(null);
-  const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [storageReport, setStorageReport] = useState<any>(null);
+  const [cortexResults] = useState<any[]>([]);
   const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [activeDebate, setActiveDebate] = useState<any>(null);
@@ -267,6 +259,7 @@ export default function App() {
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
+  const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
 
   // Phase 8.2: Neural Cortex Sync
   useEffect(() => {
@@ -339,12 +332,6 @@ export default function App() {
         const ledger = await invokeSafe("get_chronos_ledger") as any[];
         setChronosLedger(ledger);
         setChronosIndex(ledger.length > 0 ? ledger.length - 1 : 0);
-
-        const news = await invokeSafe("get_economic_news") as string[];
-        setEconomicNews(news);
-
-        const wf = await invokeSafe("get_neural_workforce", { marketIndex: 100.0 }) as any[];
-        setWorkforce(wf);
 
         const initialFiscal = await invokeSafe("get_fiscal_report") as any;
         setFiscalBurn(initialFiscal);
@@ -439,15 +426,22 @@ export default function App() {
        
        const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) as any;
        if (counts[winner] > 1 && winner !== activeContext && !showSettings && !showNexus) {
-          handleSetContext(winner);
+          handleContextSwitch(winner);
           setNotification(`Autonomous Sync: Context shifted to ${winner.toUpperCase()} via OS pattern matching.`);
        }
+    });
+
+    const unlistenSpectral = listenSafe('spectral-anomaly', (event: any) => {
+       const newAnoms = event.payload as any[];
+       setSpectralAnomalies((prev: any) => [...newAnoms, ...prev].slice(0, 50));
+       setNotification(`Spectral Breach: ${newAnoms[0].description}`);
     });
 
     return () => {
       unlistenProactive.then(f => f());
       unlistenCortexRefresh.then(f => f());
       unlistenContextSync.then(f => f());
+      unlistenSpectral.then(f => f());
     };
   }, [showGraph, activeContext, showSettings, showNexus]);
 
@@ -619,7 +613,7 @@ export default function App() {
     }, 4000);
   };
 
-  const transcribeAndResolve = async (blob: Blob) => {
+  const transcribeAndResolve = async (_blob: Blob) => {
     setIsThinking(true);
     setNotification("Oasis Core: Synchronizing Neural Voice Fragment...");
     setIsRecording(false);
@@ -755,6 +749,7 @@ export default function App() {
 
   const getNodeColor = (node: any) => {
     if (simMode) return "#f59e0b";
+    if (node.isAnomaly) return node.risk_level > 0.8 ? '#f43f5e' : '#a855f7';
     switch (node.group) {
       case 'core': return '#6366f1';
       case 'vault': return '#f59e0b';
@@ -796,18 +791,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const syncWorkforceData = async () => {
-      try {
-        const wf = await invokeSafe("get_neural_workforce") as any[];
-        setWorkforce(wf);
-      } catch (e) {}
-    };
-    syncWorkforceData();
     invokeSafe("get_active_golems").then(res => setActiveGolems(res ?? []));
     invokeSafe("get_strategic_inventory").then(res => setStrategicInventory(res ?? []));
-    
-    const interval = setInterval(syncWorkforceData, 20000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -822,17 +807,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [founderMetrics.stress_color]);
 
-  useEffect(() => {
-    const syncNewsData = async () => {
-      try {
-        const news = await invokeSafe("get_economic_news") as string[];
-        setEconomicNews(news);
-      } catch (e) {}
-    };
-    syncNewsData();
-    const interval = setInterval(syncNewsData, 60000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   useEffect(() => {
     const syncHardwareData = async () => {
@@ -989,7 +964,7 @@ export default function App() {
               appliedPriorityPids.current.add(proc.pid);
               invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
                 .then(() => {
-                  setPriorityCache((prev) => ({
+                  setPriorityCache((prev: any) => ({
                     ...prev,
                     [proc.name]: {
                       priority: cachedPriority,
@@ -1049,7 +1024,7 @@ export default function App() {
       const saved = localStorage.getItem("oas_permissions");
       if (saved) {
         const parsed = JSON.parse(saved) as Record<CommandPermission, boolean>;
-        setPermissions((prev) => ({ ...prev, ...parsed }));
+        setPermissions((prev: any) => ({ ...prev, ...parsed }));
       }
     } catch (e) {}
   }, []);
@@ -1166,7 +1141,7 @@ export default function App() {
         const fps = (frame * 1000) / delta;
         samples.push(fps);
         if (samples.length > 3) samples.shift();
-        setFpsHistory((prev) => {
+        setFpsHistory((prev: any) => {
           const next = [...prev, Math.round(fps)];
           if (next.length > 60) next.shift();
           return next;
@@ -1259,7 +1234,7 @@ export default function App() {
   };
 
   const logPriorityChange = (pid: number, name: string, priority: string, source: "Manual" | "Auto-Applied" | "Reset") => {
-    setPriorityAudit((prev) => [
+    setPriorityAudit((prev: any) => [
       { id: Date.now() + Math.floor(Math.random() * 1000), pid, name, priority, source, time: Date.now() },
       ...prev
     ].slice(0, 50));
@@ -1353,11 +1328,11 @@ export default function App() {
       invokeSafe("set_process_priority", { pid, priority })
         .then((res: any) => {
           invokeSafe("get_process_priority", { pid })
-            .then((p: any) => setProcessPriorities((prev) => ({ ...prev, [pid]: String(p || priority).toUpperCase() })))
-            .catch(() => setProcessPriorities((prev) => ({ ...prev, [pid]: priority.toUpperCase() })));
+            .then((p: any) => setProcessPriorities((prev: any) => ({ ...prev, [pid]: String(p || priority).toUpperCase() })))
+            .catch(() => setProcessPriorities((prev: any) => ({ ...prev, [pid]: priority.toUpperCase() })));
           const procName = processes.find((p) => p.pid === pid)?.name;
           if (procName) {
-            setPriorityCache((prev) => ({
+            setPriorityCache((prev: any) => ({
               ...prev,
               [procName]: {
                 priority: priority.toUpperCase(),
@@ -1379,8 +1354,8 @@ export default function App() {
     withPermission("process_control", "Process Control", () => {
       invokeSafe("set_process_priority", { pid, priority: "normal" })
         .then(() => {
-          setProcessPriorities((prev) => ({ ...prev, [pid]: "NORMAL" }));
-          setPriorityCache((prev) => {
+          setProcessPriorities((prev: any) => ({ ...prev, [pid]: "NORMAL" }));
+          setPriorityCache((prev: any) => {
             const next = { ...prev };
             delete next[name];
             return next;
@@ -1393,7 +1368,7 @@ export default function App() {
   };
 
   const handleToggleIgnoreProcess = (name: string, ignore: boolean) => {
-    setPriorityCache((prev) => ({
+    setPriorityCache((prev: any) => ({
       ...prev,
       [name]: {
         priority: prev[name]?.priority || "NORMAL",
@@ -1406,7 +1381,7 @@ export default function App() {
   };
 
   const handleSetProcessTtl = (name: string, ttlDays: number) => {
-    setPriorityCache((prev) => ({
+    setPriorityCache((prev: any) => ({
       ...prev,
       [name]: {
         priority: prev[name]?.priority || "NORMAL",
@@ -1419,7 +1394,7 @@ export default function App() {
   };
 
   const handleToggleIgnoreAll = (ignore: boolean) => {
-    setPriorityCache((prev) => {
+    setPriorityCache((prev: any) => {
       const next: Record<string, typeof prev[string]> = { ...prev };
       Object.keys(next).forEach((key) => {
         next[key] = { ...next[key], ignore };
@@ -1480,7 +1455,7 @@ export default function App() {
   };
 
   const advanceResetProgress = () => {
-    setResetProgress((prev) => {
+    setResetProgress((prev: any) => {
       if (!prev) return prev;
       const done = prev.done + 1;
       const active = done < prev.total;
@@ -1501,7 +1476,7 @@ export default function App() {
       processes.forEach((proc) => {
         invokeSafe("set_process_priority", { pid: proc.pid, priority: "normal" })
           .then(() => {
-            setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
+            setProcessPriorities((prev: any) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
           .catch(() => {})
@@ -1522,7 +1497,7 @@ export default function App() {
       processes.forEach((proc) => {
         invokeSafe("set_process_priority", { pid: proc.pid, priority: "normal" })
           .then(() => {
-            setProcessPriorities((prev) => ({ ...prev, [proc.pid]: "NORMAL" }));
+            setProcessPriorities((prev: any) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
           .catch(() => {})
@@ -1546,7 +1521,7 @@ export default function App() {
         const cachedPriority = cached.priority || "NORMAL";
         invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
           .then(() => {
-            setPriorityCache((prev) => ({
+            setPriorityCache((prev: any) => ({
               ...prev,
               [proc.name]: {
                 priority: cachedPriority,
@@ -1815,7 +1790,7 @@ export default function App() {
       handleClearAllCache();
     }
     else if (id === 'toggle_performance') {
-      setPerformanceMode((prev) => !prev);
+      setPerformanceMode((prev: any) => !prev);
     }
     else if (id === 'logs') setShowLogs(true);
     else if (id === 'presentation') setPresentationMode(true);
@@ -2426,24 +2401,78 @@ export default function App() {
           />
         )}
         {showGraph && !performanceMode && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
-             <div className="absolute top-10 left-10 z-[210] flex flex-col gap-2">
-                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Neural Cortex Matrix</h2>
-                <div className="flex items-center gap-3">
-                   <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Real-time Semantic Synchronization Active</span>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-4xl">
+             {/* Spectral HUD: Entropy Buffer */}
+             <div className="absolute top-10 left-10 z-[210] flex flex-col gap-6 w-96">
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Cortex</h2>
+                    <div className="flex items-center gap-3">
+                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Spectral eBPF Sentinel Online</span>
+                    </div>
+                </div>
+
+                <div className="glass-bright p-8 rounded-[3rem] border border-white/10 shadow-3xl shadow-black/40">
+                   <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                       <Activity size={14} className="animate-pulse" /> Kernel Anomaly Feed
+                   </h3>
+                   <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+                      {spectralAnomalies.length === 0 && (
+                        <div className="flex flex-col items-center py-12 opacity-30 text-center">
+                           <Shield size={32} className="mb-4 text-emerald-500" />
+                           <p className="text-[10px] text-slate-500 italic uppercase">System is optimized & tranquil.</p>
+                        </div>
+                      )}
+                      {spectralAnomalies.map((anom) => (
+                        <motion.div 
+                          key={anom.id} 
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all group overflow-hidden relative"
+                        >
+                           <div className="absolute top-0 right-0 p-4">
+                              <span className="text-[8px] text-slate-500 font-mono">PID {anom.associated_pid || '??'}</span>
+                           </div>
+                           <div className="flex items-center gap-3 mb-3">
+                              <span className="text-[9px] px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full font-black uppercase tracking-widest border border-rose-500/20">{anom.source}</span>
+                           </div>
+                           <p className="text-xs text-white font-bold leading-tight mb-4">{anom.description}</p>
+                           <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${anom.risk_level * 100}%` }}
+                                className="h-full bg-gradient-to-r from-rose-500 to-purple-600"
+                              />
+                           </div>
+                        </motion.div>
+                      ))}
+                   </div>
                 </div>
              </div>
-             <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all focus:outline-none"><Plus className="w-8 h-8 rotate-45" /></button>
+
+             <div className="absolute top-10 right-10 z-[210]">
+                <button onClick={() => setShowGraph(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all focus:outline-none shadow-xl shadow-black/40"><Plus className="w-8 h-8 rotate-45" /></button>
+             </div>
+             
              <div className="w-full h-full pointer-events-auto">
                 {mounted && (
                   <ForceGraph3D 
                     graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData} 
                     backgroundColor="#00000000"
                     nodeRelSize={6}
-                    nodeVal="val"
                     nodeColor={(node: any) => getNodeColor(node)}
-                    nodeLabel={(node: any) => `<div class="glass p-3 rounded-xl border border-white/10"><div class="text-[10px] font-black uppercase text-indigo-400 mb-1">${node.group}</div><div class="text-xs font-bold text-white">${node.id}</div></div>`}
+                    nodeLabel={(node: any) => `
+                      <div class="glass p-4 rounded-2xl border border-white/10 backdrop-blur-xl">
+                        <div class="text-[9px] font-black uppercase text-indigo-400 mb-2 tracking-widest">${node.isAnomaly ? 'SPECTRAL ANOMALY' : (node.group || 'Neural Node')}</div>
+                        <div class="text-xs font-bold text-white">${node.name || node.id}</div>
+                        ${node.isAnomaly ? `
+                          <div class="mt-3 p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl">
+                            <div class="text-[8px] font-black text-rose-400 uppercase">Entropy Score: ${Math.round(node.risk_level * 100)}%</div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `}
+                    nodeVal={(node: any) => node.isAnomaly ? (15 + node.risk_level * 25) : (node.val || 5)}
                     linkColor={() => "rgba(255, 255, 255, 0.05)"}
                     linkWidth={1}
                     enableNodeDrag={true}
@@ -3457,7 +3486,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
-                  setPermissions((prev) => ({ ...prev, [pendingPermission.key]: true }));
+                  setPermissions((prev: any) => ({ ...prev, [pendingPermission.key]: true }));
                   pendingPermission.action?.();
                   setPendingPermission(null);
                 }}

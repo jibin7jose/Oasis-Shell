@@ -235,13 +235,32 @@ pub struct Scenarios {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OracleForecast {
-    pub venture_id: String,
-    pub projected_arr: String,
-    pub projected_burn: String,
-    pub prediction_confidence: f32,
-    pub trend_points: Vec<f32>,
-    pub scenarios: Option<Scenarios>,
     pub recommendation: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SpectralAnomaly {
+    pub id: String,
+    pub source: String, // "Kernel", "Network", "FileSystem"
+    pub description: String,
+    pub risk_level: f32, // 0.0 to 1.0 (Entropy Score)
+    pub timestamp: String,
+    pub associated_pid: Option<u32>,
+}
+
+#[tauri::command]
+async fn get_spectral_anomalies() -> Result<Vec<SpectralAnomaly>, String> {
+    // Simulated eBPF pull from the Spectral Buffer
+    Ok(vec![
+        SpectralAnomaly {
+            id: "ANOM-884".into(),
+            source: "Kernel".into(),
+            description: "High-frequency Syscall: RegOpenKeyExW (Unauthorized Hive)".into(),
+            risk_level: 0.82,
+            timestamp: chrono::Local::now().to_rfc3339(),
+            associated_pid: Some(1024),
+        }
+    ])
 }
 
 #[tauri::command]
@@ -2869,8 +2888,72 @@ pub fn run() {
             seek_chronos,
             get_active_windows,
             set_window_layout,
-            launch_context_apps
+            launch_context_apps,
+            get_spectral_anomalies,
         ])
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            
+            // Phase 9.1: The Spectral Observer Pulse
+            // This thread monitors system telemetry for "Entropy Anomalies"
+            std::thread::spawn(move || {
+                let mut sys = System::new_all();
+                loop {
+                    std::thread::sleep(Duration::from_secs(5));
+                    sys.refresh_all();
+                    
+                    let mut anomalies = Vec::new();
+                    
+                    for (pid, process) in sys.processes() {
+                        let proc_name = process.name().to_string_lossy();
+                        let cpu = process.cpu_usage();
+                        let exe_path = process.exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                        
+                        // Rule 1: Thermal Anomaly (High CPU)
+                        if cpu > 90.0 {
+                            anomalies.push(SpectralAnomaly {
+                                id: format!("SN-THERM-{}", pid),
+                                source: "Kernel".into(),
+                                description: format!("Thermal Spike: {} [CPU: {:.1}%]", proc_name, cpu),
+                                risk_level: 0.72,
+                                timestamp: chrono::Local::now().to_rfc3339(),
+                                associated_pid: Some(pid.as_u32()),
+                            });
+                        }
+
+                        // Rule 2: Shadow Process (No exe path but high PID - placeholder for actual deep check)
+                        if pid.as_u32() > 30000 && exe_path.is_empty() {
+                            anomalies.push(SpectralAnomaly {
+                                id: format!("SN-SHADOW-{}", pid),
+                                source: "Kernel".into(),
+                                description: format!("Ghost Thread detected in Upper PID space: PID {}", pid),
+                                risk_level: 0.45,
+                                timestamp: chrono::Local::now().to_rfc3339(),
+                                associated_pid: Some(pid.as_u32()),
+                            });
+                        }
+
+                        // Rule 3: Temp Execution Sentinel
+                        if exe_path.contains("Temp") || exe_path.contains("AppData\\Local\\Temp") {
+                            anomalies.push(SpectralAnomaly {
+                                id: format!("SN-TEMP-{}", pid),
+                                source: "FileSystem".into(),
+                                description: format!("Transient Execution: {} running from volatile TEMP space", proc_name),
+                                risk_level: 0.88,
+                                timestamp: chrono::Local::now().to_rfc3339(),
+                                associated_pid: Some(pid.as_u32()),
+                            });
+                        }
+                    }
+
+                    if !anomalies.is_empty() {
+                        let _ = app_handle.emit("spectral-anomaly", &anomalies);
+                    }
+                }
+            });
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
