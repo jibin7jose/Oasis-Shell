@@ -1982,7 +1982,7 @@ fn execute_neural_command(command: String) -> Result<String, String> {
 #[tauri::command]
 async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
     #[derive(serde::Serialize)]
-    struct Node { id: String, group: i32 }
+    struct Node { id: String, group: String, val: f32 }
     #[derive(serde::Serialize)]
     struct Link { source: String, target: String, value: f32 }
     
@@ -1990,24 +1990,35 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
     let mut links = Vec::new();
     let mut files_data = Vec::new();
 
+    // 1. Anchor Nodes (System-Level Hubs)
+    nodes.push(Node { id: "Oasis Core".into(), group: "core".into(), val: 30.0 });
+    nodes.push(Node { id: "Sentinel Vault".into(), group: "vault".into(), val: 20.0 });
+    nodes.push(Node { id: "Neural Search".into(), group: "neural".into(), val: 20.0 });
+    nodes.push(Node { id: "Market Pulse".into(), group: "growth".into(), val: 20.0 });
+
+    // 2. Fetch File Embeddings
     {
         let conn = state.0.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 100").unwrap();
+        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 40").unwrap();
         let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).unwrap();
         for row in rows.flatten() {
             if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
                 files_data.push((row.0.clone(), vec));
-                let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { 1 } else if row.0.ends_with(".rs") { 2 } else { 3 };
-                nodes.push(Node { id: row.0.clone(), group });
+                let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { "logic".into() } else if row.0.ends_with(".rs") { "kernel".into() } else { "file".into() };
+                nodes.push(Node { id: row.0.clone(), group, val: 10.0 });
             }
         }
     }
 
-    // Calculate relationships (only strong ones >= 0.5)
+    // 3. Link Logic (Cosine Similarity)
     for i in 0..files_data.len() {
+        // Link to nearest hub based on file extension
+        let hub = if files_data[i].0.ends_with(".rs") { "Oasis Core" } else { "Neural Search" };
+        links.push(Link { source: hub.into(), target: files_data[i].0.clone(), value: 0.8 });
+
         for j in (i + 1)..files_data.len() {
             let score = cosine_similarity(&files_data[i].1, &files_data[j].1);
-            if score > 0.5 {
+            if score > 0.65 {
                 links.push(Link { source: files_data[i].0.clone(), target: files_data[j].0.clone(), value: score });
             }
         }

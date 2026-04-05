@@ -241,6 +241,7 @@ export default function App() {
   const [pendingManifests, setPendingManifests] = useState<any[]>([]);
   const [oracleAlert, setOracleAlert] = useState<any>(null);
   const [showGraph, setShowGraph] = useState(false);
+  const [dynamicGraph, setDynamicGraph] = useState<any>({ nodes: [], links: [] });
   const [showNetwork, setShowNetwork] = useState(false);
   const [showCortex, setShowCortex] = useState(false);
   const [cortexResults, setCortexResults] = useState<any[]>([]);
@@ -266,6 +267,20 @@ export default function App() {
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
+
+  // Phase 8.2: Neural Cortex Sync
+  useEffect(() => {
+    if (!showGraph) return;
+    const syncGraph = async () => {
+      try {
+        const data = await invokeSafe("get_neural_graph");
+        setDynamicGraph(data);
+      } catch (err) {}
+    };
+    syncGraph();
+    const interval = setInterval(syncGraph, 10000);
+    return () => clearInterval(interval);
+  }, [showGraph]);
 
   // Phase 8.0: The Eye of the Golem
   useEffect(() => {
@@ -702,12 +717,15 @@ export default function App() {
 
   const getNodeColor = (node: any) => {
     if (simMode) return "#f59e0b";
-    if (node.group === 'ghost') return 'rgba(255, 255, 255, 0.2)';
     switch (node.group) {
       case 'core': return '#6366f1';
-      case 'capital': return '#f59e0b';
-      case 'product': return '#a855f7';
+      case 'vault': return '#f59e0b';
+      case 'neural': return '#a855f7';
       case 'growth': return '#10b981';
+      case 'logic': return '#38bdf8';
+      case 'kernel': return '#ec4899';
+      case 'file': return '#94a3b8';
+      case 'ghost': return 'rgba(255, 255, 255, 0.2)';
       default: return '#94a3b8';
     }
   };
@@ -2371,17 +2389,27 @@ export default function App() {
         )}
         {showGraph && !performanceMode && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
-             <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+             <div className="absolute top-10 left-10 z-[210] flex flex-col gap-2">
+                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Neural Cortex Matrix</h2>
+                <div className="flex items-center gap-3">
+                   <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Real-time Semantic Synchronization Active</span>
+                </div>
+             </div>
+             <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all focus:outline-none"><Plus className="w-8 h-8 rotate-45" /></button>
              <div className="w-full h-full pointer-events-auto">
                 {mounted && (
                   <ForceGraph3D 
-                    graphData={graphData} 
-                    backgroundColor="#00000000" 
-                    nodeRelSize={simMode ? 10 : 10} 
-                    nodeColor={(node: any) => node.group === 'ghost' ? '#C0C0C0' : getNodeColor(node)}
-                    nodeLabel="id"
-                    linkColor={() => simMode ? "rgba(245, 158, 11, 0.3)" : "rgba(99, 102, 241, 0.3)"}
-                    onNodeClick={(node: any) => node.group === 'ghost' && setActiveGolem(node.mData)}
+                    graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData} 
+                    backgroundColor="#00000000"
+                    nodeRelSize={6}
+                    nodeVal="val"
+                    nodeColor={(node: any) => getNodeColor(node)}
+                    nodeLabel={(node: any) => `<div class="glass p-3 rounded-xl border border-white/10"><div class="text-[10px] font-black uppercase text-indigo-400 mb-1">${node.group}</div><div class="text-xs font-bold text-white">${node.id}</div></div>`}
+                    linkColor={() => "rgba(255, 255, 255, 0.05)"}
+                    linkWidth={1}
+                    enableNodeDrag={true}
+                    showNavInfo={false}
                   />
                 )}
              </div>
