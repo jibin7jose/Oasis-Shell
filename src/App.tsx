@@ -14,6 +14,7 @@ import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceI
 import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
 import RightRail from "./components/layout/RightRail";
+import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 
 // Design Utility
@@ -179,6 +180,7 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
+  const [showDocs, setShowDocs] = useState(false);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -388,6 +390,12 @@ export default function App() {
         // Logic: Scroll to Inventory section can be added to a ref
         return;
     }
+    if (q.includes("docs") || q.includes("manual") || q.includes("help") || q.includes("plan")) {
+        setShowDocs(true);
+        setNotification("Oasis Core: Manifesting Neural Documentation Hub.");
+        setIsThinking(false);
+        return;
+    }
 
     try {
       const res = await invokeSafe("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
@@ -535,10 +543,26 @@ export default function App() {
                 ...prev,
                 cpu_load: Math.max(5, Math.min(95, prev.cpu_load + (Math.random() - 0.5) * 5)),
             } : null);
+
+            // Phase 7.6: Golem Progress Progression
+            setActiveGolems(prev => (prev ?? []).map(g => {
+                const inc = Math.random() * 0.4;
+                const newProgress = Math.min(100, g.progress + inc);
+                
+                // Logic: Handle Mission Completion
+                if (newProgress >= 100 && g.progress < 100) {
+                   setNotification(`Oasis Pulse: ${g.name} MISSION ACCOMPLISHED.`);
+                   logEvent(`Golem ${g.id} completed mission: "${g.mission}"`, 'deploy');
+                   return { ...g, progress: 100, status: 'Standby' };
+                }
+                return { ...g, progress: Float(newProgress.toFixed(1)) };
+            }));
         }, 3000);
         return () => clearInterval(interval);
     }
   }, [isTauri]);
+
+  const Float = (n: string) => parseFloat(n);
 
   const handleNeuralSend = () => {
     if (!assistantInput.trim()) return;
@@ -2153,6 +2177,11 @@ export default function App() {
                     isOpen={!!selectedGolem} 
                     onClose={() => setSelectedGolem(null)} 
                     golem={selectedGolem} 
+                />
+
+                <DocumentationPanel 
+                    isOpen={showDocs} 
+                    onClose={() => setShowDocs(false)} 
                 />
 
                 <SystemPanel
