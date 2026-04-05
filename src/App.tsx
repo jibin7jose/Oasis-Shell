@@ -178,6 +178,7 @@ export default function App() {
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isVaultSealed, setIsVaultSealed] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showDocs, setShowDocs] = useState(false);
@@ -396,6 +397,14 @@ export default function App() {
         setIsThinking(false);
         return;
     }
+    if (q.includes("seal") || q.includes("lock")) {
+        handleVaultSeal();
+        return;
+    }
+    if (q.includes("optimize") || q.includes("clean") || q.includes("stabilize")) {
+        handleOptimizeNodes();
+        return;
+    }
 
     try {
       const res = await invokeSafe("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
@@ -490,6 +499,30 @@ export default function App() {
         setIsScanning(false);
         setNotification("Oasis Pulse: Strategic Diagnostic Complete. Registry Absolute.");
     }, 5000);
+  };
+
+  const handleVaultSeal = () => {
+    setIsVaultSealed(true);
+    setIsThinking(false);
+    setNotification("Oasis Core: SENTINEL VAULT SEALED. Access coordinates scrambled.");
+    logEvent("Sentinel Vault Lockdown Manifested", 'system');
+    
+    // Auto-unseal after 10 seconds for dev-loop convenience
+    setTimeout(() => {
+        setIsVaultSealed(false);
+        setNotification("Oasis Pulse: Sentinel Vault normalization complete.");
+    }, 10000);
+  };
+
+  const handleOptimizeNodes = () => {
+    setIsThinking(false);
+    setNotification("Oasis Core: Neural Optimization Sequence Active. Stabilizing Telemetry...");
+    logEvent("Nodes Optimized", 'system');
+    
+    // Manifested by the Pulse useEffect reading this state
+    setTimeout(() => {
+        setNotification("Oasis Pulse: Optimization complete. Nodes at peak fidelity.");
+    }, 4000);
   };
 
   const transcribeAndResolve = async (blob: Blob) => {
@@ -2096,7 +2129,24 @@ export default function App() {
 
                 {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
                 <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                  <div className="glass p-8 rounded-[2.5rem] border border-white/5">
+                  <div className={cn("glass p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden transition-all duration-700", isVaultSealed && "border-rose-500/50 shadow-[0_0_50px_-20px_rgba(244,63,94,0.3)]")}>
+                    {/* Phase 7.7: Sentinel Lockdown Overlay */}
+                    <AnimatePresence>
+                      {isVaultSealed && (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 bg-rose-950/20 backdrop-blur-[2px] z-[20] flex items-center justify-center border border-rose-500/20"
+                        >
+                           <div className="flex flex-col items-center gap-2 animate-bounce">
+                             <Lock className="w-8 h-8 text-rose-500" />
+                             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Sentinel Vault Locked</span>
+                           </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     <div className="flex justify-between items-center mb-6">
                       <div className="flex items-center gap-3">
                         <Database className="w-5 h-5 text-emerald-400" />
