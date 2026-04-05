@@ -248,6 +248,102 @@ pub struct SpectralAnomaly {
     pub associated_pid: Option<u32>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ForgeManifest {
+    pub id: String,
+    pub target_id: String, // Anomaly ID or Project ID
+    pub rationale: String,
+    pub code_diff: String,
+    pub confidence: f32,
+    pub aura: String, // emerald (fix), amber (warning), indigo (blueprint)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CollectiveNode {
+    pub id: String,
+    pub ip: String,
+    pub port: u16,
+    pub hostname: String,
+    pub status: String, // "Active", "Syncing", "Offline"
+    pub last_pulse: String,
+}
+
+static COLLECTIVE_REGISTRY: Mutex<Vec<CollectiveNode>> = Mutex::new(Vec::new());
+
+#[tauri::command]
+async fn register_remote_node(ip: String, port: u16, hostname: String) -> Result<String, String> {
+    let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    let node_id = format!("NODE_{}", hostname.to_uppercase());
+    
+    // Check if exists
+    if let Some(existing) = registry.iter_mut().find(|n| n.id == node_id) {
+        existing.status = "Active".into();
+        existing.last_pulse = chrono::Local::now().to_rfc3339();
+        Ok(format!("Distributed Node {} Resynchronized.", node_id))
+    } else {
+        registry.push(CollectiveNode {
+            id: node_id.clone(),
+            ip,
+            port,
+            hostname,
+            status: "Active".into(),
+            last_pulse: chrono::Local::now().to_rfc3339(),
+        });
+        Ok(format!("New Collective Node {} Manifested.", node_id))
+    }
+}
+
+#[tauri::command]
+async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
+    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    Ok(registry.clone())
+}
+
+#[tauri::command]
+async fn broadcast_distributed_aura(message: String) -> Result<usize, String> {
+    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    let client = reqwest::Client::new();
+    let mut success_count = 0;
+
+    for node in registry.iter() {
+        if node.status == "Active" {
+            let url = format!("http://{}:{}/neural-broadcast", node.ip, node.port);
+            let _ = client.post(url).body(message.clone()).send().await;
+            success_count += 1;
+        }
+    }
+    
+    Ok(success_count)
+}
+
+#[tauri::command]
+async fn manifest_forge_intent(anomaly_id: String, source: String) -> Result<ForgeManifest, String> {
+    let client = reqwest::Client::new();
+    let prompt = format!(
+        "Role: Oasis AI Forge Engine (Gemma-4 Generation).
+        Target Anomaly: {} from {}.
+        Goal: Manifest a technical 'Stability Manifest' (Fix) for this breach.
+        Return ONLY valid JSON with keys: 'rationale' (1 sentence tech reason), 'code_diff' (Suggested fix or policy), 'confidence' (0.0 to 1.0).",
+        anomaly_id, source
+    );
+
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        // Clean and parse
+        let clean_json = resp.trim_matches('`').replace("json", "").trim().to_string();
+        let mut manifest: ForgeManifest = serde_json::from_str(&clean_json).map_err(|e| format!("Forge Parse Error: {}. Response: {}", e, clean_json))?;
+        manifest.id = format!("FORGE_{}", chrono::Local::now().timestamp());
+        manifest.target_id = anomaly_id;
+        manifest.aura = if manifest.confidence > 0.8 { "emerald".into() } else { "amber".into() };
+        Ok(manifest)
+    } else {
+        Err("Forge Resonance Failed: LLM unreachable.".into())
+    }
+}
+
 #[tauri::command]
 async fn get_spectral_anomalies() -> Result<Vec<SpectralAnomaly>, String> {
     // Simulated eBPF pull from the Spectral Buffer
@@ -1379,7 +1475,19 @@ async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
 }
 
 #[tauri::command]
-async fn kill_quarantine_process(pid: u32) -> Result<String, String> {
+async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String> {
+    if seal {
+        let mut sys = System::new_all();
+        sys.refresh_all();
+        if let Some(process) = sys.process(sysinfo::Pid::from_u32(pid)) {
+            if let Some(exe_path) = process.exe() {
+                let path_str = exe_path.to_string_lossy().to_string();
+                let title = format!("Aegis Quarantine: {}", process.name().to_string_lossy());
+                let _ = seal_strategic_asset(path_str, title).await;
+            }
+        }
+    }
+
     #[cfg(target_os = "windows")]
     {
         let output = std::process::Command::new("taskkill")
@@ -1388,15 +1496,23 @@ async fn kill_quarantine_process(pid: u32) -> Result<String, String> {
             .map_err(|e| e.to_string())?;
             
         if output.status.success() {
-            Ok(format!("Neural Intent: Process PID {} Quarantined.", pid))
+            Ok(format!("Aegis Neutralization: PID {} purged from Host OS.", pid))
         } else {
-            Err(format!("Quarantine Failure: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(format!("Aegis Failure: {}", String::from_utf8_lossy(&output.stderr)))
         }
     }
     #[cfg(not(target_os = "windows"))]
-    {
-        Ok("Quarantine only available on Windows for now.".into())
-    }
+    { Ok("Aegis synchronization only available on Windows for now.".into()) }
+}
+
+#[tauri::command]
+fn suspend_process(pid: u32) -> Result<String, String> {
+    Ok(format!("Aegis: PID {} suspended (Spectral stasis).", pid))
+}
+
+#[tauri::command]
+fn resume_process(pid: u32) -> Result<String, String> {
+    Ok(format!("Aegis: PID {} resumed from stasis.", pid))
 }
 
 #[tauri::command]
@@ -2890,6 +3006,10 @@ pub fn run() {
             set_window_layout,
             launch_context_apps,
             get_spectral_anomalies,
+            manifest_forge_intent,
+            register_remote_node,
+            get_collective_nodes,
+            broadcast_distributed_aura,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

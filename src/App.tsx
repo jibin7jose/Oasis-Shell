@@ -6,7 +6,7 @@ import {
   Globe, Cpu, RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff
+  Mic, MicOff, Skull, Pause, FlaskConical, Filter, List, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
@@ -172,7 +172,6 @@ export default function App() {
   const [priorityAudit, setPriorityAudit] = useState<{ id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[]>([]);
   const [defaultTtlDays, setDefaultTtlDays] = useState(7);
   const [sparklinesEnabled, setSparklinesEnabled] = useState(true);
-  const [performanceMode, setPerformanceMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -260,6 +259,10 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
   const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
+  const [cortexMenu, setCortexMenu] = useState<{x:number, y:number, node:any} | null>(null);
+  const [activeForge, setActiveForge] = useState<any>(null);
+  const [collectiveNodes, setCollectiveNodes] = useState<any[]>([]);
+  const [performanceMode, setPerformanceMode] = useState(false);
 
   // Phase 8.2: Neural Cortex Sync
   useEffect(() => {
@@ -1649,7 +1652,58 @@ export default function App() {
     syncAegisData();
   }, []);
 
-  // --- SYNC: BRIDGE ---
+  const handleAegisPurge = async (node: any, seal: boolean) => {
+    if (!node.associated_pid) return;
+    try {
+      const res = await invokeSafe("kill_quarantine_process", { pid: node.associated_pid, seal }) as string;
+      setNotification(`Aegis Strike: ${res}`);
+      setCortexMenu(null);
+      // Prune from local graph instantly
+      setDynamicGraph((prev: any) => ({
+        ...prev,
+        nodes: prev.nodes.filter((n: any) => n.id !== node.id)
+      }));
+    } catch (e: any) {
+      setNotification(`Aegis Error: ${e}`);
+    }
+  };
+
+  const handleAegisStasis = async (node: any, resume: boolean) => {
+    if (!node.associated_pid) return;
+    try {
+        const cmd = resume ? "resume_process" : "suspend_process";
+        const res = await invokeSafe(cmd, { pid: node.associated_pid }) as string;
+        setNotification(res);
+        setCortexMenu(null);
+    } catch (e: any) {
+        setNotification(`Aegis Stasis Error: ${e}`);
+    }
+  };
+
+  const handleForgeIntent = async (node: any) => {
+    setNotification("Neural Forge: Orchestrating generative fix via Golem Alpha-9...");
+    setCortexMenu(null);
+    try {
+        const manifest = await invokeSafe("manifest_forge_intent", { anomalyId: node.id, source: node.source || 'Manual' }) as any;
+        setActiveForge(manifest);
+        setNotification("Neural Forge: Stability Manifest Manifested.");
+    } catch (e: any) {
+        setNotification(`Forge Resonance Error: ${e}`);
+    }
+  };
+
+  useEffect(() => {
+    const syncCollective = async () => {
+        try {
+            const nodes = await invokeSafe("get_collective_nodes") as any[];
+            setCollectiveNodes(nodes);
+        } catch (e) {}
+    };
+    syncCollective();
+    const interval = setInterval(syncCollective, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const syncFoundryData = async () => {
       try {
@@ -2413,9 +2467,23 @@ export default function App() {
                 </div>
 
                 <div className="glass-bright p-8 rounded-[3rem] border border-white/10 shadow-3xl shadow-black/40">
-                   <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                       <Activity size={14} className="animate-pulse" /> Kernel Anomaly Feed
-                   </h3>
+                   <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+                          <Activity size={14} className="animate-pulse" /> Kernel Anomaly Feed
+                      </h3>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 opacity-30">
+                           <Clock size={10} />
+                           <span className="text-[8px] font-black uppercase tracking-tighter">Real-time Buffer</span>
+                        </div>
+                        <button 
+                          onClick={() => setPerformanceMode(!performanceMode)}
+                          className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${performanceMode ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
+                        >
+                           {performanceMode ? 'Zen Mode: ON' : 'Optimize 3D'}
+                        </button>
+                      </div>
+                   </div>
                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
                       {spectralAnomalies.length === 0 && (
                         <div className="flex flex-col items-center py-12 opacity-30 text-center">
@@ -2448,6 +2516,39 @@ export default function App() {
                       ))}
                    </div>
                 </div>
+
+                {/* Distributed Collective: Remote Foundry Nodes */}
+                <div className="glass-bright p-8 rounded-[3rem] border border-indigo-500/10 shadow-3xl shadow-black/40">
+                   <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                       <Globe size={14} className="animate-pulse" /> Distributed Collective
+                   </h3>
+                   <div className="space-y-4">
+                      {collectiveNodes.length === 0 && (
+                        <p className="text-[10px] text-slate-500 italic uppercase">Searching for remote Foundry nodes...</p>
+                      )}
+                      {collectiveNodes.map((node) => (
+                        <div key={node.id} className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-between">
+                           <div>
+                              <p className="text-[10px] font-bold text-white leading-none mb-1">{node.hostname}</p>
+                              <p className="text-[8px] text-slate-500 font-mono">{node.ip}:{node.port}</p>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{node.status}</span>
+                           </div>
+                        </div>
+                      ))}
+                      <button 
+                        onClick={async () => {
+                           const res = await invokeSafe("register_remote_node", { ip: "127.0.0.1", port: 1420, hostname: "LocalFoundry-Alpha" }) as string;
+                           setNotification(res);
+                        }}
+                        className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest hover:bg-white/10 transition-all"
+                      >
+                         Scan for Peer Nodes
+                      </button>
+                   </div>
+                </div>
              </div>
 
              <div className="absolute top-10 right-10 z-[210]">
@@ -2459,27 +2560,152 @@ export default function App() {
                   <ForceGraph3D 
                     graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData} 
                     backgroundColor="#00000000"
-                    nodeRelSize={6}
+                    nodeRelSize={performanceMode ? 3 : 5}
                     nodeColor={(node: any) => getNodeColor(node)}
                     nodeLabel={(node: any) => `
                       <div class="glass p-4 rounded-2xl border border-white/10 backdrop-blur-xl">
                         <div class="text-[9px] font-black uppercase text-indigo-400 mb-2 tracking-widest">${node.isAnomaly ? 'SPECTRAL ANOMALY' : (node.group || 'Neural Node')}</div>
                         <div class="text-xs font-bold text-white">${node.name || node.id}</div>
-                        ${node.isAnomaly ? `
-                          <div class="mt-3 p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl">
-                            <div class="text-[8px] font-black text-rose-400 uppercase">Entropy Score: ${Math.round(node.risk_level * 100)}%</div>
-                          </div>
-                        ` : ''}
                       </div>
                     `}
-                    nodeVal={(node: any) => node.isAnomaly ? (15 + node.risk_level * 25) : (node.val || 5)}
+                    nodeVal={(node: any) => node.isAnomaly ? (12 + node.risk_level * 10) : (node.val || 4)}
                     linkColor={() => "rgba(255, 255, 255, 0.05)"}
-                    linkWidth={1}
-                    enableNodeDrag={true}
+                    linkWidth={performanceMode ? 0.5 : 1}
+                    enableNodeDrag={!performanceMode}
                     showNavInfo={false}
+                    onNodeRightClick={(node: any, event: any) => {
+                       setCortexMenu({ x: event.clientX, y: event.clientY, node });
+                    }}
+                    warmupTicks={performanceMode ? 50 : 20}
+                    cooldownTicks={performanceMode ? 30 : 60}
                   />
                 )}
              </div>
+
+             {/* Aegis Context Menu: Tactical Strike Layer */}
+             {cortexMenu && (
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.95 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 style={{ top: cortexMenu.y, left: cortexMenu.x }}
+                 className="fixed z-[400] w-64 glass-bright rounded-3xl border border-white/10 shadow-5xl p-4 flex flex-col gap-2 overflow-hidden"
+               >
+                  <div className="px-4 py-3 border-b border-white/5 mb-2">
+                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Target PID: {cortexMenu.node.associated_pid || '??'}</p>
+                     <p className="text-[10px] font-bold text-white truncate">{cortexMenu.node.name || cortexMenu.node.id}</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => handleAegisPurge(cortexMenu.node, false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-rose-500/10 text-rose-400 rounded-2xl transition-all group"
+                  >
+                     <Skull size={14} className="group-hover:animate-bounce" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest">Purge Process</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleAegisPurge(cortexMenu.node, true)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-orange-500/10 text-orange-400 rounded-2xl transition-all group"
+                  >
+                     <Lock size={14} />
+                     <span className="text-[10px] font-bold uppercase tracking-widest">Seal & Quarantine</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleAegisStasis(cortexMenu.node, false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-indigo-500/10 text-indigo-400 rounded-2xl transition-all group"
+                  >
+                     <Pause size={14} />
+                     <span className="text-[10px] font-bold uppercase tracking-widest">Suspend Stasis</span>
+                  </button>
+
+                  <button 
+                    onClick={() => handleForgeIntent(cortexMenu.node)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 text-emerald-400 rounded-2xl transition-all group"
+                  >
+                     <FlaskConical size={14} className="group-hover:animate-pulse" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest">Neural Forge Intent</span>
+                  </button>
+
+                  <div className="mt-2 pt-2 border-t border-white/5">
+                     <button 
+                        onClick={() => setCortexMenu(null)}
+                        className="w-full py-2 text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all text-center"
+                     >
+                        Cancel Tactical Intent
+                     </button>
+                  </div>
+               </motion.div>
+             )}
+
+             {/* Neural Forge Manifest Overlay */}
+             {activeForge && (
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.9, y: 50 }}
+                 animate={{ opacity: 1, scale: 1, y: 0 }}
+                 className="fixed inset-0 z-[500] flex items-center justify-center p-20 pointer-events-none"
+               >
+                  <div className="w-[800px] glass-bright rounded-[4rem] border border-emerald-500/30 p-16 flex flex-col pointer-events-auto overflow-hidden relative shadow-6xl">
+                     <div className="absolute top-0 right-0 p-8">
+                        <button onClick={() => setActiveForge(null)} className="text-slate-500 hover:text-white transition-all"><X size={24} /></button>
+                     </div>
+
+                     <div className="flex items-center gap-6 mb-10">
+                        <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                           <FlaskConical className="text-emerald-400 w-8 h-8 animate-pulse" />
+                        </div>
+                        <div>
+                           <h2 className="text-3xl font-black text-white uppercase italic leading-none">Neural Forge Output</h2>
+                           <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] mt-2">Stability Manifest // {activeForge.id}</p>
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-10">
+                        <div className="space-y-8">
+                           <div>
+                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Strategic Rationale</p>
+                              <p className="text-lg text-white font-bold leading-relaxed">{activeForge.rationale}</p>
+                           </div>
+                           <div className="p-6 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/10">
+                              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Confidence Index</p>
+                              <div className="flex items-center gap-4">
+                                 <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                    <motion.div initial={{width:0}} animate={{width:`${activeForge.confidence*100}%`}} className="h-full bg-emerald-500"/>
+                                 </div>
+                                 <span className="text-[10px] font-black text-white">{Math.round(activeForge.confidence * 100)}%</span>
+                              </div>
+                           </div>
+                        </div>
+
+                        <div className="flex flex-col">
+                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Forge Intent (Diff)</p>
+                           <div className="flex-1 rounded-[2.5rem] bg-black/60 border border-white/5 p-8 font-mono text-[10px] text-emerald-400 overflow-y-auto custom-scrollbar leading-relaxed">
+                              <pre className="whitespace-pre-wrap">{activeForge.code_diff || 'GEN-POL-884: Restricting Syscall Access for anomalous PID space...'}</pre>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="mt-12 flex justify-end gap-6">
+                        <button 
+                           onClick={() => setActiveForge(null)}
+                           className="px-10 py-5 rounded-[2rem] text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all"
+                        >
+                           Decline Manifest
+                        </button>
+                        <button 
+                           onClick={() => {
+                              setNotification("Forge Intent committed to OS Kernel.");
+                              setActiveForge(null);
+                           }}
+                           className="px-12 py-5 rounded-[2rem] bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-emerald-500 shadow-2xl shadow-emerald-900/40 transition-all border border-white/10"
+                        >
+                           Apply Forge Intent
+                        </button>
+                     </div>
+                  </div>
+               </motion.div>
+             )}
+
           </motion.div>
         )}
 
