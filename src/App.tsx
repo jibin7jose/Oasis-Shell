@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle
+  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
@@ -15,8 +15,8 @@ import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
 import RightRail from "./components/layout/RightRail";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
+import CortexLog from "./components/panels/CortexLog";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
-
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
@@ -31,10 +31,10 @@ const TAURI_DEFAULTS: Record<string, any> = {
     market_index: 142.8,
     index_change: "-1.2%",
     ai_ticker: [
-        { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
-        { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
-        { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
-        { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
+      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
+      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
+      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
+      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
     ]
   },
   get_neural_wisdom: { recommendation: "Oasis Dev: Kernel simulation active." },
@@ -79,7 +79,7 @@ const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>) =
   return invoke(cmd, payload as any) as Promise<T>;
 };
 const listenSafe = async (event: string, handler: any) => {
-  if (!isTauri) return () => {};
+  if (!isTauri) return () => { };
   return listen(event, handler);
 };
 
@@ -130,10 +130,10 @@ export default function App() {
     market_index: 142.8,
     index_change: "-1.2%",
     ai_ticker: [
-        { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
-        { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
-        { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
-        { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
+      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
+      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
+      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
+      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
     ]
   });
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
@@ -204,20 +204,20 @@ export default function App() {
 
   useEffect(() => {
     const pulse = setInterval(async () => {
-       try {
-          const metrics = await invokeSafe("get_venture_metrics") as any;
-          setFounderMetrics(metrics);
-          
-          // Only pull full diagnostics if the panel is open or every 30s
-          const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
-          setSystemStats(stats);
+      try {
+        const metrics = await invokeSafe("get_venture_metrics") as any;
+        setFounderMetrics(metrics);
 
-          const integrity = await invokeSafe("get_venture_integrity") as number;
-          setVentureIntegrity(integrity);
+        // Only pull full diagnostics if the panel is open or every 30s
+        const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
+        setSystemStats(stats);
 
-          const fiscal = await invokeSafe("get_fiscal_report") as any;
-          setFiscalBurn(fiscal);
-       } catch (e) {}
+        const integrity = await invokeSafe("get_venture_integrity") as number;
+        setVentureIntegrity(integrity);
+
+        const fiscal = await invokeSafe("get_fiscal_report") as any;
+        setFiscalBurn(fiscal);
+      } catch (e) { }
     }, 5000);
     return () => clearInterval(pulse);
   }, []);
@@ -263,7 +263,7 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
   const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
-  const [cortexMenu, setCortexMenu] = useState<{x:number, y:number, node:any} | null>(null);
+  const [cortexMenu, setCortexMenu] = useState<{ x: number, y: number, node: any } | null>(null);
   const [activeForge, setActiveForge] = useState<any>(null);
   const [collectiveNodes, setCollectiveNodes] = useState<any[]>([]);
   const [performanceMode, setPerformanceMode] = useState(false);
@@ -275,7 +275,7 @@ export default function App() {
       try {
         const data = await invokeSafe("get_neural_graph");
         setDynamicGraph(data);
-      } catch (err) {}
+      } catch (err) { }
     };
     syncGraph();
     const interval = setInterval(syncGraph, 10000);
@@ -291,17 +291,17 @@ export default function App() {
         const base64Img = await invokeSafe("capture_screenshot") as string;
         const prompt = "What is the primary technical context of this screen? Provide a very terse 1-sentence strategic summary starting. Never start with 'the screen shows'. Be direct.";
         const visionResult = await invokeSafe("query_vision", { imageBase64: base64Img, prompt }) as string;
-        
+
         setNotification(`Eye of Golem: ${visionResult}`);
         logEvent("Visual Context Pulse Successful", "neural");
 
         const normalized = visionResult.toLowerCase();
         if (normalized.includes("code") || normalized.includes("terminal") || normalized.includes("editor")) {
-           setActiveContext('dev');
+          setActiveContext('dev');
         } else if (normalized.includes("chart") || normalized.includes("trading") || normalized.includes("market")) {
-           setActiveContext('growth');
+          setActiveContext('growth');
         } else if (normalized.includes("game") || normalized.includes("video") || normalized.includes("design")) {
-           setActiveContext('design');
+          setActiveContext('design');
         }
 
       } catch (e) {
@@ -322,7 +322,7 @@ export default function App() {
         setPinnedContexts(pins);
         const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
         setNeuralLogs(logs);
-      } catch (err) {}
+      } catch (err) { }
     };
     const itv = setInterval(syncGolems, 2000);
     return () => clearInterval(itv);
@@ -335,7 +335,7 @@ export default function App() {
         // PULLING REAL VENTURE DATA FROM THE RUST KERNEL DOOMSDAY LEDGER
         const metrics = await invokeSafe("load_venture_state") as FounderMetrics;
         if (metrics) setFounderMetrics(metrics);
-        
+
         const ledger = await invokeSafe("get_chronos_ledger") as any[];
         setChronosLedger(ledger);
         setChronosIndex(ledger.length > 0 ? ledger.length - 1 : 0);
@@ -349,7 +349,7 @@ export default function App() {
         const logicPath = await invokeSafe("get_logic_path") as string;
         await invokeSafe("start_watcher", { path: logicPath });
         await invokeSafe("start_proactive_sentience");
-        
+
       } catch (e) {
         console.error("Neural Sync Failure:", e);
       }
@@ -359,10 +359,10 @@ export default function App() {
 
   useEffect(() => {
     const interval = setInterval(async () => {
-       try {
-         const integrity = await invokeSafe("get_venture_integrity") as number;
-         setVentureIntegrity(integrity);
-       } catch(e) {}
+      try {
+        const integrity = await invokeSafe("get_venture_integrity") as number;
+        setVentureIntegrity(integrity);
+      } catch (e) { }
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -375,9 +375,9 @@ export default function App() {
     recognition.onstart = () => setVoiceActive(true);
     recognition.onend = () => setVoiceActive(false);
     recognition.onresult = (event: any) => {
-       const transcript = event.results[0][0].transcript.toLowerCase();
-       setNotification(`Oasis Resonating: "${transcript}"`);
-       resolveNeuralIntent(transcript);
+      const transcript = event.results[0][0].transcript.toLowerCase();
+      setNotification(`Oasis Resonating: "${transcript}"`);
+      resolveNeuralIntent(transcript);
     };
     recognition.start();
   };
@@ -386,7 +386,7 @@ export default function App() {
     const newMetrics = { ...founderMetrics, arr: `$${simMetrics.arr}M`, burn: `$${simMetrics.burn}K/mo` };
     setFounderMetrics(newMetrics);
     setSimMode(false);
-    
+
     // PERSIST & SNAPSHOT
     await invokeSafe("save_venture_state", { metrics: newMetrics });
     await invokeSafe("create_chronos_snapshot", { metrics: newMetrics, market: marketIntel });
@@ -401,7 +401,7 @@ export default function App() {
       try {
         const inv = await invokeSafe("get_strategic_inventory") as any[];
         setStrategicInventory(inv);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncInventoryData();
   }, []);
@@ -420,27 +420,27 @@ export default function App() {
     });
 
     const unlistenCortexRefresh = listenSafe('cortex-refresh', (event: any) => {
-       setNotification(`Neural Node Manifested: ${event.payload.file}`);
-       if (showGraph) {
-          invokeSafe("get_neural_graph").then(data => setDynamicGraph(data));
-       }
+      setNotification(`Neural Node Manifested: ${event.payload.file}`);
+      if (showGraph) {
+        invokeSafe("get_neural_graph").then(data => setDynamicGraph(data));
+      }
     });
 
     const unlistenContextSync = listenSafe('cortex-context-sync', (event: any) => {
-       const counts: any = { dev: 0, growth: 0, design: 0 };
-       event.payload.contexts.forEach((c: string) => counts[c]++);
-       
-       const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) as any;
-       if (counts[winner] > 1 && winner !== activeContext && !showSettings && !showNexus) {
-          handleContextSwitch(winner);
-          setNotification(`Autonomous Sync: Context shifted to ${winner.toUpperCase()} via OS pattern matching.`);
-       }
+      const counts: any = { dev: 0, growth: 0, design: 0 };
+      event.payload.contexts.forEach((c: string) => counts[c]++);
+
+      const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) as any;
+      if (counts[winner] > 1 && winner !== activeContext && !showSettings && !showNexus) {
+        handleContextSwitch(winner);
+        setNotification(`Autonomous Sync: Context shifted to ${winner.toUpperCase()} via OS pattern matching.`);
+      }
     });
 
     const unlistenSpectral = listenSafe('spectral-anomaly', (event: any) => {
-       const newAnoms = event.payload as any[];
-       setSpectralAnomalies((prev: any) => [...newAnoms, ...prev].slice(0, 50));
-       setNotification(`Spectral Breach: ${newAnoms[0].description}`);
+      const newAnoms = event.payload as any[];
+      setSpectralAnomalies((prev: any) => [...newAnoms, ...prev].slice(0, 50));
+      setNotification(`Spectral Breach: ${newAnoms[0].description}`);
     });
 
     return () => {
@@ -453,11 +453,11 @@ export default function App() {
 
   // --- LOGIC: MEMORY & INTENT ---
   const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
-    setTimeline((prev: any[]) => [{ 
-      id: Date.now(), 
-      type, 
-      event, 
-      time: new Date().toLocaleTimeString() 
+    setTimeline((prev: any[]) => [{
+      id: Date.now(),
+      type,
+      event,
+      time: new Date().toLocaleTimeString()
     }, ...prev].slice(0, 50));
   };
 
@@ -469,36 +469,36 @@ export default function App() {
 
     // Phase 7.3: Strategic Macro Routing
     if (q.includes("scan") || q.includes("diagnostic")) {
-        triggerSystemScan();
-        return;
+      triggerSystemScan();
+      return;
     }
     if (q.includes("inventory") || q.includes("vault") || q.includes("asset")) {
-        setNotification("Oasis Core: Highlighting Strategic Asset Vault coordinates.");
-        setIsThinking(false);
-        // Logic: Scroll to Inventory section can be added to a ref
-        return;
+      setNotification("Oasis Core: Highlighting Strategic Asset Vault coordinates.");
+      setIsThinking(false);
+      // Logic: Scroll to Inventory section can be added to a ref
+      return;
     }
     if (q.includes("docs") || q.includes("manual") || q.includes("help") || q.includes("plan")) {
-        setShowDocs(true);
-        setNotification("Oasis Core: Manifesting Neural Documentation Hub.");
-        setIsThinking(false);
-        return;
+      setShowDocs(true);
+      setNotification("Oasis Core: Manifesting Neural Documentation Hub.");
+      setIsThinking(false);
+      return;
     }
     if (q.includes("seal") || q.includes("lock")) {
-        handleVaultSeal();
-        return;
+      handleVaultSeal();
+      return;
     }
     if (q.includes("optimize") || q.includes("clean") || q.includes("stabilize")) {
-        handleOptimizeNodes();
-        return;
+      handleOptimizeNodes();
+      return;
     }
 
     try {
       const res = await invokeSafe("execute_neural_intent", { query }) as { content: string, tool: string, data?: any };
       setIsThinking(false);
-      
+
       setMessages(prev => [...prev, { role: "assistant", content: res.content }]);
-      
+
       // Secondary UI Reactions based on Tool Execution
       if (res.tool === "VAULT_SEAL") {
         setShowVault(true);
@@ -525,11 +525,11 @@ export default function App() {
       } else if (res.tool === "NONE") {
         // Fallback for custom logic not yet in the backend router
         if (q.includes("presentation") || q.includes("vision")) {
-           setPresentationMode(true);
-           logEvent("Visionary Portal Activated", "system");
+          setPresentationMode(true);
+          logEvent("Visionary Portal Activated", "system");
         } else if (q.includes("graph") || q.includes("3d")) {
-           setShowGraph(true);
-           logEvent("Strategic Cortex Multi-Node Analysis", "system");
+          setShowGraph(true);
+          logEvent("Strategic Cortex Multi-Node Analysis", "system");
         }
       }
     } catch (e: any) {
@@ -537,7 +537,7 @@ export default function App() {
       setMessages(prev => [...prev, { role: "assistant", content: `Neural Error: ${e}` }]);
       setNotification(`Neural Intent Failure: ${e}`);
     }
-    
+
     setSearchQuery("");
   };
 
@@ -557,17 +557,17 @@ export default function App() {
         const recorder = new MediaRecorder(stream);
         mediaRecorderRef.current = recorder;
         audioChunksRef.current = [];
-        
+
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) audioChunksRef.current.push(e.data);
         };
-        
+
         recorder.onstop = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           transcribeAndResolve(audioBlob);
           stream.getTracks().forEach(track => track.stop());
         };
-        
+
         recorder.start();
         setIsRecording(true);
       } catch (err) {
@@ -575,8 +575,8 @@ export default function App() {
         // Fallback: Proceed with simulation even without hardware
         setIsRecording(true);
         setTimeout(() => {
-            setIsRecording(false);
-            transcribeAndResolve(new Blob());
+          setIsRecording(false);
+          transcribeAndResolve(new Blob());
         }, 3000);
       }
     }
@@ -587,11 +587,11 @@ export default function App() {
     setIsThinking(false);
     setNotification("Oasis Core: Diagnostic sweep initialized. Scanning Strategic Nodes...");
     logEvent("System Diagnostic Manifested", 'system');
-    
+
     // High-fidelity scan simulation pulse
     setTimeout(() => {
-        setIsScanning(false);
-        setNotification("Oasis Pulse: Strategic Diagnostic Complete. Registry Absolute.");
+      setIsScanning(false);
+      setNotification("Oasis Pulse: Strategic Diagnostic Complete. Registry Absolute.");
     }, 5000);
   };
 
@@ -600,11 +600,11 @@ export default function App() {
     setIsThinking(false);
     setNotification("Oasis Core: SENTINEL VAULT SEALED. Access coordinates scrambled.");
     logEvent("Sentinel Vault Lockdown Manifested", 'system');
-    
+
     // Auto-unseal after 10 seconds for dev-loop convenience
     setTimeout(() => {
-        setIsVaultSealed(false);
-        setNotification("Oasis Pulse: Sentinel Vault normalization complete.");
+      setIsVaultSealed(false);
+      setNotification("Oasis Pulse: Sentinel Vault normalization complete.");
     }, 10000);
   };
 
@@ -612,10 +612,10 @@ export default function App() {
     setIsThinking(false);
     setNotification("Oasis Core: Neural Optimization Sequence Active. Stabilizing Telemetry...");
     logEvent("Nodes Optimized", 'system');
-    
+
     // Manifested by the Pulse useEffect reading this state
     setTimeout(() => {
-        setNotification("Oasis Pulse: Optimization complete. Nodes at peak fidelity.");
+      setNotification("Oasis Pulse: Optimization complete. Nodes at peak fidelity.");
     }, 4000);
   };
 
@@ -623,25 +623,25 @@ export default function App() {
     setIsThinking(true);
     setNotification("Oasis Core: Synchronizing Neural Voice Fragment...");
     setIsRecording(false);
-    
+
     // Phase 7.1: Neural Simulation bridge to Executive Intelligence
     // Every voice intent is now mapped to a high-fidelity command manifest.
     setTimeout(() => {
-        setIsThinking(false);
-        const simulatedIntents = [
-            "Execute Strategic System Scan",
-            "Seal Sentinel Vault",
-            "Activate Visionary Portal",
-            "Analyze Global AI Market",
-            "Sync Foundry Workspace"
-        ];
-        const intent = simulatedIntents[Math.floor(Math.random() * simulatedIntents.length)];
-        
-        setNotification(`Oasis Pulse: Voice intent CAPTURED - "${intent}"`);
-        setMessages(prev => [...prev, { role: "user", content: `(Voice) ${intent}` }]);
-        
-        // Final Handshake: Injecting intent into the executive controller
-        resolveNeuralIntent(intent);
+      setIsThinking(false);
+      const simulatedIntents = [
+        "Execute Strategic System Scan",
+        "Seal Sentinel Vault",
+        "Activate Visionary Portal",
+        "Analyze Global AI Market",
+        "Sync Foundry Workspace"
+      ];
+      const intent = simulatedIntents[Math.floor(Math.random() * simulatedIntents.length)];
+
+      setNotification(`Oasis Pulse: Voice intent CAPTURED - "${intent}"`);
+      setMessages(prev => [...prev, { role: "user", content: `(Voice) ${intent}` }]);
+
+      // Final Handshake: Injecting intent into the executive controller
+      resolveNeuralIntent(intent);
     }, 2200);
   };
 
@@ -653,49 +653,49 @@ export default function App() {
       else if (ventureIntegrity < 50) activeAura = "amber";
       else if (ventureIntegrity >= 95) activeAura = "emerald";
 
-        invokeSafe("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp, color: activeAura }).catch(() => {});
+      invokeSafe("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp, color: activeAura }).catch(() => { });
     }
   }, [autoAura, activeDebate, ventureIntegrity]);
 
   // EFFECT: Neural Telemetry Dynamics (The Pulse)
   useEffect(() => {
     if (!isTauri) {
-        const interval = setInterval(() => {
-            setProcesses(prev => (prev ?? []).map(p => ({
-                ...p,
-                cpu_usage: Math.max(0.1, Math.min(99.9, p.cpu_usage + (Math.random() - 0.5) * 2)),
-                mem_usage: p.mem_usage + Math.floor((Math.random() - 0.5) * 1024 * 1024)
-            })));
-            setSystemStats(prev => prev ? {
-                ...prev,
-                cpu_load: Math.max(5, Math.min(95, prev.cpu_load + (Math.random() - 0.5) * 5)),
-            } : null);
+      const interval = setInterval(() => {
+        setProcesses(prev => (prev ?? []).map(p => ({
+          ...p,
+          cpu_usage: Math.max(0.1, Math.min(99.9, p.cpu_usage + (Math.random() - 0.5) * 2)),
+          mem_usage: p.mem_usage + Math.floor((Math.random() - 0.5) * 1024 * 1024)
+        })));
+        setSystemStats(prev => prev ? {
+          ...prev,
+          cpu_load: Math.max(5, Math.min(95, prev.cpu_load + (Math.random() - 0.5) * 5)),
+        } : null);
 
-            // Phase 7.6: Golem Progress Progression
-            setActiveGolems(prev => (prev ?? []).map(g => {
-                const inc = Math.random() * 0.4;
-                const newProgress = Math.min(100, g.progress + inc);
-                
-                // Logic: Handle Mission Completion
-                if (newProgress >= 100 && g.progress < 100) {
-                   setNotification(`Oasis Pulse: ${g.name} MISSION ACCOMPLISHED.`);
-                   logEvent(`Golem ${g.id} completed mission: "${g.mission}"`, 'deploy');
-                   return { ...g, progress: 100, status: 'Standby' };
-                }
-                return { ...g, progress: Float(newProgress.toFixed(1)) };
-            }));
+        // Phase 7.6: Golem Progress Progression
+        setActiveGolems(prev => (prev ?? []).map(g => {
+          const inc = Math.random() * 0.4;
+          const newProgress = Math.min(100, g.progress + inc);
 
-            // Phase 7.9: Global Market Pulse
-            setMarketIntel(prev => prev && prev.ai_ticker ? {
-                ...prev,
-                market_index: Math.max(10, prev.market_index + (Math.random() - 0.5) * 0.5),
-                ai_ticker: (prev.ai_ticker ?? []).map((t: any) => ({
-                    ...t,
-                    price: t.price + (Math.random() - 0.5) * (t.price * 0.001)
-                }))
-            } : prev);
-        }, 3000);
-        return () => clearInterval(interval);
+          // Logic: Handle Mission Completion
+          if (newProgress >= 100 && g.progress < 100) {
+            setNotification(`Oasis Pulse: ${g.name} MISSION ACCOMPLISHED.`);
+            logEvent(`Golem ${g.id} completed mission: "${g.mission}"`, 'deploy');
+            return { ...g, progress: 100, status: 'Standby' };
+          }
+          return { ...g, progress: Float(newProgress.toFixed(1)) };
+        }));
+
+        // Phase 7.9: Global Market Pulse
+        setMarketIntel(prev => prev && prev.ai_ticker ? {
+          ...prev,
+          market_index: Math.max(10, prev.market_index + (Math.random() - 0.5) * 0.5),
+          ai_ticker: (prev.ai_ticker ?? []).map((t: any) => ({
+            ...t,
+            price: t.price + (Math.random() - 0.5) * (t.price * 0.001)
+          }))
+        } : prev);
+      }, 3000);
+      return () => clearInterval(interval);
     }
   }, [isTauri]);
 
@@ -727,18 +727,18 @@ export default function App() {
 
   const graphData = useMemo(() => {
     const baseNodes = [
-      { id: "FOUNDRY CORE", group: "core", val: 20 }, 
-      { id: "STRATEGIC CAPITAL", group: "capital", val: 12 }, 
+      { id: "FOUNDRY CORE", group: "core", val: 20 },
+      { id: "STRATEGIC CAPITAL", group: "capital", val: 12 },
       { id: "PRODUCT ROADMAP", group: "product", val: 12 },
       { id: "GROWTH MOMENTUM", group: "growth", val: 12 },
     ];
-    
+
     const ghostNodes = pendingManifests.map(m => ({
-      id: m.title.toUpperCase(), group: "ghost", val: 15, mData: m
+      id: (m?.title || "MANIFEST").toUpperCase(), group: "ghost", val: 15, mData: m
     }));
 
     const baseLinks = [
-      { source: "FOUNDRY CORE", target: "STRATEGIC CAPITAL" }, 
+      { source: "FOUNDRY CORE", target: "STRATEGIC CAPITAL" },
       { source: "FOUNDRY CORE", target: "PRODUCT ROADMAP" },
       { source: "FOUNDRY CORE", target: "GROWTH MOMENTUM" },
     ];
@@ -747,43 +747,43 @@ export default function App() {
       source: "GROWTH MOMENTUM", target: m.title.toUpperCase()
     }));
 
-    return { 
-      nodes: [...baseNodes, ...ghostNodes], 
-      links: [...baseLinks, ...ghostLinks] 
+    return {
+      nodes: [...baseNodes, ...ghostNodes],
+      links: [...baseLinks, ...ghostLinks]
     };
   }, [pendingManifests]);
 
   const handleTimeTravel = (index: number) => {
-     if (index === -1) {
-        setIsTimeTraveling(false);
-        setTravelIndex(-1);
-        setDynamicGraph({ nodes: [], links: [] });
-        return;
-     }
-     setIsTimeTraveling(true);
-     setTravelIndex(index);
-     const snap = chronosHistory[index];
-     setDynamicGraph({ nodes: snap.nodes, links: snap.links });
-     setNotification(`Temporal Shift: System State @ ${new Date(snap.timestamp).toLocaleTimeString()}`);
+    if (index === -1) {
+      setIsTimeTraveling(false);
+      setTravelIndex(-1);
+      setDynamicGraph({ nodes: [], links: [] });
+      return;
+    }
+    setIsTimeTraveling(true);
+    setTravelIndex(index);
+    const snap = chronosHistory[index];
+    setDynamicGraph({ nodes: snap.nodes, links: snap.links });
+    setNotification(`Temporal Shift: System State @ ${new Date(snap.timestamp).toLocaleTimeString()}`);
   };
 
   const handleRewind = (seconds: number) => {
-     const index = Math.max(0, chronosHistory.length - Math.floor(seconds / 60) - 1);
-     handleTimeTravel(index);
+    const index = Math.max(0, chronosHistory.length - Math.floor(seconds / 60) - 1);
+    handleTimeTravel(index);
   };
 
   useEffect(() => {
-     const unlistenChronos = listenSafe('chronos-pulse', async () => {
-        if (isTimeTraveling) return;
-        try {
-           const nodes = dynamicGraph.nodes.length > 0 ? dynamicGraph.nodes : graphData.nodes;
-           const links = dynamicGraph.links.length > 0 ? dynamicGraph.links : graphData.links;
-           await invokeSafe("capture_chronos_snapshot", { nodes, links });
-           const history = await invokeSafe("seek_chronos_history") as any[];
-           setChronosHistory(history);
-        } catch (e) {}
-     });
-     return () => { unlistenChronos.then(f => f()); };
+    const unlistenChronos = listenSafe('chronos-pulse', async () => {
+      if (isTimeTraveling) return;
+      try {
+        const nodes = dynamicGraph.nodes.length > 0 ? dynamicGraph.nodes : graphData.nodes;
+        const links = dynamicGraph.links.length > 0 ? dynamicGraph.links : graphData.links;
+        await invokeSafe("capture_chronos_snapshot", { nodes, links });
+        const history = await invokeSafe("seek_chronos_history") as any[];
+        setChronosHistory(history);
+      } catch (e) { }
+    });
+    return () => { unlistenChronos.then(f => f()); };
   }, [isTimeTraveling, dynamicGraph, graphData]);
 
   const getNodeColor = (node: any) => {
@@ -805,14 +805,14 @@ export default function App() {
   // --- V2 COGNITION EFFECTORS ---
   useEffect(() => {
     if (founderMetrics.stress_color !== "#6366f1") {
-       invokeSafe('get_neural_wisdom', { stressColor: founderMetrics.stress_color }).then((res: any) => {
-          setNeuralWisdom(res);
-          if (res?.recommendation) {
-            setMessages(prev => [...prev, { role: "assistant", content: `Neural Wisdom: ${res.recommendation}` }]);
-          }
-       }).catch(() => {});
+      invokeSafe('get_neural_wisdom', { stressColor: founderMetrics.stress_color }).then((res: any) => {
+        setNeuralWisdom(res);
+        if (res?.recommendation) {
+          setMessages(prev => [...prev, { role: "assistant", content: `Neural Wisdom: ${res.recommendation}` }]);
+        }
+      }).catch(() => { });
     } else {
-       setNeuralWisdom(null);
+      setNeuralWisdom(null);
     }
   }, [founderMetrics.stress_color]);
 
@@ -822,7 +822,7 @@ export default function App() {
         const alert = await invokeSafe("trigger_oracle_audit", { arr: simMetrics.arr, burn: simMetrics.burn }) as any;
         setOracleAlert(alert);
         setNotification(`Neural Oracle Audit Complete: ${alert.title}`);
-      } catch (e) {}
+      } catch (e) { }
     };
     triggerAudit();
     const interval = setInterval(triggerAudit, 60000);
@@ -839,7 +839,7 @@ export default function App() {
       try {
         const pmd = await invokeSafe("get_pending_manifests", { stressColor: founderMetrics.stress_color }) as any[];
         setPendingManifests(pmd);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncGolems();
     const interval = setInterval(syncGolems, 30000);
@@ -853,7 +853,7 @@ export default function App() {
       try {
         const hs = await invokeSafe("trigger_hardware_symbiosis", { stressColor: founderMetrics.stress_color }) as any;
         setHardwareStatus(hs);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncHardwareData();
     const interval = setInterval(syncHardwareData, 10000);
@@ -866,7 +866,7 @@ export default function App() {
       setNotification(res);
       setManifestHistory([]);
       setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => {
@@ -874,7 +874,7 @@ export default function App() {
       try {
         const net = await invokeSafe("get_available_ventures") as any[];
         setVentureNetwork(net);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncNetworkData();
     const interval = setInterval(syncNetworkData, 120000);
@@ -890,7 +890,7 @@ export default function App() {
         const arrVal = parseFloat(met.arr.replace('$', '').replace('M', ''));
         const burnVal = parseFloat(met.burn.replace('$', '').replace('K/mo', ''));
         setSimMetrics({ arr: arrVal, burn: burnVal, momentum: 12.8 });
-      } catch (e) {}
+      } catch (e) { }
     };
     restoreState();
   }, []);
@@ -900,7 +900,7 @@ export default function App() {
       try {
         const inv = await invokeSafe("get_strategic_inventory") as any[];
         setStrategicInventory(inv);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncInventoryData();
     const interval = setInterval(syncInventoryData, 30000);
@@ -912,11 +912,11 @@ export default function App() {
       try {
         const stats = await invokeSafe("run_system_diagnostic") as any;
         setSystemStats(stats);
-        
+
         const ledger = await invokeSafe("get_chronos_ledger") as any[];
         setChronosLedger(ledger);
         setChronosIndex(ledger.length - 1);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncSystemData();
   }, []);
@@ -946,13 +946,13 @@ export default function App() {
       try {
         const health = await invokeSafe("get_battery_health_wmi") as any;
         setBatteryHealth(health);
-      } catch (e) {}
+      } catch (e) { }
       const disks = await invokeSafe("get_storage_map") as StorageInfo[];
       setStorageMap(disks);
       const devs = await invokeSafe("get_system_devices") as DeviceInfo[];
       setDevices(devs);
       setSystemLastSync(new Date().toLocaleTimeString());
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => {
@@ -960,7 +960,7 @@ export default function App() {
       try {
         const windows = await invokeSafe("get_running_windows") as WindowInfo[];
         setRunningWindows(windows);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncWindows();
     const interval = setInterval(syncWindows, 15000);
@@ -1015,11 +1015,11 @@ export default function App() {
                   }));
                   logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
                 })
-                .catch(() => {});
+                .catch(() => { });
             }
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     syncProcesses();
     const interval = setInterval(syncProcesses, 10000);
@@ -1035,7 +1035,7 @@ export default function App() {
         setDevices(devs);
         const health = await invokeSafe("get_battery_health_wmi") as any;
         setBatteryHealth(health);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncStorageDevices();
     const interval = setInterval(syncStorageDevices, 30000);
@@ -1065,7 +1065,7 @@ export default function App() {
         const parsed = JSON.parse(saved) as Record<CommandPermission, boolean>;
         setPermissions((prev: any) => ({ ...prev, ...parsed }));
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   useEffect(() => {
@@ -1097,14 +1097,14 @@ export default function App() {
         });
         setPriorityCache(normalized);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [defaultTtlDays]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("oas_auto_apply_priorities");
       if (saved !== null) setAutoApplyPriorities(saved === "true");
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   useEffect(() => {
@@ -1128,33 +1128,33 @@ export default function App() {
         try {
           const arr = JSON.parse(fpsHist);
           if (Array.isArray(arr)) setFpsHistory(arr.filter((v: any) => Number.isFinite(v)).slice(-60));
-        } catch (e) {}
+        } catch (e) { }
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_permissions", JSON.stringify(permissions));
-    } catch (e) {}
+    } catch (e) { }
   }, [permissions]);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_priority_cache", JSON.stringify(priorityCache));
-    } catch (e) {}
+    } catch (e) { }
   }, [priorityCache]);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_auto_apply_priorities", autoApplyPriorities ? "true" : "false");
-    } catch (e) {}
+    } catch (e) { }
   }, [autoApplyPriorities]);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_default_ttl_days", String(defaultTtlDays));
-    } catch (e) {}
+    } catch (e) { }
   }, [defaultTtlDays]);
 
   useEffect(() => {
@@ -1214,19 +1214,19 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem("oas_sparklines_enabled", sparklinesEnabled ? "true" : "false");
-    } catch (e) {}
+    } catch (e) { }
   }, [sparklinesEnabled]);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_fps_history", JSON.stringify(fpsHistory));
-    } catch (e) {}
+    } catch (e) { }
   }, [fpsHistory]);
 
   useEffect(() => {
     try {
       localStorage.setItem("oas_performance_mode", performanceMode ? "true" : "false");
-    } catch (e) {}
+    } catch (e) { }
   }, [performanceMode]);
 
   useEffect(() => {
@@ -1287,11 +1287,11 @@ export default function App() {
     });
   };
 
-  const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
-    ? chronosLedger[chronosIndex].metrics 
+  const displayedMetrics = chronosIndex >= 0 && chronosIndex < chronosLedger.length
+    ? chronosLedger[chronosIndex].metrics
     : founderMetrics;
-  
-  if (displayedMetrics) console.log("Current Metrics Context Restored.");
+
+
 
   useEffect(() => {
     const setupDragDrop = async () => {
@@ -1301,8 +1301,8 @@ export default function App() {
           if (showSentinel && !isVaultLocked) {
             setNotification(`Sentinel: Sealing ${paths.length} targeted assets...`);
             paths.forEach((p: string) => {
-               const title = p.split(/[\\/]/).pop() || "Strategic Asset";
-               handleSealAsset(p, title);
+              const title = p.split(/[\\/]/).pop() || "Strategic Asset";
+              handleSealAsset(p, title);
             });
           } else {
             setNotification(`Neural Intent: Drag-drop detected. Open Sentinel to seal files.`);
@@ -1311,14 +1311,14 @@ export default function App() {
       });
       return unlisten;
     };
-    
+
     let unlistenFn: any;
     setupDragDrop().then(u => unlistenFn = u);
     return () => { if (unlistenFn) unlistenFn(); };
   }, [showSentinel, isVaultLocked]);
 
-  const displayedMarket = chronosIndex >= 0 && chronosIndex < chronosLedger.length 
-    ? chronosLedger[chronosIndex].market 
+  const displayedMarket = chronosIndex >= 0 && chronosIndex < chronosLedger.length
+    ? chronosLedger[chronosIndex].market
     : marketIntel;
 
   const handleInstallShell = async () => {
@@ -1327,7 +1327,7 @@ export default function App() {
       setNotification(res);
       const stats = await invokeSafe("run_system_diagnostic") as any;
       setSystemStats(stats);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleKillProcess = (pid: number) => {
@@ -1449,12 +1449,12 @@ export default function App() {
         return e.source.toLowerCase() === filter;
       })
       .map((e) => ({
-      time: new Date(e.time).toISOString(),
-      pid: e.pid,
-      name: e.name,
-      priority: e.priority,
-      source: e.source
-    }));
+        time: new Date(e.time).toISOString(),
+        pid: e.pid,
+        name: e.name,
+        priority: e.priority,
+        source: e.source
+      }));
 
     let content = "";
     let mime = "text/plain";
@@ -1504,7 +1504,7 @@ export default function App() {
 
   const handleClearAllCache = () => {
     setPriorityCache({});
-    try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
+    try { localStorage.removeItem("oas_priority_cache"); } catch (e) { }
     setNotification("Priority cache cleared.");
   };
 
@@ -1518,13 +1518,13 @@ export default function App() {
             setProcessPriorities((prev: any) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => {
             advanceResetProgress();
           });
       });
       setPriorityCache({});
-      try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
+      try { localStorage.removeItem("oas_priority_cache"); } catch (e) { }
       setNotification("Priority reset + cache clear initiated.");
     });
   };
@@ -1539,7 +1539,7 @@ export default function App() {
             setProcessPriorities((prev: any) => ({ ...prev, [proc.pid]: "NORMAL" }));
             logPriorityChange(proc.pid, proc.name, "NORMAL", "Reset");
           })
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => {
             advanceResetProgress();
           });
@@ -1572,7 +1572,7 @@ export default function App() {
             }));
             logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
           })
-          .catch(() => {});
+          .catch(() => { });
       });
       setNotification("Reapply sequence initiated.");
     });
@@ -1585,7 +1585,7 @@ export default function App() {
       // Refresh workforce status
       const wf = await invokeSafe("get_neural_workforce") as any[];
       setWorkforce(wf);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleChronosSliderChange = (index: number) => {
@@ -1613,7 +1613,7 @@ export default function App() {
 
   const handleAegisSync = async () => {
     try {
-      const res = await invokeSafe("sync_venture_to_aegis", { 
+      const res = await invokeSafe("sync_venture_to_aegis", {
         ventureId: activeVenture.replace(" ", "_").toLowerCase(),
         name: activeVenture,
         metrics: founderMetrics,
@@ -1622,7 +1622,7 @@ export default function App() {
       setNotification(res);
       const ledger = await invokeSafe("get_aegis_ledger") as any;
       setAegisLedger(ledger);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleNeuralMirror = async (sourceId: string) => {
@@ -1631,7 +1631,7 @@ export default function App() {
       setCrossWisdom(wisdom);
       setNotification(`Neural Mirror Connected: Knowledge transfer from ${sourceId} successful.`);
       setShowNexus(false);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleOracleVision = async (ventureId: string) => {
@@ -1639,7 +1639,7 @@ export default function App() {
       const forecast = await invokeSafe("invoke_oracle_prediction", { ventureId }) as any;
       setActiveOracle(forecast);
       setNotification(`Oracle Sigil Detected: 12-Month Projection manifested for ${ventureId}.`);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleAuthenticateFounder = async () => {
@@ -1649,7 +1649,7 @@ export default function App() {
       if (success) {
         setIsVaultLocked(false);
         setNotification("Vocal Resonance: Founder Identity Verified. Vault Unsealed.");
-        invokeSafe("log_strategic_pulse", { nodeId: "sentinel_auth", status: "emerald" }).catch(() => {});
+        invokeSafe("log_strategic_pulse", { nodeId: "sentinel_auth", status: "emerald" }).catch(() => { });
         const vault = await invokeSafe("get_sentinel_ledger") as any;
         setSentinelVault(vault);
       }
@@ -1664,7 +1664,7 @@ export default function App() {
       setNotification(res);
       const vault = await invokeSafe("get_sentinel_ledger") as any;
       setSentinelVault(vault);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleUnsealAsset = async (id: string) => {
@@ -1673,7 +1673,7 @@ export default function App() {
       setNotification(res);
       const vault = await invokeSafe("get_sentinel_ledger") as any;
       setSentinelVault(vault);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   useEffect(() => {
@@ -1683,7 +1683,7 @@ export default function App() {
         setAegisLedger(ledger);
         const vault = await invokeSafe("get_sentinel_ledger") as any;
         setSentinelVault(vault);
-      } catch (e) {}
+      } catch (e) { }
     };
     syncAegisData();
   }, []);
@@ -1707,12 +1707,12 @@ export default function App() {
   const handleAegisStasis = async (node: any, resume: boolean) => {
     if (!node.associated_pid) return;
     try {
-        const cmd = resume ? "resume_process" : "suspend_process";
-        const res = await invokeSafe(cmd, { pid: node.associated_pid }) as string;
-        setNotification(res);
-        setCortexMenu(null);
+      const cmd = resume ? "resume_process" : "suspend_process";
+      const res = await invokeSafe(cmd, { pid: node.associated_pid }) as string;
+      setNotification(res);
+      setCortexMenu(null);
     } catch (e: any) {
-        setNotification(`Aegis Stasis Error: ${e}`);
+      setNotification(`Aegis Stasis Error: ${e}`);
     }
   };
 
@@ -1720,20 +1720,20 @@ export default function App() {
     setNotification("Neural Forge: Orchestrating generative fix via Golem Alpha-9...");
     setCortexMenu(null);
     try {
-        const manifest = await invokeSafe("manifest_forge_intent", { anomalyId: node.id, source: node.source || 'Manual' }) as any;
-        setActiveForge(manifest);
-        setNotification("Neural Forge: Stability Manifest Manifested.");
+      const manifest = await invokeSafe("manifest_forge_intent", { anomalyId: node.id, source: node.source || 'Manual' }) as any;
+      setActiveForge(manifest);
+      setNotification("Neural Forge: Stability Manifest Manifested.");
     } catch (e: any) {
-        setNotification(`Forge Resonance Error: ${e}`);
+      setNotification(`Forge Resonance Error: ${e}`);
     }
   };
 
   useEffect(() => {
     const syncCollective = async () => {
-        try {
-            const nodes = await invokeSafe("get_collective_nodes") as any[];
-            setCollectiveNodes(nodes);
-        } catch (e) {}
+      try {
+        const nodes = await invokeSafe("get_collective_nodes") as any[];
+        setCollectiveNodes(nodes);
+      } catch (e) { }
     };
     syncCollective();
     const interval = setInterval(syncCollective, 10000);
@@ -1746,19 +1746,19 @@ export default function App() {
         const metrics = await invokeSafe("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
         const intel = await invokeSafe("get_market_intelligence") as any;
         setMarketIntel(prev => ({
-            ...prev,
-            market_index: intel?.market_index || prev.market_index,
-            index_change: intel?.index_change || prev.index_change,
-            ai_ticker: intel?.ai_ticker || prev.ai_ticker
+          ...prev,
+          market_index: intel?.market_index || prev.market_index,
+          index_change: intel?.index_change || prev.index_change,
+          ai_ticker: intel?.ai_ticker || prev.ai_ticker
         }));
-        
+
         // Pass market index to workforce for reactor logic
         const wf = await invokeSafe("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
         setWorkforce(wf);
 
         if (!simMode) {
-            setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
-            invokeSafe("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
+          setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
+          invokeSafe("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
         }
         setLastSync(new Date().toLocaleTimeString());
       } catch (e) {
@@ -1798,12 +1798,12 @@ export default function App() {
         timestamp: new Date().toISOString()
       });
 
-      await invokeSafe("pin_context", { 
-        name: name || `Snapshot ${new Date().toLocaleTimeString()}`, 
-        stateBlob, 
-        aura: activeContext 
+      await invokeSafe("pin_context", {
+        name: name || `Snapshot ${new Date().toLocaleTimeString()}`,
+        stateBlob,
+        aura: activeContext
       });
-      
+
       const pins = await invokeSafe("get_pinned_contexts") as any[];
       setPinnedContexts(pins);
       const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
@@ -1821,19 +1821,19 @@ export default function App() {
       setZenMode(state.zen || false);
       setSimMode(state.sim || false);
       setActiveContext(state.aura || 'indigo');
-      
+
       const apps = state.apps || state.windowLayout;
       if (apps) {
         const launched = await invokeSafe("launch_context_apps", { apps }) as string[];
         if (launched && launched.length > 0) {
           setNotification(`Context Launch: Restored ${launched.length} strategic apps.`);
         }
-        
+
         setTimeout(async () => {
           await invokeSafe("set_window_layout", { layout: apps });
         }, 1200);
       }
-      
+
       setNotification(`Neural Context Restored: [${pin.name}]`);
     } catch (err) {
       setNotification("Temporal Drift detected. Snapshot Corrupted.");
@@ -1885,9 +1885,9 @@ export default function App() {
     else if (id === 'logs') setShowLogs(true);
     else if (id === 'presentation') setPresentationMode(true);
     else if (id.startsWith('open ')) {
-       const path = id.replace('open ', '');
-       setNotification(`Opening Strategic Asset: ${path.split('\\').pop()}`);
-       // Triggering open logic would go here
+      const path = id.replace('open ', '');
+      setNotification(`Opening Strategic Asset: ${path.split('\\').pop()}`);
+      // Triggering open logic would go here
     }
   };
 
@@ -1896,89 +1896,89 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {storageMap.map((disk, i) => (
           <div key={i} className="glass p-10 rounded-[3rem] border border-white/5 relative overflow-hidden group">
-             <div className="flex justify-between items-start mb-8">
-                <div>
-                  <h4 className="text-2xl font-black text-white mb-1 uppercase italic tracking-tighter">{disk.name || "PRIMARY HOST"}</h4>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">{disk.mount}</p>
-                </div>
-                <div className="p-3 rounded-2xl bg-white/5 text-indigo-400"><Shield className="w-7 h-7" /></div>
-             </div>
-             <div className="space-y-4">
-                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                   <span>Allocated: {((disk.total - disk.available) / (1024**3)).toFixed(1)}GB</span>
-                   <span className="text-indigo-400">{(disk.total / (1024**3)).toFixed(1)}GB Total</span>
-                </div>
-                <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
-                   <motion.div initial={{ width: 0 }} animate={{ width: `${((disk.total - disk.available) / disk.total * 100).toFixed(1)}%` }}
-                     className={cn("h-full", (disk.available / disk.total) < 0.1 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
-                </div>
-             </div>
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h4 className="text-2xl font-black text-white mb-1 uppercase italic tracking-tighter">{disk.name || "PRIMARY HOST"}</h4>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">{disk.mount}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-white/5 text-indigo-400"><Shield className="w-7 h-7" /></div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <span>Allocated: {((disk.total - disk.available) / (1024 ** 3)).toFixed(1)}GB</span>
+                <span className="text-indigo-400">{(disk.total / (1024 ** 3)).toFixed(1)}GB Total</span>
+              </div>
+              <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${((disk.total - disk.available) / disk.total * 100).toFixed(1)}%` }}
+                  className={cn("h-full", (disk.available / disk.total) < 0.1 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
+              </div>
+            </div>
           </div>
         ))}
       </div>
       <div className="glass rounded-[4rem] border border-white/5 overflow-hidden flex-1 flex flex-col shadow-2xl">
-          <div className="p-10 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
-            <h3 className="text-xl font-black text-white uppercase tracking-[0.4em] flex items-center gap-6">
-              <Activity className="w-8 h-8 text-indigo-400 animate-pulse" />
-              OS Process Orchestrator
-            </h3>
-            <div className="flex gap-4">
-              <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                {processes.length} Active Nodes
-              </span>
-            </div>
+        <div className="p-10 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
+          <h3 className="text-xl font-black text-white uppercase tracking-[0.4em] flex items-center gap-6">
+            <Activity className="w-8 h-8 text-indigo-400 animate-pulse" />
+            OS Process Orchestrator
+          </h3>
+          <div className="flex gap-4">
+            <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+              {processes.length} Active Nodes
+            </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar border-t border-white/5">
-            <table className="w-full text-left border-separate border-spacing-y-4">
-               <thead>
-                 <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">
-                    <th className="px-10">Neural PID</th>
-                    <th className="px-10">Application Identity</th>
-                    <th className="px-10">Load Sync</th>
-                    <th className="px-10 text-center">Memory Block</th>
-                    <th className="px-10 text-right">Directives</th>
-                 </tr>
-               </thead>
-               <tbody>
-                  {processes.map((proc, i) => (
-                    <tr key={i} className="hover:bg-white/[0.03] transition-all group bg-white/[0.01]">
-                      <td className="px-10 py-6 text-xs font-mono text-slate-500 rounded-l-[2rem]">{proc.pid}</td>
-                      <td className="px-10 py-6">
-                        <div className="flex items-center gap-6">
-                           <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-lg shadow-inner">
-                              {proc.name.charAt(0).toUpperCase()}
-                           </div>
-                           <div className="flex flex-col">
-                              <span className="font-black text-white text-lg tracking-tighter">{proc.name}</span>
-                              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Authenticated Host App</span>
-                           </div>
-                        </div>
-                      </td>
-                      <td className="px-10 py-6">
-                        <div className="flex items-center gap-4">
-                           <div className="h-2 w-24 bg-white/5 rounded-full overflow-hidden shadow-inner">
-                              <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(proc.cpu_usage, 100)}%` }} className="h-full bg-indigo-500" />
-                           </div>
-                           <span className="text-xs font-mono text-indigo-400 font-black">{proc.cpu_usage.toFixed(1)}%</span>
-                        </div>
-                      </td>
-                      <td className="px-10 py-6 text-center text-xs font-mono text-slate-400">
-                        {(proc.mem_usage / (1024**2)).toFixed(1)} <span className="text-[10px] text-slate-600">MB</span>
-                      </td>
-                      <td className="px-10 py-6 text-right rounded-r-[2rem]">
-                         <button onClick={async () => {
-                            await invokeSafe("kill_quarantine_process", { pid: proc.pid });
-                            setNotification(`Sentinel: Quarantined ${proc.name}`);
-                            refreshSystemSnapshot();
-                          }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
-                           Quarantine
-                         </button>
-                      </td>
-                    </tr>
-                  ))}
-               </tbody>
-            </table>
-          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar border-t border-white/5">
+          <table className="w-full text-left border-separate border-spacing-y-4">
+            <thead>
+              <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">
+                <th className="px-10">Neural PID</th>
+                <th className="px-10">Application Identity</th>
+                <th className="px-10">Load Sync</th>
+                <th className="px-10 text-center">Memory Block</th>
+                <th className="px-10 text-right">Directives</th>
+              </tr>
+            </thead>
+            <tbody>
+              {processes.map((proc, i) => (
+                <tr key={i} className="hover:bg-white/[0.03] transition-all group bg-white/[0.01]">
+                  <td className="px-10 py-6 text-xs font-mono text-slate-500 rounded-l-[2rem]">{proc.pid}</td>
+                  <td className="px-10 py-6">
+                    <div className="flex items-center gap-6">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-lg shadow-inner">
+                        {proc.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black text-white text-lg tracking-tighter">{proc.name}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Authenticated Host App</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-10 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="h-2 w-24 bg-white/5 rounded-full overflow-hidden shadow-inner">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(proc.cpu_usage, 100)}%` }} className="h-full bg-indigo-500" />
+                      </div>
+                      <span className="text-xs font-mono text-indigo-400 font-black">{proc.cpu_usage.toFixed(1)}%</span>
+                    </div>
+                  </td>
+                  <td className="px-10 py-6 text-center text-xs font-mono text-slate-400">
+                    {(proc.mem_usage / (1024 ** 2)).toFixed(1)} <span className="text-[10px] text-slate-600">MB</span>
+                  </td>
+                  <td className="px-10 py-6 text-right rounded-r-[2rem]">
+                    <button onClick={async () => {
+                      await invokeSafe("kill_quarantine_process", { pid: proc.pid });
+                      setNotification(`Sentinel: Quarantined ${proc.name}`);
+                      refreshSystemSnapshot();
+                    }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
+                      Quarantine
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -1987,11 +1987,11 @@ export default function App() {
 
 
   return (
-    <div 
-        className={cn(
-            "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000",
-            hardwareStatus?.focus_mode.includes("Survival") ? "grayscale-lockdown" : ""
-        )}
+    <div
+      className={cn(
+        "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000",
+        (hardwareStatus?.focus_mode || "").includes("Survival") ? "grayscale-lockdown" : ""
+      )}
     >
       {!isTauri && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2600] px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-black uppercase tracking-widest text-amber-300">
@@ -2001,38 +2001,38 @@ export default function App() {
       {/* Neural Command Palette (GLOBAL CORE) */}
       <AnimatePresence>
         {zenithActive && (
-          <ZenithHUD 
-            cpuLoad={systemStats?.cpu_load??0} 
-            integrity={ventureIntegrity} 
-            burn={fiscalBurn.total_burn} 
-            activeVenture={activeVenture} 
-            onExit={() => setZenithActive(false)} 
+          <ZenithHUD
+            cpuLoad={systemStats?.cpu_load ?? 0}
+            integrity={ventureIntegrity}
+            burn={fiscalBurn.total_burn}
+            activeVenture={activeVenture}
+            onExit={() => setZenithActive(false)}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {commandOpen && (
-           <CommandPalette 
-              open={commandOpen}
-              query={commandQuery}
-              onQueryChange={setCommandQuery}
-              onClose={() => setCommandOpen(false)}
-              onExecute={handlePaletteAction}
-              permissions={permissions}
-              onRequestPermission={handleCommandPermissionRequest}
-              onQuarantinePid={handleQuarantinePid}
-              processes={processes}
-              onPinContext={(name) => handlePinContext(name)}
-              onZenithPulse={handleZenithPulse}
-            />
+          <CommandPalette
+            open={commandOpen}
+            query={commandQuery}
+            onQueryChange={setCommandQuery}
+            onClose={() => setCommandOpen(false)}
+            onExecute={handlePaletteAction}
+            permissions={permissions}
+            onRequestPermission={handleCommandPermissionRequest}
+            onQuarantinePid={handleQuarantinePid}
+            processes={processes}
+            onPinContext={(name) => handlePinContext(name)}
+            onZenithPulse={handleZenithPulse}
+          />
         )}
       </AnimatePresence>
 
       {/* Oracle Alert Notification (Pillar 20) */}
       <AnimatePresence>
         {oracleAlert && (
-          <motion.div 
+          <motion.div
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
@@ -2047,7 +2047,7 @@ export default function App() {
                 <h4 className="text-red-400 font-bold text-sm mb-1 uppercase tracking-wider">{oracleAlert.title}</h4>
                 <p className="text-xs text-slate-300 leading-relaxed font-medium mb-3">{oracleAlert.body}</p>
                 <div className="flex items-center gap-2 text-[10px] font-black text-red-500 uppercase tracking-widest opacity-80">
-                   <Globe className="w-4 h-4" /> Market Signal: {oracleAlert.economic_signal}
+                  <Globe className="w-4 h-4" /> Market Signal: {oracleAlert.economic_signal}
                 </div>
               </div>
               <button onClick={() => setOracleAlert(null)} className="p-2 text-slate-500 hover:text-white transition-colors relative z-10">
@@ -2061,31 +2061,31 @@ export default function App() {
       {/* Crisis Lockout Overlay (Pillar 18) */}
       <AnimatePresence>
         {founderMetrics.stress_color === "#ef4444" && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[2000] bg-red-950/40 backdrop-blur-xl flex items-center justify-center p-12"
           >
-             <div className="max-w-2xl w-full glass-bright border border-red-500/50 shadow-[0_0_100px_rgba(239,68,68,0.2)] rounded-[3rem] p-12 text-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse" />
-                <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8 animate-bounce" />
-                <h2 className="text-4xl font-black text-white uppercase tracking-[0.2em] mb-4">Critical Venture Burn</h2>
-                <p className="text-red-200 text-lg mb-8 font-medium italic opacity-80">"Foundry Discipline Initiated. System restricted to Strategic Recovery Nodes."</p>
-                <div className="grid grid-cols-2 gap-6 mb-10 text-left">
-                   <div className="p-6 glass border-red-500/20 rounded-2xl">
-                      <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Alpha</h4>
-                      <p className="text-xs text-white">Activate Series A Outreach Code Module.</p>
-                   </div>
-                   <div className="p-6 glass border-red-500/20 rounded-2xl">
-                      <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Beta</h4>
-                      <p className="text-xs text-white">Generate Executive Venture Audit.</p>
-                   </div>
+            <div className="max-w-2xl w-full glass-bright border border-red-500/50 shadow-[0_0_100px_rgba(239,68,68,0.2)] rounded-[3rem] p-12 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse" />
+              <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8 animate-bounce" />
+              <h2 className="text-4xl font-black text-white uppercase tracking-[0.2em] mb-4">Critical Venture Burn</h2>
+              <p className="text-red-200 text-lg mb-8 font-medium italic opacity-80">"Foundry Discipline Initiated. System restricted to Strategic Recovery Nodes."</p>
+              <div className="grid grid-cols-2 gap-6 mb-10 text-left">
+                <div className="p-6 glass border-red-500/20 rounded-2xl">
+                  <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Alpha</h4>
+                  <p className="text-xs text-white">Activate Series A Outreach Code Module.</p>
                 </div>
-                <button onClick={() => setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }))} className="px-12 py-5 bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-red-500/40">
-                   Override Lockout
-                </button>
-             </div>
+                <div className="p-6 glass border-red-500/20 rounded-2xl">
+                  <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Recovery Beta</h4>
+                  <p className="text-xs text-white">Generate Executive Venture Audit.</p>
+                </div>
+              </div>
+              <button onClick={() => setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }))} className="px-12 py-5 bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-red-500/40">
+                Override Lockout
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2122,7 +2122,7 @@ export default function App() {
               </motion.div>
             )}
             {notification && (
-              <motion.div 
+              <motion.div
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
@@ -2167,7 +2167,7 @@ export default function App() {
         )}
       </div>
 
-            {/* Level 9 Executive Sidebar */}
+      {/* Level 9 Executive Sidebar */}
       <LeftRail
         activeView={activeView}
         performanceMode={performanceMode}
@@ -2194,7 +2194,7 @@ export default function App() {
 
       {/* Main Command Stage */}
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-                <TopBar
+        <TopBar
           activeVenture={activeVenture}
           activeContext={activeContext}
           contexts={contexts}
@@ -2225,264 +2225,264 @@ export default function App() {
         />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
-            {activeView !== 'dash' && (
-               <div className="w-full max-w-7xl flex flex-col items-start gap-12">
-                  <div className="flex items-center gap-6">
-                     <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
-                        <RotateCcw className="w-6 h-6" />
-                     </button>
-                     <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
-                        {activeView === 'processes' ? 'Strategic Process HUD' : 'Host Storage Atlas'}
-                     </h2>
+          {activeView !== 'dash' && (
+            <div className="w-full max-w-7xl flex flex-col items-start gap-12">
+              <div className="flex items-center gap-6">
+                <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
+                  <RotateCcw className="w-6 h-6" />
+                </button>
+                <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
+                  {activeView === 'processes' ? 'Strategic Process HUD' : 'Host Storage Atlas'}
+                </h2>
+              </div>
+              <SystemHUD />
+            </div>
+          )}
+
+          {activeView === 'dash' && (
+            <>
+              {!presentationMode && (
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
+                >
+                  <div className="flex items-center gap-5 px-4 py-2">
+                    <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={handleSearchIntent}
+                      placeholder={isRecording ? "Listening to Neural Intent..." : "Detecting Neural Intent..."}
+                      className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
+                    />
+                    <button
+                      onClick={toggleVoiceRecording}
+                      className={cn(
+                        "p-4 rounded-full transition-all relative group overflow-hidden",
+                        isRecording ? "bg-rose-500/20 text-rose-500 shadow-[0_0_25px_-5px_var(--rose-500)]" : "bg-white/5 text-slate-500 hover:bg-white/10"
+                      )}
+                    >
+                      {isRecording ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />}
+                      {isRecording && (
+                        <motion.div
+                          layoutId="voice-ping"
+                          className="absolute inset-0 bg-rose-500/20 rounded-full animate-ping"
+                        />
+                      )}
+                    </button>
+                    <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
                   </div>
-                  <SystemHUD />
-               </div>
-            )}
+                </motion.div>
+              )}
 
-            {activeView === 'dash' && (
-              <>
-                {!presentationMode && (
-                  <motion.div 
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
-                  >
-                    <div className="flex items-center gap-5 px-4 py-2">
-                      <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
-                      <input 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={handleSearchIntent}
-                        placeholder={isRecording ? "Listening to Neural Intent..." : "Detecting Neural Intent..."}
-                        className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
-                      />
-                      <button 
-                        onClick={toggleVoiceRecording}
-                        className={cn(
-                          "p-4 rounded-full transition-all relative group overflow-hidden",
-                          isRecording ? "bg-rose-500/20 text-rose-500 shadow-[0_0_25px_-5px_var(--rose-500)]" : "bg-white/5 text-slate-500 hover:bg-white/10"
-                        )}
-                      >
-                        {isRecording ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />}
-                        {isRecording && (
-                          <motion.div 
-                            layoutId="voice-ping"
-                            className="absolute inset-0 bg-rose-500/20 rounded-full animate-ping"
-                          />
-                        )}
-                      </button>
-                      <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
+              <div className={cn("flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative", zenMode && "zen-hide")}>
+                <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
+                  {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
+                    <div key={i} className="flex gap-4 items-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
+                      <span className="text-sm font-bold text-white tracking-tight">${m.price?.toFixed(1)}</span>
+                      <span className={cn("text-[10px] font-black tracking-widest uppercase", m.color === 'emerald' ? "text-emerald-500" : "text-rose-500")}>
+                        {m.change}
+                      </span>
                     </div>
-                  </motion.div>
-                )}
+                  ))}
+                </div>
+              </div>
 
-                <div className={cn("flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative", zenMode && "zen-hide")}>
-                  <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                    {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
-                      <div key={i} className="flex gap-4 items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
-                        <span className="text-sm font-bold text-white tracking-tight">${m.price?.toFixed(1)}</span>
-                        <span className={cn("text-[10px] font-black tracking-widest uppercase", m.color === 'emerald' ? "text-emerald-500" : "text-rose-500")}>
-                          {m.change}
-                        </span>
+              <div className={cn("w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12", zenMode && "zen-hide")}>
+                {[
+                  { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
+                  { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
+                  { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
+                  { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
+                ].map((m, i) => (
+                  <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
+                    <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
+                      <div className="text-xl font-bold text-white">{m.val}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
+              <div className={cn("w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12", zenMode && "zen-hide")}>
+                <div className={cn("glass p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden transition-all duration-700", isVaultSealed && "border-rose-500/50 shadow-[0_0_50px_-20px_rgba(244,63,94,0.3)]")}>
+                  {/* Phase 7.7: Sentinel Lockdown Overlay */}
+                  <AnimatePresence>
+                    {isVaultSealed && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-rose-950/20 backdrop-blur-[2px] z-[20] flex items-center justify-center border border-rose-500/20"
+                      >
+                        <div className="flex flex-col items-center gap-2 animate-bounce">
+                          <Lock className="w-8 h-8 text-rose-500" />
+                          <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Sentinel Vault Locked</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-emerald-400" />
+                      <h3 className="text-lg font-bold text-white">Strategic Inventory</h3>
+                    </div>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Liquid: $1.8M</span>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {strategicInventory.map((item, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
+                        <div className="flex items-center gap-4">
+                          <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
+                          <div>
+                            <div className="text-sm font-bold text-white">{item.name}</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-black">{item.type}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-black text-emerald-400">{item.value}</div>
+                          <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className={cn("w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12", zenMode && "zen-hide")}>
-                  {[
-                    { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
-                    { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
-                    { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-                    { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
-                  ].map((m, i) => (
-                    <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
-                      <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
-                      <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                        <div className="text-xl font-bold text-white">{m.val}</div>
-                      </div>
+                <div className="glass p-8 rounded-[2.5rem] border border-white/5">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                      <Bot className="w-5 h-5 text-indigo-400" />
+                      <h3 className="text-lg font-bold text-white">Active Golem Matrix</h3>
                     </div>
-                  ))}
-                </div>
-
-                {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
-                <div className={cn("w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12", zenMode && "zen-hide")}>
-                  <div className={cn("glass p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden transition-all duration-700", isVaultSealed && "border-rose-500/50 shadow-[0_0_50px_-20px_rgba(244,63,94,0.3)]")}>
-                    {/* Phase 7.7: Sentinel Lockdown Overlay */}
-                    <AnimatePresence>
-                      {isVaultSealed && (
-                        <motion.div 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 bg-rose-950/20 backdrop-blur-[2px] z-[20] flex items-center justify-center border border-rose-500/20"
-                        >
-                           <div className="flex flex-col items-center gap-2 animate-bounce">
-                             <Lock className="w-8 h-8 text-rose-500" />
-                             <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Sentinel Vault Locked</span>
-                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    <div className="flex justify-between items-center mb-6">
-                      <div className="flex items-center gap-3">
-                        <Database className="w-5 h-5 text-emerald-400" />
-                        <h3 className="text-lg font-bold text-white">Strategic Inventory</h3>
-                      </div>
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Liquid: $1.8M</span>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      {strategicInventory.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
-                          <div className="flex items-center gap-4">
-                            <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
-                            <div>
-                              <div className="text-sm font-bold text-white">{item.name}</div>
-                              <div className="text-[10px] text-slate-500 uppercase font-black">{item.type}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                             <div className="text-sm font-black text-emerald-400">{item.value}</div>
-                             <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Units: {activeGolems.length}</span>
                   </div>
-
-                  <div className="glass p-8 rounded-[2.5rem] border border-white/5">
-                    <div className="flex justify-between items-center mb-6">
-                      <div className="flex items-center gap-3">
-                        <Bot className="w-5 h-5 text-indigo-400" />
-                        <h3 className="text-lg font-bold text-white">Active Golem Matrix</h3>
-                      </div>
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Units: {activeGolems.length}</span>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      {activeGolems.map((golem, i) => (
-                        <div 
-                           key={i} 
-                           onClick={() => setSelectedGolem(golem)}
-                           className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
-                        >
-                          <div className="flex justify-between items-center">
-                             <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight flex items-center gap-2">
-                               {golem.name}
-                               <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
-                             </div>
-                             <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm flex items-center gap-1.5", 
-                                golem.aura === 'emerald' ? "bg-emerald-500/10 text-emerald-400" : 
-                                golem.aura === 'rose' ? "bg-rose-500/10 text-rose-400" : 
+                  <div className="flex flex-col gap-4">
+                    {activeGolems.map((golem, i) => (
+                      <div
+                        key={i}
+                        onClick={() => setSelectedGolem(golem)}
+                        className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight flex items-center gap-2">
+                            {golem.name}
+                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
+                          </div>
+                          <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm flex items-center gap-1.5",
+                            golem.aura === 'emerald' ? "bg-emerald-500/10 text-emerald-400" :
+                              golem.aura === 'rose' ? "bg-rose-500/10 text-rose-400" :
                                 "bg-indigo-500/10 text-indigo-400"
-                             )}>
-                               <span className={cn("w-1 h-1 rounded-full", golem.aura === 'emerald' ? "bg-emerald-400" : golem.aura === 'rose' ? "bg-rose-400" : "bg-indigo-400")} />
-                               {golem.status}
-                             </div>
-                          </div>
-                          <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
-                             <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${golem.progress}%` }}
-                              className={cn("h-full relative overflow-hidden", 
-                                golem.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_8px_var(--emerald-500)]" : 
-                                golem.aura === 'rose' ? "bg-rose-500 shadow-[0_0_8px_var(--rose-500)]" : 
-                                "bg-indigo-500 shadow-[0_0_8px_var(--indigo-500)]"
-                              )}
-                             />
-                          </div>
-                          <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                             <span>{golem.mission}</span>
-                             <span>{golem.progress}% Complete</span>
+                          )}>
+                            <span className={cn("w-1 h-1 rounded-full", golem.aura === 'emerald' ? "bg-emerald-400" : golem.aura === 'rose' ? "bg-rose-400" : "bg-indigo-400")} />
+                            {golem.status}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${golem.progress}%` }}
+                            className={cn("h-full relative overflow-hidden",
+                              golem.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_8px_var(--emerald-500)]" :
+                                golem.aura === 'rose' ? "bg-rose-500 shadow-[0_0_8px_var(--rose-500)]" :
+                                  "bg-indigo-500 shadow-[0_0_8px_var(--indigo-500)]"
+                            )}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                          <span>{golem.mission}</span>
+                          <span>{golem.progress}% Complete</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              </div>
 
-                <RightRail 
-                    isOpen={!!selectedGolem} 
-                    onClose={() => setSelectedGolem(null)} 
-                    golem={selectedGolem} 
-                    className={cn("transition-all duration-700", zenMode && "opacity-0 translateX-24 pointer-events-none")}
-                />
-
-                <DocumentationPanel 
-                    isOpen={showDocs} 
-                    onClose={() => setShowDocs(false)} 
-                />
-
-                <SystemPanel
-                  stats={systemStats}
-                  windows={runningWindows}
-                  processes={processes}
-                  isScanning={isScanning}
-                  storage={storageMap}
-                  devices={devices}
-              processPriorities={processPriorities}
-              priorityCache={priorityCache}
-              priorityAudit={priorityAudit}
-              batteryHealth={batteryHealth}
-              lastSync={systemLastSync}
-              onRefresh={refreshSystemSnapshot}
-              onKillProcess={handleKillProcess}
-              onSuspendProcess={handleSuspendProcess}
-              onResumeProcess={handleResumeProcess}
-              onSetPriority={handleSetPriority}
-              onClearCacheReset={handleClearCacheReset}
-              onToggleIgnoreProcess={handleToggleIgnoreProcess}
-              onExportAudit={handleExportAudit}
-              onClearAllCache={handleClearAllCache}
-              onReapplyAll={handleReapplyAll}
-              onResetAllPriorities={handleResetAllPriorities}
-              onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
-              onToggleIgnoreAll={handleToggleIgnoreAll}
-              onSetProcessTtl={handleSetProcessTtl}
-              defaultTtlDays={defaultTtlDays}
-              autoApplyPriorities={autoApplyPriorities}
-              sparklinesEnabled={sparklinesEnabled}
-              externalConfirmAction={resetConfirmAction}
-              onClearExternalConfirm={() => setResetConfirmAction(null)}
-            />
-              </>
-            )}
-
-            {activeView === 'timeline' && (
-              <CortexLog 
-                logs={neuralLogs} 
-                onRefresh={refreshSystemSnapshot}
+              <RightRail
+                isOpen={!!selectedGolem}
+                onClose={() => setSelectedGolem(null)}
+                golem={selectedGolem}
+                className={cn("transition-all duration-700", zenMode && "opacity-0 translateX-24 pointer-events-none")}
               />
-            )}
 
-            <div className="flex gap-8 pb-12">
-              {contexts.map((ctx) => {
-                const Icon = ctx.icon;
-                const isActive = activeContext === ctx.id;
-                return (
-                  <motion.button
-                    key={ctx.id}
-                    onClick={() => handleContextSwitch(ctx.id)}
-                    whileHover={{ y: -5 }}
-                    className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
-                  >
-                    <div className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center border transition-all shadow-2xl", isActive ? "bg-indigo-600 border-white/20 shadow-indigo-500/40" : "glass border-transparent hover:border-white/10")}>
-                      <Icon className={cn("w-8 h-8", isActive ? "text-white" : "text-slate-500")} />
-                    </div>
-                    <span className={cn("text-[9px] font-bold uppercase tracking-[0.3em]", isActive ? "text-white" : "text-slate-600")}>{ctx.name}</span>
-                  </motion.button>
-                );
-              })}
-            </div>
+              <DocumentationPanel
+                isOpen={showDocs}
+                onClose={() => setShowDocs(false)}
+              />
+
+              <SystemPanel
+                stats={systemStats}
+                windows={runningWindows}
+                processes={processes}
+                isScanning={isScanning}
+                storage={storageMap}
+                devices={devices}
+                processPriorities={processPriorities}
+                priorityCache={priorityCache}
+                priorityAudit={priorityAudit}
+                batteryHealth={batteryHealth}
+                lastSync={systemLastSync}
+                onRefresh={refreshSystemSnapshot}
+                onKillProcess={handleKillProcess}
+                onSuspendProcess={handleSuspendProcess}
+                onResumeProcess={handleResumeProcess}
+                onSetPriority={handleSetPriority}
+                onClearCacheReset={handleClearCacheReset}
+                onToggleIgnoreProcess={handleToggleIgnoreProcess}
+                onExportAudit={handleExportAudit}
+                onClearAllCache={handleClearAllCache}
+                onReapplyAll={handleReapplyAll}
+                onResetAllPriorities={handleResetAllPriorities}
+                onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
+                onToggleIgnoreAll={handleToggleIgnoreAll}
+                onSetProcessTtl={handleSetProcessTtl}
+                defaultTtlDays={defaultTtlDays}
+                autoApplyPriorities={autoApplyPriorities}
+                sparklinesEnabled={sparklinesEnabled}
+                externalConfirmAction={resetConfirmAction}
+                onClearExternalConfirm={() => setResetConfirmAction(null)}
+              />
+            </>
+          )}
+
+          {activeView === 'timeline' && (
+            <CortexLog
+              logs={neuralLogs}
+              onRefresh={refreshSystemSnapshot}
+            />
+          )}
+
+          <div className="flex gap-8 pb-12">
+            {contexts.map((ctx) => {
+              const Icon = ctx.icon;
+              const isActive = activeContext === ctx.id;
+              return (
+                <motion.button
+                  key={ctx.id}
+                  onClick={() => handleContextSwitch(ctx.id)}
+                  whileHover={{ y: -5 }}
+                  className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
+                >
+                  <div className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center border transition-all shadow-2xl", isActive ? "bg-indigo-600 border-white/20 shadow-indigo-500/40" : "glass border-transparent hover:border-white/10")}>
+                    <Icon className={cn("w-8 h-8", isActive ? "text-white" : "text-slate-500")} />
+                  </div>
+                  <span className={cn("text-[9px] font-bold uppercase tracking-[0.3em]", isActive ? "text-white" : "text-slate-600")}>{ctx.name}</span>
+                </motion.button>
+              );
+            })}
+          </div>
         </div>
       </main>
 
       {/* OVERLAYS */}
       <AnimatePresence>
         {zenithActive && (
-          <ZenithHUD 
+          <ZenithHUD
             cpuLoad={systemStats?.cpu_load || 0}
             integrity={ventureIntegrity}
             burn={fiscalBurn.total_burn}
@@ -2492,1212 +2492,1212 @@ export default function App() {
         )}
         {showGraph && !performanceMode && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-4xl">
-             {/* Spectral HUD: Entropy Buffer */}
-             <div className="absolute top-10 left-10 z-[210] flex flex-col gap-6 w-96">
-                <div className="flex flex-col gap-2">
-                    <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Cortex</h2>
-                    <div className="flex items-center gap-3">
-                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Spectral eBPF Sentinel Online</span>
+            {/* Spectral HUD: Entropy Buffer */}
+            <div className="absolute top-10 left-10 z-[210] flex flex-col gap-6 w-96">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase leading-none">Neural Cortex</h2>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Spectral eBPF Sentinel Online</span>
+                </div>
+              </div>
+
+              <div className="glass-bright p-8 rounded-[3rem] border border-white/10 shadow-3xl shadow-black/40">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={14} className="animate-pulse" /> Kernel Anomaly Feed
+                  </h3>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 opacity-30">
+                      <Clock size={10} />
+                      <span className="text-[8px] font-black uppercase tracking-tighter">Real-time Buffer</span>
                     </div>
+                    <button
+                      onClick={() => setPerformanceMode(!performanceMode)}
+                      className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${performanceMode ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
+                    >
+                      {performanceMode ? 'Zen Mode: ON' : 'Optimize 3D'}
+                    </button>
+                  </div>
                 </div>
-
-                <div className="glass-bright p-8 rounded-[3rem] border border-white/10 shadow-3xl shadow-black/40">
-                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-                          <Activity size={14} className="animate-pulse" /> Kernel Anomaly Feed
-                      </h3>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 opacity-30">
-                           <Clock size={10} />
-                           <span className="text-[8px] font-black uppercase tracking-tighter">Real-time Buffer</span>
-                        </div>
-                        <button 
-                          onClick={() => setPerformanceMode(!performanceMode)}
-                          className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${performanceMode ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-white/5 border-white/10 text-slate-500'}`}
-                        >
-                           {performanceMode ? 'Zen Mode: ON' : 'Optimize 3D'}
-                        </button>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+                  {spectralAnomalies.length === 0 && (
+                    <div className="flex flex-col items-center py-12 opacity-30 text-center">
+                      <Shield size={32} className="mb-4 text-emerald-500" />
+                      <p className="text-[10px] text-slate-500 italic uppercase">System is optimized & tranquil.</p>
+                    </div>
+                  )}
+                  {spectralAnomalies.map((anom) => (
+                    <motion.div
+                      key={anom.id || Math.random()}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all group overflow-hidden relative"
+                    >
+                      <div className="absolute top-0 right-0 p-4">
+                        <span className="text-[8px] text-slate-500 font-mono">PID {anom.associated_pid || '??'}</span>
                       </div>
-                   </div>
-                   <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
-                      {spectralAnomalies.length === 0 && (
-                        <div className="flex flex-col items-center py-12 opacity-30 text-center">
-                           <Shield size={32} className="mb-4 text-emerald-500" />
-                           <p className="text-[10px] text-slate-500 italic uppercase">System is optimized & tranquil.</p>
-                        </div>
-                      )}
-                      {spectralAnomalies.map((anom) => (
-                        <motion.div 
-                          key={anom.id} 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all group overflow-hidden relative"
-                        >
-                           <div className="absolute top-0 right-0 p-4">
-                              <span className="text-[8px] text-slate-500 font-mono">PID {anom.associated_pid || '??'}</span>
-                           </div>
-                           <div className="flex items-center gap-3 mb-3">
-                              <span className="text-[9px] px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full font-black uppercase tracking-widest border border-rose-500/20">{anom.source}</span>
-                           </div>
-                           <p className="text-xs text-white font-bold leading-tight mb-4">{anom.description}</p>
-                           <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${anom.risk_level * 100}%` }}
-                                className="h-full bg-gradient-to-r from-rose-500 to-purple-600"
-                              />
-                           </div>
-                        </motion.div>
-                      ))}
-                   </div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-[9px] px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full font-black uppercase tracking-widest border border-rose-500/20">{anom.source || "Unknown"}</span>
+                      </div>
+                      <p className="text-xs text-white font-bold leading-tight mb-4">{anom.description || "System anomaly detected in neural cortex."}</p>
+                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(anom.risk_level || 0) * 100}%` }}
+                          className="h-full bg-gradient-to-r from-rose-500 to-purple-600"
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Distributed Collective: Remote Foundry Nodes */}
+              <div className="glass-bright p-8 rounded-[3rem] border border-indigo-500/10 shadow-3xl shadow-black/40">
+                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                  <Globe size={14} className="animate-pulse" /> Distributed Collective
+                </h3>
+                <div className="space-y-4">
+                  {collectiveNodes.length === 0 && (
+                    <p className="text-[10px] text-slate-500 italic uppercase">Searching for remote Foundry nodes...</p>
+                  )}
+                  {collectiveNodes.map((node) => (
+                    <div key={node.id} className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-white leading-none mb-1">{node.hostname}</p>
+                        <p className="text-[8px] text-slate-500 font-mono">{node.ip}:{node.port}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{node.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={async () => {
+                      const res = await invokeSafe("register_remote_node", { ip: "127.0.0.1", port: 1420, hostname: "LocalFoundry-Alpha" }) as string;
+                      setNotification(res);
+                    }}
+                    className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest hover:bg-white/10 transition-all"
+                  >
+                    Scan for Peer Nodes
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Phase 14: Chronos Temporal Scrubber */}
+            {showGraph && chronosHistory.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[300] w-[600px] glass-bright rounded-full p-6 border border-indigo-500/20 shadow-6xl flex items-center gap-8"
+              >
+                <div className="flex items-center gap-3">
+                  <History size={18} className={`${isTimeTraveling ? 'text-indigo-400 rotate-animation' : 'text-slate-500'}`} />
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Chronos Buffer</span>
+                    <span className="text-[10px] font-bold text-white leading-none mt-1">{isTimeTraveling ? 'TIME TRAVEL ACTIVE' : 'LIVE TELEMETRY'}</span>
+                  </div>
                 </div>
 
-                {/* Distributed Collective: Remote Foundry Nodes */}
-                <div className="glass-bright p-8 rounded-[3rem] border border-indigo-500/10 shadow-3xl shadow-black/40">
-                   <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                       <Globe size={14} className="animate-pulse" /> Distributed Collective
-                   </h3>
-                   <div className="space-y-4">
-                      {collectiveNodes.length === 0 && (
-                        <p className="text-[10px] text-slate-500 italic uppercase">Searching for remote Foundry nodes...</p>
-                      )}
-                      {collectiveNodes.map((node) => (
-                        <div key={node.id} className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-between">
-                           <div>
-                              <p className="text-[10px] font-bold text-white leading-none mb-1">{node.hostname}</p>
-                              <p className="text-[8px] text-slate-500 font-mono">{node.ip}:{node.port}</p>
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{node.status}</span>
-                           </div>
-                        </div>
-                      ))}
-                      <button 
-                        onClick={async () => {
-                           const res = await invokeSafe("register_remote_node", { ip: "127.0.0.1", port: 1420, hostname: "LocalFoundry-Alpha" }) as string;
-                           setNotification(res);
-                        }}
-                        className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest hover:bg-white/10 transition-all"
-                      >
-                         Scan for Peer Nodes
-                      </button>
-                   </div>
+                <div className="flex-1 px-4 relative flex items-center">
+                  <input
+                    type="range"
+                    min="-1"
+                    max={chronosHistory.length - 1}
+                    value={travelIndex}
+                    onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-500"
+                  />
                 </div>
-             </div>
 
-             {/* Phase 14: Chronos Temporal Scrubber */}
-             {showGraph && chronosHistory.length > 0 && (
-               <motion.div 
-                 initial={{ opacity: 0, y: 50 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[300] w-[600px] glass-bright rounded-full p-6 border border-indigo-500/20 shadow-6xl flex items-center gap-8"
-               >
-                  <div className="flex items-center gap-3">
-                     <History size={18} className={`${isTimeTraveling ? 'text-indigo-400 rotate-animation' : 'text-slate-500'}`} />
-                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Chronos Buffer</span>
-                        <span className="text-[10px] font-bold text-white leading-none mt-1">{isTimeTraveling ? 'TIME TRAVEL ACTIVE' : 'LIVE TELEMETRY'}</span>
-                     </div>
-                  </div>
+                <div className="text-right whitespace-nowrap min-w-[80px]">
+                  <p className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter">
+                    {travelIndex === -1 ? 'REAL-TIME' : `${chronosHistory.length - 1 - travelIndex}m ago`}
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
-                  <div className="flex-1 px-4 relative flex items-center">
-                     <input 
-                       type="range"
-                       min="-1"
-                       max={chronosHistory.length - 1}
-                       value={travelIndex}
-                       onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
-                       className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-500"
-                     />
-                  </div>
+            <div className="absolute top-10 right-10 z-[210]">
+              <button onClick={() => setShowGraph(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all focus:outline-none shadow-xl shadow-black/40"><Plus className="w-8 h-8 rotate-45" /></button>
+            </div>
 
-                  <div className="text-right whitespace-nowrap min-w-[80px]">
-                     <p className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter">
-                        {travelIndex === -1 ? 'REAL-TIME' : `${chronosHistory.length - 1 - travelIndex}m ago`}
-                     </p>
-                  </div>
-               </motion.div>
-             )}
-
-             <div className="absolute top-10 right-10 z-[210]">
-                <button onClick={() => setShowGraph(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all focus:outline-none shadow-xl shadow-black/40"><Plus className="w-8 h-8 rotate-45" /></button>
-             </div>
-             
-             <div className="w-full h-full pointer-events-auto">
-                {mounted && (
-                  <ForceGraph3D 
-                    graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData} 
-                    backgroundColor="#00000000"
-                    nodeRelSize={performanceMode ? 3 : 5}
-                    nodeColor={(node: any) => getNodeColor(node)}
-                    nodeLabel={(node: any) => `
+            <div className="w-full h-full pointer-events-auto">
+              {mounted && (
+                <ForceGraph3D
+                  graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
+                  backgroundColor="#00000000"
+                  nodeRelSize={performanceMode ? 3 : 5}
+                  nodeColor={(node: any) => getNodeColor(node)}
+                  nodeLabel={(node: any) => `
                       <div class="glass p-4 rounded-2xl border border-white/10 backdrop-blur-xl">
                         <div class="text-[9px] font-black uppercase text-indigo-400 mb-2 tracking-widest">${node.isAnomaly ? 'SPECTRAL ANOMALY' : (node.group || 'Neural Node')}</div>
                         <div class="text-xs font-bold text-white">${node.name || node.id}</div>
                       </div>
                     `}
-                    nodeVal={(node: any) => node.isAnomaly ? (12 + node.risk_level * 10) : (node.val || 4)}
-                    linkColor={() => "rgba(255, 255, 255, 0.05)"}
-                    linkWidth={performanceMode ? 0.5 : 1}
-                    enableNodeDrag={!performanceMode}
-                    showNavInfo={false}
-                    onNodeRightClick={(node: any, event: any) => {
-                       setCortexMenu({ x: event.clientX, y: event.clientY, node });
-                    }}
-                    warmupTicks={performanceMode ? 50 : 20}
-                    cooldownTicks={performanceMode ? 30 : 60}
-                  />
-                )}
-             </div>
+                  nodeVal={(node: any) => node.isAnomaly ? (12 + node.risk_level * 10) : (node.val || 4)}
+                  linkColor={() => "rgba(255, 255, 255, 0.05)"}
+                  linkWidth={performanceMode ? 0.5 : 1}
+                  enableNodeDrag={!performanceMode}
+                  showNavInfo={false}
+                  onNodeRightClick={(node: any, event: any) => {
+                    setCortexMenu({ x: event.clientX, y: event.clientY, node });
+                  }}
+                  warmupTicks={performanceMode ? 50 : 20}
+                  cooldownTicks={performanceMode ? 30 : 60}
+                />
+              )}
+            </div>
 
-             {/* Aegis Context Menu: Tactical Strike Layer */}
-             {cortexMenu && (
-               <motion.div 
-                 initial={{ opacity: 0, scale: 0.95 }}
-                 animate={{ opacity: 1, scale: 1 }}
-                 style={{ top: cortexMenu.y, left: cortexMenu.x }}
-                 className="fixed z-[400] w-64 glass-bright rounded-3xl border border-white/10 shadow-5xl p-4 flex flex-col gap-2 overflow-hidden"
-               >
-                  <div className="px-4 py-3 border-b border-white/5 mb-2">
-                     <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Target PID: {cortexMenu.node.associated_pid || '??'}</p>
-                     <p className="text-[10px] font-bold text-white truncate">{cortexMenu.node.name || cortexMenu.node.id}</p>
+            {/* Aegis Context Menu: Tactical Strike Layer */}
+            {cortexMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                style={{ top: cortexMenu.y, left: cortexMenu.x }}
+                className="fixed z-[400] w-64 glass-bright rounded-3xl border border-white/10 shadow-5xl p-4 flex flex-col gap-2 overflow-hidden"
+              >
+                <div className="px-4 py-3 border-b border-white/5 mb-2">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Target PID: {cortexMenu.node.associated_pid || '??'}</p>
+                  <p className="text-[10px] font-bold text-white truncate">{cortexMenu.node.name || cortexMenu.node.id}</p>
+                </div>
+
+                <button
+                  onClick={() => handleAegisPurge(cortexMenu.node, false)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-rose-500/10 text-rose-400 rounded-2xl transition-all group"
+                >
+                  <Skull size={14} className="group-hover:animate-bounce" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Purge Process</span>
+                </button>
+
+                <button
+                  onClick={() => handleAegisPurge(cortexMenu.node, true)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-orange-500/10 text-orange-400 rounded-2xl transition-all group"
+                >
+                  <Lock size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Seal & Quarantine</span>
+                </button>
+
+                <button
+                  onClick={() => handleAegisStasis(cortexMenu.node, false)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-indigo-500/10 text-indigo-400 rounded-2xl transition-all group"
+                >
+                  <Pause size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Suspend Stasis</span>
+                </button>
+
+                <button
+                  onClick={() => handleForgeIntent(cortexMenu.node)}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 text-emerald-400 rounded-2xl transition-all group"
+                >
+                  <FlaskConical size={14} className="group-hover:animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Neural Forge Intent</span>
+                </button>
+
+                <div className="mt-2 pt-2 border-t border-white/5">
+                  <button
+                    onClick={() => setCortexMenu(null)}
+                    className="w-full py-2 text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all text-center"
+                  >
+                    Cancel Tactical Intent
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Neural Forge Manifest Overlay */}
+            {activeForge && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 50 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                className="fixed inset-0 z-[500] flex items-center justify-center p-20 pointer-events-none"
+              >
+                <div className="w-[800px] glass-bright rounded-[4rem] border border-emerald-500/30 p-16 flex flex-col pointer-events-auto overflow-hidden relative shadow-6xl">
+                  <div className="absolute top-0 right-0 p-8">
+                    <button onClick={() => setActiveForge(null)} className="text-slate-500 hover:text-white transition-all"><X size={24} /></button>
                   </div>
-                  
-                  <button 
-                    onClick={() => handleAegisPurge(cortexMenu.node, false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-rose-500/10 text-rose-400 rounded-2xl transition-all group"
-                  >
-                     <Skull size={14} className="group-hover:animate-bounce" />
-                     <span className="text-[10px] font-bold uppercase tracking-widest">Purge Process</span>
-                  </button>
 
-                  <button 
-                    onClick={() => handleAegisPurge(cortexMenu.node, true)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-orange-500/10 text-orange-400 rounded-2xl transition-all group"
-                  >
-                     <Lock size={14} />
-                     <span className="text-[10px] font-bold uppercase tracking-widest">Seal & Quarantine</span>
-                  </button>
-
-                  <button 
-                    onClick={() => handleAegisStasis(cortexMenu.node, false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-indigo-500/10 text-indigo-400 rounded-2xl transition-all group"
-                  >
-                     <Pause size={14} />
-                     <span className="text-[10px] font-bold uppercase tracking-widest">Suspend Stasis</span>
-                  </button>
-
-                  <button 
-                    onClick={() => handleForgeIntent(cortexMenu.node)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 text-emerald-400 rounded-2xl transition-all group"
-                  >
-                     <FlaskConical size={14} className="group-hover:animate-pulse" />
-                     <span className="text-[10px] font-bold uppercase tracking-widest">Neural Forge Intent</span>
-                  </button>
-
-                  <div className="mt-2 pt-2 border-t border-white/5">
-                     <button 
-                        onClick={() => setCortexMenu(null)}
-                        className="w-full py-2 text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all text-center"
-                     >
-                        Cancel Tactical Intent
-                     </button>
+                  <div className="flex items-center gap-6 mb-10">
+                    <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                      <FlaskConical className="text-emerald-400 w-8 h-8 animate-pulse" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-black text-white uppercase italic leading-none">Neural Forge Output</h2>
+                      <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] mt-2">Stability Manifest // {activeForge.id}</p>
+                    </div>
                   </div>
-               </motion.div>
-             )}
 
-             {/* Neural Forge Manifest Overlay */}
-             {activeForge && (
-               <motion.div 
-                 initial={{ opacity: 0, scale: 0.9, y: 50 }}
-                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                 className="fixed inset-0 z-[500] flex items-center justify-center p-20 pointer-events-none"
-               >
-                  <div className="w-[800px] glass-bright rounded-[4rem] border border-emerald-500/30 p-16 flex flex-col pointer-events-auto overflow-hidden relative shadow-6xl">
-                     <div className="absolute top-0 right-0 p-8">
-                        <button onClick={() => setActiveForge(null)} className="text-slate-500 hover:text-white transition-all"><X size={24} /></button>
-                     </div>
-
-                     <div className="flex items-center gap-6 mb-10">
-                        <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                           <FlaskConical className="text-emerald-400 w-8 h-8 animate-pulse" />
+                  <div className="grid grid-cols-2 gap-10">
+                    <div className="space-y-8">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Strategic Rationale</p>
+                        <p className="text-lg text-white font-bold leading-relaxed">{activeForge.rationale}</p>
+                      </div>
+                      <div className="p-6 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/10">
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Confidence Index</p>
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${activeForge.confidence * 100}%` }} className="h-full bg-emerald-500" />
+                          </div>
+                          <span className="text-[10px] font-black text-white">{Math.round(activeForge.confidence * 100)}%</span>
                         </div>
-                        <div>
-                           <h2 className="text-3xl font-black text-white uppercase italic leading-none">Neural Forge Output</h2>
-                           <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] mt-2">Stability Manifest // {activeForge.id}</p>
-                        </div>
-                     </div>
+                      </div>
+                    </div>
 
-                     <div className="grid grid-cols-2 gap-10">
-                        <div className="space-y-8">
-                           <div>
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Strategic Rationale</p>
-                              <p className="text-lg text-white font-bold leading-relaxed">{activeForge.rationale}</p>
-                           </div>
-                           <div className="p-6 rounded-[2rem] bg-emerald-500/5 border border-emerald-500/10">
-                              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Confidence Index</p>
-                              <div className="flex items-center gap-4">
-                                 <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                    <motion.div initial={{width:0}} animate={{width:`${activeForge.confidence*100}%`}} className="h-full bg-emerald-500"/>
-                                 </div>
-                                 <span className="text-[10px] font-black text-white">{Math.round(activeForge.confidence * 100)}%</span>
-                              </div>
-                           </div>
-                        </div>
-
-                        <div className="flex flex-col">
-                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Forge Intent (Diff)</p>
-                           <div className="flex-1 rounded-[2.5rem] bg-black/60 border border-white/5 p-8 font-mono text-[10px] text-emerald-400 overflow-y-auto custom-scrollbar leading-relaxed">
-                              <pre className="whitespace-pre-wrap">{activeForge.code_diff || 'GEN-POL-884: Restricting Syscall Access for anomalous PID space...'}</pre>
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="mt-12 flex justify-end gap-6">
-                        <button 
-                           onClick={() => setActiveForge(null)}
-                           className="px-10 py-5 rounded-[2rem] text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all"
-                        >
-                           Decline Manifest
-                        </button>
-                        <button 
-                           onClick={() => {
-                              setNotification("Forge Intent committed to OS Kernel.");
-                              setActiveForge(null);
-                           }}
-                           className="px-12 py-5 rounded-[2rem] bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-emerald-500 shadow-2xl shadow-emerald-900/40 transition-all border border-white/10"
-                        >
-                           Apply Forge Intent
-                        </button>
-                     </div>
+                    <div className="flex flex-col">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Forge Intent (Diff)</p>
+                      <div className="flex-1 rounded-[2.5rem] bg-black/60 border border-white/5 p-8 font-mono text-[10px] text-emerald-400 overflow-y-auto custom-scrollbar leading-relaxed">
+                        <pre className="whitespace-pre-wrap">{activeForge.code_diff || 'GEN-POL-884: Restricting Syscall Access for anomalous PID space...'}</pre>
+                      </div>
+                    </div>
                   </div>
-               </motion.div>
-             )}
+
+                  <div className="mt-12 flex justify-end gap-6">
+                    <button
+                      onClick={() => setActiveForge(null)}
+                      className="px-10 py-5 rounded-[2rem] text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] hover:text-white transition-all"
+                    >
+                      Decline Manifest
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNotification("Forge Intent committed to OS Kernel.");
+                        setActiveForge(null);
+                      }}
+                      className="px-12 py-5 rounded-[2rem] bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-emerald-500 shadow-2xl shadow-emerald-900/40 transition-all border border-white/10"
+                    >
+                      Apply Forge Intent
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
           </motion.div>
         )}
 
         {/* Oasis Shell: Strategic CLI Module (Phase 31) */}
         {showCLI && (
-           <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[3000] w-[800px] h-[450px] glass-bright rounded-[3rem] p-12 flex flex-col border border-emerald-500/20 shadow-5xl shadow-emerald-900/10">
-              <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
-                 <div className="flex items-center gap-4">
-                   <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
-                      <Terminal className="w-4 h-4 text-emerald-400" />
-                   </div>
-                   <h3 className="text-xl font-black text-white uppercase tracking-tighter">Oasis Shell <span className="text-[10px] text-emerald-500/50 leading-none">v3.4.0-platform</span></h3>
-                 </div>
-                 <div className="flex items-center gap-6">
-                    {systemStats && (
-                       <div className="flex items-center gap-2 px-4 py-1.5 glass rounded-xl border-white/5">
-                          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", systemStats.binary_sync ? "bg-emerald-500" : "bg-red-500")} />
-                          <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em]">{systemStats.path_status}</span>
-                       </div>
-                    )}
-                    <button onClick={handleInstallShell} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black text-white uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-emerald-600/20">
-                       Deploy Global Shell
-                    </button>
-                    <button onClick={() => setShowCLI(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
-                 </div>
+          <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[3000] w-[800px] h-[450px] glass-bright rounded-[3rem] p-12 flex flex-col border border-emerald-500/20 shadow-5xl shadow-emerald-900/10">
+            <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                  <Terminal className="w-4 h-4 text-emerald-400" />
+                </div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Oasis Shell <span className="text-[10px] text-emerald-500/50 leading-none">v3.4.0-platform</span></h3>
               </div>
-              <div className="flex-1 w-full bg-black/40 rounded-3xl p-8 mb-6 font-mono text-sm overflow-y-auto custom-scrollbar space-y-3">
-                 {cliHistory.map((h, i) => (
-                   <div key={i} className="flex gap-4">
-                      <span className="text-slate-600">[{h.type === 'cmd' ? '>' : '#'}]</span>
-                      <span style={{ color: h.color }} className="font-bold tracking-tight">{h.text}</span>
-                   </div>
-                 ))}
-                 <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth' })} />
+              <div className="flex items-center gap-6">
+                {systemStats && (
+                  <div className="flex items-center gap-2 px-4 py-1.5 glass rounded-xl border-white/5">
+                    <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", systemStats.binary_sync ? "bg-emerald-500" : "bg-red-500")} />
+                    <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em]">{systemStats.path_status}</span>
+                  </div>
+                )}
+                <button onClick={handleInstallShell} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-[10px] font-black text-white uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-emerald-600/20">
+                  Deploy Global Shell
+                </button>
+                <button onClick={() => setShowCLI(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
               </div>
-              <form onSubmit={handleCLICommand} className="relative">
-                 <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 font-mono text-sm">{">"}</span>
-                 <input 
-                   autoFocus
-                   value={cliInput}
-                   onChange={(e) => setCliInput(e.target.value)}
-                   type="text" 
-                   className="w-full h-16 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-6 text-emerald-400 font-mono text-sm focus:outline-none focus:border-emerald-500/30 transition-all placeholder:text-slate-700"
-                   placeholder="Enter directive: 'audit', 'manifest [module]', 'rewind'..."
-                 />
-              </form>
-           </motion.div>
+            </div>
+            <div className="flex-1 w-full bg-black/40 rounded-3xl p-8 mb-6 font-mono text-sm overflow-y-auto custom-scrollbar space-y-3">
+              {cliHistory.map((h, i) => (
+                <div key={i} className="flex gap-4">
+                  <span className="text-slate-600">[{h.type === 'cmd' ? '>' : '#'}]</span>
+                  <span style={{ color: h.color }} className="font-bold tracking-tight">{h.text}</span>
+                </div>
+              ))}
+              <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth' })} />
+            </div>
+            <form onSubmit={handleCLICommand} className="relative">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 font-mono text-sm">{">"}</span>
+              <input
+                autoFocus
+                value={cliInput}
+                onChange={(e) => setCliInput(e.target.value)}
+                type="text"
+                className="w-full h-16 bg-white/5 border border-white/10 rounded-2xl pl-12 pr-6 text-emerald-400 font-mono text-sm focus:outline-none focus:border-emerald-500/30 transition-all placeholder:text-slate-700"
+                placeholder="Enter directive: 'audit', 'manifest [module]', 'rewind'..."
+              />
+            </form>
+          </motion.div>
         )}
 
         {/* Venture Network Registry Portal (Phase 28) */}
         {showNetwork && (
-           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-2xl flex items-center justify-end p-20">
-              <div className="w-[500px] h-full glass-bright rounded-[3.5rem] p-12 flex flex-col items-center">
-                 <div className="w-full flex justify-between items-center mb-12">
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Venture Discovery</h3>
-                    <button onClick={() => setShowNetwork(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
-                 </div>
-                 <div className="flex-1 w-full space-y-6 overflow-y-auto custom-scrollbar pr-4">
-                    {ventureNetwork.map((v: any) => (
-                      <div key={v.id} className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all group">
-                         <div className="flex justify-between items-start mb-4">
-                            <div>
-                               <h4 className="text-lg font-black text-white uppercase tracking-tight">{v.name}</h4>
-                               <p className="text-[10px] text-slate-500 font-mono tracking-widest">{v.path}</p>
-                            </div>
-                            <span className="text-xs font-black text-indigo-400">{v.peak_arr} PEAK</span>
-                         </div>
-                         <button onClick={() => handleNeuralMirror(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
-                      </div>
-                    ))}
-                 </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-2xl flex items-center justify-end p-20">
+            <div className="w-[500px] h-full glass-bright rounded-[3.5rem] p-12 flex flex-col items-center">
+              <div className="w-full flex justify-between items-center mb-12">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Venture Discovery</h3>
+                <button onClick={() => setShowNetwork(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
               </div>
-           </motion.div>
+              <div className="flex-1 w-full space-y-6 overflow-y-auto custom-scrollbar pr-4">
+                {ventureNetwork.map((v: any) => (
+                  <div key={v.id} className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="text-lg font-black text-white uppercase tracking-tight">{v.name}</h4>
+                        <p className="text-[10px] text-slate-500 font-mono tracking-widest">{v.path}</p>
+                      </div>
+                      <span className="text-xs font-black text-indigo-400">{v.peak_arr} PEAK</span>
+                    </div>
+                    <button onClick={() => handleNeuralMirror(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         )}
 
         {activeGolem && (
-           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-2xl flex items-center justify-center p-12">
-              <div className="max-w-4xl w-full glass-bright rounded-[3rem] border border-white/10 shadow-5xl overflow-hidden flex h-[600px]">
-                 <div className="w-1/3 p-12 bg-white/5 border-r border-white/5 flex flex-col justify-between">
-                    <div>
-                       <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">{activeGolem.title}</h3>
-                       <p className="text-xs text-slate-400 leading-relaxed italic">"Agentic Rationale: {activeGolem.rationale}"</p>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                       <button onClick={() => {
-                          invokeSafe('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
-                            setNotification(res);
-                            setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
-                            setActiveGolem(null);
-                            setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
-                          });
-                       }} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30">Authorize Golem</button>
-                       <button onClick={() => setActiveGolem(null)} className="w-full py-5 glass text-slate-500 hover:text-white uppercase tracking-widest text-[10px] rounded-2xl">Dismiss Draft</button>
-                    </div>
-                 </div>
-                 <div className="flex-1 p-12 bg-black/20 font-mono text-sm text-indigo-300 custom-scrollbar overflow-y-auto">
-                    <pre className="whitespace-pre-wrap">{activeGolem.code_draft}</pre>
-                 </div>
-              </div>
-           </motion.div>
-        )}
-         {showVault && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
-             <div className="flex items-center justify-between mb-12">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-2xl flex items-center justify-center p-12">
+            <div className="max-w-4xl w-full glass-bright rounded-[3rem] border border-white/10 shadow-5xl overflow-hidden flex h-[600px]">
+              <div className="w-1/3 p-12 bg-white/5 border-r border-white/5 flex flex-col justify-between">
                 <div>
-                   <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">Sentient Vault</h2>
-                   <p className="text-sm text-slate-500 font-medium">Internal Strategic Archive & File Ledger</p>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">{activeGolem.title}</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed italic">"Agentic Rationale: {activeGolem.rationale}"</p>
                 </div>
-                <div className="flex gap-4">
-                   <button onClick={() => setShowSentinel(true)} className="px-8 py-3 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3">
-                      <Shield className="w-4 h-4" /> Sentinel Archive
-                   </button>
-                   {manifestHistory.length > 0 && (
-                      <button onClick={handleVentureRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
-                         <RotateCcw className="w-4 h-4" /> Rewind Strategy
-                      </button>
-                   )}
-                   <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => {
+                    invokeSafe('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
+                      setNotification(res);
+                      setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
+                      setActiveGolem(null);
+                      setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
+                    });
+                  }} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30">Authorize Golem</button>
+                  <button onClick={() => setActiveGolem(null)} className="w-full py-5 glass text-slate-500 hover:text-white uppercase tracking-widest text-[10px] rounded-2xl">Dismiss Draft</button>
                 </div>
-             </div>
+              </div>
+              <div className="flex-1 p-12 bg-black/20 font-mono text-sm text-indigo-300 custom-scrollbar overflow-y-auto">
+                <pre className="whitespace-pre-wrap">{activeGolem.code_draft}</pre>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        {showVault && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
+            <div className="flex items-center justify-between mb-12">
+              <div>
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">Sentient Vault</h2>
+                <p className="text-sm text-slate-500 font-medium">Internal Strategic Archive & File Ledger</p>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={() => setShowSentinel(true)} className="px-8 py-3 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3">
+                  <Shield className="w-4 h-4" /> Sentinel Archive
+                </button>
+                {manifestHistory.length > 0 && (
+                  <button onClick={handleVentureRewind} className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-red-600/30 flex items-center gap-3">
+                    <RotateCcw className="w-4 h-4" /> Rewind Strategy
+                  </button>
+                )}
+                <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+              </div>
+            </div>
 
-             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
-                {strategicInventory.map((asset: any, i: number) => (
-                   <motion.div 
-                     key={asset.file_path}
-                     initial={{ opacity: 0, y: 20 }}
-                     animate={{ opacity: 1, y: 0 }}
-                     transition={{ delay: i * 0.05 }}
-                     className="glass-bright rounded-3xl p-8 border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer"
-                   >
-                      <div className="flex items-start justify-between mb-6">
-                         <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
-                            <FolderOpen className={cn("w-6 h-6", asset.risk.includes('Ruby') ? "text-red-400" : "text-emerald-400")} />
-                         </div>
-                         <div className={cn("px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border", 
-                           asset.risk.includes('Ruby') ? "bg-red-500/10 border-red-500/30 text-red-400" : 
-                           asset.risk.includes('Emerald') ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                           "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                         )}>
-                            {asset.risk}
-                         </div>
-                      </div>
-                      <h3 className="text-sm font-black text-white truncate mb-1">{asset.file_path.split('/').pop()}</h3>
-                      <p className="text-[10px] text-slate-500 font-mono truncate mb-4">{asset.file_path}</p>
-                      
-                      <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                         <div>
-                            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Strat Debt</span>
-                            <span className="text-sm font-black text-white">{asset.debt}%</span>
-                         </div>
-                         <div className="text-right">
-                            <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Authorized By</span>
-                             <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
-                          </div>
-                       </div>
-                       <button onClick={() => handleSealAsset(asset.file_path, asset.file_path.split("/").pop() || "Strategic Asset")} className="w-full mt-6 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
-                          <Lock className="w-3 h-3" /> Seal within Sentinel
-                       </button>
-                    </motion.div>
-                ))}
-             </div>
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
+              {strategicInventory.map((asset: any, i: number) => (
+                <motion.div
+                  key={asset.file_path}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="glass-bright rounded-3xl p-8 border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
+                      <FolderOpen className={cn("w-6 h-6", (asset.risk || "").includes('Ruby') ? "text-red-400" : "text-emerald-400")} />
+                    </div>
+                    <div className={cn("px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border",
+                      (asset.risk || "").includes('Ruby') ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                        (asset.risk || "").includes('Emerald') ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                          "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    )}>
+                      {asset.risk}
+                    </div>
+                  </div>
+                  <h3 className="text-sm font-black text-white truncate mb-1">{String(asset.file_path || "blob").split('/').pop()}</h3>
+                  <p className="text-[10px] text-slate-500 font-mono truncate mb-4">{asset.file_path || "Neural Identifier Missing"}</p>
+
+                  <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Strat Debt</span>
+                      <span className="text-sm font-black text-white">{asset.debt}%</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-widest mb-1">Authorized By</span>
+                      <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => handleSealAsset(asset.file_path, asset.file_path.split("/").pop() || "Strategic Asset")} className="w-full mt-6 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
+                    <Lock className="w-3 h-3" /> Seal within Sentinel
+                  </button>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
         )}
 
         {showLogs && (
           <motion.div initial={{ opacity: 0, x: 500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 500 }} className="fixed inset-y-0 right-0 z-[400] w-[450px] glass-bright border-l border-white/10 p-12 backdrop-blur-4xl flex flex-col">
-             <div className="flex items-center justify-between mb-12">
-                <div className="flex flex-col">
-                   <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Ledger</span>
-                   <h2 className="text-3xl font-bold text-white tracking-tighter">Cognitive Timeline</h2>
-                </div>
-                <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-6 h-6 rotate-45" /></button>
-             </div>
-             <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
-                <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
-                <div className="space-y-12">
-                   {timeline.map((event: any) => (
-                      <div key={event.id} className="relative pl-12">
-                         <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center z-10", event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600")}>
-                            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                         </div>
-                         <div className="glass p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
-                            <div className="flex justify-between items-center mb-2">
-                               <span className="text-[10px] font-mono text-slate-500">{event.time}</span>
-                               <span className={cn("text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded", 
-                                  event.type === 'neural' ? "text-indigo-400 bg-indigo-400/10" : 
-                                  event.type === 'deploy' ? "text-emerald-400 bg-emerald-400/10" : 
-                                  "text-slate-400 bg-slate-400/10"
-                               )}>{event.type}</span>
-                            </div>
-                            <p className="text-sm text-slate-300 font-medium leading-relaxed">{event.event}</p>
-                         </div>
+            <div className="flex items-center justify-between mb-12">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Ledger</span>
+                <h2 className="text-3xl font-bold text-white tracking-tighter">Cognitive Timeline</h2>
+              </div>
+              <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-6 h-6 rotate-45" /></button>
+            </div>
+            <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
+              <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
+              <div className="space-y-12">
+                {timeline.map((event: any) => (
+                  <div key={event.id} className="relative pl-12">
+                    <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center z-10", event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600")}>
+                      <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    </div>
+                    <div className="glass p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-mono text-slate-500">{event.time}</span>
+                        <span className={cn("text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded",
+                          event.type === 'neural' ? "text-indigo-400 bg-indigo-400/10" :
+                            event.type === 'deploy' ? "text-emerald-400 bg-emerald-400/10" :
+                              "text-slate-400 bg-slate-400/10"
+                        )}>{event.type}</span>
                       </div>
-                   ))}
-                </div>
-             </div>
+                      <p className="text-sm text-slate-300 font-medium leading-relaxed">{event.event}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </motion.div>
         )}
 
         {showSettings && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-0 z-[8000] flex items-center justify-center p-24 bg-[#020617]/60 backdrop-blur-5xl">
             <div className="w-full max-w-2xl glass-bright rounded-[3rem] p-16 border border-white/10 shadow-5xl relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-[60px]" />
-               <div className="flex items-center justify-between mb-12">
-                  <div className="flex flex-col">
-                     <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Foundry Configuration</span>
-                     <h2 className="text-4xl font-black text-white tracking-tighter">Oasis Command Center</h2>
-                  </div>
-                  <button onClick={() => setShowSettings(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10"><Plus size={32} className="rotate-45" /></button>
-               </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-[60px]" />
+              <div className="flex items-center justify-between mb-12">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Foundry Configuration</span>
+                  <h2 className="text-4xl font-black text-white tracking-tighter">Oasis Command Center</h2>
+                </div>
+                <button onClick={() => setShowSettings(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10"><Plus size={32} className="rotate-45" /></button>
+              </div>
 
-               <div className="space-y-10">
-                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 space-y-6">
-                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                           <Globe className="w-5 h-5 text-indigo-400" />
-                           <label className="text-sm font-bold text-slate-300 uppercase tracking-widest">Physical Aura Bridge (WLED)</label>
+              <div className="space-y-10">
+                <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-5 h-5 text-indigo-400" />
+                      <label className="text-sm font-bold text-slate-300 uppercase tracking-widest">Physical Aura Bridge (WLED)</label>
+                    </div>
+                    <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">V4.4.1 BRIDGE</span>
+                  </div>
+                  <div className="flex items-center glass rounded-2xl px-6 py-4 border-white/10">
+                    <span className="text-[10px] font-black text-slate-500 mr-4 font-mono">TARGET_IP:</span>
+                    <input value={auraIp} onChange={(e) => setAuraIp(e.target.value)} placeholder="192.168.1.XXX" className="bg-transparent border-none outline-none text-lg w-full text-white font-black tracking-tighter" />
+                    <div className={cn("w-3 h-3 rounded-full animate-pulse shadow-sm", autoAura ? "bg-indigo-500 shadow-indigo-500/40" : "bg-white/10")} />
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Configure your workspace luminosity bridge. The shell targets the raw UDP/JSON API of your WLED device to reflect venture integrity in physical space.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                    <div className="flex items-center gap-3">
+                      <Cpu className="w-5 h-5 text-emerald-400" />
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sparkline Previews</span>
+                        <span className="text-[10px] text-slate-500">Disable for low-end devices</span>
+                        {sparklinesAutoDisabled && (
+                          <span className="mt-1 text-[9px] text-amber-300" title="Auto-disabled due to low FPS">Auto-disabled</span>
+                        )}
+                      </div>
+                    </div>
+                    <div onClick={() => { setSparklinesAutoDisabled(false); setSparklinesEnabled(!sparklinesEnabled); }} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", sparklinesEnabled ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
+                      <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", sparklinesEnabled ? "translate-x-6" : "translate-x-0")} />
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                    <div className="flex items-center gap-3">
+                      <Gauge className="w-5 h-5 text-amber-400" />
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Performance Mode</span>
+                        <span className="text-[10px] text-slate-500">Disable heavy visuals + effects</span>
+                      </div>
+                    </div>
+                    <div onClick={() => setPerformanceMode(!performanceMode)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", performanceMode ? "bg-amber-600 border-amber-500/50" : "bg-white/5")}>
+                      <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", performanceMode ? "translate-x-6" : "translate-x-0")} />
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Activity className="w-5 h-5 text-amber-400" />
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">FPS Threshold</span>
+                          <span className="text-[10px] text-slate-500">Auto-disable sparklines below this FPS</span>
                         </div>
-                        <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">V4.4.1 BRIDGE</span>
-                     </div>
-                     <div className="flex items-center glass rounded-2xl px-6 py-4 border-white/10">
-                        <span className="text-[10px] font-black text-slate-500 mr-4 font-mono">TARGET_IP:</span>
-                        <input value={auraIp} onChange={(e) => setAuraIp(e.target.value)} placeholder="192.168.1.XXX" className="bg-transparent border-none outline-none text-lg w-full text-white font-black tracking-tighter" />
-                        <div className={cn("w-3 h-3 rounded-full animate-pulse shadow-sm", autoAura ? "bg-indigo-500 shadow-indigo-500/40" : "bg-white/10")} />
-                     </div>
-                     <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Configure your workspace luminosity bridge. The shell targets the raw UDP/JSON API of your WLED device to reflect venture integrity in physical space.</p>
-                  </div>
-
-                 <div className="grid grid-cols-2 gap-6">
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
-                       <div className="flex items-center gap-3">
-                          <Cpu className="w-5 h-5 text-emerald-400" />
-                          <div className="flex flex-col">
-                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sparkline Previews</span>
-                             <span className="text-[10px] text-slate-500">Disable for low-end devices</span>
-                             {sparklinesAutoDisabled && (
-                               <span className="mt-1 text-[9px] text-amber-300" title="Auto-disabled due to low FPS">Auto-disabled</span>
-                             )}
-                          </div>
-                       </div>
-                       <div onClick={() => { setSparklinesAutoDisabled(false); setSparklinesEnabled(!sparklinesEnabled); }} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", sparklinesEnabled ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
-                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", sparklinesEnabled ? "translate-x-6" : "translate-x-0")} />
-                       </div>
+                      </div>
+                      <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">{fpsThreshold} FPS</span>
                     </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
-                       <div className="flex items-center gap-3">
-                          <Gauge className="w-5 h-5 text-amber-400" />
-                          <div className="flex flex-col">
-                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Performance Mode</span>
-                             <span className="text-[10px] text-slate-500">Disable heavy visuals + effects</span>
-                          </div>
-                       </div>
-                       <div onClick={() => setPerformanceMode(!performanceMode)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", performanceMode ? "bg-amber-600 border-amber-500/50" : "bg-white/5")}>
-                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", performanceMode ? "translate-x-6" : "translate-x-0")} />
-                       </div>
-                    </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
-                       <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                             <Activity className="w-5 h-5 text-amber-400" />
-                             <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">FPS Threshold</span>
-                                <span className="text-[10px] text-slate-500">Auto-disable sparklines below this FPS</span>
-                             </div>
-                          </div>
-                          <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">{fpsThreshold} FPS</span>
-                       </div>
-                       <input
-                          type="range"
-                          min="12"
-                          max="45"
-                          step="1"
-                          value={fpsThreshold}
-                          onChange={(e) => setFpsThreshold(parseInt(e.target.value, 10))}
-                          className="mt-6 w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500"
-                       />
-                       <div className="mt-4 flex items-center justify-between">
-                          <span className="text-[9px] text-slate-500">Recent FPS (60s)</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => { setSparklinesEnabled(true); setSparklinesAutoDisabled(false); }}
-                              className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20"
-                            >
-                              Re-enable Now
-                            </button>
-                            <button
-                              onClick={() => { setFpsHistory([]); setFpsHover(null); }}
-                              className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
-                            >
-                              Reset History
-                            </button>
-                            <button
-                              onClick={exportFpsCsv}
-                              className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20"
-                            >
-                              Export CSV
-                            </button>
-                          </div>
-                       </div>
-                       <div
-                          className="mt-3 h-14 w-full bg-white/[0.03] border border-white/10 rounded-xl p-2 relative"
-                          onMouseLeave={() => setFpsHover(null)}
+                    <input
+                      type="range"
+                      min="12"
+                      max="45"
+                      step="1"
+                      value={fpsThreshold}
+                      onChange={(e) => setFpsThreshold(parseInt(e.target.value, 10))}
+                      className="mt-6 w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500"
+                    />
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="text-[9px] text-slate-500">Recent FPS (60s)</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setSparklinesEnabled(true); setSparklinesAutoDisabled(false); }}
+                          className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20"
                         >
-                          {fpsHover && (
-                            <div
-                              className="absolute -top-6 px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-black/80 text-amber-200 border border-white/10"
-                              style={{ transform: `translateX(${Math.min(100, Math.max(0, fpsHover.xPct * 100))}%)` }}
-                            >
-                              {fpsHover.value} FPS
-                            </div>
-                          )}
-                          <svg
-                            viewBox="0 0 120 40"
-                            className="w-full h-full"
-                            onMouseMove={(e) => {
-                              if (fpsHistory.length === 0) return;
-                              const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-                              const x = e.clientX - rect.left;
-                              const pct = Math.max(0, Math.min(1, x / rect.width));
-                              const idx = Math.round(pct * Math.max(1, fpsHistory.length - 1));
-                              const clamped = Math.max(0, Math.min(fpsHistory.length - 1, idx));
-                              setFpsHover({ index: clamped, value: fpsHistory[clamped], xPct: pct });
+                          Re-enable Now
+                        </button>
+                        <button
+                          onClick={() => { setFpsHistory([]); setFpsHover(null); }}
+                          className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                        >
+                          Reset History
+                        </button>
+                        <button
+                          onClick={exportFpsCsv}
+                          className="px-3 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20"
+                        >
+                          Export CSV
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      className="mt-3 h-14 w-full bg-white/[0.03] border border-white/10 rounded-xl p-2 relative"
+                      onMouseLeave={() => setFpsHover(null)}
+                    >
+                      {fpsHover && (
+                        <div
+                          className="absolute -top-6 px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-black/80 text-amber-200 border border-white/10"
+                          style={{ transform: `translateX(${Math.min(100, Math.max(0, fpsHover.xPct * 100))}%)` }}
+                        >
+                          {fpsHover.value} FPS
+                        </div>
+                      )}
+                      <svg
+                        viewBox="0 0 120 40"
+                        className="w-full h-full"
+                        onMouseMove={(e) => {
+                          if (fpsHistory.length === 0) return;
+                          const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+                          const x = e.clientX - rect.left;
+                          const pct = Math.max(0, Math.min(1, x / rect.width));
+                          const idx = Math.round(pct * Math.max(1, fpsHistory.length - 1));
+                          const clamped = Math.max(0, Math.min(fpsHistory.length - 1, idx));
+                          setFpsHover({ index: clamped, value: fpsHistory[clamped], xPct: pct });
+                        }}
+                      >
+                        {fpsHover && (
+                          <line
+                            x1={fpsHover.xPct * 120}
+                            x2={fpsHover.xPct * 120}
+                            y1="0"
+                            y2="40"
+                            stroke="rgba(255,255,255,0.25)"
+                            strokeDasharray="2 2"
+                          />
+                        )}
+                        <motion.path
+                          initial={false}
+                          animate={{ d: buildFpsPath(fpsHistory) }}
+                          transition={{ duration: 0.4, ease: "easeOut" }}
+                          fill="none"
+                          stroke={fpsHistory.length > 0 && fpsHistory[fpsHistory.length - 1] < fpsThreshold ? "#f87171" : fpsHistory.length > 0 && fpsHistory[fpsHistory.length - 1] < fpsThreshold + 5 ? "#f59e0b" : "#34d399"}
+                          strokeWidth="2"
+                        />
+                        {fpsHover && (
+                          <motion.circle
+                            initial={false}
+                            animate={{
+                              cx: fpsHover.xPct * 120,
+                              cy: 40 - Math.min(40, (fpsHover.value / 60) * 40)
                             }}
-                          >
-                            {fpsHover && (
-                              <line
-                                x1={fpsHover.xPct * 120}
-                                x2={fpsHover.xPct * 120}
-                                y1="0"
-                                y2="40"
-                                stroke="rgba(255,255,255,0.25)"
-                                strokeDasharray="2 2"
-                              />
-                            )}
-                            <motion.path
-                              initial={false}
-                              animate={{ d: buildFpsPath(fpsHistory) }}
-                              transition={{ duration: 0.4, ease: "easeOut" }}
-                              fill="none"
-                              stroke={fpsHistory.length > 0 && fpsHistory[fpsHistory.length - 1] < fpsThreshold ? "#f87171" : fpsHistory.length > 0 && fpsHistory[fpsHistory.length - 1] < fpsThreshold + 5 ? "#f59e0b" : "#34d399"}
-                              strokeWidth="2"
-                            />
-                            {fpsHover && (
-                              <motion.circle
-                                initial={false}
-                                animate={{ 
-                                  cx: fpsHover.xPct * 120, 
-                                  cy: 40 - Math.min(40, (fpsHover.value / 60) * 40) 
-                                }}
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                r="3"
-                                fill={fpsHover.value < fpsThreshold ? "#f87171" : fpsHover.value < fpsThreshold + 5 ? "#f59e0b" : "#34d399"}
-                                className="shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                              />
-                            )}
-                          </svg>
-                        </div>
-                        <div className="mt-3 flex items-center gap-4 text-[8px] font-black uppercase tracking-widest text-slate-500">
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Healthy</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Warning</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400" /> Critical</span>
-                        </div>
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            r="3"
+                            fill={fpsHover.value < fpsThreshold ? "#f87171" : fpsHover.value < fpsThreshold + 5 ? "#f59e0b" : "#34d399"}
+                            className="shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                          />
+                        )}
+                      </svg>
                     </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
-                       <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                             <Shield className="w-5 h-5 text-indigo-400" />
-                             <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Default Priority TTL</span>
-                                <span className="text-[10px] text-slate-500">Applies to new cache entries</span>
-                             </div>
-                          </div>
-                          <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">CACHE POLICY</span>
-                       </div>
-                       <div className="mt-5 flex items-center gap-4">
-                          <select
-                             value={defaultTtlDays}
-                             onChange={(e) => setDefaultTtlDays(parseInt(e.target.value, 10))}
-                             className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] text-white font-black uppercase tracking-widest"
-                          >
-                             <option value="1">1 day</option>
-                             <option value="3">3 days</option>
-                             <option value="7">7 days</option>
-                             <option value="14">14 days</option>
-                             <option value="30">30 days</option>
-                          </select>
-                          <span className="text-[9px] text-slate-500">Current default: {defaultTtlDays}d</span>
-                       </div>
+                    <div className="mt-3 flex items-center gap-4 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Healthy</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> Warning</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400" /> Critical</span>
                     </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
-                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
-                       <div className="flex items-end justify-between">
-                           <span className="text-2xl font-black text-white">4.2GB</span>
-                           <span className="text-[10px] font-bold text-emerald-400">OPTIMIZED</span>
-                       </div>
-                    </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
-                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Sentiment Accuracy</span>
-                       <div className="flex items-end justify-between">
-                           <span className="text-2xl font-black text-white">99.2%</span>
-                           <span className="text-[10px] font-bold text-indigo-400">NOMINAL</span>
-                        </div>
-                     </div>
                   </div>
-               </div>
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-indigo-400" />
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Default Priority TTL</span>
+                          <span className="text-[10px] text-slate-500">Applies to new cache entries</span>
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded">CACHE POLICY</span>
+                    </div>
+                    <div className="mt-5 flex items-center gap-4">
+                      <select
+                        value={defaultTtlDays}
+                        onChange={(e) => setDefaultTtlDays(parseInt(e.target.value, 10))}
+                        className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] text-white font-black uppercase tracking-widest"
+                      >
+                        <option value="1">1 day</option>
+                        <option value="3">3 days</option>
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30">30 days</option>
+                      </select>
+                      <span className="text-[9px] text-slate-500">Current default: {defaultTtlDays}d</span>
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Neural Buffer</span>
+                    <div className="flex items-end justify-between">
+                      <span className="text-2xl font-black text-white">4.2GB</span>
+                      <span className="text-[10px] font-bold text-emerald-400">OPTIMIZED</span>
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex flex-col justify-between">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Sentiment Accuracy</span>
+                    <div className="flex items-end justify-between">
+                      <span className="text-2xl font-black text-white">99.2%</span>
+                      <span className="text-[10px] font-bold text-indigo-400">NOMINAL</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-               <button onClick={() => setShowSettings(false)} className="w-full mt-12 py-5 bg-white text-black font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-white/10 hover:scale-105 transition-all">Save Core Config</button>
+              <button onClick={() => setShowSettings(false)} className="w-full mt-12 py-5 bg-white text-black font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-white/10 hover:scale-105 transition-all">Save Core Config</button>
             </div>
           </motion.div>
         )}
 
         {simMode && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-[#020617]/40 backdrop-blur-3xl">
-             <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-12 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.1)] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
-                <div className="flex items-center justify-between mb-16">
-                   <div className="flex flex-col">
-                      <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.4em] mb-1">Strategic Sandbox</span>
-                      <h2 className="text-4xl font-bold text-white tracking-tighter">Venture Simulation Portal</h2>
-                   </div>
-                   <button onClick={handleCommitSim} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">Commit Simulation</button>
+            <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-12 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.1)] relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
+              <div className="flex items-center justify-between mb-16">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.4em] mb-1">Strategic Sandbox</span>
+                  <h2 className="text-4xl font-bold text-white tracking-tighter">Venture Simulation Portal</h2>
                 </div>
-                <div className="grid grid-cols-1 gap-12">
-                   {[
-                     { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr' },
-                     { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn' },
-                     { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum' }
-                   ].map((sim) => (
-                     <div key={sim.key} className="space-y-6">
-                        <div className="flex justify-between items-end">
-                           <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">{sim.label}</label>
-                           <span className="text-3xl font-bold text-white tracking-tighter">{sim.key === 'arr' ? '$' : ''}{sim.val}{sim.unit}</span>
-                        </div>
-                        <input type="range" min={sim.min} max={sim.max} step={0.1} value={sim.val} onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500" />
-                     </div>
-                   ))}
-                </div>
-             </div>
+                <button onClick={handleCommitSim} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">Commit Simulation</button>
+              </div>
+              <div className="grid grid-cols-1 gap-12">
+                {[
+                  { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr' },
+                  { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn' },
+                  { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum' }
+                ].map((sim) => (
+                  <div key={sim.key} className="space-y-6">
+                    <div className="flex justify-between items-end">
+                      <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">{sim.label}</label>
+                      <span className="text-3xl font-bold text-white tracking-tighter">{sim.key === 'arr' ? '$' : ''}{sim.val}{sim.unit}</span>
+                    </div>
+                    <input type="range" min={sim.min} max={sim.max} step={0.1} value={sim.val} onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </motion.div>
         )}
 
         {showNexus && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[5000] bg-[#020617]/95 backdrop-blur-4xl p-20 flex flex-col pt-10">
-              <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 blur-[150px] rounded-full animate-pulse" />
+            <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 blur-[150px] rounded-full animate-pulse" />
+            </div>
+            <div className="relative z-10 flex items-center justify-between mb-16 px-12">
+              <div>
+                <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2">Aegis Nexus Portal</h2>
+                <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-3">
+                  <Globe className="w-5 h-5" /> Portfolio Integrity: {aegisLedger?.global_integrity?.toFixed(1) || '0.0'} Index
+                </p>
               </div>
-              <div className="relative z-10 flex items-center justify-between mb-16 px-12">
-                 <div>
-                    <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2">Aegis Nexus Portal</h2>
-                    <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-3">
-                       <Globe className="w-5 h-5" /> Portfolio Integrity: {aegisLedger?.global_integrity?.toFixed(1) || '0.0'} Index
-                    </p>
-                 </div>
-                 <button onClick={() => setShowNexus(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
-              </div>
+              <button onClick={() => setShowNexus(false)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+            </div>
 
-              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar">
-                 {Object.values(aegisLedger?.ventures || {}).map((ven: any, i: number) => (
-                    <motion.div 
-                      key={ven.id}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="glass-bright p-8 rounded-[3rem] border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer shadow-3xl"
-                    >
-                       <div className="flex justify-between items-start mb-10">
-                          <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
-                             <Globe className="w-7 h-7 text-indigo-400" />
-                          </div>
-                          <div className="text-right">
-                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Peaked ARR</span>
-                             <span className="text-lg font-black text-white">{ven.metrics.arr}</span>
-                          </div>
-                       </div>
-                       <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{ven.name}</h3>
-                       <p className="text-[10px] font-mono text-slate-500 mb-8">{ven.id}</p>
-                       
-                       <div className="grid grid-cols-2 gap-4 mb-8">
-                          <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Dominance</span>
-                             <span className="text-sm font-black text-indigo-400">{ven.dominance_index.toFixed(1)}</span>
-                          </div>
-                          <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Sentiment</span>
-                             <span className="text-[10px] font-bold text-emerald-400">{ven.market.sentiment}</span>
-                          </div>
-                       </div>
+            <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar">
+              {Object.values(aegisLedger?.ventures || {}).map((ven: any, i: number) => (
+                <motion.div
+                  key={ven.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="glass-bright p-8 rounded-[3rem] border border-white/5 relative group hover:border-indigo-500/30 transition-all cursor-pointer shadow-3xl"
+                >
+                  <div className="flex justify-between items-start mb-10">
+                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 group-hover:bg-indigo-600/20 transition-all">
+                      <Globe className="w-7 h-7 text-indigo-400" />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Peaked ARR</span>
+                      <span className="text-lg font-black text-white">{ven.metrics.arr}</span>
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{ven.name}</h3>
+                  <p className="text-[10px] font-mono text-slate-500 mb-8">{ven.id}</p>
 
-                       <div className="flex gap-4">
-                          <button onClick={() => handleNeuralMirror(ven.id)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-white/5">Mirror Intelligence</button>
-                          <button onClick={() => handleOracleVision(ven.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
-                             <Zap className="w-3 h-3" /> Oracle Vision
-                          </button>
-                       </div>
-                    </motion.div>
-                 ))}
-              </div>
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Dominance</span>
+                      <span className="text-sm font-black text-indigo-400">{ven.dominance_index.toFixed(1)}</span>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em] block mb-1">Sentiment</span>
+                      <span className="text-[10px] font-bold text-emerald-400">{ven.market.sentiment}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button onClick={() => handleNeuralMirror(ven.id)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-white/5">Mirror Intelligence</button>
+                    <button onClick={() => handleOracleVision(ven.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
+                      <Zap className="w-3 h-3" /> Oracle Vision
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
         )}
         {activeOracle && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-black/90 backdrop-blur-5xl flex items-center justify-center p-20">
-              <div className="w-full max-w-5xl glass-bright rounded-[4rem] border border-amber-500/30 p-16 relative overflow-hidden flex flex-col h-[700px]">
-                 <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-amber-500/5 to-transparent pointer-events-none" />
-                 
-                 <div className="relative z-10 flex justify-between items-start mb-16">
-                    <div>
-                       <span className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mb-2 block">Neural Oracle Prediction</span>
-                       <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-4">{activeOracle.venture_id} / 2027</h2>
-                       <div className="flex items-center gap-6">
-                          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full">
-                             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                             <span className="text-[10px] font-black text-amber-500 uppercase">Confidence: 94.2%</span>
-                          </div>
-                          <span className="text-sm font-bold text-slate-400 italic">"Recommendation: {activeOracle.recommendation}"</span>
-                       </div>
-                    </div>
-                    <button onClick={() => setActiveOracle(null)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
-                 </div>
+            <div className="w-full max-w-5xl glass-bright rounded-[4rem] border border-amber-500/30 p-16 relative overflow-hidden flex flex-col h-[700px]">
+              <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-amber-500/5 to-transparent pointer-events-none" />
 
-                 <div className="relative z-10 flex-1 grid grid-cols-12 gap-12">
-                    <div className="col-span-8 flex flex-col justify-end">
-                       <div className="flex items-end gap-x-2 h-64 mb-4">
-                          {[42, 65, 89, 120, 156, 198, 245, 312, 398, 480, 590, 720].map((p: number, i: number) => (
-                             <motion.div 
-                                key={i} 
-                                initial={{ height: 0 }} 
-                                animate={{ height: `${(p / 720) * 100}%` }}
-                                transition={{ delay: i * 0.05 }}
-                                className="flex-1 bg-gradient-to-t from-amber-600/20 to-amber-500 rounded-t-lg relative group"
-                             >
-                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all text-[8px] font-bold text-white bg-black/80 px-2 py-1 rounded border border-white/10 whitespace-nowrap">{p}k</div>
-                             </motion.div>
-                          ))}
-                       </div>
-                       <div className="flex justify-between px-2">
-                          {['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'].map(m => (
-                             <span key={m} className="text-[8px] font-black text-slate-600 tracking-widest">{m}</span>
-                          ))}
-                       </div>
+              <div className="relative z-10 flex justify-between items-start mb-16">
+                <div>
+                  <span className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mb-2 block">Neural Oracle Prediction</span>
+                  <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-4">{activeOracle.venture_id} / 2027</h2>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full">
+                      <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-[10px] font-black text-amber-500 uppercase">Confidence: 94.2%</span>
                     </div>
-
-                    <div className="col-span-4 space-y-8 flex flex-col justify-center">
-                       <div className="p-8 rounded-[2.5rem] bg-amber-500/5 border border-amber-500/10">
-                          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-2 text-center">Projected ARR (12M)</span>
-                          <h4 className="text-4xl font-black text-white tracking-tighter text-center">{activeOracle.projected_arr || "$2.4M"}</h4>
-                       </div>
-                       <div className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5">
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 text-center">Reference Burn</span>
-                          <h4 className="text-2xl font-black text-white tracking-tighter text-center">{activeOracle.projected_burn || "$42K/mo"}</h4>
-                       </div>
-                    </div>
-                    <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
-                       <div className="flex items-center gap-3">
-                          <Shield className="w-5 h-5 text-emerald-400" />
-                          <div className="flex flex-col">
-                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Auto-Apply Process Priorities</span>
-                             <span className="text-[10px] text-slate-500">Reapply cached priorities for restarted processes</span>
-                          </div>
-                       </div>
-                       <div onClick={() => setAutoApplyPriorities(!autoApplyPriorities)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoApplyPriorities ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
-                          <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", autoApplyPriorities ? "translate-x-6" : "translate-x-0")} />
-                       </div>
-                    </div>
-                    <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
-                       <div className="flex flex-col">
-                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Priority Cache</span>
-                          <span className="text-[10px] text-slate-500">Entries: {Object.keys(priorityCache).length}</span>
-                       </div>
-                       <button
-                         onClick={() => {
-                           setPriorityCache({});
-                           try { localStorage.removeItem("oas_priority_cache"); } catch (e) {}
-                         }}
-                         className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl text-rose-300 border border-rose-500/20"
-                       >
-                         Clear Cache
-                       </button>
-                    </div>
-                 </div>
+                    <span className="text-sm font-bold text-slate-400 italic">"Recommendation: {activeOracle.recommendation}"</span>
+                  </div>
+                </div>
+                <button onClick={() => setActiveOracle(null)} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
               </div>
+
+              <div className="relative z-10 flex-1 grid grid-cols-12 gap-12">
+                <div className="col-span-8 flex flex-col justify-end">
+                  <div className="flex items-end gap-x-2 h-64 mb-4">
+                    {[42, 65, 89, 120, 156, 198, 245, 312, 398, 480, 590, 720].map((p: number, i: number) => (
+                      <motion.div
+                        key={i}
+                        initial={{ height: 0 }}
+                        animate={{ height: `${(p / 720) * 100}%` }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex-1 bg-gradient-to-t from-amber-600/20 to-amber-500 rounded-t-lg relative group"
+                      >
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all text-[8px] font-bold text-white bg-black/80 px-2 py-1 rounded border border-white/10 whitespace-nowrap">{p}k</div>
+                      </motion.div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between px-2">
+                    {['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR'].map(m => (
+                      <span key={m} className="text-[8px] font-black text-slate-600 tracking-widest">{m}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="col-span-4 space-y-8 flex flex-col justify-center">
+                  <div className="p-8 rounded-[2.5rem] bg-amber-500/5 border border-amber-500/10">
+                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-2 text-center">Projected ARR (12M)</span>
+                    <h4 className="text-4xl font-black text-white tracking-tighter text-center">{activeOracle.projected_arr || "$2.4M"}</h4>
+                  </div>
+                  <div className="p-8 rounded-[2.5rem] bg-white/5 border border-white/5">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 text-center">Reference Burn</span>
+                    <h4 className="text-2xl font-black text-white tracking-tighter text-center">{activeOracle.projected_burn || "$42K/mo"}</h4>
+                  </div>
+                </div>
+                <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-emerald-400" />
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Auto-Apply Process Priorities</span>
+                      <span className="text-[10px] text-slate-500">Reapply cached priorities for restarted processes</span>
+                    </div>
+                  </div>
+                  <div onClick={() => setAutoApplyPriorities(!autoApplyPriorities)} className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner", autoApplyPriorities ? "bg-emerald-600 border-emerald-500/50" : "bg-white/5")}>
+                    <div className={cn("w-4 h-4 rounded-full bg-white shadow-xl transition-transform", autoApplyPriorities ? "translate-x-6" : "translate-x-0")} />
+                  </div>
+                </div>
+                <div className="p-6 rounded-[2rem] bg-white/5 border border-white/5 flex items-center justify-between col-span-2">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Priority Cache</span>
+                    <span className="text-[10px] text-slate-500">Entries: {Object.keys(priorityCache).length}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPriorityCache({});
+                      try { localStorage.removeItem("oas_priority_cache"); } catch (e) { }
+                    }}
+                    className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl text-rose-300 border border-rose-500/20"
+                  >
+                    Clear Cache
+                  </button>
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
         {showSentinel && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[7000] bg-[#020617]/98 backdrop-blur-5xl p-20 flex flex-col pt-10">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
-               <div className="relative z-10 flex items-center justify-between mb-16 px-12">
-                  <div>
-                     <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 font-mono">Sentinel Archive</h2>
-                     <p className="text-sm font-bold text-amber-500 uppercase tracking-widest flex items-center gap-3">
-                        <ShieldCheck className="w-5 h-5" /> {isVaultLocked ? "Vault Locked / Neural Cipher Required" : `Security Resonance: ${sentinelVault?.security_resonance?.toFixed(2) || '1.00'} Index`}
-                     </p>
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
+            <div className="relative z-10 flex items-center justify-between mb-16 px-12">
+              <div>
+                <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-2 font-mono">Sentinel Archive</h2>
+                <p className="text-sm font-bold text-amber-500 uppercase tracking-widest flex items-center gap-3">
+                  <ShieldCheck className="w-5 h-5" /> {isVaultLocked ? "Vault Locked / Neural Cipher Required" : `Security Resonance: ${sentinelVault?.security_resonance?.toFixed(2) || '1.00'} Index`}
+                </p>
+              </div>
+              <div className="flex items-center gap-6">
+                {isVaultLocked && (
+                  <div className="flex items-center glass rounded-2xl px-6 py-3 border-amber-500/30 gap-4">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <input
+                      type="password"
+                      value={founderSecret}
+                      onChange={(e) => setFounderSecret(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAuthenticateFounder()}
+                      placeholder="Input Founder Secret..."
+                      className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest w-48 text-white placeholder:text-amber-500/20"
+                    />
+                    <button onClick={handleAuthenticateFounder} className="text-amber-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest">Unlock</button>
                   </div>
-                  <div className="flex items-center gap-6">
-                     {isVaultLocked && (
-                        <div className="flex items-center glass rounded-2xl px-6 py-3 border-amber-500/30 gap-4">
-                           <Lock className="w-4 h-4 text-amber-500" />
-                           <input 
-                              type="password"
-                              value={founderSecret} 
-                              onChange={(e) => setFounderSecret(e.target.value)} 
-                              onKeyDown={(e) => e.key === 'Enter' && handleAuthenticateFounder()}
-                              placeholder="Input Founder Secret..." 
-                              className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest w-48 text-white placeholder:text-amber-500/20" 
-                           />
-                           <button onClick={handleAuthenticateFounder} className="text-amber-500 hover:text-white transition-colors text-[10px] font-black uppercase tracking-widest">Unlock</button>
-                        </div>
-                     )}
-                     <button onClick={() => { setShowSentinel(false); setFounderSecret(""); }} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
-                  </div>
-               </div>
+                )}
+                <button onClick={() => { setShowSentinel(false); setFounderSecret(""); }} className="w-16 h-16 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus size={32} className="rotate-45" /></button>
+              </div>
+            </div>
 
-               {isVaultLocked ? (
-                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center py-40">
-                     <div className="w-32 h-32 rounded-[2.5rem] bg-amber-500/5 flex items-center justify-center border border-amber-500/20 mb-8 animate-pulse shadow-[0_0_50px_rgba(245,158,11,0.1)]">
-                        <ShieldAlert className="w-12 h-12 text-amber-500" />
-                     </div>
-                     <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-4">Awaiting Founder Secret</h3>
-                     <p className="text-sm text-slate-500 max-w-md text-center leading-relaxed">Pulse your unique neural identifier to derive the master cipher and unseal the Sentinel Archive.</p>
+            {isVaultLocked ? (
+              <div className="relative z-10 flex-1 flex flex-col items-center justify-center py-40">
+                <div className="w-32 h-32 rounded-[2.5rem] bg-amber-500/5 flex items-center justify-center border border-amber-500/20 mb-8 animate-pulse shadow-[0_0_50px_rgba(245,158,11,0.1)]">
+                  <ShieldAlert className="w-12 h-12 text-amber-500" />
+                </div>
+                <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-4">Awaiting Founder Secret</h3>
+                <p className="text-sm text-slate-500 max-w-md text-center leading-relaxed">Pulse your unique neural identifier to derive the master cipher and unseal the Sentinel Archive.</p>
+              </div>
+            ) : (
+              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar pr-4">
+                {Object.values(sentinelVault?.blobs || {}).map((blob: any, i: number) => (
+                  <motion.div
+                    key={blob.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="bg-[#0f172a]/80 p-8 rounded-[3rem] border border-amber-500/10 relative group hover:border-amber-500/40 transition-all shadow-3xl"
+                  >
+                    <div className="flex justify-between items-start mb-10">
+                      <div className="w-14 h-14 rounded-2xl bg-amber-500/5 flex items-center justify-center border border-amber-500/10 group-hover:bg-amber-600/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+                        <Lock className="w-7 h-7 text-amber-400" />
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Encrypted Blob</span>
+                        <span className="text-[10px] font-mono text-amber-500/60 font-bold">{blob.id}</span>
+                      </div>
+                    </div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{blob.title}</h3>
+                    <p className="text-[10px] font-mono text-slate-500 mb-8 truncate">{blob.original_path}</p>
+
+                    <div className="pt-6 border-t border-white/5 flex gap-4">
+                      <button onClick={() => handleUnsealAsset(blob.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20">Unseal Blueprint</button>
+                    </div>
+                  </motion.div>
+                ))}
+
+                {/* EMPTY STATE */}
+                {(!sentinelVault?.blobs || Object.keys(sentinelVault.blobs).length === 0) && (
+                  <div className="col-span-full flex flex-col items-center justify-center py-40 opacity-20 text-center">
+                    <ShieldAlert className="w-20 h-20 text-white mb-6 mx-auto" />
+                    <span className="text-sm font-black uppercase tracking-[0.4em] text-white">Vault Empty / Awaiting Seal</span>
                   </div>
-               ) : (
-                  <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar pr-4">
-                 {Object.values(sentinelVault?.blobs || {}).map((blob: any, i: number) => (
-                    <motion.div 
-                      key={blob.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="bg-[#0f172a]/80 p-8 rounded-[3rem] border border-amber-500/10 relative group hover:border-amber-500/40 transition-all shadow-3xl"
-                    >
-                       <div className="flex justify-between items-start mb-10">
-                          <div className="w-14 h-14 rounded-2xl bg-amber-500/5 flex items-center justify-center border border-amber-500/10 group-hover:bg-amber-600/20 transition-all shadow-[0_0_20px_rgba(245,158,11,0.1)]">
-                             <Lock className="w-7 h-7 text-amber-400" />
-                          </div>
-                          <div className="text-right">
-                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Encrypted Blob</span>
-                             <span className="text-[10px] font-mono text-amber-500/60 font-bold">{blob.id}</span>
-                          </div>
-                       </div>
-                       <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">{blob.title}</h3>
-                       <p className="text-[10px] font-mono text-slate-500 mb-8 truncate">{blob.original_path}</p>
-                       
-                       <div className="pt-6 border-t border-white/5 flex gap-4">
-                          <button onClick={() => handleUnsealAsset(blob.id)} className="flex-1 py-4 bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20">Unseal Blueprint</button>
-                       </div>
-                    </motion.div>
-                 ))}
-                 
-                 {/* EMPTY STATE */}
-                 {(!sentinelVault?.blobs || Object.keys(sentinelVault.blobs).length === 0) && (
-                   <div className="col-span-full flex flex-col items-center justify-center py-40 opacity-20 text-center">
-                      <ShieldAlert className="w-20 h-20 text-white mb-6 mx-auto" />
-                      <span className="text-sm font-black uppercase tracking-[0.4em] text-white">Vault Empty / Awaiting Seal</span>
-                   </div>
-                 )}
+                )}
               </div>
             )}
           </motion.div>
         )}
 
         {activeSynthesis && (
-           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8000] bg-indigo-950/40 backdrop-blur-5xl flex items-center justify-center p-20">
-              <div className="w-full max-w-6xl glass-bright rounded-[4rem] border border-indigo-500/30 p-16 relative overflow-hidden flex flex-col h-[750px] shadow-6xl">
-                 <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
-                 
-                 <div className="relative z-10 flex justify-between items-start mb-12">
-                    <div>
-                       <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 block animate-pulse">Neural Pitch Synthesis L_01</span>
-                       <h2 className="text-6xl font-black text-white uppercase tracking-tighter mb-4">Strategic Venture Narrative</h2>
-                       <p className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-3">
-                          <Bot className="w-5 h-5 text-indigo-400" /> Synthesis ID: {activeSynthesis.id}
-                       </p>
-                    </div>
-                    <button onClick={() => setActiveSynthesis(null)} className="w-20 h-20 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10 shadow-2xl"><Plus size={40} className="rotate-45" /></button>
-                 </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8000] bg-indigo-950/40 backdrop-blur-5xl flex items-center justify-center p-20">
+            <div className="w-full max-w-6xl glass-bright rounded-[4rem] border border-indigo-500/30 p-16 relative overflow-hidden flex flex-col h-[750px] shadow-6xl">
+              <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
 
-                 <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 gap-16 overflow-hidden">
-                    <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
-                       <section>
-                          <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">The Narrative</h4>
-                          <p className="text-xl text-white font-medium leading-relaxed italic border-l-4 border-indigo-500/40 pl-8 bg-white/5 p-8 rounded-3xl">
-                             "{activeSynthesis.strategic_narrative}"
-                          </p>
-                       </section>
-                       <section>
-                          <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Market Correlation</h4>
-                          <div className="p-8 rounded-3xl bg-black/20 border border-white/5">
-                             <p className="text-sm text-slate-300 leading-relaxed font-mono">
-                                {activeSynthesis.market_context}
-                             </p>
-                          </div>
-                       </section>
-                    </div>
-
-                    <div className="flex flex-col gap-8">
-                       <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Actionable Outreach</h4>
-                       <div className="space-y-4">
-                          {activeSynthesis.actionable_outreach.map((step: string, i: number) => (
-                             <motion.div 
-                               key={i} 
-                               initial={{ opacity: 0, x: 20 }} 
-                               animate={{ opacity: 1, x: 0 }} 
-                               transition={{ delay: i * 0.2 }}
-                               className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center gap-6 group hover:bg-indigo-500/10 transition-all"
-                             >
-                                <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center font-black text-indigo-400 border border-indigo-400/30 group-hover:bg-indigo-500 group-hover:text-white transition-all">{i+1}</div>
-                                <span className="text-xs font-black text-white uppercase tracking-wider">{step}</span>
-                             </motion.div>
-                          ))}
-                       </div>
-                       
-                       <div className="mt-auto grid grid-cols-2 gap-4 pt-10">
-                          <button className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">Export Pitch PDF</button>
-                          <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">Commit to Vault</button>
-                       </div>
-                    </div>
-                 </div>
+              <div className="relative z-10 flex justify-between items-start mb-12">
+                <div>
+                  <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.4em] mb-2 block animate-pulse">Neural Pitch Synthesis L_01</span>
+                  <h2 className="text-6xl font-black text-white uppercase tracking-tighter mb-4">Strategic Venture Narrative</h2>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-3">
+                    <Bot className="w-5 h-5 text-indigo-400" /> Synthesis ID: {activeSynthesis.id}
+                  </p>
+                </div>
+                <button onClick={() => setActiveSynthesis(null)} className="w-20 h-20 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10 shadow-2xl"><Plus size={40} className="rotate-45" /></button>
               </div>
-           </motion.div>
-         )}
+
+              <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 gap-16 overflow-hidden">
+                <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
+                  <section>
+                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">The Narrative</h4>
+                    <p className="text-xl text-white font-medium leading-relaxed italic border-l-4 border-indigo-500/40 pl-8 bg-white/5 p-8 rounded-3xl">
+                      "{activeSynthesis.strategic_narrative}"
+                    </p>
+                  </section>
+                  <section>
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Market Correlation</h4>
+                    <div className="p-8 rounded-3xl bg-black/20 border border-white/5">
+                      <p className="text-sm text-slate-300 leading-relaxed font-mono">
+                        {activeSynthesis.market_context}
+                      </p>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="flex flex-col gap-8">
+                  <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Actionable Outreach</h4>
+                  <div className="space-y-4">
+                    {activeSynthesis.actionable_outreach.map((step: string, i: number) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.2 }}
+                        className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center gap-6 group hover:bg-indigo-500/10 transition-all"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center font-black text-indigo-400 border border-indigo-400/30 group-hover:bg-indigo-500 group-hover:text-white transition-all">{i + 1}</div>
+                        <span className="text-xs font-black text-white uppercase tracking-wider">{step}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <div className="mt-auto grid grid-cols-2 gap-4 pt-10">
+                    <button className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">Export Pitch PDF</button>
+                    <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">Commit to Vault</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Floating Chat Robot */}
       {!presentationMode && (
         <>
-           {/* NEURAL MANIFEST REVIEW PANEL */}
-           {pendingManifests.length > 0 && (
-             <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="fixed bottom-32 right-12 z-[1000] w-96 glass-bright rounded-[3rem] border border-indigo-500/30 p-8 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
-                <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center animate-pulse"><Zap className="w-5 h-5 text-white" /></div>
-                      <h3 className="text-sm font-black text-white uppercase tracking-widest">Neural Proposal Ready</h3>
-                   </div>
-                   <button onClick={() => setPendingManifests([])} className="text-slate-500 hover:text-white"><Plus className="w-5 h-5 rotate-45" /></button>
+          {/* NEURAL MANIFEST REVIEW PANEL */}
+          {pendingManifests.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="fixed bottom-32 right-12 z-[1000] w-96 glass-bright rounded-[3rem] border border-indigo-500/30 p-8 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center animate-pulse"><Zap className="w-5 h-5 text-white" /></div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Neural Proposal Ready</h3>
                 </div>
-                <div className="space-y-6">
-                   {pendingManifests.map((m: any) => (
-                      <div key={m.id} className="p-5 rounded-2xl bg-white/5 border border-white/10">
-                         <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">{m.title}</h4>
-                         <p className="text-[9px] text-slate-400 font-medium leading-relaxed mb-6 line-clamp-3">
-                            {m.rationale}
-                         </p>
-                         <div className="flex gap-4">
-                            <button onClick={() => handleExecuteManifest(m)} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-indigo-600/20">Commit</button>
-                            <button onClick={() => setPendingManifests([])} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-slate-400 text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all border border-white/10">Discard</button>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </motion.div>
-           )}
+                <button onClick={() => setPendingManifests([])} className="text-slate-500 hover:text-white"><Plus className="w-5 h-5 rotate-45" /></button>
+              </div>
+              <div className="space-y-6">
+                {pendingManifests.map((m: any) => (
+                  <div key={m.id} className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">{m.title}</h4>
+                    <p className="text-[9px] text-slate-400 font-medium leading-relaxed mb-6 line-clamp-3">
+                      {m.rationale}
+                    </p>
+                    <div className="flex gap-4">
+                      <button onClick={() => handleExecuteManifest(m)} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-indigo-600/20">Commit</button>
+                      <button onClick={() => setPendingManifests([])} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-slate-400 text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all border border-white/10">Discard</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
-           <div className={cn("fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600] transition-all", zenMode && "zen-hide")}>
-           <AnimatePresence>
+          <div className={cn("fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600] transition-all", zenMode && "zen-hide")}>
+            <AnimatePresence>
               {showAI && (
-                 <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
-                    <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                       <div className="flex flex-col">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">System Link</span>
-                          <span className="text-[9px] text-slate-500 font-mono">{systemStats?.path_status || 'Initializing...'}</span>
-                       </div>
-                       <button onClick={handleInstallShell} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black uppercase rounded-lg">Deploy Global Shell</button>
-                    </header>
-                    <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
-                       {neuralWisdom && (
-                         <div className={cn("p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4 transition-all", zenMode && "opacity-0")}>
-                            <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.1.0-RESONANCE</span>
-                            </div>
-                            <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                               <span className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</span>
-                               
-                               {/* STRATEGIC BRANCHES */}
-                               <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
-                                 {neuralWisdom.agent?.branches?.map((branch: any) => (
-                                   <button 
-                                     key={branch.tag}
-                                     onClick={() => handleAuthorizeBranch(neuralWisdom.agent.id, branch.tag)}
-                                     className={cn(
-                                       "p-3 rounded-xl border flex flex-col gap-1 transition-all text-left group",
-                                       branch.tag === "emerald" || branch.tag === "organic" 
-                                         ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10" 
-                                         : "bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10"
-                                     )}
-                                   >
-                                     <span className={cn(
-                                       "text-[8px] font-black uppercase tracking-[0.2em]",
-                                       branch.tag === "emerald" || branch.tag === "organic" ? "text-emerald-400" : "text-rose-400"
-                                     )}>{branch.title}</span>
-                                     <span className="text-[9px] text-white/60 leading-tight">{branch.description}</span>
-                                     <span className="mt-2 text-[7px] text-white/30 uppercase font-mono group-hover:text-white transition-colors">AUTHORIZE PATH â†’</span>
-                                   </button>
-                                 ))}
-                               </div>
-                             </div>
-                            <p className="text-[10px] text-indigo-300 italic opacity-80">{neuralWisdom.insight}</p>
-                            <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
-                               Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
-                            </div>
-                            <div className="space-y-3 mt-4">
-                               <h6 className="text-[9px] font-black text-indigo-500/50 uppercase tracking-widest pl-1">Network Insights (CLI Platform)</h6>
-                               {crossWisdom.map((w: string, i: number) => (
-                                 <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-400 italic">
-                                   "{w}"
-                                 </div>
-                               ))}
-                             </div>
-                         </div>
-                       )}
-                       {messages.map((m, i) => (
-                         <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
-                       ))}
-                       {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
+                <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
+                  <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">System Link</span>
+                      <span className="text-[9px] text-slate-500 font-mono">{systemStats?.path_status || 'Initializing...'}</span>
                     </div>
-                    <div className="p-6 bg-black/20">
-                       <div className="flex items-center glass rounded-2xl px-5 py-3 border-white/10">
-                          <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white" />
-                          <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-white transition-colors"><Zap size={18} /></button>
-                       </div>
+                    <button onClick={handleInstallShell} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black uppercase rounded-lg">Deploy Global Shell</button>
+                  </header>
+                  <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
+                    {neuralWisdom && (
+                      <div className={cn("p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 mb-4 transition-all", zenMode && "opacity-0")}>
+                        <div className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
+                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">V4.1.0-RESONANCE</span>
+                        </div>
+                        <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <span className="text-[10px] text-slate-300 leading-relaxed italic mb-6">"{neuralWisdom.recommendation}"</span>
+
+                          {/* STRATEGIC BRANCHES */}
+                          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
+                            {neuralWisdom.agent?.branches?.map((branch: any) => (
+                              <button
+                                key={branch.tag}
+                                onClick={() => handleAuthorizeBranch(neuralWisdom.agent.id, branch.tag)}
+                                className={cn(
+                                  "p-3 rounded-xl border flex flex-col gap-1 transition-all text-left group",
+                                  branch.tag === "emerald" || branch.tag === "organic"
+                                    ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
+                                    : "bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10"
+                                )}
+                              >
+                                <span className={cn(
+                                  "text-[8px] font-black uppercase tracking-[0.2em]",
+                                  branch.tag === "emerald" || branch.tag === "organic" ? "text-emerald-400" : "text-rose-400"
+                                )}>{branch.title}</span>
+                                <span className="text-[9px] text-white/60 leading-tight">{branch.description}</span>
+                                <span className="mt-2 text-[7px] text-white/30 uppercase font-mono group-hover:text-white transition-colors">AUTHORIZE PATH â†’</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-indigo-300 italic opacity-80">{neuralWisdom.insight}</p>
+                        <div className="mt-4 pt-3 border-t border-indigo-500/20 text-[9px] font-bold text-indigo-400/60 uppercase">
+                          Confidence: {(neuralWisdom.confidence * 100).toFixed(0)}%
+                        </div>
+                        <div className="space-y-3 mt-4">
+                          <h6 className="text-[9px] font-black text-indigo-500/50 uppercase tracking-widest pl-1">Network Insights (CLI Platform)</h6>
+                          {crossWisdom.map((w: string, i: number) => (
+                            <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-400 italic">
+                              "{w}"
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {messages.map((m, i) => (
+                      <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
+                    ))}
+                    {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
+                  </div>
+                  <div className="p-6 bg-black/20">
+                    <div className="flex items-center glass rounded-2xl px-5 py-3 border-white/10">
+                      <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white" />
+                      <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-white transition-colors"><Zap size={18} /></button>
                     </div>
-                 </motion.div>
+                  </div>
+                </motion.div>
               )}
-             {activeDebate && (
-           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8500] bg-black/60 backdrop-blur-5xl flex items-center justify-center p-24">
-              <div className="w-full max-w-7xl glass-bright rounded-[4rem] border border-white/10 p-16 relative overflow-hidden flex flex-col h-[800px] shadow-6xl">
-                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-20" />
-                 
-                 <div className="flex justify-between items-start mb-16 px-4">
-                    <div>
-                        <span className={cn("text-xs font-black uppercase tracking-[0.4em] px-4 py-1 rounded-full border mb-4 inline-block", 
-                           activeDebate.consensus_aura === 'volatile' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+              {activeDebate && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[8500] bg-black/60 backdrop-blur-5xl flex items-center justify-center p-24">
+                  <div className="w-full max-w-7xl glass-bright rounded-[4rem] border border-white/10 p-16 relative overflow-hidden flex flex-col h-[800px] shadow-6xl">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white to-transparent opacity-20" />
+
+                    <div className="flex justify-between items-start mb-16 px-4">
+                      <div>
+                        <span className={cn("text-xs font-black uppercase tracking-[0.4em] px-4 py-1 rounded-full border mb-4 inline-block",
+                          activeDebate.consensus_aura === 'volatile' ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                         )}>Consensus Status: {activeDebate.consensus_aura}</span>
                         <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Strategic Advisory Debate</h2>
+                      </div>
+                      <button onClick={() => setActiveDebate(null)} className="w-20 h-20 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10 shadow-2xl"><Plus size={40} className="rotate-45" /></button>
                     </div>
-                    <button onClick={() => setActiveDebate(null)} className="w-20 h-20 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border-white/10 shadow-2xl"><Plus size={40} className="rotate-45" /></button>
-                 </div>
 
-                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 overflow-hidden px-4">
-                    {activeDebate.insights.map((insight: any, i: number) => (
-                       <motion.div 
-                         key={i} 
-                         initial={{ opacity: 0, scale: 0.9, y: 30 }} 
-                         animate={{ opacity: 1, scale: 1, y: 0 }} 
-                         transition={{ delay: i * 0.15 }}
-                         className="flex flex-col rounded-3xl p-8 bg-white/[0.03] border border-white/5 relative group hover:bg-white/5 transition-all overflow-hidden"
-                       >
-                          <div className={cn("absolute top-0 left-0 w-1 h-full", 
-                             insight.persona.includes("ARCHITECT") ? "bg-amber-500" : 
-                             insight.persona.includes("GROWTH") ? "bg-pink-500" : "bg-slate-400"
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 overflow-hidden px-4">
+                      {activeDebate.insights.map((insight: any, i: number) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ delay: i * 0.15 }}
+                          className="flex flex-col rounded-3xl p-8 bg-white/[0.03] border border-white/5 relative group hover:bg-white/5 transition-all overflow-hidden"
+                        >
+                          <div className={cn("absolute top-0 left-0 w-1 h-full",
+                            insight.persona.includes("ARCHITECT") ? "bg-amber-500" :
+                              insight.persona.includes("GROWTH") ? "bg-pink-500" : "bg-slate-400"
                           )} />
-                          
+
                           <div className="flex items-center justify-between mb-8">
-                             <span className={cn("text-[10px] font-black uppercase tracking-[0.3em]", 
-                                insight.persona.includes("ARCHITECT") ? "text-amber-500" : 
+                            <span className={cn("text-[10px] font-black uppercase tracking-[0.3em]",
+                              insight.persona.includes("ARCHITECT") ? "text-amber-500" :
                                 insight.persona.includes("GROWTH") ? "text-pink-500" : "text-slate-400"
-                             )}>{insight.persona}</span>
-                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-slate-500">{insight.strategic_score}%</span>
-                                <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                   <div className="h-full bg-white/40" style={{ width: `${insight.strategic_score}%` }} />
-                                </div>
-                             </div>
+                            )}>{insight.persona}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-slate-500">{insight.strategic_score}%</span>
+                              <div className="w-12 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-white/40" style={{ width: `${insight.strategic_score}%` }} />
+                              </div>
+                            </div>
                           </div>
 
                           <p className="text-sm text-slate-200 leading-relaxed font-medium mb-auto">
-                             "{insight.perspective}"
+                            "{insight.perspective}"
                           </p>
-                          
-                          <div className="mt-10 pt-6 border-t border-white/5 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-opacity">
-                             <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Risk Index: {Math.round(insight.risk_impact * 100)}%</span>
-                             <ShieldAlert className={cn("w-4 h-4", insight.risk_impact > 0.7 ? "text-rose-500" : "text-slate-500")} />
-                          </div>
-                       </motion.div>
-                    ))}
-                 </div>
 
-                 <div className="mt-16 bg-white/5 p-8 rounded-[2rem] border border-white/10 flex items-center justify-between">
-                    <p className="text-xs font-medium text-slate-400 max-w-2xl px-4">Observe the conflicting perspectives between technical stability, market velocity, and catastrophic risk mitigation. Your tie-breaking decision is required for commit manifestation.</p>
-                    <button className="px-12 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 transition-all">Review & Commit</button>
-                 </div>
-              </div>
-           </motion.div>
-         )}
-       </AnimatePresence>
-           <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
-             <Bot className="w-9 h-9" />
-           </button>
-        </div>
+                          <div className="mt-10 pt-6 border-t border-white/5 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-opacity">
+                            <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Risk Index: {Math.round(insight.risk_impact * 100)}%</span>
+                            <ShieldAlert className={cn("w-4 h-4", insight.risk_impact > 0.7 ? "text-rose-500" : "text-slate-500")} />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="mt-16 bg-white/5 p-8 rounded-[2rem] border border-white/10 flex items-center justify-between">
+                      <p className="text-xs font-medium text-slate-400 max-w-2xl px-4">Observe the conflicting perspectives between technical stability, market velocity, and catastrophic risk mitigation. Your tie-breaking decision is required for commit manifestation.</p>
+                      <button className="px-12 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 transition-all">Review & Commit</button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
+              <Bot className="w-9 h-9" />
+            </button>
+          </div>
         </>
       )}
       {/* Directive: Cortex Semantic HUD (Pillar 21) */}
       <AnimatePresence>
         {showCortex && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[3000] bg-indigo-950/40 backdrop-blur-3xl flex items-center justify-center p-24"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               className="max-w-6xl w-full h-[85vh] glass-bright border border-indigo-500/30 rounded-[4rem] flex flex-col overflow-hidden shadow-5xl relative"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent animate-pulse" />
-              
+
               <header className="px-16 pt-16 pb-12 border-b border-white/5 flex items-center justify-between">
                 <div>
-                   <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-3 block animate-pulse">Neural Cortex Scan Active</span>
-                   <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Semantic Intelligence HUD</h2>
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-3 block animate-pulse">Neural Cortex Scan Active</span>
+                  <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Semantic Intelligence HUD</h2>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowCortex(false)}
                   className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
                 >
-                   <X className="w-8 h-8 text-slate-500 group-hover:text-white transition-colors" />
+                  <X className="w-8 h-8 text-slate-500 group-hover:text-white transition-colors" />
                 </button>
               </header>
 
               <div className="flex-1 overflow-y-auto px-16 py-12 custom-scrollbar">
                 <div className="grid grid-cols-1 gap-8">
                   {cortexResults.map((res: any, i: number) => (
-                    <motion.div 
+                    <motion.div
                       key={res.filepath}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -3705,85 +3705,85 @@ export default function App() {
                       className="bg-white/[0.02] p-10 rounded-[3rem] border border-white/5 hover:border-indigo-500/40 transition-all group relative overflow-hidden"
                     >
                       <div className="absolute top-0 right-0 p-8">
-                         <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
-                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Aura Relevance: {(res.score * 100).toFixed(1)}%</span>
-                         </div>
+                        <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Aura Relevance: {(res.score * 100).toFixed(1)}%</span>
+                        </div>
                       </div>
-                      
+
                       <div className="flex items-start gap-10">
-                         <div className="w-20 h-20 rounded-3xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-all">
-                            <BrainCircuit className="w-10 h-10 text-indigo-500" />
-                         </div>
-                         <div className="flex-1">
-                            <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-3 group-hover:text-indigo-400 transition-colors">{res.filename}</h3>
-                            <p className="text-xs font-mono text-slate-500 mb-8 border-l-2 border-indigo-500/20 pl-4">{res.filepath}</p>
-                            <p className="text-sm text-slate-300 leading-relaxed font-medium bg-white/5 p-6 rounded-2xl italic">"{res.preview}"</p>
-                         </div>
+                        <div className="w-20 h-20 rounded-3xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-all">
+                          <BrainCircuit className="w-10 h-10 text-indigo-500" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-3 group-hover:text-indigo-400 transition-colors">{res.filename}</h3>
+                          <p className="text-xs font-mono text-slate-500 mb-8 border-l-2 border-indigo-500/20 pl-4">{res.filepath}</p>
+                          <p className="text-sm text-slate-300 leading-relaxed font-medium bg-white/5 p-6 rounded-2xl italic">"{res.preview}"</p>
+                        </div>
                       </div>
-                      
+
                       <div className="mt-8 pt-8 border-t border-white/5 flex gap-4">
-                         <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">Open Neural Node</button>
-                         <button className="px-8 py-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">Index Core</button>
+                        <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">Open Neural Node</button>
+                        <button className="px-8 py-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">Index Core</button>
                       </div>
                     </motion.div>
                   ))}
-                  
+
                   {cortexResults.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-40 opacity-20 text-center">
-                       <BrainCircuit className="w-24 h-24 text-white mb-8 mx-auto animate-pulse" />
-                       <span className="text-xl font-black uppercase tracking-[0.5em] text-white">No Semantic Matches In Cohort</span>
+                      <BrainCircuit className="w-24 h-24 text-white mb-8 mx-auto animate-pulse" />
+                      <span className="text-xl font-black uppercase tracking-[0.5em] text-white">No Semantic Matches In Cohort</span>
                     </div>
                   )}
                 </div>
               </div>
-              
-              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-6">
-                  {chronosHistory.length > 0 && (
-                    <div className="w-full max-w-4xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
-                       <div className="flex items-center justify-between mb-4 px-2">
-                          <div className="flex items-center gap-3">
-                             <div className={cn("w-2 h-2 rounded-full", isTimeTraveling ? "bg-amber-500 animate-pulse" : "bg-emerald-500")} />
-                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                {isTimeTraveling ? "Chronos: Temporal View Active" : "Chronos: Real-Time Stream"}
-                             </span>
-                          </div>
-                          <span className="text-[10px] font-mono text-slate-500">
-                             {chronosHistory.length} Snapshots Archived
-                          </span>
-                       </div>
-                       <input 
-                         type="range" 
-                         min="-1" 
-                         max={chronosHistory.length - 1} 
-                         value={travelIndex}
-                         onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
-                         className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
-                       />
-                       <div className="flex justify-between mt-2 px-1">
-                          <span className="text-[9px] font-black text-slate-600 uppercase">Live</span>
-                          <span className="text-[9px] font-black text-slate-600 uppercase">Archival Origin</span>
-                       </div>
-                    </div>
-                  )}
 
-                  {storageReport && (
-                    <div className="flex items-center gap-4 py-2 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-in fade-in slide-in-from-bottom-4">
-                       <Database className="w-3 h-3 text-emerald-400" />
-                       <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">{storageReport.status} // {Math.round(storageReport.transferred_bytes / 1024)} KB SYNCED</span>
+              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-6">
+                {chronosHistory.length > 0 && (
+                  <div className="w-full max-w-4xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
+                    <div className="flex items-center justify-between mb-4 px-2">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-2 h-2 rounded-full", isTimeTraveling ? "bg-amber-500 animate-pulse" : "bg-emerald-500")} />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          {isTimeTraveling ? "Chronos: Temporal View Active" : "Chronos: Real-Time Stream"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {chronosHistory.length} Snapshots Archived
+                      </span>
                     </div>
-                  )}
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
-                  <div className="flex gap-10 mt-2 opacity-30 grayscale hover:grayscale-0 transition-all">
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-[8px] font-bold text-white uppercase">C: System Nominal</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                        <span className="text-[8px] font-bold text-white uppercase">D: Golem Space Ready</span>
-                     </div>
+                    <input
+                      type="range"
+                      min="-1"
+                      max={chronosHistory.length - 1}
+                      value={travelIndex}
+                      onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
+                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
+                    />
+                    <div className="flex justify-between mt-2 px-1">
+                      <span className="text-[9px] font-black text-slate-600 uppercase">Live</span>
+                      <span className="text-[9px] font-black text-slate-600 uppercase">Archival Origin</span>
+                    </div>
                   </div>
-               </footer>
+                )}
+
+                {storageReport && (
+                  <div className="flex items-center gap-4 py-2 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-in fade-in slide-in-from-bottom-4">
+                    <Database className="w-3 h-3 text-emerald-400" />
+                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">{storageReport.status} // {Math.round(storageReport.transferred_bytes / 1024)} KB SYNCED</span>
+                  </div>
+                )}
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
+                <div className="flex gap-10 mt-2 opacity-30 grayscale hover:grayscale-0 transition-all">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-[8px] font-bold text-white uppercase">C: System Nominal</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                    <span className="text-[8px] font-bold text-white uppercase">D: Golem Space Ready</span>
+                  </div>
+                </div>
+              </footer>
             </motion.div>
           </motion.div>
         )}
