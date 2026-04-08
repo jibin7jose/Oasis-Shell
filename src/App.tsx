@@ -18,6 +18,7 @@ import RightRail from "./components/layout/RightRail";
 import BoardroomPanel from "./components/panels/BoardroomPanel";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CortexLog from "./components/panels/CortexLog";
+import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -123,6 +124,7 @@ interface FounderMetrics {
 }
 
 export default function App() {
+  const { playPulse, playNotification } = useSoundscape();
   // --- CORE STATE ---
   const [founderMetrics, setFounderMetrics] = useState<FounderMetrics>({
     arr: "$1.24M",
@@ -1878,6 +1880,7 @@ export default function App() {
 
   const handleNodeClick = async (node: any) => {
     if (!node) return;
+    playPulse(100 + (node.val || 10) * 20);
     setNotification(`Cortex: Synchronizing with node "${node.id}"...`);
     
     // Smooth kinematic zoom
@@ -2202,9 +2205,8 @@ export default function App() {
             )}
             {notification && (
               <motion.div
-                initial={{ x: 300, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
+                onViewportEnter={() => playNotification()}
                 className="glass-bright border-emerald-500/30 rounded-2xl p-6 shadow-4xl flex items-center gap-5 relative"
               >
                 <button

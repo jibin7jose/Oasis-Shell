@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Lock } from 'lucide-react';
+import { useSoundscape } from '../../hooks/useSoundscape';
 
 interface BootSequenceProps {
   onSuccess: () => void;
@@ -11,6 +12,7 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [key, setKey] = useState('');
   const [isError, setIsError] = useState(false);
+  const { playHandshake, playPulse } = useSoundscape();
 
   const rawLogs = [
     "INITIALIZING OASIS KERNEL V4.0.1...",
@@ -31,6 +33,7 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
           i++;
         } else {
           clearInterval(interval);
+          playPulse(880);
           setTimeout(() => setStage('handshake'), 1000);
         }
       }, 400);
@@ -41,6 +44,7 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
   const handleHandshake = () => {
     // For now, simulate successful handshake if key is not empty
     if (key.length > 3) {
+      playHandshake();
       setStage('breach');
       setTimeout(onSuccess, 1500);
     } else {
