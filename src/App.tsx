@@ -209,6 +209,23 @@ export default function App() {
   } | null>(null);
 
   const [fiscalBurn, setFiscalBurn] = useState({ total_burn: 0.0, token_load: 0, status: 'NOMINAL' });
+  const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
+
+  useEffect(() => {
+    if (!isHandshakeSuccessful) return;
+    
+    const triggerVision = async () => {
+        try {
+            const context = await invokeSafe("analyze_work_context") as string;
+            setNotification(`Vision: Resonance detected with "${context}".`);
+            setVisionaryContext(context);
+        } catch (e) { }
+    };
+    triggerVision();
+
+    const interval = setInterval(triggerVision, 300000); 
+    return () => clearInterval(interval);
+  }, [isHandshakeSuccessful]);
 
   useEffect(() => {
     const pulse = setInterval(async () => {

@@ -2609,6 +2609,30 @@ async fn capture_screenshot() -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn analyze_work_context() -> Result<String, String> {
+    let screenshot_b64 = capture_screenshot().await?;
+    let client = reqwest::Client::new();
+    
+    // Attempt Vision analysis via local Ollama (Llava/Gemma)
+    let body = serde_json::json!({
+        "model": "llava:7b",
+        "prompt": "Identify the primary programming language or technical task visible in this screen. Output exactly 1-2 words. (e.g. 'Rust Backend', 'React UI', 'Neural Ethics').",
+        "images": [screenshot_b64],
+        "stream": false
+    });
+
+    if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            if let Some(resp) = json["response"].as_str() {
+                return Ok(resp.trim().to_string());
+            }
+        }
+    }
+    
+    Ok("Generic Workflow".into())
+}
+
+#[tauri::command]
 async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
     let registry = GOLEM_REGISTRY.lock().unwrap();
     Ok(registry.values().cloned().collect())
@@ -3078,6 +3102,7 @@ pub fn run() {
             get_market_intelligence,
             manifest_code_module,
             generate_venture_audit,
+            analyze_work_context,
             get_neural_brief,
             get_neural_wisdom,
             trigger_oracle_audit,
