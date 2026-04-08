@@ -2477,16 +2477,31 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn sync_hardware_aura(aura: String) -> Result<(), String> {
-    let ps_cmd = match aura.as_str() {
-        "gaming" => "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)", 
-        "dev" => "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)",
-        _ => "echo 'Aura Parity Nominal'",
-    };
+async fn sync_hardware_aura(target_ip: String, hex_color: String) -> Result<(), String> {
+    if target_ip.is_empty() || target_ip == "192.168.1.100" { return Ok(()); }
+    
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(800))
+        .build()
+        .map_err(|e| e.to_string())?;
 
-    let _ = std::process::Command::new("powershell")
-        .args(["-Command", ps_cmd])
-        .spawn();
+    // Clean hex
+    let hex = hex_color.replace('#', "");
+    if hex.len() != 6 { return Err("Invalid Hex Sequence".into()); }
+
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+
+    let body = serde_json::json!({
+        "on": true,
+        "bri": 255,
+        "seg": [{"col": [[r, g, b]]}]
+    });
+
+    let url = format!("http://{}/json/state", target_ip);
+    // Silent fail if device offline for ultra-low latency
+    let _ = client.post(url).json(&body).send().await;
 
     Ok(())
 }
@@ -2848,6 +2863,79 @@ async fn transcribe_audio(audio_data: Vec<u8>) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn get_documentation_index() -> Result<Vec<String>, String> {
+    let docs_path = std::path::Path::new("../blog/docs");
+    let mut entries = Vec::new();
+    
+    if docs_path.exists() {
+        for entry in std::fs::read_dir(docs_path).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".html") {
+                entries.push(name.replace(".html", ""));
+            }
+        }
+
+        // Add Logs
+        let logs_path = docs_path.join("logs");
+        if logs_path.exists() {
+            for entry in std::fs::read_dir(logs_path).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with(".html") {
+                    entries.push(format!("logs/{}", name.replace(".html", "")));
+                }
+            }
+        }
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+async fn get_documentation_chapter(id: String) -> Result<String, String> {
+    let file_path = format!("../blog/docs/{}.html", id);
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err(format!("Chapter {} not found in neural hub.", id));
+    }
+
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn manifest_temporal_log(metrics: serde_json::Value) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let prompt = format!(
+        "Role: Oasis AI Oracle (Gemma-4 Synthesis).
+         Context: Strategic Snapshot of the Oasis Shell v1.0.
+         Metrics: {}.
+         Goal: Manifest a terse, high-fidelity dev-log entry for the 'Manual Hub'.
+         Output ONLY HTML: An <article> with <h3>Title</h3>, <p>Summary</p>, and a <ul class='neural-metrics'> list. Use Tailwind-like classes: text-white, text-slate-400.",
+        metrics.to_string()
+    );
+
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        let logs_path = std::path::Path::new("../blog/docs/logs");
+        if !logs_path.exists() {
+            std::fs::create_dir_all(logs_path).map_err(|e| e.to_string())?;
+        }
+        
+        let id = chrono::Local::now().format("%Y-%m-%d_%H%M%S").to_string();
+        let file_path = logs_path.join(format!("{}.html", id));
+        let clean_resp = resp.trim_matches('`').replace("html", "").trim().to_string();
+        std::fs::write(file_path, &clean_resp).map_err(|e| e.to_string())?;
+        
+        Ok(format!("Temporal Snapshot Synthesized: {}", id))
+    } else {
+        Err("Oracle Resonance Failed: Log generation breach.".into())
+    }
+}
+
 pub fn run() {
     let conn = rusqlite::Connection::open("oasis_crates.db").expect("failed to open database");
     
@@ -2968,6 +3056,9 @@ pub fn run() {
             check_ai_status,
             start_proactive_sentience,
             sync_hardware_aura,
+            get_documentation_index,
+            get_documentation_chapter,
+            manifest_temporal_log,
             capture_screenshot,
             query_vision,
             get_logic_path,

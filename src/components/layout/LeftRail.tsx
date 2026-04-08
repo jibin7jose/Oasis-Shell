@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck } from "lucide-react";
+import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -15,6 +15,8 @@ interface LeftRailProps {
   onActivateSim: () => void;
   onToggleSim: () => void;
   onOpenSettings: () => void;
+  onOpenDocs: () => void;
+  onSnapshot: () => void;
   chronosIndex: number;
   chronosCount: number;
   chronosLabel?: string;
@@ -39,6 +41,8 @@ export default function LeftRail({
   onActivateSim,
   onToggleSim,
   onOpenSettings,
+  onOpenDocs,
+  onSnapshot,
   chronosIndex,
   chronosCount,
   chronosLabel,
@@ -117,6 +121,13 @@ export default function LeftRail({
               JUMP TO PRESENT →
             </button>
           )}
+          <button
+            onClick={onSnapshot}
+            className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group"
+          >
+            <Camera className="w-3 h-3 group-hover:scale-125 transition-transform" />
+            MANIFEST SNAPSHOT
+          </button>
           {chronosCount > 0 && (
             <div className="flex flex-col items-end gap-2 p-4 glass rounded-2xl border-white/5">
               <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em] mb-1">
@@ -159,6 +170,13 @@ export default function LeftRail({
             </div>
           )}
         </div>
+
+        <button onClick={onOpenDocs} className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
+          <Book className="w-6 h-6" />
+          <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
+            System Manual
+          </span>
+        </button>
 
         <button onClick={onOpenSettings} className="p-4 text-slate-500 hover:text-white transition-colors">
           <Settings className="w-6 h-6" />

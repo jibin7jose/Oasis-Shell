@@ -6,7 +6,7 @@ import {
   RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe
+  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe, Cpu
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
@@ -42,6 +42,9 @@ const TAURI_DEFAULTS: Record<string, any> = {
   get_aegis_ledger: [],
   seek_chronos: [],
   search_semantic_nodes: [],
+  manifest_temporal_log: "Snapshot Saved.",
+  get_documentation_index: ["overview", "architecture", "security", "roadmap"],
+  get_documentation_chapter: "<h1>System Documentation</h1><p>Welcome to the Oasis Kernel Technical Manual.</p>",
   get_process_list: [
     { pid: 1420, name: "oasis-shell.exe", cpu_usage: 2.4, mem_usage: 149422080, status: "Running", user: "Founder" },
     { pid: 8842, name: "Code.exe", cpu_usage: 12.8, mem_usage: 882999296, status: "Running", user: "Founder" },
@@ -267,6 +270,17 @@ export default function App() {
   const [activeForge, setActiveForge] = useState<any>(null);
   const [collectiveNodes, setCollectiveNodes] = useState<any[]>([]);
   const [performanceMode, setPerformanceMode] = useState(false);
+
+  // Phase 9.0: Physical Aura Bridge
+  useEffect(() => {
+    if (!autoAura) return;
+    const sync = async () => {
+      try {
+        await invokeSafe("sync_hardware_aura", { targetIp: auraIp, hexColor: founderMetrics.stress_color });
+      } catch (e) { }
+    };
+    sync();
+  }, [founderMetrics.stress_color, auraIp, autoAura]);
 
   // Phase 8.2: Neural Cortex Sync
   useEffect(() => {
@@ -1840,6 +1854,18 @@ export default function App() {
     }
   };
 
+  const handleTemporalSnapshot = async () => {
+    setNotification("Oracle: Captured Strategic Snapshot. Manifesting Temporal Log...");
+    try {
+      const stats = await invokeSafe("run_system_diagnostic");
+      const res = await invokeSafe("manifest_temporal_log", { metrics: { ...stats, arr: founderMetrics.arr, integrity: ventureIntegrity } });
+      setNotification(res as string);
+      refreshSystemSnapshot();
+    } catch (e) {
+      setNotification("Oracle: Temporal Phase-Shift Failure.");
+    }
+  };
+
   const handlePaletteAction = async (id: string) => {
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
@@ -2176,11 +2202,13 @@ export default function App() {
         simMode={simMode}
         onDash={() => setActiveView("dash")}
         onOpenGraph={() => setShowGraph(true)}
-        onOpenVault={() => setShowVault(true)}
+        onOpenVault={() => setShowSentinel(true)}
         onOpenLogs={() => setShowLogs(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
         onOpenSettings={() => setShowSettings(!showSettings)}
+        onOpenDocs={() => setShowDocs(true)}
+        onSnapshot={handleTemporalSnapshot}
         chronosIndex={chronosIndex}
         chronosCount={pinnedContexts.length}
         chronosLabel={chronosIndex >= 0 ? pinnedContexts[chronosIndex]?.name : undefined}
@@ -3424,7 +3452,7 @@ export default function App() {
                 ))}
 
                 {/* EMPTY STATE */}
-                {(!sentinelVault?.blobs || Object.keys(sentinelVault.blobs).length === 0) && (
+                {(!sentinelVault?.blobs || Object.keys(sentinelVault?.blobs || {}).length === 0) && (
                   <div className="col-span-full flex flex-col items-center justify-center py-40 opacity-20 text-center">
                     <ShieldAlert className="w-20 h-20 text-white mb-6 mx-auto" />
                     <span className="text-sm font-black uppercase tracking-[0.4em] text-white">Vault Empty / Awaiting Seal</span>
