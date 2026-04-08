@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera } from "lucide-react";
+import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera, MessageSquareQuote } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -16,6 +16,7 @@ interface LeftRailProps {
   onToggleSim: () => void;
   onOpenSettings: () => void;
   onOpenDocs: () => void;
+  onOpenBoardroom: () => void;
   onSnapshot: () => void;
   chronosIndex: number;
   chronosCount: number;
@@ -42,6 +43,7 @@ export default function LeftRail({
   onToggleSim,
   onOpenSettings,
   onOpenDocs,
+  onOpenBoardroom,
   onSnapshot,
   chronosIndex,
   chronosCount,
@@ -170,6 +172,13 @@ export default function LeftRail({
             </div>
           )}
         </div>
+
+        <button onClick={onOpenBoardroom} className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
+          <MessageSquareQuote className="w-6 h-6" />
+          <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
+            Boardroom Debate
+          </span>
+        </button>
 
         <button onClick={onOpenDocs} className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
           <Book className="w-6 h-6" />

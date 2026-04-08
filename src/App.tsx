@@ -15,6 +15,7 @@ import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
 import BootSequence from "./components/auth/BootSequence";
 import RightRail from "./components/layout/RightRail";
+import BoardroomPanel from "./components/panels/BoardroomPanel";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CortexLog from "./components/panels/CortexLog";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
@@ -195,6 +196,7 @@ export default function App() {
   const [isTimeTraveling, setIsTimeTraveling] = useState(false);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showDocs, setShowDocs] = useState(false);
+  const [showBoardroom, setShowBoardroom] = useState(false);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -2244,6 +2246,7 @@ export default function App() {
         onDash={() => setActiveView("dash")}
         onOpenGraph={() => setShowGraph(true)}
         onOpenVault={() => setShowSentinel(true)}
+        onOpenBoardroom={() => setShowBoardroom(true)}
         onOpenLogs={() => setShowLogs(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
@@ -2477,6 +2480,12 @@ export default function App() {
                 onClose={() => setSelectedGolem(null)}
                 golem={selectedGolem}
                 className={cn("transition-all duration-700", zenMode && "opacity-0 translateX-24 pointer-events-none")}
+              />
+
+              <BoardroomPanel
+                isOpen={showBoardroom}
+                onClose={() => setShowBoardroom(false)}
+                metrics={{ ARR: founderMetrics.arr, Growth: founderMetrics.momentum, Integrity: ventureIntegrity, Efficiency: 0.94 }}
               />
 
               <DocumentationPanel
