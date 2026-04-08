@@ -2203,6 +2203,16 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
 }
 
 #[tauri::command]
+async fn get_neural_brief(state: tauri::State<'_, DbState>, filename: String) -> Result<String, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT content FROM file_embeddings WHERE filename = ? LIMIT 1").map_err(|e| e.to_string())?;
+    let content: String = stmt.query_row([filename], |row| row.get(0)).map_err(|e| e.to_string())?;
+    
+    // Return a curated technical brief
+    Ok(content)
+}
+
+#[tauri::command]
 async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
     #[derive(serde::Serialize)]
     struct FileEntry { id: i32, filename: String, filepath: String, snippet: String }
@@ -3068,6 +3078,7 @@ pub fn run() {
             get_market_intelligence,
             manifest_code_module,
             generate_venture_audit,
+            get_neural_brief,
             get_neural_wisdom,
             trigger_oracle_audit,
             get_neural_workforce,

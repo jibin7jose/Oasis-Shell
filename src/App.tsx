@@ -6,13 +6,14 @@ import {
   RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe, Cpu
+  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe, Cpu, Book
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
 import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
 import LeftRail from "./components/layout/LeftRail";
 import TopBar from "./components/layout/TopBar";
+import BootSequence from "./components/auth/BootSequence";
 import RightRail from "./components/layout/RightRail";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CortexLog from "./components/panels/CortexLog";
@@ -180,8 +181,10 @@ export default function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const [resetConfirmAction, setResetConfirmAction] = useState<"reset" | "reset_clear" | null>(null);
   const [fpsThreshold, setFpsThreshold] = useState(22);
+  const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
+  const fgRef = useRef<any>(null);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isVaultSealed, setIsVaultSealed] = useState(false);
@@ -1854,7 +1857,34 @@ export default function App() {
     }
   };
 
+  const handleNodeClick = async (node: any) => {
+    if (!node) return;
+    setNotification(`Cortex: Synchronizing with node "${node.id}"...`);
+    
+    // Smooth kinematic zoom
+    if (fgRef.current) {
+      const distance = 120;
+      const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+      fgRef.current.cameraPosition(
+        { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+        node,
+        2000
+      );
+    }
+
+    // Manifest Neural Brief
+    if (node.group !== 'core') {
+      try {
+        const brief = await invokeSafe("get_neural_brief", { filename: node.id }) as string;
+        setActiveSynthesis({ id: node.id, content: brief, type: 'FILE_MANIFEST' });
+      } catch (e) {
+        setNotification("Cortex: Resonance failure.");
+      }
+    }
+  };
+
   const handleTemporalSnapshot = async () => {
+    if (!isHandshakeSuccessful) return;
     setNotification("Oracle: Captured Strategic Snapshot. Manifesting Temporal Log...");
     try {
       const stats = await invokeSafe("run_system_diagnostic");
@@ -2011,6 +2041,10 @@ export default function App() {
 
 
 
+
+  if (!isHandshakeSuccessful) {
+    return <BootSequence onSuccess={() => setIsHandshakeSuccessful(true)} />;
+  }
 
   return (
     <div
@@ -2182,12 +2216,19 @@ export default function App() {
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
         {mounted && !performanceMode && (
           <ForceGraph3D
-            graphData={graphData}
+            ref={fgRef}
+            graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
             backgroundColor="#00000000"
-            nodeRelSize={simMode ? 10 : 6}
-            nodeColor={() => simMode ? "#f59e0b" : founderMetrics.stress_color}
+            nodeRelSize={simMode ? 10 : 7}
+            nodeColor={(node: any) => {
+              if (node.group === 'core') return "#6366f1";
+              if (node.group === 'logic') return "#fbbf24";
+              if (node.group === 'kernel') return "#f87171";
+              return "#94a3b8";
+            }}
             nodeLabel="id"
-            linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.1)"}
+            onNodeClick={handleNodeClick}
+            linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.15)"}
             showNavInfo={false}
           />
         )}
@@ -3480,45 +3521,82 @@ export default function App() {
               </div>
 
               <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 gap-16 overflow-hidden">
-                <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
-                  <section>
-                    <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">The Narrative</h4>
-                    <p className="text-xl text-white font-medium leading-relaxed italic border-l-4 border-indigo-500/40 pl-8 bg-white/5 p-8 rounded-3xl">
-                      "{activeSynthesis.strategic_narrative}"
-                    </p>
-                  </section>
-                  <section>
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Market Correlation</h4>
-                    <div className="p-8 rounded-3xl bg-black/20 border border-white/5">
-                      <p className="text-sm text-slate-300 leading-relaxed font-mono">
-                        {activeSynthesis.market_context}
-                      </p>
+                {activeSynthesis.type === 'FILE_MANIFEST' ? (
+                  <>
+                    <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
+                      <section>
+                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">Neural File Manifest</h4>
+                        <div className="p-8 rounded-3xl bg-black/40 border border-white/10 font-mono text-[11px] text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto custom-scrollbar">
+                          {activeSynthesis.content}
+                        </div>
+                      </section>
                     </div>
-                  </section>
-                </div>
+                    <div className="flex flex-col gap-8">
+                       <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Neural Context</h4>
+                       <div className="p-10 rounded-[2.5rem] bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-6">
+                          <p className="text-lg text-white font-medium italic">"This node represents a critical junction in the {activeSynthesis.id.split('.').pop()?.toUpperCase()} logic layer. Its structural integrity is essential for the Oasis Kernel's stability."</p>
+                          <div className="flex items-center gap-4">
+                             <div className="px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 uppercase tracking-widest">Type: {activeSynthesis.id.split('.').pop()?.toUpperCase()}</div>
+                             <div className="px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-black text-indigo-400 uppercase tracking-widest">Resonance: 0.98</div>
+                          </div>
+                       </div>
+                       <div className="mt-auto flex flex-col gap-4 pt-10">
+                          <button 
+                            onClick={() => {
+                                setShowDocs(true);
+                                setActiveSynthesis(null);
+                            }}
+                            className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3"
+                          >
+                             <Book className="w-5 h-5" /> REVEAL IN MANUAL HUB
+                          </button>
+                          <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">GENERATE ARCHITECTURAL AUDIT</button>
+                       </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
+                      <section>
+                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">The Narrative</h4>
+                        <p className="text-xl text-white font-medium leading-relaxed italic border-l-4 border-indigo-500/40 pl-8 bg-white/5 p-8 rounded-3xl">
+                          "{activeSynthesis.strategic_narrative}"
+                        </p>
+                      </section>
+                      <section>
+                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Market Correlation</h4>
+                        <div className="p-8 rounded-3xl bg-black/20 border border-white/5">
+                          <p className="text-sm text-slate-300 leading-relaxed font-mono">
+                            {activeSynthesis.market_context}
+                          </p>
+                        </div>
+                      </section>
+                    </div>
 
-                <div className="flex flex-col gap-8">
-                  <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Actionable Outreach</h4>
-                  <div className="space-y-4">
-                    {activeSynthesis.actionable_outreach.map((step: string, i: number) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.2 }}
-                        className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center gap-6 group hover:bg-indigo-500/10 transition-all"
-                      >
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center font-black text-indigo-400 border border-indigo-400/30 group-hover:bg-indigo-500 group-hover:text-white transition-all">{i + 1}</div>
-                        <span className="text-xs font-black text-white uppercase tracking-wider">{step}</span>
-                      </motion.div>
-                    ))}
-                  </div>
+                    <div className="flex flex-col gap-8">
+                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Actionable Outreach</h4>
+                      <div className="space-y-4">
+                        {activeSynthesis.actionable_outreach.map((step: string, i: number) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.2 }}
+                            className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 flex items-center gap-6 group hover:bg-indigo-500/10 transition-all"
+                          >
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center font-black text-indigo-400 border border-indigo-400/30 group-hover:bg-indigo-500 group-hover:text-white transition-all">{i + 1}</div>
+                            <span className="text-xs font-black text-white uppercase tracking-wider">{step}</span>
+                          </motion.div>
+                        ))}
+                      </div>
 
-                  <div className="mt-auto grid grid-cols-2 gap-4 pt-10">
-                    <button className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">Export Pitch PDF</button>
-                    <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">Commit to Vault</button>
-                  </div>
-                </div>
+                      <div className="mt-auto grid grid-cols-2 gap-4 pt-10">
+                        <button className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">Export Pitch PDF</button>
+                        <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">Commit to Vault</button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
