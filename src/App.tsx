@@ -307,7 +307,19 @@ export default function App() {
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
-  const [cortexResults] = useState<any[]>([]);
+  const [cortexResults, setCortexResults] = useState<any[]>([]);
+  const [cortexQuery, setCortexQuery] = useState("");
+
+  const handleCortexSearch = async () => {
+    if (!cortexQuery.trim()) return;
+    try {
+      const results: any[] = await invokeSafe('search_semantic_nodes', { query: cortexQuery });
+      setCortexResults(results);
+      setNotification(`Neural Search: Found ${results.length} semantic matches.`);
+    } catch (err) {
+      console.error("Cortex Search Failure:", err);
+    }
+  };
   const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [activeDebate, setActiveDebate] = useState<any>(null);
@@ -2270,10 +2282,16 @@ export default function App() {
             backgroundColor="#00000000"
             nodeRelSize={simMode ? 10 : 7}
             nodeColor={(node: any) => {
+              const isMatch = cortexResults.some(res => res.filename === node.id);
+              if (isMatch) return "#10b981"; // Emerald Manifestation
               if (node.group === 'core') return "#6366f1";
               if (node.group === 'logic') return "#fbbf24";
               if (node.group === 'kernel') return "#f87171";
               return "#94a3b8";
+            }}
+            nodeVal={(node: any) => {
+               const isMatch = cortexResults.some(res => res.filename === node.id);
+               return isMatch ? 20 : node.val || 7;
             }}
             nodeLabel="id"
             onNodeClick={handleNodeClick}
@@ -3780,6 +3798,23 @@ export default function App() {
                   <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-3 block animate-pulse">Neural Cortex Scan Active</span>
                   <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Semantic Intelligence HUD</h2>
                 </div>
+
+                <div className="flex-1 max-w-xl mx-16">
+                   <div className="flex items-center glass-bright rounded-3xl px-8 py-5 border-indigo-500/30">
+                     <Search className="w-6 h-6 text-indigo-400 mr-4" />
+                     <input 
+                       value={cortexQuery}
+                       onChange={(e) => setCortexQuery(e.target.value)}
+                       onKeyDown={(e) => e.key === 'Enter' && handleCortexSearch()}
+                       placeholder="Search Semantic Neural Cortex..." 
+                       className="bg-transparent border-none outline-none text-white w-full font-bold placeholder:text-slate-600 text-lg"
+                     />
+                     <button onClick={handleCortexSearch} className="text-indigo-400 hover:text-white transition-colors">
+                       <Zap size={22} fill={cortexQuery.length > 0 ? "currentColor" : "none"} />
+                     </button>
+                   </div>
+                </div>
+
                 <button
                   onClick={() => setShowCortex(false)}
                   className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
