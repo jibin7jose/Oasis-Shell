@@ -126,7 +126,7 @@ interface FounderMetrics {
 }
 
 export default function App() {
-  const { playPulse, playHandshake, playNotification } = useSoundscape();
+  const { playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
   // --- CORE STATE ---
   const [founderMetrics, setFounderMetrics] = useState<FounderMetrics>({
     arr: "$1.24M",
@@ -250,6 +250,19 @@ export default function App() {
     }, 5000);
     return () => clearInterval(pulse);
   }, []);
+
+  // Phase 9.2: Sensory Feedback Bridge (Dynamic Hum)
+  useEffect(() => {
+    if (isHandshakeSuccessful) {
+      startEngine();
+    }
+  }, [isHandshakeSuccessful]);
+
+  useEffect(() => {
+    if (isHandshakeSuccessful && systemStats) {
+      updateEngine(systemStats.cpu_load);
+    }
+  }, [systemStats?.cpu_load, isHandshakeSuccessful]);
 
   const [zenMode, setZenMode] = useState(false);
   const [visionActive, setVisionActive] = useState(false);

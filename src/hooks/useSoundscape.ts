@@ -2,12 +2,74 @@ import { useCallback, useRef } from 'react';
 
 export function useSoundscape() {
   const audioCtx = useRef<AudioContext | null>(null);
+  const engineBase = useRef<OscillatorNode | null>(null);
+  const engineTexture = useRef<OscillatorNode | null>(null);
+  const engineGain = useRef<GainNode | null>(null);
+  const engineFilter = useRef<BiquadFilterNode | null>(null);
 
   const initAudio = () => {
     if (!audioCtx.current) {
       audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
   };
+
+  const startEngine = useCallback(() => {
+    initAudio();
+    if (!audioCtx.current || engineBase.current) return;
+    const ctx = audioCtx.current;
+
+    const base = ctx.createOscillator();
+    const texture = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    base.type = 'sine';
+    base.frequency.setValueAtTime(40, ctx.currentTime);
+
+    texture.type = 'sawtooth';
+    texture.frequency.setValueAtTime(40, ctx.currentTime);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(200, ctx.currentTime);
+    filter.Q.setValueAtTime(2, ctx.currentTime);
+
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime); 
+
+    base.connect(filter);
+    texture.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    base.start();
+    texture.start();
+
+    engineBase.current = base;
+    engineTexture.current = texture;
+    engineGain.current = gain;
+    engineFilter.current = filter;
+
+    // Fade in primary hum
+    gain.gain.exponentialRampToValueAtTime(0.02, ctx.currentTime + 3);
+  }, []);
+
+  const updateEngine = useCallback((load: number) => {
+    if (!audioCtx.current || !engineBase.current || !engineGain.current || !engineFilter.current) return;
+    const ctx = audioCtx.current;
+    const normalizedLoad = Math.min(100, Math.max(0, load)) / 100;
+
+    // Frequency shift (40Hz to 60Hz)
+    const baseFreq = 40 + (normalizedLoad * 20);
+    engineBase.current.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.8);
+    if (engineTexture.current) engineTexture.current.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.8);
+
+    // Filter opening (200Hz to 1200Hz) - the "Whirl"
+    const filterFreq = 180 + (normalizedLoad * 1000);
+    engineFilter.current.frequency.setTargetAtTime(filterFreq, ctx.currentTime, 0.5);
+
+    // Volume modulation (subtle increase with load)
+    const targetGain = 0.02 + (normalizedLoad * 0.04);
+    engineGain.current.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.6);
+  }, []);
 
   const playClick = useCallback(() => {
     initAudio();
@@ -113,5 +175,12 @@ export function useSoundscape() {
     osc2.stop(ctx.currentTime + 0.3);
   }, []);
 
-  return { playClick, playPulse, playHandshake, playNotification };
+  return { 
+    playClick, 
+    playPulse, 
+    playHandshake, 
+    playNotification,
+    startEngine,
+    updateEngine
+  };
 }
