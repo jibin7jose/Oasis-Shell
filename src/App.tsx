@@ -21,6 +21,7 @@ import CortexLog from "./components/panels/CortexLog";
 import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
+import { TerminalPanel } from "./components/panels/TerminalPanel";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -263,6 +264,18 @@ export default function App() {
       updateEngine(systemStats.cpu_load);
     }
   }, [systemStats?.cpu_load, isHandshakeSuccessful]);
+
+  // Phase 9.3: Strategic Shortcuts (Command Hub)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + ` or Alt + T to toggle Terminal
+      if ((e.ctrlKey && e.key === '`') || (e.altKey && e.key === 't')) {
+        setShowCLI(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const [zenMode, setZenMode] = useState(false);
   const [visionActive, setVisionActive] = useState(false);
@@ -3909,6 +3922,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* STRATEGIC COMMAND HUB (PILLAR 17) */}
+      <TerminalPanel 
+        isOpen={showCLI} 
+        onClose={() => setShowCLI(false)} 
+        stressColor={founderMetrics.stress_color} 
+      />
     </div>
   );
 }
