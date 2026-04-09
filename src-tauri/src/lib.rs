@@ -831,6 +831,14 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn delete_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn launch_context_apps(apps: Vec<WindowInfo>) -> Result<Vec<String>, String> {
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
@@ -3071,6 +3079,7 @@ pub fn run() {
             get_crates,
             start_watcher,
             launch_crate,
+            delete_crate,
             log_event,
             get_logs,
             get_nearby_projects,

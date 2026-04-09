@@ -22,6 +22,7 @@ import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
+import CrateGallery, { ContextCrate } from "./components/panels/CrateGallery";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -252,6 +253,12 @@ export default function App() {
     return () => clearInterval(pulse);
   }, []);
 
+  useEffect(() => {
+    if (isHandshakeSuccessful) {
+        loadCrates();
+    }
+  }, [isHandshakeSuccessful]);
+
   // Phase 9.2: Sensory Feedback Bridge (Dynamic Hum)
   useEffect(() => {
     if (isHandshakeSuccessful) {
@@ -271,6 +278,10 @@ export default function App() {
       // Ctrl + ` or Alt + T to toggle Terminal
       if ((e.ctrlKey && e.key === '`') || (e.altKey && e.key === 't')) {
         setShowCLI(prev => !prev);
+      }
+      // Alt + C to toggle Crate Gallery
+      if (e.altKey && e.key === 'c') {
+        setShowCrates(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -318,6 +329,53 @@ export default function App() {
       setNotification(`Neural Search: Found ${results.length} semantic matches.`);
     } catch (err) {
       console.error("Cortex Search Failure:", err);
+    }
+  };
+
+  const [showCrates, setShowCrates] = useState(false);
+  const [crates, setCrates] = useState<ContextCrate[]>([]);
+  const [isSavingCrate, setIsSavingCrate] = useState(false);
+
+  const loadCrates = async () => {
+    try {
+      const data = await invokeSafe('get_crates');
+      setCrates(data || []);
+    } catch (err) {
+      console.error("Crates Sync Failure:", err);
+    }
+  };
+
+  const handleSaveCrate = async () => {
+    setIsSavingCrate(true);
+    try {
+      const currentWindows = await invokeSafe('get_running_windows');
+      const suggestedName = await invokeSafe('generate_crate_name', { apps: currentWindows });
+      await invokeSafe('save_crate', { name: suggestedName, apps: currentWindows });
+      setNotification(`Context Manifested: "${suggestedName}" saved.`);
+      loadCrates();
+    } catch (err) {
+      setNotification(`Crate Manifest Fault: ${err}`);
+    } finally {
+      setIsSavingCrate(false);
+    }
+  };
+
+  const handleLaunchCrate = async (id: number) => {
+    try {
+      await invokeSafe('launch_crate', { id });
+      setNotification("Kernel Strategy: Restoring crated environment.");
+      setShowCrates(false);
+    } catch (err) {
+      setNotification(`Deployment Fault: ${err}`);
+    }
+  };
+
+  const handleDeleteCrate = async (id: number) => {
+    try {
+      await invokeSafe('delete_crate', { id });
+      loadCrates();
+    } catch (err) {
+      setNotification(`Purge Fault: ${err}`);
     }
   };
   const [golems, setGolems] = useState<any[]>([]);
@@ -3963,6 +4021,17 @@ export default function App() {
         isOpen={showCLI} 
         onClose={() => setShowCLI(false)} 
         stressColor={founderMetrics.stress_color} 
+      />
+
+      {/* NEURAL WORKSPACE PERSISTENCE (PILLAR 12) */}
+      <CrateGallery
+        isOpen={showCrates}
+        onClose={() => setShowCrates(false)}
+        crates={crates}
+        onLaunch={handleLaunchCrate}
+        onSave={handleSaveCrate}
+        onDelete={handleDeleteCrate}
+        isSaving={isSavingCrate}
       />
     </div>
   );
