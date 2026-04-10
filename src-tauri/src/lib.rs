@@ -60,7 +60,31 @@ static PROPOSAL_REGISTRY: Mutex<HashMap<String, GolemProposal>> = Mutex::new(Has
 
 
 
-struct DbState(Mutex<Connection>);
+#[derive(Clone, Debug)]
+pub struct OasisConfig {
+    pub ollama_url: String,
+    pub broadcast_port: u16,
+    pub neural_engine_endpoint: String,
+}
+
+impl OasisConfig {
+    pub fn load() -> Self {
+        let _ = dotenvy::dotenv(); // Load .env if present
+        Self {
+            ollama_url: std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into()),
+            broadcast_port: std::env::var("BROADCAST_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(4040),
+            neural_engine_endpoint: std::env::var("NEURAL_ENGINE_ENDPOINT").unwrap_or_else(|_| "http://localhost:11434".into()),
+        }
+    }
+}
+
+struct AppState {
+    db: Mutex<Connection>,
+    config: OasisConfig,
+}
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct ContextCrate {
@@ -369,8 +393,9 @@ async fn broadcast_distributed_aura(message: String) -> Result<usize, String> {
 }
 
 #[tauri::command]
-async fn manifest_forge_intent(anomaly_id: String, source: String) -> Result<ForgeManifest, String> {
+async fn manifest_forge_intent(state: tauri::State<'_, AppState>, anomaly_id: String, source: String) -> Result<ForgeManifest, String> {
     let client = reqwest::Client::new();
+    let config = &state.config;
     let prompt = format!(
         "Role: Oasis AI Forge Engine (Gemma-4 Generation).
         Target Anomaly: {} from {}.
@@ -380,7 +405,7 @@ async fn manifest_forge_intent(anomaly_id: String, source: String) -> Result<For
     );
 
     let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(resp) = json["response"].as_str() {
@@ -751,7 +776,7 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
                         });
 
                         // Fire and forget embedding to local LLM
-                        if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&req_body).send() {
+                        if let Ok(res) = client.post(format!("{}/api/embeddings", state.config.ollama_url)).json(&req_body).send() {
                             if let Ok(json) = res.json::<serde_json::Value>() {
                                 if let Some(embedding) = json["embedding"].as_array() {
                                     if let Ok(vector_str) = serde_json::to_string(embedding) {
@@ -778,8 +803,8 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_crate(state: tauri::State<DbState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn save_crate(state: tauri::State<'_, AppState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
 
@@ -792,8 +817,8 @@ fn save_crate(state: tauri::State<DbState>, name: String, description: String, a
 }
 
 #[tauri::command]
-fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String> {
-    let conn = state.0.lock().unwrap();
+fn get_crates(state: tauri::State<'_, AppState>) -> Result<Vec<ContextCrate>, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, name, apps, timestamp FROM context_crates").map_err(|e| e.to_string())?;
     
     let crate_iter = stmt.query_map([], |row| {
@@ -816,13 +841,14 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
 }
 
 #[tauri::command]
-async fn synthesize_crate_aura(apps: Vec<WindowInfo>) -> Result<serde_json::Value, String> {
+async fn synthesize_crate_aura(state: tauri::State<'_, AppState>, apps: Vec<WindowInfo>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
+    let config = &state.config;
     let app_titles: Vec<String> = apps.iter().map(|a| a.title.clone()).collect();
     let prompt = format!("Analyze these open window titles: {}.\n\nReturn a JSON object with:\n1. 'name': A 3-4 word punchy title.\n2. 'description': A one-sentence strategic summary.\n3. 'aura_color': A hex color string that fits the vibe (e.g. emerald for growth, amber for stress, indigo for dev).\n\nRespond ONLY with the JSON object.", app_titles.join(", "));
     
     let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false, "format": "json" });
-    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(suggestion_str) = json["response"].as_str() {
@@ -845,8 +871,8 @@ async fn synthesize_crate_aura(apps: Vec<WindowInfo>) -> Result<serde_json::Valu
 
 
 #[tauri::command]
-fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn launch_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
     
     let apps_json: String = stmt.query_row(params![id], |row| row.get(0)).map_err(|e| e.to_string())?;
@@ -871,8 +897,8 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn export_crate_manifest(state: tauri::State<DbState>, id: i32, target_path: String) -> Result<String, String> {
-    let conn = state.0.lock().unwrap();
+fn export_crate_manifest(state: tauri::State<'_, AppState>, id: i32, target_path: String) -> Result<String, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT name, description, aura_color, apps, timestamp FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
     
     let crate_data: ContextCrate = stmt.query_row(params![id], |row| {
@@ -895,8 +921,8 @@ fn export_crate_manifest(state: tauri::State<DbState>, id: i32, target_path: Str
 }
 
 #[tauri::command]
-fn delete_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn delete_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -924,8 +950,8 @@ fn launch_context_apps(apps: Vec<WindowInfo>) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn log_event(state: tauri::State<DbState>, event_type: String, message: String) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: String) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
 
     conn.execute(
@@ -937,8 +963,8 @@ fn log_event(state: tauri::State<DbState>, event_type: String, message: String) 
 }
 
 #[tauri::command]
-fn oas_save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn oas_save_resume_analysis(state: tauri::State<'_, AppState>, role: String, score: i32) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     conn.execute(
         "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
         [role, score.to_string()],
@@ -947,8 +973,8 @@ fn oas_save_resume_analysis(state: tauri::State<DbState>, role: String, score: i
 }
 
 #[tauri::command]
-fn oas_get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
-    let conn = state.0.lock().unwrap();
+fn oas_get_latest_resume_analysis(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
     let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
     
@@ -971,20 +997,21 @@ pub struct SearchResult {
 }
 
 #[tauri::command]
-async fn search_semantic_nodes(state: tauri::State<'_, DbState>, query: String) -> Result<Vec<SearchResult>, String> {
+async fn search_semantic_nodes(state: tauri::State<'_, AppState>, query: String) -> Result<Vec<SearchResult>, String> {
     let client = reqwest::Client::new();
+    let config = &state.config;
     let req_body = serde_json::json!({
         "model": "nomic-embed-text",
         "prompt": query
     });
     
-    let res = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     let embedding_val = json["embedding"].as_array().ok_or("No embedding in response")?;
     let query_vector: Vec<f32> = embedding_val.iter().map(|v| v.as_f64().unwrap() as f32).collect();
     
-    let conn = state.0.lock().unwrap();
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT filename, filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
     
     let rows = stmt.query_map([], |row| {
@@ -1028,7 +1055,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 #[tauri::command]
-async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<i32, String> {
+async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result<i32, String> {
     let mut files = Vec::new();
     for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file() {
@@ -1057,7 +1084,7 @@ async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<
             "prompt": content
         });
         
-        let res = match client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await {
+        let res = match client.post(format!("{}/api/embeddings", state.config.ollama_url)).json(&req_body).send().await {
             Ok(r) => r,
             Err(_) => continue, // skip if ollama fails
         };
@@ -1069,7 +1096,7 @@ async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<
         
         if let Some(embedding) = json["embedding"].as_array() {
             let vector_str = serde_json::to_string(embedding).unwrap();
-            let conn = state.0.lock().unwrap();
+            let conn = state.db.lock().unwrap();
             let _ = conn.execute(
                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![name, fp, content, vector_str],
@@ -1826,7 +1853,7 @@ async fn manifest_code_module(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn generate_venture_synthesis(state: tauri::State<'_, DbState>, venture_id: String) -> Result<SynthesisReport, String> {
+async fn generate_venture_synthesis(state: tauri::State<'_, AppState>, venture_id: String) -> Result<SynthesisReport, String> {
     let client = reqwest::Client::new();
     
     // 1. GATHER REAL DATA (Fiscal Metrics & Economic Pulse)
@@ -1845,7 +1872,7 @@ async fn generate_venture_synthesis(state: tauri::State<'_, DbState>, venture_id
     );
 
     let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     let raw_response = json["response"].as_str().ok_or("No Golem response")?;
@@ -1905,7 +1932,7 @@ async fn sync_physical_aura(color_hex: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn derive_boardroom_debate(task: String, context: String) -> Result<DebateManifest, String> {
+async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String, context: String) -> Result<DebateManifest, String> {
     let client = reqwest::Client::new();
     let personas = vec![
         ("THE ARCHITECT", "Focus on technical elegance, code debt, and long-term infrastructure stability."),
@@ -1924,7 +1951,7 @@ async fn derive_boardroom_debate(task: String, context: String) -> Result<Debate
         );
 
         let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-        if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await {
+        if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await {
             if let Ok(json) = res.json::<serde_json::Value>().await {
                 if let Some(resp) = json["response"].as_str() {
                     let insight_data: serde_json::Value = serde_json::from_str(resp.trim_matches('`')).unwrap_or(serde_json::json!({
@@ -1952,9 +1979,16 @@ async fn derive_boardroom_debate(task: String, context: String) -> Result<Debate
 }
 
 #[tauri::command]
-async fn invoke_deep_oracle(task: String, context: String) -> Result<serde_json::Value, String> {
+async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, context: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "MOCK_KEY".into());
+    
+    // 1. Attempt to pull from Sentinel Vault first
+    let vault_key = match vault_get_secret(state.clone(), "DEEPSEEK_API_KEY".into(), "OASIS_MASTER_KEY".into()).await {
+        Ok(k) => k,
+        Err(_) => std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "MOCK_KEY".into())
+    };
+    
+    let api_key = vault_key;
     
     if api_key == "MOCK_KEY" {
         return Ok(serde_json::json!({
@@ -2079,14 +2113,15 @@ async fn generate_venture_audit() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Result<serde_json::Value, String> {
+async fn semantic_search(state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
+    let config = &state.config;
     let req_body = serde_json::json!({
         "model": "nomic-embed-text",
         "prompt": query
     });
     
-    let res = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     let query_vector: Vec<f32> = serde_json::from_value(json["embedding"].clone()).unwrap_or_default();
     
@@ -2097,7 +2132,7 @@ async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Res
     let mut results = Vec::new();
     
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.db.lock().unwrap();
         let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").unwrap();
         let rows = stmt.query_map([], |row| {
             Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
@@ -2119,12 +2154,13 @@ async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Res
 }
 
 #[tauri::command]
-async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<String, String> {
+async fn rag_query(state: tauri::State<'_, AppState>, query: String) -> Result<String, String> {
     let client = reqwest::Client::new();
+    let config = &state.config;
     
     // 1. Embed query
     let embed_body = serde_json::json!({ "model": "nomic-embed-text", "prompt": &query });
-    let embed_res = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send().await.map_err(|e| e.to_string())?;
+    let embed_res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&embed_body).send().await.map_err(|e| e.to_string())?;
     let embed_json: serde_json::Value = embed_res.json().await.map_err(|e| e.to_string())?;
     let query_vector: Vec<f32> = serde_json::from_value(embed_json["embedding"].clone()).unwrap_or_default();
     
@@ -2135,7 +2171,7 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
         let mut results: Vec<Match> = Vec::new();
         
         {
-            let conn = state.0.lock().unwrap();
+            let conn = state.db.lock().unwrap();
             let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").unwrap();
             let rows = stmt.query_map([], |row| {
                 Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
@@ -2166,7 +2202,7 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
 
     // 4. Generate Semantic Response via Gemma3
     let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": final_prompt, "stream": false });
-    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(response) = json["response"].as_str() {
@@ -2177,9 +2213,9 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
 }
 
 #[tauri::command]
-async fn check_ai_status() -> Result<serde_json::Value, String> {
+async fn check_ai_status(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let res = client.get("http://localhost:11434/api/tags").send().await.map_err(|e| e.to_string())?;
+    let res = client.get(format!("{}/api/tags", state.config.ollama_url)).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     let models = json["models"].as_array().ok_or("Invalid Ollama response")?;
@@ -2197,7 +2233,7 @@ async fn check_ai_status() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn execute_neural_intent(state: tauri::State<'_, DbState>, query: String) -> Result<serde_json::Value, String> {
+async fn execute_neural_intent(state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     
     // 1. Semantic Intent Retrieval (RAG)
@@ -2225,7 +2261,7 @@ async fn execute_neural_intent(state: tauri::State<'_, DbState>, query: String) 
     );
     
     let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post("http://localhost:11434/api/generate").json(&body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     let ai_response = json["response"].as_str().unwrap_or("Thinking...").to_string();
 
@@ -2289,7 +2325,7 @@ fn execute_neural_command(command: String) -> Result<String, String> {
 
 
 #[tauri::command]
-async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+async fn get_neural_graph(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     #[derive(serde::Serialize)]
     struct Node { id: String, group: String, val: f32 }
     #[derive(serde::Serialize)]
@@ -2307,7 +2343,7 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
 
     // 2. Fetch File Embeddings
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.db.lock().unwrap();
         let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 40").unwrap();
         let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).unwrap();
         for row in rows.flatten() {
@@ -2337,8 +2373,8 @@ async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json
 }
 
 #[tauri::command]
-async fn get_neural_brief(state: tauri::State<'_, DbState>, filename: String) -> Result<String, String> {
-    let conn = state.0.lock().unwrap();
+async fn get_neural_brief(state: tauri::State<'_, AppState>, filename: String) -> Result<String, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT content FROM file_embeddings WHERE filename = ? LIMIT 1").map_err(|e| e.to_string())?;
     let content: String = stmt.query_row([filename], |row| row.get(0)).map_err(|e| e.to_string())?;
     
@@ -2347,13 +2383,13 @@ async fn get_neural_brief(state: tauri::State<'_, DbState>, filename: String) ->
 }
 
 #[tauri::command]
-async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+async fn get_all_files(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     #[derive(serde::Serialize)]
     struct FileEntry { id: i32, filename: String, filepath: String, snippet: String }
     let mut entries = Vec::new();
 
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.db.lock().unwrap();
         let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").unwrap();
         let rows = stmt.query_map([], |row| Ok((
             row.get::<_, i32>(0)?,
@@ -2411,7 +2447,7 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn execute_neural_commission(state: tauri::State<'_, DbState>, task: String, agent_id: String) -> Result<PendingManifest, String> {
+async fn execute_neural_commission(state: tauri::State<'_, AppState>, task: String, agent_id: String) -> Result<PendingManifest, String> {
    // 1. Log the starting pulse of the Neural Workhorse
    let _ = log_strategic_pulse(state.clone(), format!("task_start_{}", agent_id), "amber".into());
    
@@ -2429,7 +2465,7 @@ async fn execute_neural_commission(state: tauri::State<'_, DbState>, task: Strin
    
    let client = reqwest::Client::new();
    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-   let res = client.post("http://localhost:11434/api/generate").json(&body).send().await.map_err(|e| e.to_string())?;
+   let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
    
    let resp_str = json["response"].as_str().unwrap_or("{}");
@@ -2458,7 +2494,7 @@ async fn execute_neural_commission(state: tauri::State<'_, DbState>, task: Strin
 #[tauri::command]
 async fn release_golem_workforce(
     app: tauri::AppHandle,
-    state: tauri::State<'_, DbState>,
+    state: tauri::State<'_, AppState>,
     agent_id: String,
     agent_name: String,
     target_path: String,
@@ -2475,7 +2511,8 @@ async fn release_golem_workforce(
     });
     drop(registry);
 
-    let state_clone = state.0.lock().unwrap().path().map(|p| p.to_string()).unwrap_or_default();
+    let state_clone = state.db.lock().unwrap().path().map(|p| p.to_string()).unwrap_or_default();
+    let config_clone = state.config.clone();
     let task_id_clone = task_id.clone();
     let agent_name_clone = agent_name.clone();
     let path_clone = target_path.clone();
@@ -2483,7 +2520,6 @@ async fn release_golem_workforce(
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
-            // 1. Read existing content
             let original_content = std::fs::read_to_string(&path_clone).unwrap_or_default();
             
             // 2. Update status
@@ -2504,7 +2540,7 @@ async fn release_golem_workforce(
             let client = reqwest::Client::new();
             let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
             
-            if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send().await {
+            if let Ok(res) = client.post(format!("{}/api/generate", config_clone.ollama_url)).json(&body).send().await {
                 if let Ok(json) = res.json::<serde_json::Value>().await {
                     let resp_str = json["response"].as_str().unwrap_or("{}");
                     let clean_json = if resp_str.contains("```json") {
@@ -2577,8 +2613,8 @@ async fn resolve_golem_proposal(proposal_id: String, action: String) -> Result<S
 }
 
 #[tauri::command]
-fn log_strategic_pulse(state: tauri::State<'_, DbState>, node_id: String, status: String) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, status: String) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
     let _ = conn.execute(
         "INSERT INTO strategic_pulses (node_id, status, timestamp) VALUES (?1, ?2, ?3)",
@@ -2588,8 +2624,8 @@ fn log_strategic_pulse(state: tauri::State<'_, DbState>, node_id: String, status
 }
 
 #[tauri::command]
-fn get_venture_integrity(state: tauri::State<'_, DbState>) -> Result<f32, String> {
-    let conn = state.0.lock().unwrap();
+fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = match conn.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
         Ok(s) => s,
         Err(_) => return Ok(100.0),
@@ -2603,8 +2639,8 @@ fn get_venture_integrity(state: tauri::State<'_, DbState>) -> Result<f32, String
 }
 
 #[tauri::command]
-fn get_fiscal_report(state: tauri::State<'_, DbState>) -> Result<FiscalReport, String> {
-    let conn = state.0.lock().unwrap();
+fn get_fiscal_report(state: tauri::State<'_, AppState>) -> Result<FiscalReport, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = match conn.prepare("SELECT SUM(cost), SUM(tokens) FROM compute_ledger") {
         Ok(s) => s,
         Err(_) => return Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() }),
@@ -2630,8 +2666,8 @@ fn internal_log_compute(conn: &rusqlite::Connection, tokens: i64, cost: f32) {
 }
 
 #[tauri::command]
-fn log_compute_pulse(state: tauri::State<'_, DbState>, tokens: i64, cost: f32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+fn log_compute_pulse(state: tauri::State<'_, AppState>, tokens: i64, cost: f32) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     internal_log_compute(&conn, tokens, cost);
     Ok(())
 }
@@ -2828,8 +2864,8 @@ fn get_nearby_projects() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
-    let conn = state.0.lock().unwrap();
+fn get_logs(state: tauri::State<'_, AppState>) -> Result<Vec<NeuralLog>, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
     
     let log_iter = stmt.query_map([], |row| {
@@ -2864,7 +2900,7 @@ async fn capture_screenshot() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn analyze_work_context() -> Result<String, String> {
+async fn analyze_work_context(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let screenshot_b64 = capture_screenshot().await?;
     let client = reqwest::Client::new();
     
@@ -2876,7 +2912,7 @@ async fn analyze_work_context() -> Result<String, String> {
         "stream": false
     });
 
-    if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send().await {
+    if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await {
         if let Ok(json) = res.json::<serde_json::Value>().await {
             if let Some(resp) = json["response"].as_str() {
                 return Ok(resp.trim().to_string());
@@ -2921,8 +2957,8 @@ async fn update_golem_task(id: String, status: String, progress: f32) -> Result<
 }
 
 #[tauri::command]
-async fn pin_context(state: tauri::State<'_, DbState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
-    let conn = state.0.lock().unwrap();
+async fn pin_context(state: tauri::State<'_, AppState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
+    let conn = state.db.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
     conn.execute(
         "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
@@ -2932,8 +2968,8 @@ async fn pin_context(state: tauri::State<'_, DbState>, name: String, state_blob:
 }
 
 #[tauri::command]
-async fn get_pinned_contexts(state: tauri::State<'_, DbState>) -> Result<Vec<PinnedContext>, String> {
-    let conn = state.0.lock().unwrap();
+async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<PinnedContext>, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([], |row| {
         Ok(PinnedContext {
@@ -2951,8 +2987,8 @@ async fn get_pinned_contexts(state: tauri::State<'_, DbState>) -> Result<Vec<Pin
 }
 
 #[tauri::command]
-async fn get_neural_logs(state: tauri::State<'_, DbState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let conn = state.0.lock().unwrap();
+async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
+    let conn = state.db.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT ?1").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([limit], |row| {
         Ok(serde_json::json!({
@@ -2969,15 +3005,87 @@ async fn get_neural_logs(state: tauri::State<'_, DbState>, limit: i32) -> Result
 }
 
 #[tauri::command]
-async fn delete_pinned_context(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
+    let conn = state.db.lock().unwrap();
     conn.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-async fn seek_chronos(state: tauri::State<'_, DbState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let conn = state.0.lock().unwrap();
+fn vault_derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, 100_000, &mut key);
+    key
+}
+
+#[tauri::command]
+async fn vault_store_secret(
+    state: tauri::State<'_, AppState>,
+    name: String,
+    value: String,
+    master_key: String,
+) -> Result<(), String> {
+    let mut salt = [0u8; 16];
+    let mut nonce_bytes = [0u8; 12];
+    use aes_gcm::aead::OsRng;
+    use aes_gcm::aead::rand_core::RngCore;
+    OsRng.fill_bytes(&mut salt);
+    OsRng.fill_bytes(&mut nonce_bytes);
+
+    let encryption_key_bytes = vault_derive_key(&master_key, &salt);
+    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&encryption_key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher.encrypt(nonce, value.as_bytes()).map_err(|e| format!("Encryption failure: {}", e))?;
+    
+    let conn = state.db.lock().unwrap();
+    let timestamp = chrono::Local::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT OR REPLACE INTO system_secrets (name, secret_blob, nonce, salt, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![name, ciphertext, nonce_bytes.to_vec(), salt.to_vec(), timestamp],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn vault_get_secret(
+    state: tauri::State<'_, AppState>,
+    name: String,
+    master_key: String,
+) -> Result<String, String> {
+    let conn = state.db.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT secret_blob, nonce, salt FROM system_secrets WHERE name = ?1").map_err(|e| e.to_string())?;
+    
+    let (ciphertext, nonce_bytes, salt): (Vec<u8>, Vec<u8>, Vec<u8>) = stmt.query_row([name], |row| {
+        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+    }).map_err(|e| format!("Secret not found or access denied: {}", e))?;
+
+    let encryption_key_bytes = vault_derive_key(&master_key, &salt);
+    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&encryption_key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let plaintext = cipher.decrypt(nonce, ciphertext.as_slice()).map_err(|e| format!("Decryption failure: {}", e))?;
+    String::from_utf8(plaintext).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn vault_list_secrets(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
+    let conn = state.db.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT name FROM system_secrets").map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| e.to_string())?;
+    
+    let mut names = Vec::new();
+    for r in rows { names.push(r.map_err(|e| e.to_string())?); }
+    Ok(names)
+}
+
+#[tauri::command]
+async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
+    let conn = state.db.lock().unwrap();
     // High-Fidelity Neural Search across logs and contexts
     let mut results = Vec::new();
     
@@ -3023,7 +3131,7 @@ async fn seek_chronos(state: tauri::State<'_, DbState>, query: String, limit: i3
 }
 
 #[tauri::command]
-async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
+async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
         "model": "llava",
@@ -3032,7 +3140,7 @@ async fn query_vision(image_base64: String, prompt: String) -> Result<String, St
         "stream": false
     });
 
-    let res = client.post("http://localhost:11434/api/generate")
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
         .json(&body)
         .send()
         .await
@@ -3193,7 +3301,7 @@ async fn get_documentation_chapter(id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn manifest_temporal_log(metrics: serde_json::Value) -> Result<String, String> {
+async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde_json::Value) -> Result<String, String> {
     let client = reqwest::Client::new();
     let prompt = format!(
         "Role: Oasis AI Oracle (Gemma-4 Synthesis).
@@ -3205,7 +3313,7 @@ async fn manifest_temporal_log(metrics: serde_json::Value) -> Result<String, Str
     );
 
     let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(resp) = json["response"].as_str() {
@@ -3307,8 +3415,20 @@ pub fn run() {
         [],
     ).expect("failed to create pinned_contexts table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS system_secrets (
+            name TEXT PRIMARY KEY,
+            secret_blob BLOB NOT NULL,
+            nonce BLOB NOT NULL,
+            salt BLOB NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create system_secrets table");
+
+    let config = OasisConfig::load();
     tauri::Builder::default()
-        .manage(DbState(std::sync::Mutex::new(conn)))
+        .manage(AppState { db: std::sync::Mutex::new(conn), config })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
@@ -3438,6 +3558,9 @@ pub fn run() {
             broadcast_distributed_aura,
             capture_chronos_snapshot,
             seek_chronos_history,
+            vault_store_secret,
+            vault_get_secret,
+            vault_list_secrets,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

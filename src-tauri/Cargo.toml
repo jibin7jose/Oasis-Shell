@@ -39,4 +39,5 @@ aead = "0.5.2"
 pbkdf2 = { version = "0.12.2", features = ["simple"] }
 hmac = "0.12.1"
 sha2 = "0.10.6"
+dotenvy = "0.15"
 
