@@ -1904,6 +1904,68 @@ async fn derive_boardroom_debate(task: String, context: String) -> Result<Debate
 }
 
 #[tauri::command]
+async fn invoke_deep_oracle(task: String, context: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let api_key = std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "MOCK_KEY".into());
+    
+    if api_key == "MOCK_KEY" {
+        return Ok(serde_json::json!({
+            "thought_trace": "Analyzing venture stress vectors... [OK]\nCross-referencing market momentum with burn rate... [OK]\nSynthesizing optimal strategic shift... [READY]",
+            "advice": "Founders should immediately decouple infrastructure burn from short-term growth goals to extend runway into the next fiscal cycle.",
+            "status": "NOMINAL"
+        }));
+    }
+
+    let body = serde_json::json!({
+        "model": "deepseek-reasoner",
+        "messages": [
+            { "role": "system", "content": "You are the Deep-Oracle, the final strategic arbiter of the Oasis Shell. Analyze startup tasks with deep reasoning." },
+            { "role": "user", "content": format!("Task: {}. Context: {}. Respond with a JSON object containing 'thought_trace' (your reasoning process) and 'advice' (your final directive).", task, context) }
+        ],
+        "response_format": { "type": "json_object" }
+    });
+
+    let res = client.post("https://api.deepseek.com/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let choice = &json["choices"][0]["message"];
+    let thought = choice["reasoning_content"].as_str().unwrap_or("Neural synthesis in progress...");
+    let content_str = choice["content"].as_str().unwrap_or("{}");
+    let content_json: serde_json::Value = serde_json::from_str(content_str).unwrap_or_default();
+
+    Ok(serde_json::json!({
+        "thought_trace": thought,
+        "advice": content_json["advice"].as_str().unwrap_or(&content_str),
+        "status": "ORACLE_MANIFESTED"
+    }))
+}
+
+#[tauri::command]
+async fn generate_strategic_report(summary: String, oracle_advice: String) -> Result<String, String> {
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let report = format!(
+        "# OASIS SHELL // STRATEGIC SYNTHESIS REPORT\n\
+        Generated: {}\n\n\
+        ## Boardroom Consensus Summary\n\
+        {}\n\n\
+        ## Deep-Oracle Directive\n\
+        {}\n\n\
+        ---\n\
+        *This report is signed by the Oasis Shell Neural Kernel.*",
+        timestamp, summary, oracle_advice
+    );
+
+    let path = format!("strategic_report_{}.md", chrono::Local::now().timestamp());
+    std::fs::write(&path, &report).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
+#[tauri::command]
 async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, String> {
     let base_folders = vec!["vault", "manifested"];
     let db_file = "src-tauri/oasis_crates.db";
@@ -3250,6 +3312,8 @@ pub fn run() {
             generate_venture_audit,
             analyze_work_context,
             get_neural_brief,
+            invoke_deep_oracle,
+            generate_strategic_report,
             get_neural_wisdom,
             trigger_oracle_audit,
             get_neural_workforce,

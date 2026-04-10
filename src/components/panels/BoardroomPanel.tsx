@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote } from 'lucide-react';
+import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2 } from 'lucide-react';
 import { invoke } from "@tauri-apps/api/core";
 
 interface BoardroomPanelProps {
@@ -13,6 +13,9 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [debate, setDebate] = useState<any>(null);
   const [activePersona, setActivePersona] = useState(0);
+  const [oracleData, setOracleData] = useState<any>(null);
+  const [isSummoning, setIsSummoning] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const triggerDebate = async () => {
     setIsSynthesizing(true);
@@ -25,6 +28,38 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
       console.error("Boardroom Breach", e);
     } finally {
       setIsSynthesizing(false);
+    }
+  };
+
+  const summonOracle = async () => {
+    setIsSummoning(true);
+    try {
+      const task = "Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.";
+      const context = JSON.stringify({ ...metrics, boardroom_consensus: debate?.summary });
+      const res = await invoke("invoke_deep_oracle", { task, context });
+      setOracleData(res);
+      setActivePersona(99); // Magic index for Oracle
+    } catch (e) {
+      console.error("Oracle Summoning Failed", e);
+    } finally {
+      setIsSummoning(false);
+    }
+  };
+
+  const manifestReport = async () => {
+    if (!debate) return;
+    setIsExporting(true);
+    try {
+      const path = await invoke("generate_strategic_report", { 
+        summary: debate.summary, 
+        oracleAdvice: oracleData?.advice || "No Oracle directive present." 
+      }) as string;
+      console.log("Strategic Report Manifested at:", path);
+      // In a real app, we might trigger a download or show a file link
+    } catch (e) {
+      console.error("Report Manifestation Failed", e);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -87,6 +122,27 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                 </div>
               )}
 
+              {debate && (
+                <button
+                  onClick={oracleData ? () => setActivePersona(99) : summonOracle}
+                  disabled={isSummoning}
+                  className={`p-6 rounded-3xl border transition-all flex flex-col gap-3 group relative overflow-hidden ${activePersona === 99 ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.2)]' : 'bg-white/5 border-transparent opacity-60 hover:opacity-100'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">The Deep-Oracle</span>
+                    {isSummoning ? <Loader2 className="w-4 h-4 text-purple-400 animate-spin" /> : <Brain className="w-4 h-4 text-purple-400" />}
+                  </div>
+                  <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest leading-none">
+                    {oracleData ? "REASONING MANIFESTED" : "SUMMON CLOUD ORACLE"}
+                  </p>
+                  
+                  {activePersona === 99 && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent pointer-events-none" />
+                  )}
+                </button>
+              )}
+
+
               <button 
                 onClick={triggerDebate}
                 disabled={isSynthesizing}
@@ -96,10 +152,10 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
               </button>
            </aside>
 
-           {/* Main Hub: The Insight */}
+            {/* Main Hub: The Insight */}
            <main className="flex-1 p-16 overflow-y-auto custom-scrollbar relative">
               <AnimatePresence mode="wait">
-                 {debate ? (
+                 {debate && activePersona !== 99 ? (
                    <motion.div 
                      key={activePersona}
                      initial={{ opacity: 0, x: 20 }}
@@ -112,36 +168,70 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                          <h3 className="text-5xl font-black text-white uppercase tracking-tighter">Strategic Advice</h3>
                       </div>
 
-                      <p className="text-3xl text-slate-300 font-medium leading-relaxed italic border-l-8 border-white/10 pl-12 py-6">
+                      <p className="text-3xl text-slate-300 font-medium leading-relaxed italic border-l-8 border-white/10 pl-12 py-6 text-left">
                         "{debate.insights[activePersona].advice}"
                       </p>
 
                       <div className="grid grid-cols-2 gap-10">
-                         <div className="p-10 rounded-[3rem] bg-rose-500/5 border border-rose-500/10 space-y-4">
+                         <div className="p-10 rounded-[3rem] bg-rose-500/5 border border-rose-500/10 space-y-4 shadow-xl">
                             <div className="flex items-center gap-3 text-rose-400">
                                <ShieldAlert className="w-6 h-6" />
                                <span className="text-xs font-black uppercase tracking-[0.3em]">Risk Probability</span>
                             </div>
                             <div className="text-6xl font-black text-white">{(debate.insights[activePersona].risk * 100).toFixed(0)}%</div>
-                            <p className="text-[10px] text-rose-500/60 uppercase font-black tracking-widest leading-relaxed">System-Level instability detected for this strategic vector.</p>
+                            <p className="text-[10px] text-rose-500/60 uppercase font-black tracking-widest leading-relaxed text-left">System-Level instability detected for this strategic vector.</p>
                          </div>
 
-                         <div className="p-10 rounded-[3rem] bg-indigo-500/5 border border-indigo-500/10 space-y-4">
+                         <div className="p-10 rounded-[3rem] bg-indigo-500/5 border border-indigo-500/10 space-y-4 shadow-xl">
                             <div className="flex items-center gap-3 text-indigo-400">
                                <Zap className="w-6 h-6" />
                                <span className="text-xs font-black uppercase tracking-[0.3em]">Neural Resonance</span>
                             </div>
                             <div className="text-6xl font-black text-white">{debate.insights[activePersona].score}</div>
-                            <p className="text-[10px] text-indigo-500/60 uppercase font-black tracking-widest leading-relaxed">Persona alignment score based on current kernel telemetry.</p>
+                            <p className="text-[10px] text-indigo-500/60 uppercase font-black tracking-widest leading-relaxed text-left">Persona alignment score based on current kernel telemetry.</p>
                          </div>
                       </div>
 
                       <section className="p-12 glass-bright rounded-[3.5rem] border-white/5">
                          <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Concensus Summary</h4>
-                         <p className="text-xl text-white font-black uppercase tracking-tighter leading-snug">
+                         <p className="text-xl text-white font-black uppercase tracking-tighter leading-snug text-left">
                            {debate.summary}
                          </p>
                       </section>
+                   </motion.div>
+                 ) : activePersona === 99 && oracleData ? (
+                   <motion.div 
+                     key="oracle"
+                     initial={{ opacity: 0, scale: 0.98 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     className="space-y-12"
+                   >
+                      <div className="flex items-center gap-4">
+                         <div className="w-1.5 h-10 bg-purple-500 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
+                         <h3 className="text-5xl font-black text-white uppercase tracking-tighter">Oracle Synthesis</h3>
+                      </div>
+
+                      <div className="space-y-4">
+                         <div className="flex items-center gap-3 text-purple-400">
+                            <ScrollText className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Neural Thought Trace (Chain of Thought)</span>
+                         </div>
+                         <div className="p-10 glass-dark rounded-[2.5rem] border-purple-500/20 max-h-64 overflow-y-auto custom-scrollbar font-mono text-[11px] leading-relaxed text-purple-200/60 lowercase italic text-left">
+                            {oracleData.thought_trace}
+                         </div>
+                      </div>
+
+                      <div className="space-y-6">
+                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Final Strategic Directive</h4>
+                         <p className="text-4xl text-white font-medium leading-tight border-l-8 border-purple-500/30 pl-12 py-6 text-left">
+                           "{oracleData.advice}"
+                         </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-6 bg-purple-500/5 border border-purple-500/10 rounded-2xl">
+                         <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                         <span className="text-[9px] font-black text-purple-400 uppercase tracking-[0.4em]">Hybrid Reasoning Synergy: STABLE</span>
+                      </div>
                    </motion.div>
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center gap-8 text-center">
@@ -158,11 +248,32 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
 
         {/* Footer */}
         <footer className="px-12 py-6 border-t border-white/5 bg-white/[0.01] flex items-center justify-between relative z-10">
-           <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Gemma-4 Multi-Agent Synthesis: ACTIVE</span>
+           <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Gemma-4 Synthesis: ACTIVE</span>
+              </div>
+              {oracleData && (
+                <div className="flex items-center gap-3">
+                   <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                   <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">Deep-Oracle Sync: NOMINAL</span>
+                </div>
+              )}
            </div>
-           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.4em]">Strategic Directive Layer // Locked To Founder Signature</p>
+
+           <div className="flex items-center gap-4">
+              {debate && (
+                <button 
+                  onClick={manifestReport}
+                  disabled={isExporting}
+                  className="flex items-center gap-3 px-6 py-2 bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/30 rounded-full transition-all group"
+                >
+                  {isExporting ? <Loader2 className="w-3 h-3 text-emerald-400 animate-spin" /> : <Download className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform" />}
+                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Manifest Strategic Report</span>
+                </button>
+              )}
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.4em]">Strategic Directive Layer // Locked To Founder Signature</p>
+           </div>
         </footer>
       </div>
     </motion.div>
