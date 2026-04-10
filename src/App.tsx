@@ -18,6 +18,7 @@ import RightRail from "./components/layout/RightRail";
 import BoardroomPanel from "./components/panels/BoardroomPanel";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CortexLog from "./components/panels/CortexLog";
+import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
@@ -203,6 +204,8 @@ export default function App() {
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showDocs, setShowDocs] = useState(false);
   const [showBoardroom, setShowBoardroom] = useState(false);
+  const [showWorkforce, setShowWorkforce] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -1981,6 +1984,28 @@ export default function App() {
     playPulse(100 + (node.val || 10) * 20);
     setNotification(`Cortex: Synchronizing with node "${node.id}"...`);
     
+    // Commission Golem Option for files
+    if (node.filepath) {
+        setPendingPermission({
+            key: "process_control",
+            label: `Release Autonomous Golem to ${node.id}?`,
+            action: async () => {
+                try {
+                    await invoke('release_golem_workforce', {
+                        agentId: "ARCHITECT_01",
+                        agentName: "Neural Architect",
+                        targetPath: node.filepath,
+                        directive: "Refactor this module for high performance and temporal stability."
+                    });
+                    setNotification(`Workforce: Golem released to ${node.id}.`);
+                    setShowWorkforce(true);
+                } catch (e) {
+                    console.error("Golem release failed", e);
+                }
+            }
+        });
+    }
+
     // Smooth kinematic zoom
     if (fgRef.current) {
       const distance = 120;
@@ -2370,6 +2395,7 @@ export default function App() {
         onOpenGraph={() => setShowGraph(true)}
         onOpenVault={() => setShowSentinel(true)}
         onOpenBoardroom={() => setShowBoardroom(true)}
+        onOpenWorkforce={() => setShowWorkforce(true)}
         onOpenLogs={() => setShowLogs(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
@@ -2609,6 +2635,11 @@ export default function App() {
                 isOpen={showBoardroom}
                 onClose={() => setShowBoardroom(false)}
                 metrics={{ ARR: founderMetrics.arr, Growth: founderMetrics.momentum, Integrity: ventureIntegrity, Efficiency: 0.94 }}
+              />
+
+              <WorkforcePanel
+                isOpen={showWorkforce}
+                onClose={() => setShowWorkforce(false)}
               />
 
               <DocumentationPanel

@@ -43,6 +43,22 @@ pub struct GolemTask {
 
 static GOLEM_REGISTRY: Mutex<HashMap<String, GolemTask>> = Mutex::new(HashMap::new());
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GolemProposal {
+    pub id: String,
+    pub task_id: String,
+    pub agent_name: String,
+    pub file_path: String,
+    pub title: String,
+    pub original_content: String,
+    pub proposed_content: String,
+    pub rationale: String,
+    pub status: String, // "pending", "merged", "discarded"
+}
+
+static PROPOSAL_REGISTRY: Mutex<HashMap<String, GolemProposal>> = Mutex::new(HashMap::new());
+
+
 
 struct DbState(Mutex<Connection>);
 
@@ -2327,6 +2343,127 @@ async fn execute_neural_commission(state: tauri::State<'_, DbState>, task: Strin
        rationale: parsed["rationale"].as_str().unwrap_or("Autonomous Neural Manifestation").to_string(),
        code_draft: parsed["code"].as_str().unwrap_or(resp_str).to_string(),
    })
+}
+
+#[tauri::command]
+async fn release_golem_workforce(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DbState>,
+    agent_id: String,
+    agent_name: String,
+    target_path: String,
+    directive: String,
+) -> Result<String, String> {
+    let task_id = format!("GOLEM_{}", chrono::Local::now().timestamp());
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    registry.insert(task_id.clone(), GolemTask {
+        id: task_id.clone(),
+        name: format!("{} [{}]", agent_name, target_path.split('\\').last().unwrap_or(&target_path)),
+        status: "Neural Initialization...".into(),
+        progress: 0.0,
+        aura: "amber".into(),
+    });
+    drop(registry);
+
+    let state_clone = state.0.lock().unwrap().path().map(|p| p.to_string()).unwrap_or_default();
+    let task_id_clone = task_id.clone();
+    let agent_name_clone = agent_name.clone();
+    let path_clone = target_path.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            // 1. Read existing content
+            let original_content = std::fs::read_to_string(&path_clone).unwrap_or_default();
+            
+            // 2. Update status
+            {
+                let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                if let Some(task) = registry.get_mut(&task_id_clone) {
+                    task.status = "Analyzing Logic...".into();
+                    task.progress = 0.2;
+                }
+            }
+
+            // 3. Construct prompt & call Ollama
+            let prompt = format!(
+                "You are an Oasis Neural Golem (Agent: {}). Objective: {}. File: {}. Content: {}. Respond ONLY in JSON: {{ \"rationale\": \"EXPLAIN\", \"code\": \"NEW_CONTENT\" }}",
+                agent_name_clone, directive, path_clone, original_content
+            );
+
+            let client = reqwest::Client::new();
+            let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+            
+            if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send().await {
+                if let Ok(json) = res.json::<serde_json::Value>().await {
+                    let resp_str = json["response"].as_str().unwrap_or("{}");
+                    let clean_json = if resp_str.contains("```json") {
+                        resp_str.split("```json").nth(1).unwrap().split("```").next().unwrap().trim()
+                    } else { resp_str };
+
+                    let parsed: serde_json::Value = serde_json::from_str(clean_json).unwrap_or(serde_json::json!({
+                        "rationale": "Autonomous strategic refactor initiated.",
+                        "code": resp_str
+                    }));
+
+                    // 4. Register Proposal
+                    let proposal_id = format!("PROP_{}", chrono::Local::now().timestamp());
+                    let mut prop_registry = PROPOSAL_REGISTRY.lock().unwrap();
+                    prop_registry.insert(proposal_id.clone(), GolemProposal {
+                        id: proposal_id,
+                        task_id: task_id_clone.clone(),
+                        agent_name: agent_name_clone,
+                        file_path: path_clone,
+                        title: directive,
+                        original_content,
+                        proposed_content: parsed["code"].as_str().unwrap_or("").to_string(),
+                        rationale: parsed["rationale"].as_str().unwrap_or("").to_string(),
+                        status: "pending".into(),
+                    });
+
+                    // 5. Finalize Task
+                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                    if let Some(task) = registry.get_mut(&task_id_clone) {
+                        task.status = "Proposal Manifested".into();
+                        task.progress = 1.0;
+                        task.aura = "emerald".into();
+                    }
+                }
+            }
+        });
+    });
+
+    Ok(task_id)
+}
+
+#[tauri::command]
+async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
+    let registry = PROPOSAL_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
+async fn resolve_golem_proposal(proposal_id: String, action: String) -> Result<String, String> {
+    let mut prop_registry = PROPOSAL_REGISTRY.lock().unwrap();
+    if let Some(prop) = prop_registry.get_mut(&proposal_id) {
+        if action == "merge" {
+            std::fs::write(&prop.file_path, &prop.proposed_content).map_err(|e| e.to_string())?;
+            prop.status = "merged".into();
+            
+            // Cleanup task
+            let mut task_registry = GOLEM_REGISTRY.lock().unwrap();
+            task_registry.remove(&prop.task_id);
+            
+            Ok("Neural PR Merged Successfully.".into())
+        } else {
+            prop.status = "discarded".into();
+            let mut task_registry = GOLEM_REGISTRY.lock().unwrap();
+            task_registry.remove(&prop.task_id);
+            Ok("Neural PR Discarded.".into())
+        }
+    } else {
+        Err("Proposal not found".into())
+    }
 }
 
 #[tauri::command]

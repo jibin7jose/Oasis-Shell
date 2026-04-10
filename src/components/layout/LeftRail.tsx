@@ -17,6 +17,7 @@ interface LeftRailProps {
   onOpenSettings: () => void;
   onOpenDocs: () => void;
   onOpenBoardroom: () => void;
+  onOpenWorkforce: () => void;
   onSnapshot: () => void;
   chronosIndex: number;
   chronosCount: number;
@@ -44,6 +45,7 @@ export default function LeftRail({
   onOpenSettings,
   onOpenDocs,
   onOpenBoardroom,
+  onOpenWorkforce,
   onSnapshot,
   chronosIndex,
   chronosCount,
@@ -80,7 +82,9 @@ export default function LeftRail({
           { id: "timeline", icon: History, label: "Timeline", action: () => onViewChange("timeline") },
           { id: "graph", icon: BrainCircuit, label: "Cortex", action: onOpenGraph },
           { id: "vault", icon: FolderOpen, label: "Vault", action: onOpenVault },
-          { id: "logs", icon: Activity, label: "Pulse", action: onOpenLogs },
+          { id: 'boardroom', icon: MessageSquareQuote, label: 'Strategic Consensus', action: onOpenBoardroom },
+          { id: 'workforce', icon: Users, label: 'Neural Workforce', action: onOpenWorkforce },
+          { id: 'logs', icon: Activity, label: 'Temporal Logs', action: onOpenLogs },
           { id: "zenith", icon: ShieldCheck, label: "Focus", action: onActivateZenith },
         ].map((item) => (
           <button
