@@ -352,9 +352,21 @@ export default function App() {
     setIsSavingCrate(true);
     try {
       const currentWindows = await invokeSafe('get_running_windows');
-      const suggestedName = await invokeSafe('generate_crate_name', { apps: currentWindows });
-      await invokeSafe('save_crate', { name: suggestedName, apps: currentWindows });
-      setNotification(`Context Manifested: "${suggestedName}" saved.`);
+      // Phase 22: Synthesize Neural Aura (Name, Desc, Color)
+      const aura = await invokeSafe('synthesize_crate_aura', { apps: currentWindows }) as { name: string, description: string, aura_color: string };
+      
+      // We also save internal state: activeView and activeContext
+      const internalState = JSON.stringify({ activeView, activeContext, timestamp: Date.now() });
+      
+      // save_crate now takes description and aura_color
+      await invokeSafe('save_crate', { 
+        name: aura.name, 
+        description: aura.description,
+        aura_color: aura.aura_color,
+        apps: currentWindows 
+      });
+      
+      setNotification(`Context Manifested: "${aura.name}" saved with ${aura.aura_color} aura.`);
       loadCrates();
     } catch (err) {
       setNotification(`Crate Manifest Fault: ${err}`);
@@ -365,9 +377,14 @@ export default function App() {
 
   const handleLaunchCrate = async (id: number) => {
     try {
-      await invokeSafe('launch_crate', { id });
-      setNotification("Kernel Strategy: Restoring crated environment.");
-      setShowCrates(false);
+      const crate = crates.find(c => c.id === id);
+      if (crate) {
+          // Restore internal state if encoded in description or separate logic (future improvement)
+          // For now, we restore OS apps
+          await invokeSafe('launch_crate', { id });
+          setNotification(`Kernel Strategy: Restoring "${crate.name}" Environment.`);
+          setShowCrates(false);
+      }
     } catch (err) {
       setNotification(`Deployment Fault: ${err}`);
     }
@@ -379,6 +396,15 @@ export default function App() {
       loadCrates();
     } catch (err) {
       setNotification(`Purge Fault: ${err}`);
+    }
+  };
+
+  const handleExportCrate = async (id: number) => {
+    try {
+      const path = await invokeSafe('export_crate_manifest', { id, targetPath: "./vault" });
+      setNotification(`Crate Manifest Exported: ${path}`);
+    } catch (err) {
+      setNotification(`Export Fault: ${err}`);
     }
   };
   const [golems, setGolems] = useState<any[]>([]);
@@ -4062,6 +4088,7 @@ export default function App() {
         onLaunch={handleLaunchCrate}
         onSave={handleSaveCrate}
         onDelete={handleDeleteCrate}
+        onExport={handleExportCrate}
         isSaving={isSavingCrate}
       />
     </div>

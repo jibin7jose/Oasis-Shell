@@ -7,6 +7,8 @@ import { WindowInfo } from './SystemPanel';
 export interface ContextCrate {
   id?: number;
   name: string;
+  description: string;
+  aura_color: string;
   apps: string; // JSON string of WindowInfo[]
   timestamp: string;
 }
@@ -18,6 +20,7 @@ interface CrateGalleryProps {
   onLaunch: (id: number) => void;
   onSave: () => void;
   onDelete: (id: number) => void;
+  onExport: (id: number) => void;
   isSaving?: boolean;
 }
 
@@ -28,6 +31,7 @@ export default function CrateGallery({
   onLaunch, 
   onSave, 
   onDelete, 
+  onExport,
   isSaving = false 
 }: CrateGalleryProps) {
   
@@ -95,27 +99,39 @@ export default function CrateGallery({
                       transition={{ delay: i * 0.05 }}
                       className="group bg-white/[0.02] p-8 rounded-[3rem] border border-white/5 hover:border-indigo-500/40 transition-all relative overflow-hidden flex flex-col"
                     >
-                      <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => crate.id && onDelete(crate.id)}
-                          className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => crate.id && onExport(crate.id)}
+                            title="Export Manifest"
+                            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-all"
+                          >
+                            <Globe size={18} />
+                          </button>
+                          <button 
+                            onClick={() => crate.id && onDelete(crate.id)}
+                            title="Purge Crate"
+                            className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
 
                       <div className="flex items-center gap-4 mb-6">
                         <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-all">
                           <Box className="w-7 h-7 text-indigo-500" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-black text-white uppercase tracking-tight group-hover:text-indigo-400 transition-colors line-clamp-1">{crate.name}</h3>
+                          <h3 className="text-xl font-black text-white uppercase tracking-tight group-hover:text-white transition-colors line-clamp-1">{crate.name}</h3>
                           <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
                             <Clock size={12} />
-                            {new Date(crate.timestamp).toLocaleDateString()} // {new Date(crate.timestamp).toLocaleTimeString()}
+                            {new Date(crate.timestamp).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed mb-6 italic opacity-80 group-hover:opacity-100 transition-opacity">
+                        "{crate.description}"
+                      </p>
 
                       <div className="flex-1 space-y-3 mb-8">
                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Neural Entities</span>
@@ -136,9 +152,11 @@ export default function CrateGallery({
 
                       <button 
                         onClick={() => crate.id && onLaunch(crate.id)}
-                        className="w-full py-5 bg-white/5 hover:bg-indigo-600 border border-white/10 hover:border-indigo-500 text-slate-300 hover:text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-3 group/btn"
+                        style={{ boxShadow: `0 0 40px -10px ${crate.aura_color}20` }}
+                        className="w-full py-5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-3 group/btn relative overflow-hidden"
                       >
-                        <Zap size={18} className="text-indigo-500 group-hover/btn:text-white group-hover/btn:animate-pulse" />
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-10 scale-0 group-hover:scale-100 transition-all duration-700" style={{ background: `radial-gradient(circle, ${crate.aura_color} 0%, transparent 70%)` }} />
+                        <Zap size={18} style={{ color: crate.aura_color }} className="group-hover:animate-pulse" />
                         Restore Environment
                       </button>
                     </motion.div>

@@ -62,12 +62,14 @@ static PROPOSAL_REGISTRY: Mutex<HashMap<String, GolemProposal>> = Mutex::new(Has
 
 struct DbState(Mutex<Connection>);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct ContextCrate {
     pub id: Option<i32>,
     pub name: String,
+    pub description: String,
+    pub aura_color: String,
+    pub apps: String,
     pub timestamp: String,
-    pub apps: String, // JSON string of applications
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -776,14 +778,14 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_crate(state: tauri::State<DbState>, name: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+fn save_crate(state: tauri::State<DbState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
     let conn = state.0.lock().unwrap();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
 
     conn.execute(
-        "INSERT INTO context_crates (name, apps, timestamp) VALUES (?1, ?2, ?3)",
-        params![name, apps_json, timestamp],
+        "INSERT INTO context_crates (name, description, aura_color, apps, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![name, description, aura_color, apps_json, timestamp],
     ).map_err(|e| e.to_string())?;
 
     Ok(())
@@ -798,8 +800,10 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
         Ok(ContextCrate {
             id: Some(row.get(0)?),
             name: row.get(1)?,
-            apps: row.get(2)?,
-            timestamp: row.get(3)?,
+            description: row.get(2).unwrap_or_else(|_| "Strategic context manifold.".into()),
+            aura_color: row.get(3).unwrap_or_else(|_| "#4f46e5".into()),
+            apps: row.get(4)?,
+            timestamp: row.get(5)?,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -812,19 +816,30 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
 }
 
 #[tauri::command]
-async fn generate_crate_name(apps: Vec<WindowInfo>) -> Result<String, String> {
+async fn synthesize_crate_aura(apps: Vec<WindowInfo>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let app_titles: Vec<String> = apps.iter().map(|a| a.title.clone()).collect();
-    let prompt = format!("I am saving a 'Desktop Context Crate' on my AI OS. Here are the open window titles: {}.\n\nSuggest a single, punchy, 3-4 word title for this workspace context (e.g. 'Figma UI & React Dev', 'Market Research Pulse'). Return ONLY the title string.", app_titles.join(", "));
+    let prompt = format!("Analyze these open window titles: {}.\n\nReturn a JSON object with:\n1. 'name': A 3-4 word punchy title.\n2. 'description': A one-sentence strategic summary.\n3. 'aura_color': A hex color string that fits the vibe (e.g. emerald for growth, amber for stress, indigo for dev).\n\nRespond ONLY with the JSON object.", app_titles.join(", "));
     
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false, "format": "json" });
     let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
-    if let Some(suggestion) = json["response"].as_str() {
-        Ok(suggestion.trim_matches('"').to_string())
+    if let Some(suggestion_str) = json["response"].as_str() {
+        let parsed: serde_json::Value = serde_json::from_str(suggestion_str).unwrap_or_else(|_| {
+            serde_json::json!({
+                "name": "Manual Context Layer",
+                "description": "Custom neural manifold defined by the founder.",
+                "aura_color": "#4f46e5"
+            })
+        });
+        Ok(parsed)
     } else {
-        Ok("Manual Context Layer".into())
+        Ok(serde_json::json!({
+            "name": "Neural Default",
+            "description": "Standard operating context.",
+            "aura_color": "#6366f1"
+        }))
     }
 }
 
@@ -839,11 +854,44 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
 
     for app in apps {
         if !app.exe_path.is_empty() {
+            // Intelligent Launch: Detect if it's VS Code and try to restore project context
+            if app.exe_path.to_uppercase().contains("CODE.EXE") {
+                // Heuristic: If title contains a path-like string, try to open it
+                if let Some(pos) = app.title.find(" - ") {
+                    let project_name = &app.title[..pos];
+                    println!("Oasis Kernel: Resolving project context for {}", project_name);
+                    // For now, simple spawn; future: pass project path as arg
+                }
+            }
             let _ = std::process::Command::new(app.exe_path).spawn();
         }
     }
     
     Ok(())
+}
+
+#[tauri::command]
+fn export_crate_manifest(state: tauri::State<DbState>, id: i32, target_path: String) -> Result<String, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT name, description, aura_color, apps, timestamp FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
+    
+    let crate_data: ContextCrate = stmt.query_row(params![id], |row| {
+        Ok(ContextCrate {
+            id: Some(id),
+            name: row.get(0)?,
+            description: row.get(1).unwrap_or_default(),
+            aura_color: row.get(2).unwrap_or_default(),
+            apps: row.get(3)?,
+            timestamp: row.get(4)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let json = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
+    let filename = format!("crate_{}_{}.json", crate_data.name.replace(" ", "_"), id);
+    let final_path = std::path::Path::new(&target_path).join(filename);
+    
+    std::fs::write(&final_path, json).map_err(|e| e.to_string())?;
+    Ok(final_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -3184,11 +3232,17 @@ pub fn run() {
         "CREATE TABLE IF NOT EXISTS context_crates (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
+            description TEXT,
+            aura_color TEXT,
             apps TEXT NOT NULL,
             timestamp TEXT NOT NULL
         )",
         [],
     ).expect("failed to create table");
+
+    // Atomic Schema Migration Layer (Phase 22)
+    let _ = conn.execute("ALTER TABLE context_crates ADD COLUMN description TEXT", []);
+    let _ = conn.execute("ALTER TABLE context_crates ADD COLUMN aura_color TEXT", []);
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS neural_logs (
@@ -3279,6 +3333,7 @@ pub fn run() {
             start_watcher,
             launch_crate,
             delete_crate,
+            export_crate_manifest,
             log_event,
             get_logs,
             get_nearby_projects,
@@ -3293,7 +3348,7 @@ pub fn run() {
             get_neural_graph,
             get_all_files,
             start_telemetry_server,
-            generate_crate_name,
+            synthesize_crate_aura,
             execute_neural_command,
             check_ai_status,
             start_proactive_sentience,
