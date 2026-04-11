@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Lock, FileText } from "lucide-react";
+import { Search, Lock, FileText, Activity } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 

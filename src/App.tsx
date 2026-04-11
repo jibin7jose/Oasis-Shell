@@ -6,7 +6,7 @@ import {
   RotateCcw, Database,
   Bot, BrainCircuit, Terminal, Search, Plus,
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
-  Mic, MicOff, Skull, Pause, FlaskConical, Clock, CheckCircle2, History, LineChart, PieChart, Info, HelpCircle, Globe, Cpu, Book
+  Mic, MicOff, Skull, Pause, FlaskConical, Clock, History, Globe, Cpu, Book
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
@@ -23,9 +23,10 @@ import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
-import CrateGallery, { ContextCrate } from "./components/panels/CrateGallery";
+import CrateGallery from "./components/panels/CrateGallery";
 import { cn } from "./lib/utils";
 import { useSystemStore } from "./lib/systemStore";
+import { ChronosSnapshot } from "./lib/systemStore";
 import { isTauri, invokeSafe, listenSafe } from "./lib/tauri";
 
 // New Modular Components
@@ -210,11 +211,11 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl + ` or Alt + T to toggle Terminal
       if ((e.ctrlKey && e.key === '`') || (e.altKey && e.key === 't')) {
-        setShowCLI(prev => !prev);
+        setShowCLI(!showCLI);
       }
       // Alt + C to toggle Crate Gallery
       if (e.altKey && e.key === 'c') {
-        setShowCrates(prev => !prev);
+        setShowCrates(!showCrates);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -765,43 +766,46 @@ export default function App() {
     }
   }, [autoAura, activeDebate, ventureIntegrity]);
 
-  // EFFECT: Neural Telemetry Dynamics (The Pulse)
   useEffect(() => {
     if (!isTauri) {
       const interval = setInterval(() => {
-        setProcesses(prev => (Array.isArray(prev) ? prev : []).map(p => ({
+        const updatedProcs = (Array.isArray(processes) ? processes : []).map(p => ({
           ...p,
           cpu_usage: Math.max(0.1, Math.min(99.9, p.cpu_usage + (Math.random() - 0.5) * 2)),
           mem_usage: p.mem_usage + Math.floor((Math.random() - 0.5) * 1024 * 1024)
-        })));
-        setSystemStats(prev => prev ? {
-          ...prev,
-          cpu_load: Math.max(5, Math.min(95, prev.cpu_load + (Math.random() - 0.5) * 5)),
-        } : null);
+        }));
+        setProcesses(updatedProcs);
+        if (systemStats) {
+          setSystemStats({
+            ...systemStats,
+            cpu_load: Math.max(5, Math.min(95, systemStats.cpu_load + (Math.random() - 0.5) * 5)),
+          });
+        }
 
         // Phase 7.6: Golem Progress Progression
-        setActiveGolems(prev => (prev ?? []).map(g => {
+        const updatedGolems = (activeGolems ?? []).map(g => {
           const inc = Math.random() * 0.4;
           const newProgress = Math.min(100, g.progress + inc);
-
-          // Logic: Handle Mission Completion
           if (newProgress >= 100 && g.progress < 100) {
             setNotification(`Oasis Pulse: ${g.name} MISSION ACCOMPLISHED.`);
             logEvent(`Golem ${g.id} completed mission: "${g.mission}"`, 'deploy');
             return { ...g, progress: 100, status: 'Standby' };
           }
-          return { ...g, progress: Float(newProgress.toFixed(1)) };
-        }));
+          return { ...g, progress: parseFloat(newProgress.toFixed(1)) };
+        });
+        setActiveGolems(updatedGolems);
 
         // Phase 7.9: Global Market Pulse
-        setMarketIntel(prev => prev && prev.ai_ticker ? {
-          ...prev,
-          market_index: Math.max(10, prev.market_index + (Math.random() - 0.5) * 0.5),
-          ai_ticker: (prev.ai_ticker ?? []).map((t: any) => ({
-            ...t,
-            price: t.price + (Math.random() - 0.5) * (t.price * 0.001)
-          }))
-        } : prev);
+        if (marketIntel && marketIntel.ai_ticker) {
+          setMarketIntel({
+            ...marketIntel,
+            market_index: Math.max(10, marketIntel.market_index + (Math.random() - 0.5) * 0.5),
+            ai_ticker: (marketIntel.ai_ticker ?? []).map((t: any) => ({
+              ...t,
+              price: t.price + (Math.random() - 0.5) * (t.price * 0.001)
+            }))
+          });
+        }
       }, 3000);
       return () => clearInterval(interval);
     }
@@ -829,7 +833,7 @@ export default function App() {
 
   const handleContextSwitch = (id: string) => {
     setActiveContext(id);
-    setLastSync(new Date().toLocaleTimeString());
+    setSystemLastSync(new Date().toLocaleTimeString());
     logEvent(`Context Shifted to: ${id.toUpperCase()}`, 'system');
   };
 
@@ -984,7 +988,7 @@ export default function App() {
       const res = await invokeSafe("restore_venture_state", { files: manifestHistory }) as string;
       setNotification(res);
       setManifestHistory([]);
-      setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }));
+      setFounderMetrics({ ...founderMetrics, stress_color: "#6366f1" });
     } catch (e) { }
   };
 
@@ -1045,7 +1049,7 @@ export default function App() {
       const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
       setSystemStats(stats);
       const windows = await invokeSafe("get_running_windows") as WindowInfo[];
-      setRunningWindows(windows);
+      setWindows(windows);
       const procList = await invokeSafe("get_process_list") as ProcessInfo[];
       setProcesses(procList);
       const priorities = await Promise.all(
@@ -1067,7 +1071,7 @@ export default function App() {
         setBatteryHealth(health);
       } catch (e) { }
       const disks = await invokeSafe("get_storage_map") as StorageInfo[];
-      setStorageMap(disks);
+      setStorage(disks);
       const devs = await invokeSafe("get_system_devices") as DeviceInfo[];
       setDevices(devs);
       setSystemLastSync(new Date().toLocaleTimeString());
@@ -1078,7 +1082,7 @@ export default function App() {
     const syncWindows = async () => {
       try {
         const windows = await invokeSafe("get_running_windows") as WindowInfo[];
-        setRunningWindows(windows);
+        setWindows(windows);
       } catch (e) { }
     };
     syncWindows();
@@ -1527,8 +1531,6 @@ export default function App() {
   };
 
   const handleExportAudit = (format: "json" | "csv", columns: string[], filter: string) => {
-    const visibleProcesses = (Array.isArray(processes) ? processes : [])
-    .filter((p) => matchesSearch(p) && matchesFilter(p));
     const rows = priorityAudit
       .filter((e) => {
         if (filter === "all") return true;
@@ -1689,10 +1691,10 @@ export default function App() {
         setNotification("New Golem Registered.");
       }
       const res = await invokeSafe("execute_cli_directive", { directive: { cmd, args }, stressColor: founderMetrics.stress_color }) as any;
-      setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: res.output, color: res.aura_color }]);
+      setCliHistory([...cliHistory, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: res.output, color: res.aura_color }]);
       setNotification(`Oas Directive Executed: ${cmd.toUpperCase()}`);
     } catch (e: any) {
-      setCliHistory(prev => [...prev, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: e, color: '#ef4444' }]);
+      setCliHistory([...cliHistory, { type: 'cmd', text: `oas ${cliInput}`, color: '#6366f1' }, { type: 'res', text: e, color: '#ef4444' }]);
     }
     setCliInput("");
   };
@@ -1781,10 +1783,10 @@ export default function App() {
       setNotification(`Aegis Strike: ${res}`);
       setCortexMenu(null);
       // Prune from local graph instantly
-      setDynamicGraph((prev: any) => ({
-        ...prev,
-        nodes: prev.nodes.filter((n: any) => n.id !== node.id)
-      }));
+      setDynamicGraph({
+        ...dynamicGraph,
+        nodes: dynamicGraph.nodes.filter((n: any) => n.id !== node.id)
+      });
     } catch (e: any) {
       setNotification(`Aegis Error: ${e}`);
     }
@@ -2168,7 +2170,7 @@ export default function App() {
                   <p className="text-xs text-white">Generate Executive Venture Audit.</p>
                 </div>
               </div>
-              <button onClick={() => setFounderMetrics(prev => ({ ...prev, stress_color: "#6366f1" }))} className="px-12 py-5 bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-red-500/40">
+              <button onClick={() => setFounderMetrics({ ...founderMetrics, stress_color: "#6366f1" })} className="px-12 py-5 bg-red-500 hover:bg-red-600 text-white font-black uppercase tracking-[0.3em] rounded-2xl transition-all shadow-2xl shadow-red-500/40">
                 Override Lockout
               </button>
             </div>
@@ -2337,7 +2339,38 @@ export default function App() {
                   {activeView === 'processes' ? 'Strategic Process HUD' : 'Host Storage Atlas'}
                 </h2>
               </div>
-              <SystemHUD />
+              <SystemPanel
+                stats={systemStats}
+                windows={windows}
+                processes={processes}
+                storage={storage}
+                devices={devices}
+                lastSync={systemLastSync}
+                processPriorities={processPriorities}
+                priorityAudit={priorityAudit}
+                priorityCache={priorityCache}
+                autoApplyPriorities={autoApplyPriorities}
+                defaultTtlDays={defaultTtlDays}
+                batteryHealth={batteryHealth}
+                sparklinesEnabled={sparklinesEnabled}
+                isScanning={isScanning}
+                externalConfirmAction={resetConfirmAction}
+                onClearExternalConfirm={() => setResetConfirmAction(null)}
+                onRefresh={refreshSystemSnapshot}
+                onKillProcess={handleKillProcess}
+                onSuspendProcess={handleSuspendProcess}
+                onResumeProcess={handleResumeProcess}
+                onSetPriority={handleSetPriority}
+                onClearCacheReset={handleClearCacheReset}
+                onToggleIgnoreProcess={handleToggleIgnoreProcess}
+                onSetProcessTtl={handleSetProcessTtl}
+                onToggleIgnoreAll={handleToggleIgnoreAll}
+                onExportAudit={handleExportAudit}
+                onClearAllCache={handleClearAllCache}
+                onResetAllPriorities={handleResetAllPriorities}
+                onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
+                onReapplyAll={handleReapplyAll}
+              />
             </div>
           )}
 
