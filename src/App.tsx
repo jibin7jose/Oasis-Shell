@@ -824,7 +824,7 @@ export default function App() {
       setNotification(`Foundry: Committing Neural Manifest '${m.title}' to Kernel...`);
       await invokeSafe("execute_golem_manifest", { id: m.id, title: m.title, code: m.code_draft });
       setNotification(`Strategic Sync Success: Module '${m.title}' is now LIVE.`);
-      setPendingManifests(prev => prev.filter(p => p.id !== m.id));
+      setPendingManifests(pendingManifests.filter((p: any) => p.id !== m.id));
       logEvent(`Autonomous Manifest '${m.title}' Deployed`, "deploy");
     } catch (e) {
       setNotification(`Manifest Failure: ${e}`);
@@ -3009,9 +3009,9 @@ export default function App() {
                   <button onClick={() => {
                     invokeSafe('execute_golem_manifest', { id: activeGolem.id, title: activeGolem.title, code: activeGolem.code_draft }).then((res: any) => {
                       setNotification(res);
-                      setManifestHistory(prev => [...prev, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
+                       setManifestHistory([...manifestHistory, `manifested/${activeGolem.title.replace(" ", "_").toLowerCase()}.ts`]);
                       setActiveGolem(null);
-                      setPendingManifests(prev => prev.filter(p => p.id !== activeGolem.id));
+                       setPendingManifests(pendingManifests.filter((p) => p.id !== activeGolem.id));
                     });
                   }} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30">Authorize Golem</button>
                   <button onClick={() => setActiveGolem(null)} className="w-full py-5 glass text-slate-500 hover:text-white uppercase tracking-widest text-[10px] rounded-2xl">Dismiss Draft</button>
