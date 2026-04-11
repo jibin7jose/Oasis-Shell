@@ -74,11 +74,23 @@ interface FounderMetrics {
 
 export default function App() {
   const { playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
+  
   const {
+    processes, setProcesses,
+    windows, setWindows,
+    storage, setStorage,
+    devices, setDevices,
+    marketIntel, setMarketIntel,
+    fiscalBurn, setFiscalBurn,
+    ventureIntegrity, setVentureIntegrity,
+    strategicInventory, setStrategicInventory,
+    sparklinesEnabled, setSparklinesEnabled,
+    performanceOptimized, setPerformanceOptimized,
+    systemLastSync, setSystemLastSync,
     founderMetrics, setFounderMetrics,
     systemStats, setSystemStats,
     notification, setNotification,
-    logEvent, timeline,
+    timeline, logEvent,
     activeDebate, setActiveDebate,
     activeSynthesis, setActiveSynthesis,
     showCortex, setShowCortex,
@@ -90,29 +102,22 @@ export default function App() {
     dynamicGraph, setDynamicGraph,
     cortexResults, setCortexResults,
     cortexQuery, setCortexQuery,
-    processes, setProcesses,
-    windows, setWindows,
-    storage, setStorage,
-    devices, setDevices
+    showCLI, setShowCLI,
+    showCrates, setShowCrates,
+    isSavingCrate, setIsSavingCrate,
+    crates, setCrates,
+    activeVenture, setActiveVenture,
+    cliInput, setCliInput,
+    cliHistory, setCliHistory,
+    searchQuery, setSearchQuery,
+    pendingManifests, setPendingManifests,
+    oracleAlert, setOracleAlert
   } = useSystemStore();
 
   // --- CORE STATE ---
-  const [marketIntel, setMarketIntel] = useState<any>({
-    market_index: 142.8,
-    index_change: "-1.2%",
-    ai_ticker: [
-      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
-      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
-      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
-      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
-    ]
-  });
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
-  const [timeline, setTimeline] = useState<any[]>([
-    { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
-    { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
-  ]);
+  const [isCortexSearching, setIsCortexSearching] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
@@ -120,11 +125,10 @@ export default function App() {
   const [presentationMode, setPresentationMode] = useState(false);
   const [showVault, setShowVault] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [showCLI, setShowCLI] = useState(false);
+  const [showNexus, setShowNexus] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
   const [activeContext, setActiveContext] = useState('dev');
-  const [systemLastSync, setSystemLastSync] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
@@ -134,7 +138,6 @@ export default function App() {
   const [autoApplyPriorities, setAutoApplyPriorities] = useState(true);
   const [priorityAudit, setPriorityAudit] = useState<{ id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[]>([]);
   const [defaultTtlDays, setDefaultTtlDays] = useState(7);
-  const [performanceOptimized, setPerformanceOptimized] = useState(false);
   const pulseIntervalRef = useRef<number>(2000);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -153,7 +156,6 @@ export default function App() {
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showBoardroom, setShowBoardroom] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
-  const [showGraph, setShowGraph] = useState(false);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -165,7 +167,6 @@ export default function App() {
     action: (() => void) | null;
   } | null>(null);
 
-  const [fiscalBurn, setFiscalBurn] = useState({ total_burn: 0.0, token_load: 0, status: 'NOMINAL' });
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
 
   useEffect(() => {
@@ -184,25 +185,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isHandshakeSuccessful]);
 
-  useEffect(() => {
-    const pulse = setInterval(async () => {
-      try {
-        const metrics = await invokeSafe("get_venture_metrics") as any;
-        setFounderMetrics(metrics);
-
-        // Only pull full diagnostics if the panel is open or every 30s
-        const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
-        setSystemStats(stats);
-
-        const integrity = await invokeSafe("get_venture_integrity") as number;
-        setVentureIntegrity(integrity);
-
-        const fiscal = await invokeSafe("get_fiscal_report") as any;
-        setFiscalBurn(fiscal);
-      } catch (e) { }
-    }, 5000);
-    return () => clearInterval(pulse);
-  }, []);
 
   useEffect(() => {
     if (isHandshakeSuccessful) {
@@ -218,7 +200,7 @@ export default function App() {
   }, [isHandshakeSuccessful]);
 
   useEffect(() => {
-    if (isHandshakeSuccessful && systemStats) {
+    if (isHandshakeSuccessful && systemStats && typeof systemStats.cpu_load === 'number') {
       updateEngine(systemStats.cpu_load);
     }
   }, [systemStats?.cpu_load, isHandshakeSuccessful]);
@@ -249,16 +231,9 @@ export default function App() {
   const [aegisLedger, setAegisLedger] = useState<any>(null);
   const [activeOracle, setActiveOracle] = useState<any>(null);
   const [sentinelVault, setSentinelVault] = useState<any>(null);
-  const [showNexus, setShowNexus] = useState(false);
   const [showSentinel, setShowSentinel] = useState(false);
   const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [founderSecret, setFounderSecret] = useState("");
-  const [activeVenture /*, setActiveVenture */] = useState("Oasis Core (Alpha)");
-  const [cliInput, setCliInput] = useState("");
-  const [cliHistory, setCliHistory] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [pendingManifests, setPendingManifests] = useState<any[]>([]);
-  const [oracleAlert, setOracleAlert] = useState<any>(null);
   const [showNetwork, setShowNetwork] = useState(false);
   const [storageReport] = useState<any>(null);
   const [manifestHistory, setManifestHistory] = useState<string[]>([]);
@@ -277,9 +252,6 @@ export default function App() {
     }
   };
 
-  const [showCrates, setShowCrates] = useState(false);
-  const [crates, setCrates] = useState<ContextCrate[]>([]);
-  const [isSavingCrate, setIsSavingCrate] = useState(false);
 
   const loadCrates = async () => {
     try {
@@ -352,7 +324,6 @@ export default function App() {
   const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [autoAura, setAutoAura] = useState(false);
-  const [ventureIntegrity, setVentureIntegrity] = useState(100);
   const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -468,8 +439,8 @@ export default function App() {
       try {
         const stats = await invokeSafe("run_system_diagnostic");
         if (stats) setSystemStats(stats);
-        const procs = await invokeSafe("get_process_list");
-        if (procs) setProcesses(procs);
+        const procs = await invokeSafe("get_running_processes") as any[];
+        if (procs && Array.isArray(procs)) setProcesses(procs);
         const wins = await invokeSafe("get_running_windows");
         if (wins) setWindows(wins);
         const stor = await invokeSafe("get_storage_map");
@@ -511,15 +482,6 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const integrity = await invokeSafe("get_venture_integrity") as number;
-        setVentureIntegrity(integrity);
-      } catch (e) { }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleVoiceIntent = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -807,7 +769,7 @@ export default function App() {
   useEffect(() => {
     if (!isTauri) {
       const interval = setInterval(() => {
-        setProcesses(prev => (prev ?? []).map(p => ({
+        setProcesses(prev => (Array.isArray(prev) ? prev : []).map(p => ({
           ...p,
           cpu_usage: Math.max(0.1, Math.min(99.9, p.cpu_usage + (Math.random() - 0.5) * 2)),
           mem_usage: p.mem_usage + Math.floor((Math.random() - 0.5) * 1024 * 1024)
@@ -1565,6 +1527,8 @@ export default function App() {
   };
 
   const handleExportAudit = (format: "json" | "csv", columns: string[], filter: string) => {
+    const visibleProcesses = (Array.isArray(processes) ? processes : [])
+    .filter((p) => matchesSearch(p) && matchesFilter(p));
     const rows = priorityAudit
       .filter((e) => {
         if (filter === "all") return true;
@@ -1863,38 +1827,59 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const syncFoundryData = async () => {
+    const pulse = async () => {
       try {
         const metrics = await invokeSafe("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
+        setFounderMetrics(metrics);
+
+        const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
+        setSystemStats(stats);
+
+        const integrity = await invokeSafe("get_venture_integrity") as number;
+        setVentureIntegrity(integrity);
+
+        const fiscal = await invokeSafe("get_fiscal_report") as any;
+        setFiscalBurn(fiscal);
+
         const intel = await invokeSafe("get_market_intelligence") as any;
-        setMarketIntel(prev => ({
-          ...prev,
-          market_index: intel?.market_index || prev.market_index,
-          index_change: intel?.index_change || prev.index_change,
-          ai_ticker: intel?.ai_ticker || prev.ai_ticker
-        }));
+        setMarketIntel(intel);
 
-        // Pass market index to workforce for reactor logic
-        const wf = await invokeSafe("get_neural_workforce", { marketIndex: intel.market_index || 100.0 }) as any[];
-        setWorkforce(wf);
+        const inv = await invokeSafe("get_strategic_inventory") as any[];
+        setStrategicInventory(inv);
 
-        if (!simMode) {
-          setFounderMetrics({ ...metrics, stress_color: metrics.stress_color || "#6366f1" });
-          invokeSafe("save_venture_state", { metrics: { ...metrics, stress_color: metrics.stress_color || "#6366f1" } });
-        }
-        setLastSync(new Date().toLocaleTimeString());
-      } catch (e) {
-        if (!simMode) {
-          setFounderMetrics({
-            arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%", stress_color: "#10b981"
-          });
-        }
-        setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
-      }
+        setSystemLastSync(new Date().toLocaleTimeString());
+      } catch (e) { }
     };
-    syncFoundryData();
-    const interval = setInterval(syncFoundryData, 10000);
-    return () => clearInterval(interval);
+
+    const handleFocus = () => {
+      setPerformanceOptimized(false);
+      pulseIntervalRef.current = 2000;
+      startPulse(2000);
+    };
+
+    const handleBlur = () => {
+      setPerformanceOptimized(true);
+      pulseIntervalRef.current = 10000;
+      startPulse(10000);
+    };
+
+    let itv: any;
+    const startPulse = (ms: number) => {
+      if (itv) clearInterval(itv);
+      itv = setInterval(pulse, ms);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    
+    pulse();
+    startPulse(2000);
+
+    return () => {
+      clearInterval(itv);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, [simMode, simMetrics.arr, simMetrics.burn]);
 
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
@@ -2075,100 +2060,6 @@ export default function App() {
     }
   };
 
-  const SystemHUD = () => (
-    <div className="w-full h-full flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {storage.map((disk, i) => (
-          <div key={i} className="glass p-10 rounded-[3rem] border border-white/5 relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h4 className="text-2xl font-black text-white mb-1 uppercase italic tracking-tighter">{disk.name || "PRIMARY HOST"}</h4>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">{disk.mount}</p>
-              </div>
-              <div className="p-3 rounded-2xl bg-white/5 text-indigo-400"><Shield className="w-7 h-7" /></div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <span>Allocated: {((disk.total - disk.available) / (1024 ** 3)).toFixed(1)}GB</span>
-                <span className="text-indigo-400">{(disk.total / (1024 ** 3)).toFixed(1)}GB Total</span>
-              </div>
-              <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${((disk.total - disk.available) / disk.total * 100).toFixed(1)}%` }}
-                  className={cn("h-full", (disk.available / disk.total) < 0.1 ? "bg-rose-500" : "bg-indigo-500 shadow-[0_0_15px_#6366f1]")} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="glass rounded-[4rem] border border-white/5 overflow-hidden flex-1 flex flex-col shadow-2xl">
-        <div className="p-10 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
-          <h3 className="text-xl font-black text-white uppercase tracking-[0.4em] flex items-center gap-6">
-            <Activity className="w-8 h-8 text-indigo-400 animate-pulse" />
-            OS Process Orchestrator
-          </h3>
-          <div className="flex gap-4">
-            <span className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-              {processes.length} Active Nodes
-            </span>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar border-t border-white/5">
-          <table className="w-full text-left border-separate border-spacing-y-4">
-            <thead>
-              <tr className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">
-                <th className="px-10">Neural PID</th>
-                <th className="px-10">Application Identity</th>
-                <th className="px-10">Load Sync</th>
-                <th className="px-10 text-center">Memory Block</th>
-                <th className="px-10 text-right">Directives</th>
-              </tr>
-            </thead>
-            <tbody>
-              {processes.map((proc, i) => (
-                <tr key={i} className="hover:bg-white/[0.03] transition-all group bg-white/[0.01]">
-                  <td className="px-10 py-6 text-xs font-mono text-slate-500 rounded-l-[2rem]">{proc.pid}</td>
-                  <td className="px-10 py-6">
-                    <div className="flex items-center gap-6">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-lg shadow-inner">
-                        {proc.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-black text-white text-lg tracking-tighter">{proc.name}</span>
-                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Authenticated Host App</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-10 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-2 w-24 bg-white/5 rounded-full overflow-hidden shadow-inner">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(proc.cpu_usage, 100)}%` }} className="h-full bg-indigo-500" />
-                      </div>
-                      <span className="text-xs font-mono text-indigo-400 font-black">{proc.cpu_usage.toFixed(1)}%</span>
-                    </div>
-                  </td>
-                  <td className="px-10 py-6 text-center text-xs font-mono text-slate-400">
-                    {(proc.mem_usage / (1024 ** 2)).toFixed(1)} <span className="text-[10px] text-slate-600">MB</span>
-                  </td>
-                  <td className="px-10 py-6 text-right rounded-r-[2rem]">
-                    <button onClick={async () => {
-                      await invokeSafe("kill_quarantine_process", { pid: proc.pid });
-                      setNotification(`Sentinel: Quarantined ${proc.name}`);
-                      refreshSystemSnapshot();
-                    }} className="px-6 py-3 border border-red-500/20 text-red-500/40 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:shadow-lg hover:shadow-red-500/20 transition-all opacity-0 group-hover:opacity-100">
-                      Quarantine
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-
-
-
 
   if (!isHandshakeSuccessful) {
     return <BootSequence onSuccess={() => setIsHandshakeSuccessful(true)} />;
@@ -2198,6 +2089,13 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+      <CortexHUD />
+      
+      {pendingPermission && (
+        <div className="fixed inset-0 z-[3000] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          {/* Permission Modal Content */}
+        </div>
+      )}
 
       <AnimatePresence>
         {commandOpen && (
@@ -2412,7 +2310,7 @@ export default function App() {
           fiscalBurn={fiscalBurn}
           hardwareStatus={hardwareStatus}
           displayedMarket={displayedMarket}
-          lastSync={lastSync}
+          lastSync={systemLastSync}
           presentationMode={presentationMode}
           performanceMode={performanceMode}
           onOpenSentinel={() => setShowSentinel(true)}
@@ -3853,15 +3751,8 @@ export default function App() {
           </div>
         </>
       )}
-      {/* Directive: Cortex Semantic HUD (Pillar 21) */}
-      <AnimatePresence>
-        )}
-      </AnimatePresence>
-
       <CortexHUD />
-
-      {pendingPermission && (
-      </AnimatePresence>
+      
       {pendingPermission && (
         <div className="fixed inset-0 z-[5000] bg-black/70 backdrop-blur-xl flex items-center justify-center p-8">
           <div className="w-full max-w-lg glass-bright rounded-[2rem] border border-white/10 p-8 shadow-5xl">

@@ -54,6 +54,7 @@ export function useSoundscape() {
 
   const updateEngine = useCallback((load: number) => {
     if (!audioCtx.current || !engineBase.current || !engineGain.current || !engineFilter.current) return;
+    if (typeof load !== 'number' || !Number.isFinite(load)) return;
     const ctx = audioCtx.current;
     const normalizedLoad = Math.min(100, Math.max(0, load)) / 100;
 

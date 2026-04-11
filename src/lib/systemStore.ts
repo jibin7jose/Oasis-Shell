@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "../components/panels/SystemPanel";
+import { ContextCrate } from "../components/panels/CrateGallery";
 
 export interface FounderMetrics {
   arr: string;
@@ -18,11 +19,11 @@ export interface ChronosSnapshot {
   integrity: number;
 }
 
-interface SystemState {
+export interface SystemState {
   founderMetrics: FounderMetrics;
   systemStats: SystemStats | null;
   notification: string;
-  timeline: TimelineEvent[];
+  timeline: { id: number; type: string; event: string; time: string }[];
   activeDebate: any | null;
   activeSynthesis: any | null;
   showCortex: boolean;
@@ -38,8 +39,42 @@ interface SystemState {
   windows: WindowInfo[];
   storage: StorageInfo[];
   devices: DeviceInfo[];
+  marketIntel: any;
+  fiscalBurn: { total_burn: number; token_load: number; status: string };
+  ventureIntegrity: number;
+  strategicInventory: any[];
+  sparklinesEnabled: boolean;
+  performanceOptimized: boolean;
+  systemLastSync: string;
+  showCLI: boolean;
+  setShowCLI: (show: boolean) => void;
+  showCrates: boolean;
+  setShowCrates: (show: boolean) => void;
+  isSavingCrate: boolean;
+  setIsSavingCrate: (is: boolean) => void;
+  crates: ContextCrate[];
+  setCrates: (crates: ContextCrate[]) => void;
+  activeVenture: string;
+  setActiveVenture: (v: string) => void;
+  cliInput: string;
+  setCliInput: (i: string) => void;
+  cliHistory: any[];
+  setCliHistory: (h: any[]) => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  pendingManifests: any[];
+  setPendingManifests: (m: any[]) => void;
+  oracleAlert: any | null;
+  setOracleAlert: (a: any | null) => void;
   
   // Actions
+  setMarketIntel: (market: any) => void;
+  setFiscalBurn: (burn: any) => void;
+  setVentureIntegrity: (integrity: number) => void;
+  setStrategicInventory: (inventory: any[]) => void;
+  setSparklinesEnabled: (enabled: boolean) => void;
+  setPerformanceOptimized: (optimized: boolean) => void;
+  setSystemLastSync: (time: string) => void;
   setFounderMetrics: (metrics: FounderMetrics) => void;
   setSystemStats: (stats: SystemStats | null) => void;
   setProcesses: (procs: ProcessInfo[]) => void;
@@ -48,12 +83,41 @@ interface SystemState {
   setDevices: (devices: DeviceInfo[]) => void;
   setNotification: (msg: string) => void;
   clearNotification: () => void;
-  logEvent: (event: string, type: TimelineEvent["type"]) => void;
+  logEvent: (event: string, type: "neural" | "deploy" | "system") => void;
   setActiveDebate: (debate: any | null) => void;
   setActiveSynthesis: (synthesis: any | null) => void;
+  setShowCortex: (show: boolean) => void;
+  setShowDocs: (show: boolean) => void;
+  setShowGraph: (show: boolean) => void;
+  setTravelIndex: (index: number) => void;
+  setIsTimeTraveling: (is: boolean) => void;
+  setChronosHistory: (history: any[]) => void;
+  setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => void;
+  setCortexResults: (results: any[]) => void;
+  setCortexQuery: (query: string) => void;
 }
 
 export const useSystemStore = create<SystemState>((set) => ({
+  marketIntel: {
+    market_index: 142.8,
+    index_change: "-1.2%",
+    ai_ticker: [
+      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
+      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
+      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
+      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
+    ]
+  },
+  fiscalBurn: { total_burn: 0.0, token_load: 0, status: 'NOMINAL' },
+  ventureIntegrity: 100,
+  strategicInventory: [
+    { name: "Nebula Compute Core", type: "Infrastructure", value: "$420K", health: 98, aura: "indigo" },
+    { name: "Oasis Sentinel Vault", type: "Security", value: "$1.2M", health: 100, aura: "emerald" },
+    { name: "Golem Swarm Alpha", type: "Workforce", value: "$180K", health: 92, aura: "purple" },
+  ],
+  sparklinesEnabled: true,
+  performanceOptimized: false,
+  systemLastSync: "",
   founderMetrics: {
     arr: "$1.24M",
     burn: "$0.85M",
@@ -78,11 +142,28 @@ export const useSystemStore = create<SystemState>((set) => ({
   dynamicGraph: { nodes: [], links: [] },
   cortexResults: [],
   cortexQuery: "",
+  showCLI: false,
+  showCrates: false,
+  isSavingCrate: false,
+  crates: [],
+  activeVenture: "Oasis Core (Alpha)",
+  cliInput: "",
+  cliHistory: [],
+  searchQuery: "",
+  pendingManifests: [],
+  oracleAlert: null,
   processes: [],
   windows: [],
   storage: [],
   devices: [],
 
+  setMarketIntel: (market) => set({ marketIntel: market }),
+  setFiscalBurn: (burn) => set({ fiscalBurn: burn }),
+  setVentureIntegrity: (integrity) => set({ ventureIntegrity: integrity }),
+  setStrategicInventory: (inventory) => set({ strategicInventory: inventory }),
+  setSparklinesEnabled: (enabled) => set({ sparklinesEnabled: enabled }),
+  setPerformanceOptimized: (optimized) => set({ performanceOptimized: optimized }),
+  setSystemLastSync: (time) => set({ systemLastSync: time }),
   setFounderMetrics: (metrics) => set({ founderMetrics: metrics }),
   setSystemStats: (stats) => set({ systemStats: stats }),
   setProcesses: (procs) => set({ processes: procs }),
@@ -114,4 +195,14 @@ export const useSystemStore = create<SystemState>((set) => ({
   setDynamicGraph: (graph) => set({ dynamicGraph: graph }),
   setCortexResults: (results) => set({ cortexResults: results }),
   setCortexQuery: (query) => set({ cortexQuery: query }),
+  setShowCLI: (show) => set({ showCLI: show }),
+  setShowCrates: (show) => set({ showCrates: show }),
+  setIsSavingCrate: (is) => set({ isSavingCrate: is }),
+  setCrates: (crates) => set({ crates }),
+  setActiveVenture: (v) => set({ activeVenture: v }),
+  setCliInput: (i) => set({ cliInput: i }),
+  setCliHistory: (h) => set({ cliHistory: h }),
+  setSearchQuery: (q) => set({ searchQuery: q }),
+  setPendingManifests: (m) => set({ pendingManifests: m }),
+  setOracleAlert: (a) => set({ oracleAlert: a }),
 }));

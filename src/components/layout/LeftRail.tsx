@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera, MessageSquareQuote } from "lucide-react";
+import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera, MessageSquareQuote, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 

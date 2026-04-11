@@ -99,8 +99,8 @@ export default function TopBar({
               <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Host Pulse</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-indigo-400 font-black">{systemStats? systemStats.cpu_load.toFixed(1) : "0.0"}% CPU</span>
-                  <span className="text-[10px] font-mono text-purple-400 font-black">{systemStats? systemStats.mem_used.toFixed(1) : "0.0"}% RAM</span>
+                  <span className="text-[10px] font-mono text-indigo-400 font-black">{(systemStats?.cpu_load ?? 0).toFixed(1)}% CPU</span>
+                  <span className="text-[10px] font-mono text-purple-400 font-black">{(systemStats?.mem_used ?? 0).toFixed(1)}% RAM</span>
                 </div>
               </div>
 
@@ -323,11 +323,11 @@ export default function TopBar({
                     fiscalBurn.status === "CRITICAL" ? "text-red-500" : fiscalBurn.status === "HIGH" ? "text-amber-500" : "text-emerald-500"
                   )}
                 >
-                  ${fiscalBurn.total_burn.toFixed(2)}
+                  ${(fiscalBurn?.total_burn ?? 0).toFixed(2)}
                 </span>
               </div>
               <span className="text-[7px] font-mono text-slate-600 bg-white/5 px-2 py-1 rounded">
-                {(fiscalBurn.token_load / 1000).toFixed(1)}K TOKENS
+                {((fiscalBurn?.token_load ?? 0) / 1000).toFixed(1)}K TOKENS
               </span>
             </div>
             {hardwareStatus && (

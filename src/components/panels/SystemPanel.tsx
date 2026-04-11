@@ -332,7 +332,7 @@ export default function SystemPanel({
     return true;
   };
 
-  const visibleProcesses = (processes ?? [])
+  const visibleProcesses = (Array.isArray(processes) ? processes : [])
     .filter((p) => matchesSearch(p) && matchesFilter(p))
     .sort((a, b) => {
       let aVal = 0;
@@ -418,7 +418,7 @@ export default function SystemPanel({
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">CPU Load</span>
             <Activity className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-black text-white">{stats ? `${stats.cpu_load.toFixed(1)}%` : "--"}</div>
+          <div className="text-2xl font-black text-white">{stats ? `${(stats.cpu_load ?? 0).toFixed(1)}%` : "--"}</div>
           <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
               className={cn("h-full rounded-full", stats && stats.cpu_load > 80 ? "bg-rose-500" : "bg-amber-400")}
@@ -432,7 +432,7 @@ export default function SystemPanel({
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Memory Used</span>
             <Activity className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-white">{stats ? `${stats.mem_used.toFixed(1)}%` : "--"}</div>
+          <div className="text-2xl font-black text-white">{stats ? `${(stats.mem_used ?? 0).toFixed(1)}%` : "--"}</div>
           <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
               className={cn("h-full rounded-full", stats && stats.mem_used > 85 ? "bg-rose-500" : "bg-emerald-400")}
@@ -531,7 +531,7 @@ export default function SystemPanel({
                     <div className="text-right">
                       <div className="text-[10px] font-black text-slate-300">{formatBytes(used)} / {formatBytes(disk.total)}</div>
                       <div className={cn("text-[9px] font-black", disk.health_score < 10 ? "text-rose-500" : disk.health_score < 25 ? "text-amber-400" : "text-emerald-400")}>
-                        {disk.health_score.toFixed(0)}% free
+                        {(disk.health_score ?? 0).toFixed(0)}% free
                       </div>
                     </div>
                   </div>
@@ -552,7 +552,7 @@ export default function SystemPanel({
             </div>
             <div className="flex items-center gap-3 text-[9px] font-mono text-slate-500">
               <span>{(devices ?? []).length} signals</span>
-              {avgTemp !== null && <span>Thermal Avg {avgTemp.toFixed(1)}°C</span>}
+              {avgTemp !== null && <span>Thermal Avg {(avgTemp ?? 0).toFixed(1)}°C</span>}
             </div>
           </div>
           <div className="space-y-3 max-h-52 overflow-y-auto custom-scrollbar">
@@ -709,8 +709,8 @@ export default function SystemPanel({
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[10px] font-black text-slate-300">{proc.cpu_usage.toFixed(1)}% CPU</div>
-                          <div className="text-[9px] text-slate-500">{(proc.mem_usage / 1024 / 1024).toFixed(1)} MB</div>
+                          <div className="text-[10px] font-black text-slate-300">{(proc.cpu_usage ?? 0).toFixed(1)}% CPU</div>
+                          <div className="text-[9px] text-slate-500">{((proc.mem_usage ?? 0) / 1024 / 1024).toFixed(1)} MB</div>
                           <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">
                             {processPriorities[proc.pid] || "Normal"}
                           </div>
