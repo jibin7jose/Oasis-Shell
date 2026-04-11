@@ -24,75 +24,19 @@ import CommandPalette, { CommandPermission } from "./components/overlays/Command
 import SentinelVault from "./components/panels/SentinelVault";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
 import CrateGallery, { ContextCrate } from "./components/panels/CrateGallery";
+import { cn } from "./lib/utils";
+import { useSystemStore } from "./lib/systemStore";
+import { isTauri, invokeSafe, listenSafe } from "./lib/tauri";
+
+// New Modular Components
+import AdvisoryDebate from "./components/panels/AdvisoryDebate";
+import SynthesisPanel from "./components/panels/SynthesisPanel";
+import CortexHUD from "./components/panels/CortexHUD";
+
 
 // Design Utility
-const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
-const isTauri = typeof (window as any).__TAURI__ !== "undefined";
-const TAURI_DEFAULTS: Record<string, any> = {
-  get_venture_metrics: { arr: "$0M", burn: "$0K", runway: "0mo", momentum: "0%", stress_color: "#6366f1" },
-  run_system_diagnostic: { cpu_load: 0, mem_used: 0, battery_level: 100, is_charging: true, battery_health: 100, time_remaining_min: 120 },
-  get_venture_integrity: 100,
-  get_fiscal_report: { total_burn: 0, token_load: 0, status: 'NOMINAL' },
-  load_venture_state: { arr: "$0M", burn: "$0K", runway: "0mo", momentum: "0%", stress_color: "#6366f1" },
-  get_market_intelligence: {
-    market_index: 142.8,
-    index_change: "-1.2%",
-    ai_ticker: [
-      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
-      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
-      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
-      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
-    ]
-  },
-  get_neural_wisdom: { recommendation: "Oasis Dev: Kernel simulation active." },
-  get_sentinel_ledger: [],
-  get_aegis_ledger: [],
-  seek_chronos: [],
-  search_semantic_nodes: [],
-  manifest_temporal_log: "Snapshot Saved.",
-  get_documentation_index: ["overview", "architecture", "security", "roadmap"],
-  get_documentation_chapter: "<h1>System Documentation</h1><p>Welcome to the Oasis Kernel Technical Manual.</p>",
-  get_process_list: [
-    { pid: 1420, name: "oasis-shell.exe", cpu_usage: 2.4, mem_usage: 149422080, status: "Running", user: "Founder" },
-    { pid: 8842, name: "Code.exe", cpu_usage: 12.8, mem_usage: 882999296, status: "Running", user: "Founder" },
-    { pid: 4421, name: "chrome.exe", cpu_usage: 8.2, mem_usage: 1300500480, status: "Running", user: "Founder" },
-    { pid: 9924, name: "rust-foundry-kernel", cpu_usage: 0.1, mem_usage: 44892160, status: "Background", user: "System" }
-  ],
-  get_running_windows: [
-    { pid: 8842, title: "Oasis Shell - Visual Studio Code", exe_path: "C:\\Program Files\\VSCode\\Code.exe", x: 0, y: 0, width: 1920, height: 1080, is_maximized: true },
-    { pid: 4421, title: "Oasis Foundry Dashboard - Chrome", exe_path: "C:\\Program Files\\Google\\Chrome.exe", x: 100, y: 100, width: 1280, height: 720, is_maximized: false }
-  ],
-  save_venture_state: null,
-  execute_neural_intent: { content: "Neural Intent Handled.", tool: "NONE" },
-  get_chronos_ledger: [],
-  get_neural_logs: [],
-  get_neural_workforce: [],
-  get_active_golems: [
-    { id: "GLM-001", name: "Golem Alpha-9", mission: "Market Sync", progress: 82, aura: "emerald", status: "Active" },
-    { id: "GLM-002", name: "Golem Beta-4", mission: "Vault Seal", progress: 14, aura: "rose", status: "Latency" },
-    { id: "GLM-003", name: "Golem Sigma-1", mission: "Intent Parse", progress: 99, aura: "indigo", status: "Finalizing" }
-  ],
-  get_pinned_contexts: [],
-  get_economic_news: [],
-  get_pending_manifests: [],
-  get_strategic_inventory: [
-    { id: "AST-442", name: "Neural Logic Key v2", type: "Security", value: "$0.14M", aura: "indigo", health: 100 },
-    { id: "AST-821", name: "Foundry Dash Segment", type: "Interface", value: "$0.42M", aura: "emerald", health: 98 },
-    { id: "AST-994", name: "Oasis Kernel Runtime", type: "Core", value: "$1.24M", aura: "rose", health: 100 }
-  ],
-  get_available_ventures: [],
-  get_storage_map: [],
-  get_system_devices: [],
-};
-const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>) => {
-  if (!isTauri) return (TAURI_DEFAULTS[cmd] ?? null) as T;
-  return invoke(cmd, payload as any) as Promise<T>;
-};
-const listenSafe = async (event: string, handler: any) => {
-  if (!isTauri) return () => { };
-  return listen(event, handler);
-};
+// Design Utility moved to lib/tauri
 
 // Context Library
 const contexts = [
@@ -130,14 +74,29 @@ interface FounderMetrics {
 
 export default function App() {
   const { playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
+  const {
+    founderMetrics, setFounderMetrics,
+    systemStats, setSystemStats,
+    notification, setNotification,
+    logEvent, timeline,
+    activeDebate, setActiveDebate,
+    activeSynthesis, setActiveSynthesis,
+    showCortex, setShowCortex,
+    showDocs, setShowDocs,
+    showGraph, setShowGraph,
+    travelIndex, setTravelIndex,
+    isTimeTraveling, setIsTimeTraveling,
+    chronosHistory, setChronosHistory,
+    dynamicGraph, setDynamicGraph,
+    cortexResults, setCortexResults,
+    cortexQuery, setCortexQuery,
+    processes, setProcesses,
+    windows, setWindows,
+    storage, setStorage,
+    devices, setDevices
+  } = useSystemStore();
+
   // --- CORE STATE ---
-  const [founderMetrics, setFounderMetrics] = useState<FounderMetrics>({
-    arr: "$1.24M",
-    burn: "$0.85M",
-    runway: "14.2 Mo",
-    momentum: "+12.8%",
-    stress_color: "#10b981"
-  });
   const [marketIntel, setMarketIntel] = useState<any>({
     market_index: 142.8,
     index_change: "-1.2%",
@@ -154,7 +113,6 @@ export default function App() {
     { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
     { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
   ]);
-  const [notification, setNotification] = useState("");
   const [showAI, setShowAI] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
@@ -166,16 +124,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
   const [activeContext, setActiveContext] = useState('dev');
-  const [lastSync, setLastSync] = useState("");
-  const [strategicInventory, setStrategicInventory] = useState<any[]>([]);
-  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
-  const [runningWindows, setRunningWindows] = useState<WindowInfo[]>([]);
   const [systemLastSync, setSystemLastSync] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
-  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
-  const [storageMap, setStorageMap] = useState<StorageInfo[]>([]);
-  const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
   const appliedPriorityPids = useRef<Set<number>>(new Set());
@@ -183,7 +134,8 @@ export default function App() {
   const [autoApplyPriorities, setAutoApplyPriorities] = useState(true);
   const [priorityAudit, setPriorityAudit] = useState<{ id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[]>([]);
   const [defaultTtlDays, setDefaultTtlDays] = useState(7);
-  const [sparklinesEnabled, setSparklinesEnabled] = useState(true);
+  const [performanceOptimized, setPerformanceOptimized] = useState(false);
+  const pulseIntervalRef = useRef<number>(2000);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -198,11 +150,7 @@ export default function App() {
   const [isVaultSealed, setIsVaultSealed] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
   const [workforce, setWorkforce] = useState<any[]>([]);
-  const [chronosHistory, setChronosHistory] = useState<any[]>([]);
-  const [travelIndex, setTravelIndex] = useState(-1);
-  const [isTimeTraveling, setIsTimeTraveling] = useState(false);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
-  const [showDocs, setShowDocs] = useState(false);
   const [showBoardroom, setShowBoardroom] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
@@ -311,25 +259,19 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingManifests, setPendingManifests] = useState<any[]>([]);
   const [oracleAlert, setOracleAlert] = useState<any>(null);
-  const [showGraph, setShowGraph] = useState(false);
-  const [dynamicGraph, setDynamicGraph] = useState<any>({ nodes: [], links: [] });
   const [showNetwork, setShowNetwork] = useState(false);
-  const [showCortex, setShowCortex] = useState(false);
-  const [activeSynthesis, setActiveSynthesis] = useState<any>(null);
   const [storageReport] = useState<any>(null);
   const [manifestHistory, setManifestHistory] = useState<string[]>([]);
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
-  const [cortexResults, setCortexResults] = useState<any[]>([]);
-  const [cortexQuery, setCortexQuery] = useState("");
 
   const handleCortexSearch = async () => {
     if (!cortexQuery.trim()) return;
     try {
       const results: any[] = await invokeSafe('search_semantic_nodes', { query: cortexQuery });
-      setCortexResults(results);
-      setNotification(`Neural Search: Found ${results.length} semantic matches.`);
+      setCortexResults(results || []);
+      setNotification(`Neural Search: Found ${results?.length || 0} semantic matches.`);
     } catch (err) {
       console.error("Cortex Search Failure:", err);
     }
@@ -409,7 +351,6 @@ export default function App() {
   };
   const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
-  const [activeDebate, setActiveDebate] = useState<any>(null);
   const [autoAura, setAutoAura] = useState(false);
   const [ventureIntegrity, setVentureIntegrity] = useState(100);
   const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
@@ -523,6 +464,54 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const pulse = async () => {
+      try {
+        const stats = await invokeSafe("run_system_diagnostic");
+        if (stats) setSystemStats(stats);
+        const procs = await invokeSafe("get_process_list");
+        if (procs) setProcesses(procs);
+        const wins = await invokeSafe("get_running_windows");
+        if (wins) setWindows(wins);
+        const stor = await invokeSafe("get_storage_map");
+        if (stor) setStorage(stor);
+        const dev = await invokeSafe("get_system_devices");
+        if (dev) setDevices(dev);
+        setSystemLastSync(new Date().toLocaleTimeString());
+      } catch (err) { }
+    };
+
+    let itv: any;
+    const startPulse = (ms: number) => {
+      if (itv) clearInterval(itv);
+      itv = setInterval(pulse, ms);
+    };
+
+    const handleFocus = () => {
+      setPerformanceOptimized(false);
+      pulseIntervalRef.current = 2000;
+      startPulse(2000);
+    };
+
+    const handleBlur = () => {
+      setPerformanceOptimized(true);
+      pulseIntervalRef.current = 10000; // Throttle to 10s when not in focus
+      startPulse(10000);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    
+    pulse();
+    startPulse(2000);
+
+    return () => {
+      clearInterval(itv);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const integrity = await invokeSafe("get_venture_integrity") as number;
@@ -617,14 +606,6 @@ export default function App() {
   }, [showGraph, activeContext, showSettings, showNexus]);
 
   // --- LOGIC: MEMORY & INTENT ---
-  const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
-    setTimeline((prev: any[]) => [{
-      id: Date.now(),
-      type,
-      event,
-      time: new Date().toLocaleTimeString()
-    }, ...prev].slice(0, 50));
-  };
 
   const resolveNeuralIntent = async (query: string) => {
     const q = query.toLowerCase();
@@ -927,9 +908,14 @@ export default function App() {
     }
     setIsTimeTraveling(true);
     setTravelIndex(index);
-    const snap = chronosHistory[index];
-    setDynamicGraph({ nodes: snap.nodes, links: snap.links });
-    setNotification(`Temporal Shift: System State @ ${new Date(snap.timestamp).toLocaleTimeString()}`);
+    const snap = chronosHistory[index] as ChronosSnapshot;
+    if (snap) {
+      setDynamicGraph({ nodes: snap.nodes || [], links: snap.links || [] });
+      if (snap.metrics) setFounderMetrics(snap.metrics);
+      if (snap.market) setMarketIntel(snap.market);
+      setVentureIntegrity(snap.integrity);
+      setNotification(`Temporal Shift: System State @ ${new Date(snap.timestamp).toLocaleTimeString()}`);
+    }
   };
 
   const handleRewind = (seconds: number) => {
@@ -943,13 +929,19 @@ export default function App() {
       try {
         const nodes = dynamicGraph.nodes.length > 0 ? dynamicGraph.nodes : graphData.nodes;
         const links = dynamicGraph.links.length > 0 ? dynamicGraph.links : graphData.links;
-        await invokeSafe("capture_chronos_snapshot", { nodes, links });
+        await invokeSafe("capture_chronos_snapshot", { 
+          nodes, 
+          links,
+          metrics: founderMetrics,
+          market: marketIntel,
+          integrity: ventureIntegrity
+        });
         const history = await invokeSafe("seek_chronos_history") as any[];
         setChronosHistory(history);
       } catch (e) { }
     });
     return () => { unlistenChronos.then(f => f()); };
-  }, [isTimeTraveling, dynamicGraph, graphData]);
+  }, [isTimeTraveling, dynamicGraph, graphData, founderMetrics, marketIntel, ventureIntegrity]);
 
   const getNodeColor = (node: any) => {
     if (simMode) return "#f59e0b";
@@ -1132,80 +1124,45 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Phase 1: Automated Priority Enforcement
   useEffect(() => {
-    const syncProcesses = async () => {
-      try {
-        const procList = await invokeSafe("get_process_list") as ProcessInfo[];
-        setProcesses(procList);
-        const priorities = await Promise.all(
-          procList.map(async (proc) => {
-            try {
-              const p = await invokeSafe("get_process_priority", { pid: proc.pid }) as string;
-              return [proc.pid, p || "Normal"] as const;
-            } catch (e) {
-              return [proc.pid, "Normal"] as const;
-            }
-          })
-        );
-        const priorityMap = Object.fromEntries(priorities);
-        setProcessPriorities(priorityMap);
-        appliedPriorityPids.current = new Set(
-          [...appliedPriorityPids.current].filter((pid) => procList.some((p) => p.pid === pid))
-        );
-
-        // Apply cached priorities for restarted processes when allowed
-        if (permissions.process_control && autoApplyPriorities) {
-          const now = Date.now();
-          for (const proc of procList) {
-            const cached = priorityCache[proc.name];
-            if (!cached || cached.ignore) continue;
-            const cachedPriority = cached.priority || "NORMAL";
-            const ttlDays = cached.ttlDays ?? defaultTtlDays;
-            const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
-            if (cached.lastApplied > 0 && now - cached.lastApplied > ttlMs) continue;
-            const current = (priorityMap[proc.pid] || "Normal").toString().toLowerCase();
-            if (current !== cachedPriority.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
-              appliedPriorityPids.current.add(proc.pid);
-              invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() })
-                .then(() => {
-                  setPriorityCache((prev: any) => ({
-                    ...prev,
-                    [proc.name]: {
-                      priority: cachedPriority,
-                      lastApplied: Date.now(),
-                      source: "Auto-Applied",
-                      ignore: prev[proc.name]?.ignore,
-                      ttlDays: prev[proc.name]?.ttlDays ?? defaultTtlDays
-                    }
-                  }));
-                  logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
-                })
-                .catch(() => { });
-            }
-          }
+    if (!permissions.process_control || !autoApplyPriorities || processes.length === 0) return;
+    
+    const enforcePriorities = async () => {
+      const now = Date.now();
+      for (const proc of processes) {
+        const cached = priorityCache[proc.name];
+        if (!cached || cached.ignore) continue;
+        
+        const cachedPriority = cached.priority || "NORMAL";
+        const ttlDays = cached.ttlDays ?? defaultTtlDays;
+        const ttlMs = ttlDays * 24 * 60 * 60 * 1000;
+        
+        if (cached.lastApplied > 0 && now - cached.lastApplied > ttlMs) continue;
+        
+        // We check against the store-driven processPriorities
+        const current = (processPriorities[proc.pid] || "Normal").toString().toLowerCase();
+        if (current !== cachedPriority.toLowerCase() && !appliedPriorityPids.current.has(proc.pid)) {
+          appliedPriorityPids.current.add(proc.pid);
+          try {
+            await invokeSafe("set_process_priority", { pid: proc.pid, priority: cachedPriority.toLowerCase() });
+            setPriorityCache((prev: any) => ({
+              ...prev,
+              [proc.name]: {
+                ...prev[proc.name],
+                lastApplied: Date.now(),
+                source: "Auto-Applied"
+              }
+            }));
+            logPriorityChange(proc.pid, proc.name, cachedPriority.toUpperCase(), "Auto-Applied");
+          } catch (e) { }
         }
-      } catch (e) { }
+      }
     };
-    syncProcesses();
-    const interval = setInterval(syncProcesses, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    enforcePriorities();
+  }, [processes, autoApplyPriorities, permissions.process_control, priorityCache, defaultTtlDays, processPriorities]);
 
-  useEffect(() => {
-    const syncStorageDevices = async () => {
-      try {
-        const disks = await invokeSafe("get_storage_map") as StorageInfo[];
-        setStorageMap(disks);
-        const devs = await invokeSafe("get_system_devices") as DeviceInfo[];
-        setDevices(devs);
-        const health = await invokeSafe("get_battery_health_wmi") as any;
-        setBatteryHealth(health);
-      } catch (e) { }
-    };
-    syncStorageDevices();
-    const interval = setInterval(syncStorageDevices, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Primary hardware telemetry is handled by the main pulse
 
   useEffect(() => {
     const handleHotkey = (e: KeyboardEvent) => {
@@ -2121,7 +2078,7 @@ export default function App() {
   const SystemHUD = () => (
     <div className="w-full h-full flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {storageMap.map((disk, i) => (
+        {storage.map((disk, i) => (
           <div key={i} className="glass p-10 rounded-[3rem] border border-white/5 relative overflow-hidden group">
             <div className="flex justify-between items-start mb-8">
               <div>
@@ -2675,10 +2632,10 @@ export default function App() {
 
               <SystemPanel
                 stats={systemStats}
-                windows={runningWindows}
+                windows={windows}
                 processes={processes}
                 isScanning={isScanning}
-                storage={storageMap}
+                storage={storage}
                 devices={devices}
                 processPriorities={processPriorities}
                 priorityCache={priorityCache}
@@ -3533,6 +3490,10 @@ export default function App() {
             </div>
           </motion.div>
         )}
+
+        <SynthesisPanel />
+        <AdvisoryDebate />
+
         {activeOracle && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-black/90 backdrop-blur-5xl flex items-center justify-center p-20">
             <div className="w-full max-w-5xl glass-bright rounded-[4rem] border border-amber-500/30 p-16 relative overflow-hidden flex flex-col h-[700px]">
@@ -3894,143 +3855,12 @@ export default function App() {
       )}
       {/* Directive: Cortex Semantic HUD (Pillar 21) */}
       <AnimatePresence>
-        {showCortex && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[3000] bg-indigo-950/40 backdrop-blur-3xl flex items-center justify-center p-24"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="max-w-6xl w-full h-[85vh] glass-bright border border-indigo-500/30 rounded-[4rem] flex flex-col overflow-hidden shadow-5xl relative"
-            >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent animate-pulse" />
-
-              <header className="px-16 pt-16 pb-12 border-b border-white/5 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-3 block animate-pulse">Neural Cortex Scan Active</span>
-                  <h2 className="text-5xl font-black text-white uppercase tracking-tighter">Semantic Intelligence HUD</h2>
-                </div>
-
-                <div className="flex-1 max-w-xl mx-16">
-                   <div className="flex items-center glass-bright rounded-3xl px-8 py-5 border-indigo-500/30">
-                     <Search className="w-6 h-6 text-indigo-400 mr-4" />
-                     <input 
-                       value={cortexQuery}
-                       onChange={(e) => setCortexQuery(e.target.value)}
-                       onKeyDown={(e) => e.key === 'Enter' && handleCortexSearch()}
-                       placeholder="Search Semantic Neural Cortex..." 
-                       className="bg-transparent border-none outline-none text-white w-full font-bold placeholder:text-slate-600 text-lg"
-                     />
-                     <button onClick={handleCortexSearch} className="text-indigo-400 hover:text-white transition-colors">
-                       <Zap size={22} fill={cortexQuery.length > 0 ? "currentColor" : "none"} />
-                     </button>
-                   </div>
-                </div>
-
-                <button
-                  onClick={() => setShowCortex(false)}
-                  className="w-16 h-16 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
-                >
-                  <X className="w-8 h-8 text-slate-500 group-hover:text-white transition-colors" />
-                </button>
-              </header>
-
-              <div className="flex-1 overflow-y-auto px-16 py-12 custom-scrollbar">
-                <div className="grid grid-cols-1 gap-8">
-                  {cortexResults.map((res: any, i: number) => (
-                    <motion.div
-                      key={res.filepath}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="bg-white/[0.02] p-10 rounded-[3rem] border border-white/5 hover:border-indigo-500/40 transition-all group relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 right-0 p-8">
-                        <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
-                          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Aura Relevance: {(res.score * 100).toFixed(1)}%</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-10">
-                        <div className="w-20 h-20 rounded-3xl bg-indigo-600/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-all">
-                          <BrainCircuit className="w-10 h-10 text-indigo-500" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-3 group-hover:text-indigo-400 transition-colors">{res.filename}</h3>
-                          <p className="text-xs font-mono text-slate-500 mb-8 border-l-2 border-indigo-500/20 pl-4">{res.filepath}</p>
-                          <p className="text-sm text-slate-300 leading-relaxed font-medium bg-white/5 p-6 rounded-2xl italic">"{res.preview}"</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-8 pt-8 border-t border-white/5 flex gap-4">
-                        <button className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">Open Neural Node</button>
-                        <button className="px-8 py-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">Index Core</button>
-                      </div>
-                    </motion.div>
-                  ))}
-
-                  {cortexResults.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-40 opacity-20 text-center">
-                      <BrainCircuit className="w-24 h-24 text-white mb-8 mx-auto animate-pulse" />
-                      <span className="text-xl font-black uppercase tracking-[0.5em] text-white">No Semantic Matches In Cohort</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <footer className="p-10 border-t border-white/5 bg-black/20 text-center flex flex-col items-center gap-6">
-                {chronosHistory.length > 0 && (
-                  <div className="w-full max-w-4xl bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-xl">
-                    <div className="flex items-center justify-between mb-4 px-2">
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-2 h-2 rounded-full", isTimeTraveling ? "bg-amber-500 animate-pulse" : "bg-emerald-500")} />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          {isTimeTraveling ? "Chronos: Temporal View Active" : "Chronos: Real-Time Stream"}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-500">
-                        {chronosHistory.length} Snapshots Archived
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-1"
-                      max={chronosHistory.length - 1}
-                      value={travelIndex}
-                      onChange={(e) => handleTimeTravel(parseInt(e.target.value))}
-                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500 hover:accent-indigo-400 transition-all"
-                    />
-                    <div className="flex justify-between mt-2 px-1">
-                      <span className="text-[9px] font-black text-slate-600 uppercase">Live</span>
-                      <span className="text-[9px] font-black text-slate-600 uppercase">Archival Origin</span>
-                    </div>
-                  </div>
-                )}
-
-                {storageReport && (
-                  <div className="flex items-center gap-4 py-2 px-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-4 animate-in fade-in slide-in-from-bottom-4">
-                    <Database className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">{storageReport.status} // {Math.round(storageReport.transferred_bytes / 1024)} KB SYNCED</span>
-                  </div>
-                )}
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em]">Oasis Shell Framework / Semantic Intelligence Engine V0.1.2_ALPHA</span>
-                <div className="flex gap-10 mt-2 opacity-30 grayscale hover:grayscale-0 transition-all">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-[8px] font-bold text-white uppercase">C: System Nominal</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                    <span className="text-[8px] font-bold text-white uppercase">D: Golem Space Ready</span>
-                  </div>
-                </div>
-              </footer>
-            </motion.div>
-          </motion.div>
         )}
+      </AnimatePresence>
+
+      <CortexHUD />
+
+      {pendingPermission && (
       </AnimatePresence>
       {pendingPermission && (
         <div className="fixed inset-0 z-[5000] bg-black/70 backdrop-blur-xl flex items-center justify-center p-8">

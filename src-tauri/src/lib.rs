@@ -315,18 +315,30 @@ pub struct ChronosSnapshot {
     pub timestamp: String,
     pub nodes: Vec<serde_json::Value>,
     pub links: Vec<serde_json::Value>,
+    pub metrics: Option<VentureMetrics>,
+    pub market: Option<MarketIntelligence>,
+    pub integrity: f32,
     pub entropy_index: f32,
 }
 
 static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
 
 #[tauri::command]
-async fn capture_chronos_snapshot(nodes: Vec<serde_json::Value>, links: Vec<serde_json::Value>) -> Result<String, String> {
+async fn capture_chronos_snapshot(
+  nodes: Vec<serde_json::Value>, 
+  links: Vec<serde_json::Value>,
+  metrics: Option<VentureMetrics>,
+  market: Option<MarketIntelligence>,
+  integrity: f32
+) -> Result<String, String> {
     let mut buffer = CHRONOS_BUFFER.lock().unwrap();
     let snapshot = ChronosSnapshot {
         timestamp: chrono::Local::now().to_rfc3339(),
         nodes,
         links,
+        metrics,
+        market,
+        integrity,
         entropy_index: 0.0, // Calculated later
     };
     
@@ -335,7 +347,7 @@ async fn capture_chronos_snapshot(nodes: Vec<serde_json::Value>, links: Vec<serd
         buffer.remove(0);
     }
     buffer.push(snapshot);
-    Ok("Chronos Snapshot Captured.".into())
+    Ok("Chronos State Archival Complete.".into())
 }
 
 #[tauri::command]
@@ -988,12 +1000,14 @@ fn oas_get_latest_resume_analysis(state: tauri::State<'_, AppState>) -> Result<s
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SearchResult {
     pub filename: String,
     pub filepath: String,
     pub score: f32,
     pub preview: String,
+    pub last_modified: String,
+    pub size: u64,
 }
 
 #[tauri::command]
@@ -1033,11 +1047,23 @@ async fn search_semantic_nodes(state: tauri::State<'_, AppState>, query: String)
         
         let score = if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a.sqrt() * norm_b.sqrt()) };
         
+        let meta = std::fs::metadata(&filepath).ok();
+        let last_modified = meta
+            .and_then(|m| m.modified().ok())
+            .map(|t| {
+                let datetime: chrono::DateTime<chrono::Local> = t.into();
+                datetime.format("%Y-%m-%d %H:%M").to_string()
+            })
+            .unwrap_or_else(|| "Unknown".into());
+        let size = meta.map(|m| m.len()).unwrap_or(0);
+
         Ok(SearchResult {
             filename,
             filepath,
             score,
             preview: if content.len() > 150 { format!("{}...", &content[..150]) } else { content },
+            last_modified,
+            size: size,
         })
     }).map_err(|e| e.to_string())?;
     
