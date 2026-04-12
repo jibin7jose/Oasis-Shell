@@ -14,6 +14,8 @@ use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use std::collections::HashMap;
 use chrono::Timelike;
+use std::path::{Path, PathBuf};
+use std::fs;
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
@@ -803,7 +805,7 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
                             if let Ok(json) = res.json::<serde_json::Value>() {
                                 if let Some(embedding) = json["embedding"].as_array() {
                                     if let Ok(vector_str) = serde_json::to_string(embedding) {
-                                        if let Ok(conn) = rusqlite::Connection::open("oasis_crates.db") {
+                                        if let Ok(conn) = rusqlite::Connection::open("oasis_shell.db") {
                                             // Delete old version if exists, insert new
                                             let _ = conn.execute("DELETE FROM file_embeddings WHERE filepath = ?1", rusqlite::params![fp]);
                                             let _ = conn.execute(
@@ -825,42 +827,68 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn save_crate(state: tauri::State<'_, AppState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
-    let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
-    let timestamp = chrono::Local::now().to_rfc3339();
+fn get_crates_dir(app: &tauri::AppHandle) -> PathBuf {
+    let path = app.path().app_local_data_dir().expect("failed to get app data dir").join("crates");
+    if !path.exists() {
+        let _ = fs::create_dir_all(&path);
+    }
+    path
+}
 
-    conn.execute(
-        "INSERT INTO context_crates (name, description, aura_color, apps, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![name, description, aura_color, apps_json, timestamp],
-    ).map_err(|e| e.to_string())?;
+#[tauri::command]
+async fn save_crate(app: tauri::AppHandle, state: tauri::State<'_, AppState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+    let crates_dir = get_crates_dir(&app);
+    let id = chrono::Local::now().timestamp();
+    let timestamp = chrono::Local::now().to_rfc3339();
+    
+    let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
+    
+    let crate_data = ContextCrate {
+        id: Some(id as i32),
+        name: name.clone(),
+        description: description.clone(),
+        aura_color: aura_color.clone(),
+        apps: apps_json,
+        timestamp,
+    };
+
+    let file_path = crates_dir.join(format!("{}.json", id));
+    let json = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
+    fs::write(file_path, json).map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-fn get_crates(state: tauri::State<'_, AppState>) -> Result<Vec<ContextCrate>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT id, name, apps, timestamp FROM context_crates").map_err(|e| e.to_string())?;
-    
-    let crate_iter = stmt.query_map([], |row| {
-        Ok(ContextCrate {
-            id: Some(row.get(0)?),
-            name: row.get(1)?,
-            description: row.get(2).unwrap_or_else(|_| "Strategic context manifold.".into()),
-            aura_color: row.get(3).unwrap_or_else(|_| "#4f46e5".into()),
-            apps: row.get(4)?,
-            timestamp: row.get(5)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
+async fn get_crates(app: tauri::AppHandle) -> Result<Vec<ContextCrate>, String> {
+    let crates_dir = get_crates_dir(&app);
     let mut crates = Vec::new();
-    for c in crate_iter {
-        crates.push(c.map_err(|e| e.to_string())?);
+
+    if crates_dir.exists() {
+        for entry in fs::read_dir(crates_dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+                if let Ok(c) = serde_json::from_str::<ContextCrate>(&content) {
+                    crates.push(c);
+                }
+            }
+        }
     }
-    
+
+    crates.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     Ok(crates)
+}
+
+#[tauri::command]
+fn delete_crate(app: tauri::AppHandle, id: i32) -> Result<(), String> {
+    let crates_dir = get_crates_dir(&app);
+    let file_path = crates_dir.join(format!("{}.json", id));
+    if file_path.exists() {
+        let _ = fs::remove_file(file_path);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -894,25 +922,21 @@ async fn synthesize_crate_aura(state: tauri::State<'_, AppState>, apps: Vec<Wind
 
 
 #[tauri::command]
-fn launch_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
+fn launch_crate(app: tauri::AppHandle, id: i32) -> Result<(), String> {
+    let crates_dir = get_crates_dir(&app);
+    let file_path = crates_dir.join(format!("{}.json", id));
     
-    let apps_json: String = stmt.query_row(params![id], |row| row.get(0)).map_err(|e| e.to_string())?;
-    let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
+    if !file_path.exists() {
+        return Err("Neural Crate Variant Not Found in Local Storage.".into());
+    }
 
-    for app in apps {
-        if !app.exe_path.is_empty() {
-            // Intelligent Launch: Detect if it's VS Code and try to restore project context
-            if app.exe_path.to_uppercase().contains("CODE.EXE") {
-                // Heuristic: If title contains a path-like string, try to open it
-                if let Some(pos) = app.title.find(" - ") {
-                    let project_name = &app.title[..pos];
-                    println!("Oasis Kernel: Resolving project context for {}", project_name);
-                    // For now, simple spawn; future: pass project path as arg
-                }
-            }
-            let _ = std::process::Command::new(app.exe_path).spawn();
+    let content = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
+    let crate_data: ContextCrate = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let apps: Vec<WindowInfo> = serde_json::from_str(&crate_data.apps).map_err(|e| e.to_string())?;
+
+    for app_info in apps {
+        if !app_info.exe_path.is_empty() {
+             let _ = std::process::Command::new(app_info.exe_path).spawn();
         }
     }
     
@@ -920,37 +944,23 @@ fn launch_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String
 }
 
 #[tauri::command]
-fn export_crate_manifest(state: tauri::State<'_, AppState>, id: i32, target_path: String) -> Result<String, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT name, description, aura_color, apps, timestamp FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
+fn export_crate_manifest(app: tauri::AppHandle, id: i32, target_path: String) -> Result<String, String> {
+    let crates_dir = get_crates_dir(&app);
+    let file_path = crates_dir.join(format!("{}.json", id));
     
-    let crate_data: ContextCrate = stmt.query_row(params![id], |row| {
-        Ok(ContextCrate {
-            id: Some(id),
-            name: row.get(0)?,
-            description: row.get(1).unwrap_or_default(),
-            aura_color: row.get(2).unwrap_or_default(),
-            apps: row.get(3)?,
-            timestamp: row.get(4)?,
-        })
-    }).map_err(|e| e.to_string())?;
+    if !file_path.exists() {
+        return Err("Neural Source Missing.".into());
+    }
 
-    let json = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let crate_data: ContextCrate = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
     let filename = format!("crate_{}_{}.json", crate_data.name.replace(" ", "_"), id);
     let final_path = std::path::Path::new(&target_path).join(filename);
     
-    std::fs::write(&final_path, json).map_err(|e| e.to_string())?;
+    fs::write(&final_path, content).map_err(|e| e.to_string())?;
     Ok(final_path.to_string_lossy().to_string())
 }
-
-#[tauri::command]
-fn delete_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
-    conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
-}
-
 #[tauri::command]
 fn launch_context_apps(apps: Vec<WindowInfo>) -> Result<Vec<String>, String> {
     let mut sys = sysinfo::System::new_all();
@@ -2193,7 +2203,7 @@ async fn generate_strategic_report(summary: String, oracle_advice: String) -> Re
 #[tauri::command]
 async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, String> {
     let base_folders = vec!["vault", "manifested"];
-    let db_file = "src-tauri/oasis_crates.db";
+    let db_file = "src-tauri/oasis_shell.db";
     let target_dir = std::path::Path::new(&target_path);
 
     if !target_dir.exists() {
@@ -2204,7 +2214,7 @@ async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, 
 
     // 1. MIGRATE CRATES DB (Critical)
     if std::path::Path::new(db_file).exists() {
-        let db_target = target_dir.join("oasis_crates.db");
+        let db_target = target_dir.join("oasis_shell.db");
         std::fs::copy(db_file, &db_target).map_err(|e| e.to_string())?;
         total_bytes += std::fs::metadata(db_file).unwrap().len();
     }
@@ -3479,101 +3489,10 @@ async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde
 }
 
 pub fn run() {
-    let conn = rusqlite::Connection::open("oasis_crates.db").expect("failed to open database");
+    let context = tauri::generate_context!();
     
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS context_crates (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT,
-            aura_color TEXT,
-            apps TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create table");
-
-    // Atomic Schema Migration Layer (Phase 22)
-    let _ = conn.execute("ALTER TABLE context_crates ADD COLUMN description TEXT", []);
-    let _ = conn.execute("ALTER TABLE context_crates ADD COLUMN aura_color TEXT", []);
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS neural_logs (
-            id INTEGER PRIMARY KEY,
-            event_type TEXT NOT NULL,
-            message TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create logs table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS resume_analysis (
-            id INTEGER PRIMARY KEY,
-            role TEXT NOT NULL,
-            match_score INTEGER NOT NULL,
-            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
-        )",
-        [],
-    ).expect("failed to create resume analysis table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS file_embeddings (
-            id INTEGER PRIMARY KEY,
-            filename TEXT NOT NULL,
-            filepath TEXT NOT NULL,
-            content TEXT NOT NULL,
-            vector TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create vector table");
-
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS strategic_pulses (
-            id INTEGER PRIMARY KEY,
-            node_id TEXT NOT NULL,
-            status TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create strategic_pulses table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS compute_ledger (
-            id INTEGER PRIMARY KEY,
-            tokens INTEGER NOT NULL,
-            cost REAL NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create compute_ledger table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS pinned_contexts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            state_blob TEXT NOT NULL,
-            aura_color TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create pinned_contexts table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS system_secrets (
-            name TEXT PRIMARY KEY,
-            secret_blob BLOB NOT NULL,
-            nonce BLOB NOT NULL,
-            salt BLOB NOT NULL,
-            timestamp TEXT NOT NULL
-        )",
-        [],
-    ).expect("failed to create system_secrets table");
-
-    let config = OasisConfig::load();
-    tauri::Builder::default()
-        .manage(AppState { db: std::sync::Mutex::new(conn), config })
+    // We build the app first to get access to path resolution
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
@@ -3710,8 +3629,32 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
             
-            // Phase 14: Chronos Pulse (Temporal Snapshotting)
-            // This thread signals the frontend to capture a 3D state snapshot every 60s
+            // Resolve storage paths
+            let app_data_dir = app_handle.path().app_local_data_dir().expect("failed to resolve app data dir");
+            if !app_data_dir.exists() {
+                let _ = std::fs::create_dir_all(&app_data_dir);
+            }
+            
+            // Initialize Crates Directory
+            let crates_dir = app_data_dir.join("crates");
+            if !crates_dir.exists() {
+                let _ = std::fs::create_dir_all(&crates_dir);
+            }
+
+            let db_path = app_data_dir.join("oasis_shell.db");
+            let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
+            
+            // DB Table Initialization
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (id INTEGER PRIMARY KEY, name TEXT NOT NULL, apps TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
+
+            // Manage state
+            app.manage(AppState { db: std::sync::Mutex::new(conn), config: OasisConfig::load() });
+
+            // Background threads
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
@@ -3719,63 +3662,10 @@ pub fn run() {
                 }
             });
 
-            // Phase 9.1: The Spectral Observer Pulse
-            let app_handle_spectral = app.handle().clone();
-            std::thread::spawn(move || {
-                let mut sys = System::new_all();
-                loop {
-                    std::thread::sleep(Duration::from_secs(5));
-                    sys.refresh_all();
-                    
-                    let mut anomalies = Vec::new();
-                    
-                    for (pid, process) in sys.processes() {
-                        let proc_name = process.name().to_string_lossy();
-                        let cpu = process.cpu_usage();
-                        let exe_path = process.exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
-                        
-                        if cpu > 90.0 {
-                            anomalies.push(SpectralAnomaly {
-                                id: format!("SN-THERM-{}", pid),
-                                source: "Kernel".into(),
-                                description: format!("Thermal Spike: {} [CPU: {:.1}%]", proc_name, cpu),
-                                risk_level: 0.72,
-                                timestamp: chrono::Local::now().to_rfc3339(),
-                                associated_pid: Some(pid.as_u32()),
-                            });
-                        }
-
-                        if pid.as_u32() > 30000 && exe_path.is_empty() {
-                            anomalies.push(SpectralAnomaly {
-                                id: format!("SN-SHADOW-{}", pid),
-                                source: "Kernel".into(),
-                                description: format!("Ghost Thread detected in Upper PID space: PID {}", pid),
-                                risk_level: 0.45,
-                                timestamp: chrono::Local::now().to_rfc3339(),
-                                associated_pid: Some(pid.as_u32()),
-                            });
-                        }
-
-                        if exe_path.contains("Temp") || exe_path.contains("AppData\\Local\\Temp") {
-                            anomalies.push(SpectralAnomaly {
-                                id: format!("SN-TEMP-{}", pid),
-                                source: "FileSystem".into(),
-                                description: format!("Transient Execution: {} running from volatile TEMP space", proc_name),
-                                risk_level: 0.88,
-                                timestamp: chrono::Local::now().to_rfc3339(),
-                                associated_pid: Some(pid.as_u32()),
-                            });
-                        }
-                    }
-
-                    if !anomalies.is_empty() {
-                        let _ = app_handle_spectral.emit("spectral-anomaly", &anomalies);
-                    }
-                }
-            });
-
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(context)
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, _event| {});
 }
