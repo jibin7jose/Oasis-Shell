@@ -2329,7 +2329,7 @@ export default function App() {
         />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
-          {activeView !== 'dash' && (
+          {(activeView === 'processes' || activeView === 'storage') && (
             <div className="w-full max-w-7xl flex flex-col items-start gap-12">
               <div className="flex items-center gap-6">
                 <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
@@ -2414,9 +2414,9 @@ export default function App() {
               <div className={cn("flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative", zenMode && "zen-hide")}>
                 <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
                   {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
-                    <div key={i} className="flex gap-4 items-center">
+                    <div key={`app-ticker-${m.id || i}`} className="flex gap-4 items-center">
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
-                      <span className="text-sm font-bold text-white tracking-tight">${m.price?.toFixed(1)}</span>
+                      <span className="text-sm font-bold text-white tracking-tight">${(m.price ?? 0).toFixed(1)}</span>
                       <span className={cn("text-[10px] font-black tracking-widest uppercase", m.color === 'emerald' ? "text-emerald-500" : "text-rose-500")}>
                         {m.change}
                       </span>
@@ -2432,7 +2432,7 @@ export default function App() {
                   { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
                   { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
                 ].map((m, i) => (
-                  <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
+                  <div key={`founder-metric-${m.label}-${i}`} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
                     <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
                     <div>
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
@@ -2471,7 +2471,7 @@ export default function App() {
                   </div>
                   <div className="flex flex-col gap-4">
                     {strategicInventory.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
+                      <div key={`inventory-${item.id || item.name || i}`} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
                         <div className="flex items-center gap-4">
                           <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
                           <div>
@@ -2499,7 +2499,7 @@ export default function App() {
                   <div className="flex flex-col gap-4">
                     {activeGolems.map((golem, i) => (
                       <div
-                        key={i}
+                        key={`golem-matrix-${golem.id || golem.name || i}`}
                         onClick={() => setSelectedGolem(golem)}
                         className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
                       >
@@ -2598,7 +2598,7 @@ export default function App() {
 
           {activeView === 'timeline' && (
             <CortexLog
-              logs={neuralLogs}
+              logs={timeline}
               onRefresh={refreshSystemSnapshot}
             />
           )}
@@ -2673,9 +2673,9 @@ export default function App() {
                       <p className="text-[10px] text-slate-500 italic uppercase">System is optimized & tranquil.</p>
                     </div>
                   )}
-                  {spectralAnomalies.map((anom) => (
+                  {spectralAnomalies.map((anom, i) => (
                     <motion.div
-                      key={anom.id || Math.random()}
+                      key={`anomaly-${anom.id || i}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="p-5 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-rose-500/30 transition-all group overflow-hidden relative"
@@ -2950,7 +2950,7 @@ export default function App() {
             </div>
             <div className="flex-1 w-full bg-black/40 rounded-3xl p-8 mb-6 font-mono text-sm overflow-y-auto custom-scrollbar space-y-3">
               {cliHistory.map((h, i) => (
-                <div key={i} className="flex gap-4">
+                <div key={`cli-line-${i}`} className="flex gap-4">
                   <span className="text-slate-600">[{h.type === 'cmd' ? '>' : '#'}]</span>
                   <span style={{ color: h.color }} className="font-bold tracking-tight">{h.text}</span>
                 </div>

@@ -69,7 +69,7 @@ export default function CortexLog({ logs, onRefresh }: CortexLogProps) {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.05 }}
-            key={entry.id} 
+            key={`${entry.id ?? entry.timestamp ?? "log"}-${i}`} 
             className="relative pl-8 border-l border-white/10 last:border-0 pb-6"
           >
             <div className={cn(

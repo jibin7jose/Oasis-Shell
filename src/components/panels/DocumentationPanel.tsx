@@ -5,7 +5,7 @@ import {
   Shield, Zap, Cpu, Code2, 
   Search, Terminal, Database, Bot, Activity, History
 } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invokeSafe, isTauri } from "../../lib/tauri";
 
 interface DocumentationPanelProps {
     isOpen: boolean;
@@ -14,7 +14,8 @@ interface DocumentationPanelProps {
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
-const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+
+
 
 export default function DocumentationPanel({ isOpen, onClose }: DocumentationPanelProps) {
     const [chapters, setChapters] = useState<any[]>([]);
@@ -27,7 +28,7 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
             const fetchIndex = async () => {
                 try {
                     const idx = isTauri 
-                        ? await invoke<string[]>("get_documentation_index")
+                        ? await invokeSafe<string[]>("get_documentation_index")
                         : ["overview", "architecture", "security", "roadmap"];
                     
                     const formatted = idx.map(id => ({
@@ -54,7 +55,7 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
                 setIsLoading(true);
                 try {
                     const content = isTauri 
-                        ? await invoke<string>("get_documentation_chapter", { id: selectedChapter })
+                        ? await invokeSafe<string>("get_documentation_chapter", { id: selectedChapter })
                         : `<h1>${selectedChapter}</h1><p>This is a simulated manual entry for the ${selectedChapter} module.</p>`;
                     setHtmlContent(content);
                 } catch (e) {
@@ -160,7 +161,7 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
                            <span className="uppercase tracking-widest font-black">Registry Check // Channel: {selectedChapter}</span>
                         </div>
                         <div className="text-emerald-500 opacity-80 flex items-center gap-4">
-                           <span className="animate-pulse">●</span>
+                           <span className="animate-pulse">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â</span>
                            oasisshell.exe -load --chapter {selectedChapter.toLowerCase()} --source blog/docs/
                         </div>
                         <div className="text-white opacity-40">
@@ -173,3 +174,4 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
         </motion.div>
     );
 }
+

@@ -908,8 +908,8 @@ export default function SystemPanel({
             )}
             {(filteredAudit ?? [])
               .slice(auditPageSafe * auditPageSize, auditPageSafe * auditPageSize + auditPageSize)
-              .map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between text-[10px] text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
+              .map((entry, index) => (
+                <div key={`${entry.id ?? entry.pid ?? "audit"}-${index}`} className="flex items-center justify-between text-[10px] text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
                   <div className="truncate">
                     <span className="font-bold text-white/80">{entry.name}</span> ? PID {entry.pid}
                   </div>

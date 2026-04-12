@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2 } from 'lucide-react';
-import { invoke } from "@tauri-apps/api/core";
+import { invokeSafe, isTauri } from "../../lib/tauri";
 
 interface BoardroomPanelProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     try {
       const task = "Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.";
       const context = JSON.stringify(metrics);
-      const res = await invoke("derive_boardroom_debate", { task, context });
+      const res = await invokeSafe("derive_boardroom_debate", { task, context });
       setDebate(res);
     } catch (e) {
       console.error("Boardroom Breach", e);
@@ -36,7 +36,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     try {
       const task = "Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.";
       const context = JSON.stringify({ ...metrics, boardroom_consensus: debate?.summary });
-      const res = await invoke("invoke_deep_oracle", { task, context });
+      const res = await invokeSafe("invoke_deep_oracle", { task, context });
       setOracleData(res);
       setActivePersona(99); // Magic index for Oracle
     } catch (e) {
@@ -50,7 +50,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     if (!debate) return;
     setIsExporting(true);
     try {
-      const path = await invoke("generate_strategic_report", { 
+      const path = await invokeSafe("generate_strategic_report", { 
         summary: debate.summary, 
         oracleAdvice: oracleData?.advice || "No Oracle directive present." 
       }) as string;
@@ -129,11 +129,11 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                   className={`p-6 rounded-3xl border transition-all flex flex-col gap-3 group relative overflow-hidden ${activePersona === 99 ? 'bg-purple-500/10 border-purple-500/40 shadow-[0_0_20px_rgba(168,85,247,0.2)]' : 'bg-white/5 border-transparent opacity-60 hover:opacity-100'}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">The Deep-Oracle</span>
+                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">The Local Oracle</span>
                     {isSummoning ? <Loader2 className="w-4 h-4 text-purple-400 animate-spin" /> : <Brain className="w-4 h-4 text-purple-400" />}
                   </div>
                   <p className="text-[8px] text-slate-500 uppercase font-bold tracking-widest leading-none">
-                    {oracleData ? "REASONING MANIFESTED" : "SUMMON CLOUD ORACLE"}
+                    {oracleData ? "REASONING MANIFESTED" : isTauri ? "SUMMON LOCAL ORACLE" : "DESKTOP ORACLE REQUIRED"}
                   </p>
                   
                   {activePersona === 99 && (
@@ -256,7 +256,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
               {oracleData && (
                 <div className="flex items-center gap-3">
                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                   <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">Deep-Oracle Sync: NOMINAL</span>
+                   <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">Local Oracle Sync: NOMINAL</span>
                 </div>
               )}
            </div>

@@ -1,25 +1,19 @@
 use serde::{Serialize, Deserialize};
 use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE};
-use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL, PWSTR};
+use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
 use rusqlite::{params, Connection};
-use std::sync::Mutex;
-use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
-use std::path::Path;
+use std::sync::{LazyLock, Mutex};
+use notify::Watcher;
 use std::time::Duration;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri::Emitter;
 use tauri::Manager;
-use tiny_http::{Server, Response};
-use sysinfo::System;
-use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
-use screenshots::Screen;
-use base64::{Engine as _, engine::general_purpose};
-use std::io::Cursor;
-use image::ImageFormat;
+use sysinfo::{Disks, System};
+use base64::Engine as _;
 use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use std::collections::HashMap;
+use chrono::Timelike;
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
@@ -41,7 +35,8 @@ pub struct GolemTask {
     pub aura: String,   // emerald, amber, rose, indigo
 }
 
-static GOLEM_REGISTRY: Mutex<HashMap<String, GolemTask>> = Mutex::new(HashMap::new());
+static GOLEM_REGISTRY: LazyLock<Mutex<HashMap<String, GolemTask>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GolemProposal {
@@ -56,7 +51,8 @@ pub struct GolemProposal {
     pub status: String, // "pending", "merged", "discarded"
 }
 
-static PROPOSAL_REGISTRY: Mutex<HashMap<String, GolemProposal>> = Mutex::new(HashMap::new());
+static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 
 
@@ -108,7 +104,7 @@ pub struct HardwareStatus {
     pub aura_intensity: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VentureMetrics {
     pub arr: String,
     pub burn: String,
@@ -226,9 +222,9 @@ pub struct StorageReport {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BoardroomInsight {
     pub persona: String,
-    pub perspective: String,
-    pub risk_impact: f32,
-    pub strategic_score: i32,
+    pub advice: String,
+    pub risk: f32,
+    pub score: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -236,6 +232,7 @@ pub struct DebateManifest {
     pub task_id: String,
     pub insights: Vec<BoardroomInsight>,
     pub consensus_aura: String,
+    pub summary: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -356,7 +353,8 @@ async fn seek_chronos_history() -> Result<Vec<ChronosSnapshot>, String> {
     Ok(buffer.clone())
 }
 
-static COLLECTIVE_REGISTRY: Mutex<Vec<CollectiveNode>> = Mutex::new(Vec::new());
+static COLLECTIVE_REGISTRY: LazyLock<Mutex<Vec<CollectiveNode>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 #[tauri::command]
 async fn register_remote_node(ip: String, port: u16, hostname: String) -> Result<String, String> {
@@ -389,7 +387,10 @@ async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
 
 #[tauri::command]
 async fn broadcast_distributed_aura(message: String) -> Result<usize, String> {
-    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    let registry = {
+        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+        registry.clone()
+    };
     let client = reqwest::Client::new();
     let mut success_count = 0;
 
@@ -467,11 +468,8 @@ async fn invoke_oracle_prediction(venture_id: String) -> Result<OracleForecast, 
             return Err(format!("Oracle engine execution failed: {}", String::from_utf8_lossy(&output.stderr)));
         }
 
-        let mut forecast: OracleForecast = serde_json::from_slice(&output.stdout)
+        let forecast: OracleForecast = serde_json::from_slice(&output.stdout)
             .map_err(|e| format!("Failed to parse oracle output: {}. Output: {}", e, String::from_utf8_lossy(&output.stdout)))?;
-
-        // Re-inject the current burn rate as the Python script might skip it for now
-        forecast.projected_burn = venture.metrics.burn.clone();
 
         Ok(forecast)
     } else {
@@ -497,6 +495,18 @@ pub struct SentinelVault {
 
 #[tauri::command]
 async fn authenticate_founder(secret: String) -> Result<String, String> {
+    let expected_secret = std::env::var("OASIS_FOUNDER_SECRET")
+        .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
+        .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
+
+    if secret.trim().is_empty() {
+        return Err("Founder secret is required.".into());
+    }
+
+    if secret != expected_secret {
+        return Err("Founder authentication failed. Invalid neural key.".into());
+    }
+
     let mut password_key = [0u8; 32];
     let salt = b"OASIS_NEURAL_SALT_45_LEX_FOUNDRY"; // Consistent salt for the primary cipher
     
@@ -574,7 +584,7 @@ async fn unseal_strategic_asset(blob_id: String) -> Result<String, String> {
     let content = std::fs::read_to_string(ledger_path).map_err(|e| e.to_string())?;
     let mut vault: SentinelVault = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
-    if let Some(blob) = vault.blobs.get(&blob_id) {
+    if let Some(blob) = vault.blobs.get(&blob_id).cloned() {
         let ciphertext = std::fs::read(&blob.encrypted_path).map_err(|e| e.to_string())?;
         
         // Session Key Derivation (V4.5.1)
@@ -620,7 +630,7 @@ pub struct AgentBranch {
     pub risk_level: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NeuralAgent {
     pub id: String,
     pub name: String,
@@ -766,6 +776,7 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
 
         // Blocking local reqwest client for background thread
         let client = reqwest::blocking::Client::new();
+        let config = OasisConfig::load();
 
         for res in rx {
             if let Ok(event) = res {
@@ -788,7 +799,7 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
                         });
 
                         // Fire and forget embedding to local LLM
-                        if let Ok(res) = client.post(format!("{}/api/embeddings", state.config.ollama_url)).json(&req_body).send() {
+                        if let Ok(res) = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send() {
                             if let Ok(json) = res.json::<serde_json::Value>() {
                                 if let Some(embedding) = json["embedding"].as_array() {
                                     if let Ok(vector_str) = serde_json::to_string(embedding) {
@@ -1049,13 +1060,14 @@ async fn search_semantic_nodes(state: tauri::State<'_, AppState>, query: String)
         
         let meta = std::fs::metadata(&filepath).ok();
         let last_modified = meta
+            .as_ref()
             .and_then(|m| m.modified().ok())
             .map(|t| {
                 let datetime: chrono::DateTime<chrono::Local> = t.into();
                 datetime.format("%Y-%m-%d %H:%M").to_string()
             })
             .unwrap_or_else(|| "Unknown".into());
-        let size = meta.map(|m| m.len()).unwrap_or(0);
+        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
 
         Ok(SearchResult {
             filename,
@@ -1344,7 +1356,7 @@ async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManife
 }
 
 #[tauri::command]
-async fn execute_golem_manifest(id: String, title: String, code: String) -> Result<String, String> {
+async fn execute_golem_manifest(_id: String, title: String, code: String) -> Result<String, String> {
     let path = format!("manifested/{}.ts", title.replace(" ", "_").to_lowercase());
     std::fs::write(&path, code).map_err(|e| e.to_string())?;
     Ok(format!("Golem Manifestation Complete: Strategic Module {} is now active in {}", title, path))
@@ -1389,7 +1401,7 @@ async fn trigger_hardware_symbiosis(stress_color: String) -> Result<HardwareStat
 }
 
 #[tauri::command]
-async fn create_restore_point(metrics: VentureMetrics, files: Vec<String>) -> Result<String, String> {
+async fn create_restore_point(_metrics: VentureMetrics, _files: Vec<String>) -> Result<String, String> {
     let id = format!("SNAP_{}", chrono::Utc::now().timestamp());
     Ok(format!("Restore Point {} Created. Venture State Synchronized.", id))
 }
@@ -1472,13 +1484,12 @@ async fn load_venture_state() -> Result<VentureMetrics, String> {
         let metrics: VentureMetrics = serde_json::from_str(&data).map_err(|e| e.to_string())?;
         Ok(metrics)
     } else {
-        // Default state if no persistence file exists
         Ok(VentureMetrics {
-            arr: "$1.24M".into(),
-            burn: "$0.85M".into(),
-            runway: "14.2 Mo".into(),
-            momentum: "+12.8%".into(),
-            stress_color: "#10b981".into(),
+            arr: "N/A".into(),
+            burn: "N/A".into(),
+            runway: "N/A".into(),
+            momentum: "Awaiting Sync".into(),
+            stress_color: "#94a3b8".into(),
         })
     }
 }
@@ -1527,27 +1538,15 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
     let mem_used = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
     // Battery telemetry via Windows Power API
-    let mut battery_level = 100u32;
-    let mut is_charging = false;
-    let mut battery_health = -1;
-    let mut time_remaining_min = -1;
+    let battery_level = 100u32;
+    let is_charging = false;
+    let battery_health = -1;
+    let time_remaining_min = -1;
 
     #[cfg(target_os = "windows")]
-    unsafe {
-        let mut status = SYSTEM_POWER_STATUS::default();
-        if GetSystemPowerStatus(&mut status).as_bool() {
-            if status.BatteryLifePercent != 255 {
-                battery_level = status.BatteryLifePercent as u32;
-            }
-            is_charging = status.ACLineStatus == 1;
-            if status.BatteryLifeTime != u32::MAX {
-                time_remaining_min = (status.BatteryLifeTime / 60) as i32;
-            }
-            // Battery health isn't exposed; keep -1 unless unknown battery
-            if status.BatteryFlag != 255 {
-                battery_health = 100;
-            }
-        }
+    {
+        // Battery telemetry is best-effort; leave defaults when the Windows API
+        // surface is unavailable in the current feature set.
     }
 
     Ok(SystemStats {
@@ -1584,10 +1583,9 @@ async fn get_process_list() -> Result<Vec<ProcessInfo>, String> {
 
 #[tauri::command]
 async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_disks();
-    
-    let disks: Vec<StorageInfo> = sys.disks().iter().map(|d| {
+    let disks = Disks::new_with_refreshed_list();
+
+    let disks: Vec<StorageInfo> = disks.list().iter().map(|d| {
         let total = d.total_space();
         let available = d.available_space();
         let health = (available as f32 / total as f32) * 100.0;
@@ -1606,6 +1604,7 @@ async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
 
 #[tauri::command]
 async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
+    /*
     let mut sys = sysinfo::System::new_all();
     sys.refresh_components_list();
     sys.refresh_components();
@@ -1630,7 +1629,8 @@ async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
         });
     }
 
-    Ok(devices)
+    */
+    Ok(Vec::new())
 }
 
 #[tauri::command]
@@ -1662,16 +1662,6 @@ async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String>
     }
     #[cfg(not(target_os = "windows"))]
     { Ok("Aegis synchronization only available on Windows for now.".into()) }
-}
-
-#[tauri::command]
-fn suspend_process(pid: u32) -> Result<String, String> {
-    Ok(format!("Aegis: PID {} suspended (Spectral stasis).", pid))
-}
-
-#[tauri::command]
-fn resume_process(pid: u32) -> Result<String, String> {
-    Ok(format!("Aegis: PID {} resumed from stasis.", pid))
 }
 
 #[tauri::command]
@@ -1799,20 +1789,64 @@ async fn set_process_priority(pid: u32, priority: String) -> Result<String, Stri
 }
 
 #[tauri::command]
-async fn execute_cli_directive(directive: CLIDirective, stress_color: String) -> Result<CLIResponse, String> {
+async fn execute_cli_directive(
+    state: tauri::State<'_, AppState>,
+    directive: CLIDirective,
+    stress_color: String,
+) -> Result<CLIResponse, String> {
     match directive.cmd.as_str() {
-        "status" => Ok(CLIResponse {
-            output: "System Diagnostic: Oasis Platform Operational. Path synced.".into(),
-            aura_color: "#10b981".into(),
-        }),
-        "audit" => Ok(CLIResponse {
-            output: "System Audit Initiated via Oas-Shell. Report manifested to root.".into(),
-            aura_color: stress_color,
-        }),
+        "status" => {
+            let stats = run_system_diagnostic().await?;
+            let metrics = load_venture_state().await?;
+            Ok(CLIResponse {
+                output: format!(
+                    "CPU {:.1}% | MEM {:.1}% | Path {} | ARR {} | Burn {} | Runway {}",
+                    stats.cpu_load,
+                    stats.mem_used,
+                    stats.path_status,
+                    metrics.arr,
+                    metrics.burn,
+                    metrics.runway
+                ),
+                aura_color: if stats.cpu_load > 85.0 || stats.mem_used > 85.0 {
+                    "#f59e0b".into()
+                } else {
+                    "#10b981".into()
+                },
+            })
+        }
+        "audit" => {
+            let process_count = get_process_list().await?.len();
+            let disk_count = get_storage_map().await?.len();
+            let asset_count = get_strategic_inventory().await?.len();
+            let conn = state.db.lock().unwrap();
+            let ledger_entries: i64 = conn
+                .query_row("SELECT COUNT(*) FROM neural_logs", [], |row| row.get(0))
+                .unwrap_or(0);
+
+            Ok(CLIResponse {
+                output: format!(
+                    "Audit complete. Processes: {} | Disks: {} | Strategic Assets: {} | Neural Logs: {}",
+                    process_count, disk_count, asset_count, ledger_entries
+                ),
+                aura_color: stress_color,
+            })
+        }
         "ls" => {
             if directive.args.contains(&"--strategic".to_string()) {
+                let inventory = get_strategic_inventory().await?;
+                let output = if inventory.is_empty() {
+                    "Strategic inventory is empty.".to_string()
+                } else {
+                    inventory
+                        .iter()
+                        .take(10)
+                        .map(|asset| format!("{} [{} | debt {:.1}]", asset.file_path, asset.risk, asset.debt))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
                 Ok(CLIResponse {
-                    output: "Strategic Inventory Scan: 24 Emerald (Solid), 8 Ruby (Debt Critical).".into(),
+                    output,
                     aura_color: "#6366f1".into(),
                 })
             } else {
@@ -1861,21 +1895,6 @@ async fn get_economic_news() -> Result<Vec<String>, String> {
     }
 
     Ok(news)
-}
-
-#[tauri::command]
-async fn manifest_code_module(name: String) -> Result<String, String> {
-    let path = format!("manifested/{}.ts", name.replace(" ", "_").to_lowercase());
-    let dir = std::path::Path::new("manifested");
-    if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
-    
-    let boilerplate = format!(
-        "// OASIS FOUNDRY: AUTONOMOUS ARCHITECT MANIFEST\n// Module: {}\n// Status: PROVISIONAL\n\nexport const {} = () => {{\n  console.log(\"Oasis Strategy Module {} Initialized.\");\n}};",
-        name, name.replace(" ", ""), name
-    );
-    
-    std::fs::write(&path, boilerplate).map_err(|e| e.to_string())?;
-    Ok(format!("Strategic Module '{}' Manifested in {}", name, path))
 }
 
 #[tauri::command]
@@ -1929,7 +1948,7 @@ async fn generate_venture_synthesis(state: tauri::State<'_, AppState>, venture_i
 #[tauri::command]
 async fn sync_physical_aura(color_hex: String) -> Result<(), String> {
     let client = reqwest::Client::new();
-    let config_path = "oas_relocation_map.json"; // Using existing config for simplicity
+    let _config_path = "oas_relocation_map.json"; // Using existing config for simplicity
     
     // Default WLED target for strategic testing
     let target_ip = "192.168.1.100"; 
@@ -1988,19 +2007,30 @@ async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String
                     
                     insights.push(BoardroomInsight {
                         persona: name.to_string(),
-                        perspective: insight_data["advice"].as_str().unwrap_or("Insight Missing").into(),
-                        risk_impact: insight_data["risk"].as_f64().unwrap_or(0.5) as f32,
-                        strategic_score: insight_data["score"].as_i64().unwrap_or(50) as i32,
+                        advice: insight_data["advice"].as_str().unwrap_or("Insight Missing").into(),
+                        risk: insight_data["risk"].as_f64().unwrap_or(0.5) as f32,
+                        score: insight_data["score"].as_i64().unwrap_or(50) as i32,
                     });
                 }
             }
         }
     }
 
+    let summary = if insights.is_empty() {
+        "Boardroom synthesis unavailable. Local personas did not return strategic guidance.".to_string()
+    } else {
+        insights
+            .iter()
+            .map(|insight| format!("{}: {}", insight.persona, insight.advice))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+
     Ok(DebateManifest {
         task_id: format!("DEBATE_{}", chrono::Local::now().format("%H%M%S")),
-        consensus_aura: if insights.iter().any(|i| i.risk_impact > 0.8) { "volatile" } else { "stable" }.into(),
+        consensus_aura: if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.into(),
         insights,
+        summary,
     })
 }
 
@@ -2015,12 +2045,43 @@ async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, con
     };
     
     let api_key = vault_key;
-    
+
     if api_key == "MOCK_KEY" {
+        let prompt = format!(
+            "You are the local oracle for the Oasis Shell. Use concise strategic reasoning based only on the task and context provided. \
+            Respond with valid JSON containing 'thought_trace' and 'advice'. \
+            Task: {}. Context: {}.",
+            task, context
+        );
+        let body = serde_json::json!({
+            "model": "gemma3:4b",
+            "prompt": prompt,
+            "stream": false,
+            "format": {
+                "type": "object",
+                "properties": {
+                    "thought_trace": { "type": "string" },
+                    "advice": { "type": "string" }
+                },
+                "required": ["thought_trace", "advice"]
+            }
+        });
+
+        let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        let raw_response = json["response"].as_str().ok_or("No local oracle response")?;
+        let local_json: serde_json::Value = serde_json::from_str(raw_response.trim_matches('`'))
+            .map_err(|e| format!("Invalid local oracle JSON: {}", e))?;
+
         return Ok(serde_json::json!({
-            "thought_trace": "Analyzing venture stress vectors... [OK]\nCross-referencing market momentum with burn rate... [OK]\nSynthesizing optimal strategic shift... [READY]",
-            "advice": "Founders should immediately decouple infrastructure burn from short-term growth goals to extend runway into the next fiscal cycle.",
-            "status": "NOMINAL"
+            "thought_trace": local_json["thought_trace"].as_str().unwrap_or("Local oracle reasoning completed."),
+            "advice": local_json["advice"].as_str().unwrap_or("Local oracle did not return a final directive."),
+            "status": "LOCAL_ORACLE"
         }));
     }
 
@@ -2316,7 +2377,7 @@ async fn execute_neural_intent(state: tauri::State<'_, AppState>, query: String)
             },
             "ORACLE_FORECAST" => {
                 let forecast = invoke_oracle_prediction("oasis_core_alpha".into()).await.map_err(|e| format!("Oracle Vision Failure: {}", e))?;
-                return Ok(serde_json::json!({ "content": format!("Neural Intent: Oracle Vision: 12-Mo Projection received. Forecast: {}.", forecast.projected_arr), "tool": "ORACLE_FORECAST", "data": forecast }));
+                return Ok(serde_json::json!({ "content": format!("Neural Intent: Oracle Vision received. Recommendation: {}.", forecast.recommendation), "tool": "ORACLE_FORECAST", "data": forecast }));
             },
             "EXEC_COMMAND" => {
                 let exec_result = execute_neural_command(param.to_string()).unwrap_or_else(|e| format!("Error: {}", e));
@@ -2519,9 +2580,9 @@ async fn execute_neural_commission(state: tauri::State<'_, AppState>, task: Stri
 
 #[tauri::command]
 async fn release_golem_workforce(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
-    agent_id: String,
+    _agent_id: String,
     agent_name: String,
     target_path: String,
     directive: String,
@@ -2537,15 +2598,13 @@ async fn release_golem_workforce(
     });
     drop(registry);
 
-    let state_clone = state.db.lock().unwrap().path().map(|p| p.to_string()).unwrap_or_default();
     let config_clone = state.config.clone();
     let task_id_clone = task_id.clone();
     let agent_name_clone = agent_name.clone();
     let path_clone = target_path.clone();
 
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
+        tauri::async_runtime::block_on(async move {
             let original_content = std::fs::read_to_string(&path_clone).unwrap_or_default();
             
             // 2. Update status
@@ -2718,6 +2777,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
         loop {
             sys.refresh_memory();
             sys.refresh_all();
+            let disks = Disks::new_with_refreshed_list();
             
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
@@ -2732,7 +2792,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            for disk in sys.disks() {
+            for disk in disks.list() {
                 if disk.mount_point().to_string_lossy().contains("C:") {
                     let free = disk.available_space();
                     if free < 2 * 1024 * 1024 * 1024 {
@@ -2746,12 +2806,17 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 
             sys.refresh_cpu_all();
             let cpu_usage = sys.global_cpu_usage();
+            if cpu_usage > 90.0 {
+                let _ = app.emit("proactive-pulse", serde_json::json!({
+                    "suggestion": "CPU Load Critical (90%+). Consider pausing heavy rendering or background indexing.",
+                    "action": "PERF_GUARD"
+                }));
             }
 
             // DOOMSDAY PROCESS SYNC: Detect context-shifting apps
             let mut detected_contexts = Vec::new();
             for process in sys.processes().values() {
-                let name = process.name().to_string_lossy().to_string().toLowerCase();
+                let name = process.name().to_string_lossy().to_string().to_lowercase();
                 if name.contains("code") || name.contains("terminal") || name.contains("rust") || name.contains("studio") { detected_contexts.push("dev"); }
                 if name.contains("chart") || name.contains("trading") || name.contains("tradingview") || name.contains("binance") { detected_contexts.push("growth"); }
                 if name.contains("maya") || name.contains("blender") || name.contains("photoshop") || name.contains("figma") { detected_contexts.push("design"); }
@@ -2918,7 +2983,9 @@ async fn capture_screenshot() -> Result<String, String> {
         let image = screen.capture().map_err(|e| e.to_string())?;
         let mut buffer = std::io::Cursor::new(Vec::new());
         // Use PNG for high fidelity visual reasoning
-        image.write_to(&mut buffer, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+        image
+            .write_to(&mut buffer, screenshots::image::ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
         Ok(base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()))
     } else {
         Err("No screen found".to_string())
@@ -2975,10 +3042,6 @@ async fn update_golem_task(id: String, status: String, progress: f32) -> Result<
         task.status = status;
         task.progress = progress;
     }
-    Ok(())
-}
-
-#[tauri::command]
     Ok(())
 }
 
@@ -3506,8 +3569,6 @@ pub fn run() {
             query_vision,
             get_logic_path,
             get_venture_metrics,
-            trigger_deploy,
-            get_vault_nodes,
             get_market_intelligence,
             manifest_code_module,
             generate_venture_audit,
@@ -3528,7 +3589,6 @@ pub fn run() {
             get_cross_venture_wisdom,
             execute_cli_directive,
             get_strategic_inventory,
-            install_oas_binary,
             run_system_diagnostic,
             save_venture_state,
             load_venture_state,
@@ -3568,7 +3628,9 @@ pub fn run() {
             get_active_golems,
             register_golem_task,
             update_golem_task,
-            complete_golem_task,
+            release_golem_workforce,
+            get_golem_proposals,
+            resolve_golem_proposal,
             pin_context,
             get_pinned_contexts,
             delete_pinned_context,

@@ -141,8 +141,8 @@ export default function TopBar({
 
             {golems && golems.length > 0 && (
               <div className="flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 animate-in fade-in slide-in-from-left-4">
-                {golems.map(g => (
-                  <div key={g.id} className="flex items-center gap-4 transition-all group">
+                {golems.map((g, index) => (
+                  <div key={`golem-${g.id || g.name || index}`} className="flex items-center gap-4 transition-all group">
                     <div className={cn(
                       "w-2 h-2 rounded-full animate-pulse",
                       g.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_10px_#10b981]" :
@@ -185,9 +185,9 @@ export default function TopBar({
               </div>
               <div className="h-8 w-[1px] bg-white/10" />
               <div className="flex items-center gap-8 pl-2">
-                 {(displayedMarket?.ai_ticker || []).map((t: any) => (
+                 {(displayedMarket?.ai_ticker || []).map((t: any, index: number) => (
                     <div 
-                      key={t.id} 
+                      key={`ticker-${t.id || t.name || index}`} 
                       onClick={() => onDeepLink && onDeepLink(t.name)}
                       className="flex flex-col cursor-pointer hover:scale-110 transition-all duration-300"
                     >
@@ -197,7 +197,7 @@ export default function TopBar({
                             {t.change}
                           </span>
                        </div>
-                       <span className="text-[9px] font-mono font-bold text-slate-400 tracking-tighter">${t.price?.toFixed(1)}</span>
+                       <span className="text-[9px] font-mono font-bold text-slate-400 tracking-tighter">${(t.price ?? 0).toFixed(1)}</span>
                     </div>
                  ))}
               </div>
@@ -297,7 +297,7 @@ export default function TopBar({
               <div className="flex gap-1.5">
                 {[...Array(8)].map((_, i) => (
                   <div
-                    key={i}
+                    key={`integrity-bar-${i}`}
                     className={cn(
                       "w-2 h-4 rounded-[1px]",
                       i < Math.ceil(ventureIntegrity / 12.5)

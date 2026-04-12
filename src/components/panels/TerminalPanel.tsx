@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal as TerminalIcon, X, ChevronRight, Zap, Ghost, RefreshCcw } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
 
 interface TerminalLine {
@@ -64,7 +64,7 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
       const cmd = parts[0];
       const args = parts.slice(1);
 
-      const response: any = await invoke('execute_cli_directive', {
+      const response: any = await invokeSafe('execute_cli_directive', {
         directive: { cmd, args },
         stressColor
       });
@@ -158,8 +158,8 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
               ref={scrollRef}
               className="flex-1 overflow-y-auto p-12 custom-scrollbar space-y-3 font-mono text-[13px] relative z-10 scroll-smooth"
             >
-              {lines.map((line) => (
-                <div key={line.id} className="flex gap-4 group">
+              {lines.map((line, index) => (
+                <div key={`${line.id ?? line.timestamp ?? "line"}-${index}`} className="flex gap-4 group">
                   <span className="text-[10px] text-slate-700 w-20 shrink-0 font-bold leading-6">[{line.timestamp}]</span>
                   <div className={cn(
                     "leading-relaxed break-words",

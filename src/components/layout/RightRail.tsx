@@ -100,8 +100,8 @@ export default function RightRail({ isOpen, onClose, golem, className }: RightRa
                         { id: 2, label: 'Context Buffer Sync', status: 'Stable', aura: 'indigo' },
                         { id: 3, label: 'Remote Foundry Link', status: 'Synchronizing', aura: 'emerald' },
                         { id: 4, label: 'Sentinel Archival', status: 'Standby', aura: 'slate' }
-                    ].map((thread) => (
-                        <div key={thread.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
+                    ].map((thread, index) => (
+                        <div key={`${thread.id}-${index}`} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
                             <div className="flex items-center gap-3">
                                 <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", thread.aura === 'emerald' ? "bg-emerald-500" : thread.aura === 'indigo' ? "bg-indigo-500" : "bg-slate-500")} />
                                 <span className="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">{thread.label}</span>

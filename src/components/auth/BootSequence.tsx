@@ -57,7 +57,7 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
     <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center p-10 overflow-hidden font-mono">
       {/* Background Pulse */}
       <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent pointer-events-none" />
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-10 pointer-events-none" />
 
       <AnimatePresence mode="wait">
         {stage === 'audit' && (
@@ -145,3 +145,4 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
     </div>
   );
 }
+

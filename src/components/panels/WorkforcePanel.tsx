@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Cpu, GitPullRequest, Check, Trash2, Loader2, ChevronRight, FileCode, Zap } from 'lucide-react';
-import { invoke } from "@tauri-apps/api/core";
+import { invokeSafe } from "../../lib/tauri";
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
@@ -41,8 +41,8 @@ export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps)
       const interval = setInterval(async () => {
         try {
           const [tasks, props] = await Promise.all([
-            invoke('get_active_golems') as Promise<GolemTask[]>,
-            invoke('get_golem_proposals') as Promise<GolemProposal[]>
+            invokeSafe('get_active_golems') as Promise<GolemTask[]>,
+            invokeSafe('get_golem_proposals') as Promise<GolemProposal[]>
           ]);
           setActiveGolems(tasks);
           setProposals(props.filter(p => p.status === 'pending'));
@@ -57,7 +57,7 @@ export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps)
   const handleResolve = async (id: string, action: 'merge' | 'discard') => {
     setIsResolving(true);
     try {
-      await invoke('resolve_golem_proposal', { proposalId: id, action });
+      await invokeSafe('resolve_golem_proposal', { proposalId: id, action });
       setSelectedProposal(null);
     } catch (e) {
       console.error("Resolution failed", e);
@@ -115,9 +115,9 @@ export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps)
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activeGolems.map((golem) => (
+                    {activeGolems.map((golem, index) => (
                       <motion.div 
-                        key={golem.id as string}
+                        key={`${String(golem.id ?? golem.name ?? "golem")}-${index}`}
                         layout
                         className="p-5 glass rounded-2xl border border-white/5 flex flex-col gap-4"
                       >
@@ -159,9 +159,9 @@ export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps)
                 </div>
 
                 <div className="grid gap-4">
-                  {proposals.map((prop) => (
+                  {proposals.map((prop, index) => (
                     <motion.button
-                      key={prop.id}
+                      key={`${prop.id ?? prop.file_path ?? "proposal"}-${index}`}
                       onClick={() => setSelectedProposal(prop)}
                       className={cn(
                         "w-full text-left p-6 glass rounded-2xl border border-white/5 hover:border-emerald-500/40 transition-all group relative overflow-hidden",

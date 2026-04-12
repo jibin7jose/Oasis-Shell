@@ -23,7 +23,7 @@ export interface SystemState {
   founderMetrics: FounderMetrics;
   systemStats: SystemStats | null;
   notification: string;
-  timeline: { id: number; type: string; event: string; time: string }[];
+  timeline: { id: number; type: string; message: string; timestamp: string }[];
   activeDebate: any | null;
   activeSynthesis: any | null;
   showCortex: boolean;
@@ -99,37 +99,28 @@ export interface SystemState {
 
 export const useSystemStore = create<SystemState>((set) => ({
   marketIntel: {
-    market_index: 142.8,
-    index_change: "-1.2%",
-    ai_ticker: [
-      { id: 'NVDA', name: 'NVIDIA', price: 824.2, change: '+2.4%', color: 'emerald' },
-      { id: 'DSK', name: 'DeepSeek', price: 92.1, change: '+14.2%', color: 'emerald' },
-      { id: 'TSM', name: 'TSMC', price: 148.5, change: '-0.8%', color: 'rose' },
-      { id: 'OPENAI', name: 'OpenAI Index', price: 1042.8, change: '+0.4%', color: 'indigo' }
-    ]
+    market_index: 0,
+    index_change: "Awaiting kernel sync",
+    ai_ticker: []
   },
   fiscalBurn: { total_burn: 0.0, token_load: 0, status: 'NOMINAL' },
   ventureIntegrity: 100,
-  strategicInventory: [
-    { name: "Nebula Compute Core", type: "Infrastructure", value: "$420K", health: 98, aura: "indigo" },
-    { name: "Oasis Sentinel Vault", type: "Security", value: "$1.2M", health: 100, aura: "emerald" },
-    { name: "Golem Swarm Alpha", type: "Workforce", value: "$180K", health: 92, aura: "purple" },
-  ],
+  strategicInventory: [],
   sparklinesEnabled: true,
   performanceOptimized: false,
   systemLastSync: "",
   founderMetrics: {
-    arr: "$1.24M",
-    burn: "$0.85M",
-    runway: "14.2 Mo",
-    momentum: "+12.8%",
-    stress_color: "#10b981",
+    arr: "N/A",
+    burn: "N/A",
+    runway: "N/A",
+    momentum: "Awaiting kernel sync",
+    stress_color: "#6366f1",
   },
   systemStats: null,
   notification: "",
   timeline: [
-    { id: 1, type: "system", event: "Oasis Foundry Kernel Initialized", time: "09:42:00" },
-    { id: 2, type: "neural", event: "Venture Metrics Synced with Rust Kernel", time: "09:42:15" },
+    { id: 1, type: "system", message: "Oasis Foundry Kernel Initialized", timestamp: new Date().toISOString() },
+    { id: 2, type: "neural", message: "Venture Metrics Synced with Rust Kernel", timestamp: new Date().toISOString() },
   ],
   activeDebate: null,
   activeSynthesis: null,
@@ -172,14 +163,14 @@ export const useSystemStore = create<SystemState>((set) => ({
   setDevices: (devices) => set({ devices: devices }),
   setNotification: (msg) => set({ notification: msg }),
   clearNotification: () => set({ notification: "" }),
-  logEvent: (event, type) =>
+  logEvent: (message, type) =>
     set((state) => ({
       timeline: [
         {
           id: Date.now(),
           type,
-          event,
-          time: new Date().toLocaleTimeString(),
+          message,
+          timestamp: new Date().toISOString(),
         },
         ...state.timeline,
       ].slice(0, 50),

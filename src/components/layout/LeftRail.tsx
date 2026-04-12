@@ -90,6 +90,7 @@ export default function LeftRail({
           <button
             key={item.id}
             onClick={item.action}
+            aria-label={item.label}
             className={cn(
               "p-4 rounded-2xl transition-all group relative",
               activeView === item.id
@@ -108,6 +109,7 @@ export default function LeftRail({
       <div className="flex flex-col gap-6 items-center mt-auto">
         <button
           onClick={onToggleSim}
+          aria-label="Toggle Simulation Matrix"
           className={cn(
             "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
             simMode
@@ -122,6 +124,7 @@ export default function LeftRail({
           {chronosIndex < chronosCount - 1 && (
             <button
               onClick={onJumpToPresent}
+              aria-label="Jump to Present"
               className="px-4 py-2 bg-indigo-600/40 hover:bg-indigo-600 text-[10px] font-black text-white rounded-xl border border-indigo-500/30 animate-pulse"
             >
               JUMP TO PRESENT →
@@ -129,6 +132,7 @@ export default function LeftRail({
           )}
           <button
             onClick={onSnapshot}
+            aria-label="Manifest Strategic Snapshot"
             className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group"
           >
             <Camera className="w-3 h-3 group-hover:scale-125 transition-transform" />
@@ -177,21 +181,21 @@ export default function LeftRail({
           )}
         </div>
 
-        <button onClick={onOpenBoardroom} className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
+        <button onClick={onOpenBoardroom} aria-label="Boardroom Debate" className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
           <MessageSquareQuote className="w-6 h-6" />
           <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
             Boardroom Debate
           </span>
         </button>
 
-        <button onClick={onOpenDocs} className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
-          <Book className="w-6 h-6" />
+        <button onClick={onOpenDocs} aria-label="System Manual" className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
+          <MessageSquareQuote className="w-6 h-6" />
           <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
             System Manual
           </span>
         </button>
 
-        <button onClick={onOpenSettings} className="p-4 text-slate-500 hover:text-white transition-colors">
+        <button onClick={onOpenSettings} aria-label="Open System Settings" className="p-4 text-slate-500 hover:text-white transition-colors">
           <Settings className="w-6 h-6" />
         </button>
       </div>

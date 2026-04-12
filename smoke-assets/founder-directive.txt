@@ -1,0 +1,9 @@
+Oasis Shell Manual Smoke Asset
+
+This file is safe to use for Sentinel Vault seal/unseal testing.
+
+Expected manual flow:
+1. Authenticate in Sentinel Vault with the configured founder secret.
+2. Seal this file using its real local path.
+3. Confirm it appears in the vault ledger.
+4. Unseal it and confirm it is restored to the same path.

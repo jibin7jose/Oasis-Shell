@@ -15,7 +15,7 @@ import {
   Database,
   Fingerprint
 } from 'lucide-react';
-import { invoke } from "@tauri-apps/api/core";
+import { invokeSafe } from "../../lib/tauri";
 
 interface SentinelVaultProps {
   isOpen: boolean;
@@ -47,10 +47,12 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
   const [activeTab, setActiveTab] = useState<'vault' | 'logs'>('vault');
   const [scanQuery, setScanQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [assetPath, setAssetPath] = useState("");
+  const [assetTitle, setAssetTitle] = useState("");
 
   const fetchLedger = async () => {
     try {
-      const res = await invoke("get_sentinel_ledger") as SentinelLedger;
+      const res = await invokeSafe("get_sentinel_ledger") as SentinelLedger;
       setLedger(res);
     } catch (e) {
       console.error("Vault Ledger Sync Failed", e);
@@ -61,7 +63,7 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
     try {
       setError(null);
       onPlayHandshake();
-      const res = await invoke("authenticate_founder", { secret: founderSecret });
+      await invokeSafe("authenticate_founder", { secret: founderSecret });
       setIsAuthenticated(true);
       onPlayNotification();
       fetchLedger();
@@ -72,11 +74,15 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
   };
 
   const handleSealAsset = async () => {
-    // In a real scenario, we'd open a file picker.
-    // For this UI demo, we simulate a target sealing.
+    if (!assetPath.trim() || !assetTitle.trim()) {
+      setError("Provide a real file path and asset title before sealing.");
+      return;
+    }
+
+    setError(null);
     setIsSealing(true);
     setSealingProgress(0);
-    
+
     const interval = setInterval(() => {
       setSealingProgress(prev => {
         if (prev >= 100) {
@@ -88,12 +94,12 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
     }, 100);
 
     try {
-      const targetPath = "C:\\Volumes\\Oasis\\Core\\system_directive.pdf";
-      const title = "System Directive 01";
-      await invoke("seal_strategic_asset", { filePath: targetPath, title });
-      setTimeout(() => {
+      await invokeSafe("seal_strategic_asset", { filePath: assetPath.trim(), title: assetTitle.trim() });
+      setTimeout(async () => {
         setIsSealing(false);
-        fetchLedger();
+        setAssetPath("");
+        setAssetTitle("");
+      fetchLedger();
         onPlayNotification();
       }, 2500);
     } catch (e: any) {
@@ -104,7 +110,7 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
 
   const handleUnsealAsset = async (id: string) => {
     try {
-      await invoke("unseal_strategic_asset", { blobId: id });
+      await invokeSafe("unseal_strategic_asset", { blobId: id });
       fetchLedger();
       onPlayNotification();
     } catch (e: any) {
@@ -130,7 +136,7 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
       <div className="w-full max-w-7xl h-full border border-white/10 rounded-[3rem] bg-[#050505] overflow-hidden flex flex-col relative shadow-[0_0_100px_rgba(0,0,0,1)]">
         {/* Cyber Background elements */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent animate-pulse" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20 pointer-events-none" />
 
         {/* Header */}
         <header className="px-12 py-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
@@ -176,6 +182,11 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                 <Lock className="w-16 h-16 text-indigo-500/20 mx-auto" />
                 <h3 className="text-2xl font-black text-white uppercase tracking-widest">Authentication Required</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">Please provide the founder-level neural key to unlock the Sentinel Archive and access encrypted assets.</p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                <p className="text-[10px] font-black uppercase tracking-widest">Setup Required</p>
+                <p className="text-[10px] leading-relaxed mt-2">Set `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY` in your environment before using Sentinel Vault authentication.</p>
               </div>
 
               <div className="relative group">
@@ -262,6 +273,36 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                   </button>
                </div>
 
+               <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Real File Path</label>
+                    <input
+                      type="text"
+                      placeholder="D:\path\to\real-file.pdf"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-5 text-xs text-white font-bold outline-none focus:border-indigo-500/40 transition-all"
+                      value={assetPath}
+                      onChange={(e) => setAssetPath(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Asset Title</label>
+                    <input
+                      type="text"
+                      placeholder="Founder Directive"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-5 text-xs text-white font-bold outline-none focus:border-indigo-500/40 transition-all"
+                      value={assetTitle}
+                      onChange={(e) => setAssetTitle(e.target.value)}
+                    />
+                  </div>
+               </div>
+
+               {error && isAuthenticated && (
+                 <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-4 text-rose-400">
+                   <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                   <span className="text-[10px] font-black uppercase tracking-wider leading-relaxed">{error}</span>
+                 </div>
+               )}
+
                <AnimatePresence>
                  {isSealing && (
                    <motion.div 
@@ -296,8 +337,8 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {Object.values(ledger.blobs)
                         .filter(blob => blob.title.toLowerCase().includes(scanQuery.toLowerCase()))
-                        .map((blob) => (
-                        <div key={blob.id} className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
+                        .map((blob, index) => (
+                        <div key={`${blob.id ?? blob.original_path ?? "blob"}-${index}`} className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/20 group-hover:bg-indigo-500 transition-all" />
                            
                            <div className="flex items-start justify-between mb-6">
@@ -339,3 +380,12 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
     </motion.div>
   );
 }
+
+
+
+
+
+
+
+
+
