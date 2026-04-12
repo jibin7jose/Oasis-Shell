@@ -33,6 +33,7 @@ import { isTauri, invokeSafe, listenSafe } from "./lib/tauri";
 import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
+import { DashboardPanel } from "./components/panels/DashboardPanel";
 
 
 // Design Utility
@@ -2375,225 +2376,25 @@ export default function App() {
           )}
 
           {activeView === 'dash' && (
-            <>
-              {!presentationMode && (
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
-                >
-                  <div className="flex items-center gap-5 px-4 py-2">
-                    <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
-                    <input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={handleSearchIntent}
-                      placeholder={isRecording ? "Listening to Neural Intent..." : "Detecting Neural Intent..."}
-                      className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
-                    />
-                    <button
-                      onClick={toggleVoiceRecording}
-                      className={cn(
-                        "p-4 rounded-full transition-all relative group overflow-hidden",
-                        isRecording ? "bg-rose-500/20 text-rose-500 shadow-[0_0_25px_-5px_var(--rose-500)]" : "bg-white/5 text-slate-500 hover:bg-white/10"
-                      )}
-                    >
-                      {isRecording ? <MicOff className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />}
-                      {isRecording && (
-                        <motion.div
-                          layoutId="voice-ping"
-                          className="absolute inset-0 bg-rose-500/20 rounded-full animate-ping"
-                        />
-                      )}
-                    </button>
-                    <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
-                  </div>
-                </motion.div>
-              )}
-
-              <div className={cn("flex gap-12 items-center overflow-hidden w-full max-w-5xl py-4 border-y border-white/5 bg-black/20 backdrop-blur-md px-12 rounded-[5rem] mb-12 group cursor-pointer relative", zenMode && "zen-hide")}>
-                <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
-                  {((displayedMarket?.ai_ticker || marketIntel.ai_ticker || [])).map((m: any, i: number) => (
-                    <div key={`app-ticker-${m.id || i}`} className="flex gap-4 items-center">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
-                      <span className="text-sm font-bold text-white tracking-tight">${(m.price ?? 0).toFixed(1)}</span>
-                      <span className={cn("text-[10px] font-black tracking-widest uppercase", m.color === 'emerald' ? "text-emerald-500" : "text-rose-500")}>
-                        {m.change}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className={cn("w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12", zenMode && "zen-hide")}>
-                {[
-                  { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
-                  { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
-                  { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-                  { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: Activity }
-                ].map((m, i) => (
-                  <div key={`founder-metric-${m.label}-${i}`} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group">
-                    <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                      <div className="text-xl font-bold text-white">{m.val}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Phase 7.2: Strategic Inventory & Golem Matrix */}
-              <div className={cn("w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12", zenMode && "zen-hide")}>
-                <div className={cn("glass p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden transition-all duration-700", isVaultSealed && "border-rose-500/50 shadow-[0_0_50px_-20px_rgba(244,63,94,0.3)]")}>
-                  {/* Phase 7.7: Sentinel Lockdown Overlay */}
-                  <AnimatePresence>
-                    {isVaultSealed && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-rose-950/20 backdrop-blur-[2px] z-[20] flex items-center justify-center border border-rose-500/20"
-                      >
-                        <div className="flex flex-col items-center gap-2 animate-bounce">
-                          <Lock className="w-8 h-8 text-rose-500" />
-                          <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Sentinel Vault Locked</span>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                      <Database className="w-5 h-5 text-emerald-400" />
-                      <h3 className="text-lg font-bold text-white">Strategic Inventory</h3>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Liquid: $1.8M</span>
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    {strategicInventory.map((item, i) => (
-                      <div key={`inventory-${item.id || item.name || i}`} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
-                        <div className="flex items-center gap-4">
-                          <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
-                          <div>
-                            <div className="text-sm font-bold text-white">{item.name}</div>
-                            <div className="text-[10px] text-slate-500 uppercase font-black">{item.type}</div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-black text-emerald-400">{item.value}</div>
-                          <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="glass p-8 rounded-[2.5rem] border border-white/5">
-                  <div className="flex justify-between items-center mb-6">
-                    <div className="flex items-center gap-3">
-                      <Bot className="w-5 h-5 text-indigo-400" />
-                      <h3 className="text-lg font-bold text-white">Active Golem Matrix</h3>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Units: {activeGolems.length}</span>
-                  </div>
-                  <div className="flex flex-col gap-4">
-                    {activeGolems.map((golem, i) => (
-                      <div
-                        key={`golem-matrix-${golem.id || golem.name || i}`}
-                        onClick={() => setSelectedGolem(golem)}
-                        className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors uppercase tracking-tight flex items-center gap-2">
-                            {golem.name}
-                            <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-indigo-500" />
-                          </div>
-                          <div className={cn("text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm flex items-center gap-1.5",
-                            golem.aura === 'emerald' ? "bg-emerald-500/10 text-emerald-400" :
-                              golem.aura === 'rose' ? "bg-rose-500/10 text-rose-400" :
-                                "bg-indigo-500/10 text-indigo-400"
-                          )}>
-                            <span className={cn("w-1 h-1 rounded-full", golem.aura === 'emerald' ? "bg-emerald-400" : golem.aura === 'rose' ? "bg-rose-400" : "bg-indigo-400")} />
-                            {golem.status}
-                          </div>
-                        </div>
-                        <div className="w-full h-1 bg-black/20 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${golem.progress}%` }}
-                            className={cn("h-full relative overflow-hidden",
-                              golem.aura === 'emerald' ? "bg-emerald-500 shadow-[0_0_8px_var(--emerald-500)]" :
-                                golem.aura === 'rose' ? "bg-rose-500 shadow-[0_0_8px_var(--rose-500)]" :
-                                  "bg-indigo-500 shadow-[0_0_8px_var(--indigo-500)]"
-                            )}
-                          />
-                        </div>
-                        <div className="flex justify-between text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                          <span>{golem.mission}</span>
-                          <span>{golem.progress}% Complete</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <RightRail
-                isOpen={!!selectedGolem}
-                onClose={() => setSelectedGolem(null)}
-                golem={selectedGolem}
-                className={cn("transition-all duration-700", zenMode && "opacity-0 translateX-24 pointer-events-none")}
-              />
-
-              <BoardroomPanel
-                isOpen={showBoardroom}
-                onClose={() => setShowBoardroom(false)}
-                metrics={{ ARR: founderMetrics.arr, Growth: founderMetrics.momentum, Integrity: ventureIntegrity, Efficiency: 0.94 }}
-              />
-
-              <WorkforcePanel
-                isOpen={showWorkforce}
-                onClose={() => setShowWorkforce(false)}
-              />
-
-              <DocumentationPanel
-                isOpen={showDocs}
-                onClose={() => setShowDocs(false)}
-              />
-
-              <SystemPanel
-                stats={systemStats}
-                windows={windows}
-                processes={processes}
-                isScanning={isScanning}
-                storage={storage}
-                devices={devices}
-                processPriorities={processPriorities}
-                priorityCache={priorityCache}
-                priorityAudit={priorityAudit}
-                batteryHealth={batteryHealth}
-                lastSync={systemLastSync}
-                onRefresh={refreshSystemSnapshot}
-                onKillProcess={handleKillProcess}
-                onSuspendProcess={handleSuspendProcess}
-                onResumeProcess={handleResumeProcess}
-                onSetPriority={handleSetPriority}
-                onClearCacheReset={handleClearCacheReset}
-                onToggleIgnoreProcess={handleToggleIgnoreProcess}
-                onExportAudit={handleExportAudit}
-                onClearAllCache={handleClearAllCache}
-                onReapplyAll={handleReapplyAll}
-                onResetAllPriorities={handleResetAllPriorities}
-                onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
-                onToggleIgnoreAll={handleToggleIgnoreAll}
-                onSetProcessTtl={handleSetProcessTtl}
-                defaultTtlDays={defaultTtlDays}
-                autoApplyPriorities={autoApplyPriorities}
-                sparklinesEnabled={sparklinesEnabled}
-                externalConfirmAction={resetConfirmAction}
-                onClearExternalConfirm={() => setResetConfirmAction(null)}
-              />
-            </>
+            <DashboardPanel
+              presentationMode={presentationMode}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              isThinking={isThinking}
+              isRecording={isRecording}
+              toggleVoiceRecording={toggleVoiceRecording}
+              handleSearchIntent={handleSearchIntent}
+              displayedMarket={displayedMarket}
+              marketIntel={marketIntel}
+              zenMode={zenMode}
+              simMode={simMode}
+              simMetrics={simMetrics}
+              founderMetrics={founderMetrics}
+              isVaultSealed={isVaultSealed}
+              strategicInventory={strategicInventory}
+              activeGolems={activeGolems}
+              setSelectedGolem={setSelectedGolem}
+            />
           )}
 
           {activeView === 'timeline' && (
@@ -3704,7 +3505,7 @@ export default function App() {
                       </div>
                     )}
                     {messages.map((m, i) => (
-                      <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
+                      <div key={`msg-${m.role}-${m.id || i}`} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
                     ))}
                     {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
                   </div>
@@ -3734,7 +3535,7 @@ export default function App() {
                     <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 overflow-hidden px-4">
                       {activeDebate.insights.map((insight: any, i: number) => (
                         <motion.div
-                          key={i}
+                          key={`insight-${insight.id || i}`}
                           initial={{ opacity: 0, scale: 0.9, y: 30 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           transition={{ delay: i * 0.15 }}

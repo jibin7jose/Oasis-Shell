@@ -297,13 +297,13 @@ export default function TopBar({
               <div className="flex gap-1.5">
                 {[...Array(8)].map((_, i) => (
                   <div
-                    key={`integrity-bar-${i}`}
+                    key={`integrity-bar-${ventureIntegrity}-${i}`}
                     className={cn(
                       "w-2 h-4 rounded-[1px]",
-                      i < Math.ceil(ventureIntegrity / 12.5)
-                        ? ventureIntegrity < 40
+                      i < Math.ceil((ventureIntegrity ?? 0) / 12.5)
+                        ? (ventureIntegrity ?? 0) < 40
                           ? "bg-red-500"
-                          : ventureIntegrity < 80
+                          : (ventureIntegrity ?? 0) < 80
                           ? "bg-amber-500"
                           : "bg-emerald-500 shadow-[0_0_10px_#10b981]"
                         : "bg-white/5"
