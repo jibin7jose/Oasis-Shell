@@ -1521,6 +1521,34 @@ async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntellig
 #[tauri::command]
 async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
     let path = ".chronos_ledger.json";
+
+#[tauri::command]
+async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
+    let path = ".chronos_ledger.json";
+    let mut snapshots = if std::path::Path::new(path).exists() {
+        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<Vec<VentureSnapshot>>(&data).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    snapshots.push(VentureSnapshot {
+        id: format!("S_{}", snapshots.len()),
+        name: "Chronos Snapshot".to_string(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+        metrics,
+        market,
+        dominance_index: 85.0, // Seed value
+    });
+
+    let data = serde_json::to_string(&snapshots).map_err(|e| e.to_string())?;
+    std::fs::write(path, data).map_err(|e| e.to_string())?;
+    Ok("Chronos Snapshot Etched to Neural Ledger.".into())
+}
+
+#[tauri::command]
+async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
+    let path = ".chronos_ledger.json";
     if std::path::Path::new(path).exists() {
         let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         Ok(serde_json::from_str(&data).unwrap_or_default())
@@ -1537,16 +1565,29 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
     let cpu_load = sys.global_cpu_usage();
     let mem_used = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
-    // Battery telemetry via Windows Power API
-    let battery_level = 100u32;
-    let is_charging = false;
-    let battery_health = -1;
-    let time_remaining_min = -1;
+    // Default battery telemetry
+    let mut battery_level = 100u32;
+    let mut is_charging = false;
+    let mut battery_health = -1;
+    let mut time_remaining_min = -1;
 
     #[cfg(target_os = "windows")]
     {
-        // Battery telemetry is best-effort; leave defaults when the Windows API
-        // surface is unavailable in the current feature set.
+        // Try to get battery status via PowerShell
+        let cmd = "Get-CimInstance -ClassName Win32_Battery | Select-Object -Property EstimatedChargeRemaining, BatteryStatus, ExpectedLife | ConvertTo-Json";
+        if let Ok(output) = std::process::Command::new("powershell").args(["-Command", cmd]).output() {
+            if output.status.success() {
+                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+                    battery_level = json["EstimatedChargeRemaining"].as_u64().unwrap_or(100) as u32;
+                    is_charging = json["BatteryStatus"].as_u64().unwrap_or(1) != 2;
+                    time_remaining_min = json["ExpectedLife"].as_i64().unwrap_or(-1) as i32;
+                }
+            }
+        }
+        
+        if let Ok(health_info) = get_battery_health_wmi().await {
+            battery_health = health_info.health_percent;
+        }
     }
 
     Ok(SystemStats {
@@ -1559,6 +1600,20 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
         is_charging,
         battery_health,
         time_remaining_min,
+    })
+}
+
+#[tauri::command]
+async fn get_market_intel() -> Result<MarketIntelligence, String> {
+    let rng = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+    let drift = (rng % 100) as f32 / 50.0 - 1.0; 
+    
+    Ok(MarketIntelligence {
+        sentiment: "Bullish Consensus".into(),
+        index_change: format!("{:.2}%", drift * 0.5),
+        sectors_active: vec!["Neural Compute".into(), "Capital Guard".into(), "Strategic Edge".into()],
+        market_index: 142.5 + drift,
+        sector_divergence: 0.12,
     })
 }
 
@@ -1604,7 +1659,6 @@ async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
 
 #[tauri::command]
 async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
-    /*
     let mut sys = sysinfo::System::new_all();
     sys.refresh_components_list();
     sys.refresh_components();
@@ -1615,28 +1669,31 @@ async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
 
     for c in sys.components() {
         devices.push(DeviceInfo {
-            kind: "component".into(),
+            kind: "thermal".into(),
             name: c.label().to_string(),
             detail: format!("{:.1}°C", c.temperature()),
         });
     }
 
     for (name, data) in sys.networks() {
-        devices.push(DeviceInfo {
-            kind: "network".into(),
-            name: name.to_string(),
-            detail: format!("rx {} KB / tx {} KB", data.received() / 1024, data.transmitted() / 1024),
-        });
+        let rx_kb = data.received() / 1024;
+        let tx_kb = data.transmitted() / 1024;
+        if rx_kb > 0 || tx_kb > 0 {
+            devices.push(DeviceInfo {
+                kind: "network".into(),
+                name: name.to_string(),
+                detail: format!("RX: {} KB | TX: {} KB", rx_kb, tx_kb),
+            });
+        }
     }
 
-    */
-    Ok(Vec::new())
+    Ok(devices)
 }
 
 #[tauri::command]
 async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String> {
     if seal {
-        let mut sys = System::new_all();
+        let mut sys = sysinfo::System::new_all();
         sys.refresh_all();
         if let Some(process) = sys.process(sysinfo::Pid::from_u32(pid)) {
             if let Some(exe_path) = process.exe() {
@@ -1664,10 +1721,9 @@ async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String>
     { Ok("Aegis synchronization only available on Windows for now.".into()) }
 }
 
+
 #[tauri::command]
 async fn get_process_priority(pid: u32) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
         let cmd = format!("(Get-Process -Id {}).PriorityClass", pid);
         let output = std::process::Command::new("powershell")
             .args(["-Command", &cmd])
@@ -3569,6 +3625,7 @@ pub fn run() {
             query_vision,
             get_logic_path,
             get_venture_metrics,
+            get_market_intel,
             get_market_intelligence,
             manifest_code_module,
             generate_venture_audit,

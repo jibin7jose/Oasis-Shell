@@ -441,14 +441,22 @@ export default function App() {
       try {
         const stats = await invokeSafe("run_system_diagnostic");
         if (stats) setSystemStats(stats);
-        const procs = await invokeSafe("get_running_processes") as any[];
+        
+        const procs = await invokeSafe("get_process_list") as any[];
         if (procs && Array.isArray(procs)) setProcesses(procs);
+        
         const wins = await invokeSafe("get_running_windows");
         if (wins) setWindows(wins);
+        
         const stor = await invokeSafe("get_storage_map");
         if (stor) setStorage(stor);
+        
         const dev = await invokeSafe("get_system_devices");
         if (dev) setDevices(dev);
+
+        const market = await invokeSafe("get_market_intel");
+        if (market) setMarketIntel(market);
+
         setSystemLastSync(new Date().toLocaleTimeString());
       } catch (err) { }
     };
