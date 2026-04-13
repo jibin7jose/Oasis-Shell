@@ -323,7 +323,8 @@ export default function App() {
       setNotification(`Export Fault: ${err}`);
     }
   };
-  const [golems, setGolems] = useState<any[]>([]);
+  // DELETED: Duplicate Golem state removed
+  // const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [autoAura, setAutoAura] = useState(false);
   const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
@@ -396,7 +397,7 @@ export default function App() {
     const syncGolems = async () => {
       try {
         const active = await invokeSafe("get_active_golems") as any[];
-        setGolems(active);
+        setActiveGolems(active);
         const pins = await invokeSafe("get_pinned_contexts") as any[];
         setPinnedContexts(pins);
         const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];

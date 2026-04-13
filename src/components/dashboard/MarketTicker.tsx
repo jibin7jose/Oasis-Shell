@@ -21,7 +21,7 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({
     )}>
       <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
         {tickerItems.map((m: any, i: number) => (
-          <div key={`app-ticker-${m.id || i}`} className="flex gap-4 items-center">
+          <div key={`app-ticker-${m.id}-${i}`} className="flex gap-4 items-center">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{m.id}</span>
             <span className="text-sm font-bold text-white tracking-tight">${(m.price ?? 0).toFixed(1)}</span>
             <span className={cn(

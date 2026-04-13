@@ -29,7 +29,7 @@ export const GolemMatrix: React.FC<GolemMatrixProps> = ({
       <div className="flex flex-col gap-4">
         {activeGolems.map((golem, i) => (
           <div
-            key={`golem-matrix-${golem.id || golem.name || i}`}
+            key={`golem-matrix-${golem.id}-${i}`}
             onClick={() => setSelectedGolem(golem)}
             className="flex flex-col gap-3 p-5 bg-white/5 rounded-2xl group cursor-pointer hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
           >

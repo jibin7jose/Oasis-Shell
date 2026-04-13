@@ -167,7 +167,7 @@ export const useSystemStore = create<SystemState>((set) => ({
     set((state) => ({
       timeline: [
         {
-          id: Date.now(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type,
           message,
           timestamp: new Date().toISOString(),

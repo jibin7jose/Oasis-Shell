@@ -432,7 +432,7 @@ export default function SystemPanel({
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Memory Used</span>
             <Activity className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-white">{stats ? `${(stats.mem_used ?? 0).toFixed(1)}%` : "--"}</div>
+          <div className="text-2xl font-black text-white">{stats ? formatBytes(stats.mem_used ?? 0) : "--"}</div>
           <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
               className={cn("h-full rounded-full", stats && stats.mem_used > 85 ? "bg-rose-500" : "bg-emerald-400")}
