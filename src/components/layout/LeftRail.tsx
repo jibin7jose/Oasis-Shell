@@ -19,6 +19,7 @@ interface LeftRailProps {
   onOpenBoardroom: () => void;
   onOpenWorkforce: () => void;
   onSnapshot: () => void;
+  proposalCount: number;
   chronosIndex: number;
   chronosCount: number;
   chronosLabel?: string;
@@ -55,6 +56,7 @@ export default function LeftRail({
   pinnedContexts,
   onRestoreContext,
   onActivateZenith,
+  proposalCount,
   className
 }: LeftRailProps) {
   if (presentationMode) return null;
@@ -99,6 +101,15 @@ export default function LeftRail({
             )}
           >
             <item.icon className="w-6 h-6" />
+            {item.id === 'workforce' && proposalCount > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute top-2 right-2 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-[8px] font-black text-white shadow-lg border-2 border-[#020617]"
+              >
+                {proposalCount}
+              </motion.div>
+            )}
             <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
               {item.label}
             </span>

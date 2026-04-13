@@ -154,6 +154,7 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [isVaultSealed, setIsVaultSealed] = useState(false);
   const [activeGolems, setActiveGolems] = useState<any[]>([]);
+  const [activeProposals, setActiveProposals] = useState<any[]>([]);
   const [workforce, setWorkforce] = useState<any[]>([]);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showBoardroom, setShowBoardroom] = useState(false);
@@ -399,6 +400,8 @@ export default function App() {
       try {
         const active = await invokeSafe("get_active_golems") as any[];
         setActiveGolems(active);
+        const props = await invokeSafe("get_golem_proposals") as any[];
+        setActiveProposals(props || []);
         const pins = await invokeSafe("get_pinned_contexts") as any[];
         setPinnedContexts(pins);
         const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
@@ -2296,6 +2299,7 @@ export default function App() {
         onOpenSettings={() => setShowSettings(!showSettings)}
         onOpenDocs={() => setShowDocs(true)}
         onSnapshot={handleTemporalSnapshot}
+        proposalCount={activeProposals.length}
         chronosIndex={chronosIndex}
         chronosCount={pinnedContexts.length}
         chronosLabel={chronosIndex >= 0 ? pinnedContexts[chronosIndex]?.name : undefined}
@@ -3657,6 +3661,12 @@ export default function App() {
         isOpen={showCLI} 
         onClose={() => setShowCLI(false)} 
         stressColor={founderMetrics.stress_color} 
+      />
+
+      {/* NEURAL WORKFORCE (TRACK C) */}
+      <WorkforcePanel
+        isOpen={showWorkforce}
+        onClose={() => setShowWorkforce(false)}
       />
 
       {/* NEURAL WORKSPACE PERSISTENCE (PILLAR 12) */}
