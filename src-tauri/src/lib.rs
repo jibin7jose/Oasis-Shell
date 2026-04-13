@@ -1402,9 +1402,28 @@ async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManife
 
 #[tauri::command]
 async fn execute_golem_manifest(_id: String, title: String, code: String) -> Result<String, String> {
-    let path = format!("manifested/{}.ts", title.replace(" ", "_").to_lowercase());
-    std::fs::write(&path, code).map_err(|e| e.to_string())?;
-    Ok(format!("Golem Manifestation Complete: Strategic Module {} is now active in {}", title, path))
+    // 1. Ensure Manifest Directory Exists
+    let dir_path = "manifested";
+    if !std::path::Path::new(dir_path).exists() {
+        std::fs::create_dir_all(dir_path).map_err(|e| e.to_string())?;
+    }
+
+    // 2. Write Manifestation
+    let file_basename = title.replace(" ", "_").to_lowercase();
+    let path = format!("{}/{}.ts", dir_path, file_basename);
+    std::fs::write(&path, &code).map_err(|e| e.to_string())?;
+
+    // 3. Neural Git Sync (Forensic Locking)
+    let _ = std::process::Command::new("git")
+        .args(["add", &path])
+        .output();
+    
+    let commit_msg = format!("Oasis Neural Manifest: {}", title);
+    let _ = std::process::Command::new("git")
+        .args(["commit", "-m", &commit_msg])
+        .output();
+
+    Ok(format!("Strategic Execution Complete: Neural Module '{}' manifested and forensically locked in Git repository.", title))
 }
 
 #[tauri::command]

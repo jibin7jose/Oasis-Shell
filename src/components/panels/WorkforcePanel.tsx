@@ -62,8 +62,30 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
   const handleResolve = async (id: string, action: 'merge' | 'discard') => {
     setIsResolving(true);
     if (onPlayClick) onPlayClick();
+    
+    // Optimistic status update for the golem
+    const currentProposal = proposals.find(p => p.id === id);
+    if (currentProposal) {
+        setActiveGolems(prev => prev.map(g => 
+            g.name === currentProposal.agent_name 
+            ? { ...g, status: action === 'merge' ? "Executing Neural Manifest..." : "Discarding Intent...", aura: action === 'merge' ? "emerald" : "rose" } 
+            : g
+        ));
+    }
+
     try {
-      await invokeSafe('resolve_golem_proposal', { proposalId: id, action });
+      if (action === 'merge' && currentProposal) {
+        // Use the hardened execute_golem_manifest for the Merge action (Git integrated)
+        await invokeSafe('execute_golem_manifest', { 
+            id: currentProposal.id, 
+            title: currentProposal.title, 
+            code: currentProposal.proposed_content 
+        });
+        // Also cleanup the proposal registry
+        await invokeSafe('resolve_golem_proposal', { proposalId: id, action: 'merge' });
+      } else {
+        await invokeSafe('resolve_golem_proposal', { proposalId: id, action });
+      }
       setSelectedProposal(null);
     } catch (e) {
       console.error("Resolution failed", e);
