@@ -122,7 +122,12 @@ const MOCK_STATE = {
       "B1": { id: "B1", title: "Founder Directive v0.1", original_path: "C:/Secret/Directive.pdf", encrypted_path: "C:/Oasis/Vault/B1.enc", timestamp: new Date().toISOString(), aura_intensity: 0.8 }
     },
     security_resonance: 98.4
-  }
+  },
+  golems: [
+    { id: "G-ALPHA", name: "Golem Alpha", mission: "Neural Refactor", progress: 45, aura: "indigo", status: "PROCESSING" },
+    { id: "G-BETA", name: "Golem Beta", mission: "Market Scraping", progress: 12, aura: "emerald", status: "COLLECTING" }
+  ],
+  proposals: [] as any[]
 };
 
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {

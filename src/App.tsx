@@ -399,7 +399,7 @@ export default function App() {
     const syncGolems = async () => {
       try {
         const active = await invokeSafe("get_active_golems") as any[];
-        setActiveGolems(active);
+        setActiveGolems(active || []);
         const props = await invokeSafe("get_golem_proposals") as any[];
         setActiveProposals(props || []);
         const pins = await invokeSafe("get_pinned_contexts") as any[];
@@ -2809,7 +2809,7 @@ export default function App() {
                 <button onClick={() => setShowNetwork(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
               </div>
               <div className="flex-1 w-full space-y-6 overflow-y-auto custom-scrollbar pr-4">
-                {ventureNetwork && ventureNetwork.map((v: any) => (
+                {ventureNetwork && ventureNetwork.length > 0 ? ventureNetwork.map((v: any) => (
                   <div key={v.id} className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all group">
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -3458,7 +3458,7 @@ export default function App() {
       {!presentationMode && (
         <>
           {/* NEURAL MANIFEST REVIEW PANEL */}
-          {pendingManifests.length > 0 && (
+          {pendingManifests && pendingManifests.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="fixed bottom-32 right-12 z-[1000] w-96 glass-bright rounded-[3rem] border border-indigo-500/30 p-8 shadow-[0_0_50px_rgba(99,102,241,0.2)]">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
