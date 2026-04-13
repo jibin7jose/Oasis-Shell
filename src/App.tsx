@@ -2312,7 +2312,7 @@ export default function App() {
           activeVenture={activeVenture}
           activeContext={activeContext}
           contexts={contexts}
-          golems={golems}
+          golems={activeGolems}
           systemStats={systemStats}
           zenMode={zenMode}
           voiceActive={voiceActive}
@@ -3233,7 +3233,12 @@ export default function App() {
         )}
 
         <SynthesisPanel />
-        <AdvisoryDebate />
+        <BoardroomPanel
+          isOpen={showBoardroom}
+          onClose={() => setShowBoardroom(false)}
+          metrics={founderMetrics}
+        />
+        {/* <AdvisoryDebate /> */}
 
         {activeOracle && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[6000] bg-black/90 backdrop-blur-5xl flex items-center justify-center p-20">

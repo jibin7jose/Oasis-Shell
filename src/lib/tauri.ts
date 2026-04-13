@@ -64,6 +64,19 @@ export const TAURI_DEFAULTS: Record<string, any> = {
     { name: "Neural Cortex GPU", type: "GPU", status: "Online" },
     { name: "Quantum Aura Mic", type: "Audio", status: "Ready" }
   ],
+  "derive_boardroom_debate": {
+    summary: "Strategic v1.1 Roadmap: The consensus suggests prioritizing Spectral Sound integration while hardening Remote Context Crates. Risk impact is moderate but scalability is high.",
+    insights: [
+      { persona: "ARCHITECT-01", score: 94, advice: "Core kernel stability must be maintained. Implementing the Crate Registry as a distributed ledger is the most robust path forward.", risk: 0.12 },
+      { persona: "GROWTH-X", score: 82, advice: "Market resonance requires immediate 'Spectral Sound' deployment. Users are pivoting toward immersive sensory dashboards. Speed is the only metric.", risk: 0.45 },
+      { persona: "SENTINEL-ROOT", score: 88, advice: "Security audit of the 'Shadow Vault' is pending. We cannot allow unauthorized telemetry leaks during the soundscape initialization.", risk: 0.08 }
+    ]
+  },
+  "invoke_deep_oracle": {
+    thought_trace: "Initializing Deep Synthesis... Analyzing venture metrics (ARR: $1.24M)... Correlating with market sentiment... Detecting spectral anomalies... Conclusion prioritized: Total Consensus requires Founder Signature.",
+    advice: "Strategic Directive: Integrate the Neural Key with the Spectral Sound layer. This will create a 'Founder-Only' sensory firewall, ensuring absolute command over the Oasis Shell evolution."
+  },
+  "generate_strategic_report": "C:/Oasis/Reports/Strategic_v1.1_Consensus_Report.pdf",
 };
 
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {
