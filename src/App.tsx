@@ -2820,7 +2820,7 @@ export default function App() {
                     </div>
                     <button onClick={() => handleNeuralMirror(v.id)} className="w-full py-4 bg-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Mirror Neural Wisdom</button>
                   </div>
-                ))}
+                )) : null}
               </div>
             </div>
           </motion.div>
