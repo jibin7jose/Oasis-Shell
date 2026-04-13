@@ -46,7 +46,30 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   search_semantic_nodes: [],
   manifest_temporal_log: "Browser preview active.",
   get_documentation_index: ["overview", "architecture", "security", "roadmap"],
-  get_documentation_chapter: "<h1>System Documentation</h1><p>Welcome to the Oasis Kernel Technical Manual.</p>",
+  get_documentation_chapter: `
+    <div class="p-8 space-y-8 font-sans text-slate-300">
+      <h1 class="text-5xl font-black text-white uppercase tracking-tighter mb-12">Oasis Kernel <span class="text-indigo-500">v1.1</span></h1>
+      
+      <section class="space-y-4">
+        <h2 class="text-xl font-bold text-indigo-400 uppercase tracking-widest">01 / Sentinel Vault</h2>
+        <p class="leading-relaxed opacity-80">The system utilizes a zero-knowledge Sentinel Vault for strategic asset archival. All secrets are hardened using PBKDF2-HMAC-SHA256 key derivation and native AES-256-GCM encryption within the Rust kernel.</p>
+      </section>
+
+      <section class="space-y-4">
+        <h2 class="text-xl font-bold text-emerald-400 uppercase tracking-widest">02 / Neural Forge</h2>
+        <p class="leading-relaxed opacity-80">Autonomous workforce simulation is processed in a background native thread. Golems manifest neural proposals by correlating local context embeddings with the Gemma3 LLM edge-bridge.</p>
+      </section>
+
+      <section class="space-y-4">
+        <h2 class="text-xl font-bold text-amber-400 uppercase tracking-widest">03 / Chronos Ledger</h2>
+        <p class="leading-relaxed opacity-80">System-wide state snapshots are persisted to a forensic SQLite ledger. Temporal scrubbing allows the Founder to navigate historical system integrity metrics with micro-second precision.</p>
+      </section>
+
+      <div class="pt-12 border-t border-white/5">
+        <p class="text-[10px] font-mono uppercase tracking-[0.5em] text-slate-500">Kernel Status: HARDENED | Resonance: OPTIMAL</p>
+      </div>
+    </div>
+  `,
   get_process_list: [
     { pid: 1024, name: "oasis_kernel.exe", cpu_usage: 12.4, mem_usage: 512000000, status: "stable", priority: "high" },
     { pid: 2048, name: "neural_cortex.sys", cpu_usage: 8.2, mem_usage: 1024000000, status: "active", priority: "critical" },
