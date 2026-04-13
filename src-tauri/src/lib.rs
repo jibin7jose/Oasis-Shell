@@ -324,35 +324,70 @@ static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
 
 #[tauri::command]
 async fn capture_chronos_snapshot(
+  state: tauri::State<'_, AppState>,
   nodes: Vec<serde_json::Value>, 
   links: Vec<serde_json::Value>,
   metrics: Option<VentureMetrics>,
   market: Option<MarketIntelligence>,
   integrity: f32
 ) -> Result<String, String> {
-    let mut buffer = CHRONOS_BUFFER.lock().unwrap();
-    let snapshot = ChronosSnapshot {
-        timestamp: chrono::Local::now().to_rfc3339(),
-        nodes,
-        links,
-        metrics,
-        market,
-        integrity,
-        entropy_index: 0.0, // Calculated later
-    };
+    let timestamp = chrono::Local::now().to_rfc3339();
+    let snapshot_data = serde_json::json!({
+        "nodes": nodes,
+        "links": links,
+        "metrics": metrics,
+        "market": market,
+        "integrity": integrity,
+    });
     
-    // Keep last 100 snapshots (rolling history)
-    if buffer.len() >= 100 {
-        buffer.remove(0);
-    }
-    buffer.push(snapshot);
-    Ok("Chronos State Archival Complete.".into())
+    let json_str = serde_json::to_string(&snapshot_data).map_err(|e| e.to_string())?;
+    
+    let conn = state.db.lock().unwrap();
+    conn.execute(
+        "INSERT INTO chronos_history (timestamp, data, integrity) VALUES (?1, ?2, ?3)",
+        rusqlite::params![timestamp, json_str, integrity],
+    ).map_err(|e| e.to_string())?;
+    
+    // Prune history to keep last 100 for performance
+    let _ = conn.execute(
+        "DELETE FROM chronos_history WHERE id NOT IN (SELECT id FROM chronos_history ORDER BY id DESC LIMIT 100)",
+        []
+    );
+
+    Ok("Chronos State Archival Complete (Native).".into())
 }
 
 #[tauri::command]
-async fn seek_chronos_history() -> Result<Vec<ChronosSnapshot>, String> {
-    let buffer = CHRONOS_BUFFER.lock().unwrap();
-    Ok(buffer.clone())
+async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<ChronosSnapshot>, String> {
+    let conn = state.db.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT timestamp, data, integrity FROM chronos_history ORDER BY id DESC").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        let timestamp: String = row.get(0)?;
+        let data_str: String = row.get(1)?;
+        let integrity: f32 = row.get(2)?;
+        
+        let data: serde_json::Value = serde_json::from_str(&data_str).unwrap_or_default();
+        
+        Ok(ChronosSnapshot {
+            timestamp,
+            nodes: data["nodes"].as_array().cloned().unwrap_or_default(),
+            links: data["links"].as_array().cloned().unwrap_or_default(),
+            metrics: serde_json::from_value(data["metrics"].clone()).ok(),
+            market: serde_json::from_value(data["market"].clone()).ok(),
+            integrity,
+            entropy_index: 0.0,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut history = Vec::new();
+    for r in rows {
+        if let Ok(snap) = r {
+            history.push(snap);
+        }
+    }
+    
+    Ok(history)
 }
 
 static COLLECTIVE_REGISTRY: LazyLock<Mutex<Vec<CollectiveNode>>> =
@@ -2671,14 +2706,33 @@ async fn release_golem_workforce(
 
     std::thread::spawn(move || {
         tauri::async_runtime::block_on(async move {
-            let original_content = std::fs::read_to_string(&path_clone).unwrap_or_default();
+            let original_content = std::fs::read_to_string(&path_clone).unwrap_or_else(|_| "// New file manifestation...".into());
             
-            // 2. Update status
+            // 1. Initial Resonance
             {
                 let mut registry = GOLEM_REGISTRY.lock().unwrap();
                 if let Some(task) = registry.get_mut(&task_id_clone) {
-                    task.status = "Analyzing Logic...".into();
-                    task.progress = 0.2;
+                    task.status = "Neural Initialization...".into();
+                    task.progress = 0.05;
+                }
+            }
+
+            // 2. Simulated Progress Loop (The "Forge" effect)
+            for i in 1..=8 {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                if let Some(task) = registry.get_mut(&task_id_clone) {
+                    task.progress = 0.05 + (i as f32 * 0.1);
+                    task.status = match i {
+                        1 => "Analyzing Logic Layers...".into(),
+                        2 => "Indexing Contextual Nodes...".into(),
+                        3 => "Deriving Strategic Intent...".into(),
+                        4 => "Consulting Neural Oracle...".into(),
+                        5 => "Synthesizing Refactor Manifest...".into(),
+                        6 => "Optimizing Code Surface...".into(),
+                        7 => "Validating Integrity...".into(),
+                        _ => "Finalizing Neural Proposal...".into(),
+                    };
                 }
             }
 
@@ -2726,6 +2780,13 @@ async fn release_golem_workforce(
                         task.aura = "emerald".into();
                     }
                 }
+            } else {
+                // Fallback if AI offline
+                 let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                 if let Some(task) = registry.get_mut(&task_id_clone) {
+                     task.status = "Neutral Edge Failure (LLM Offline)".into();
+                     task.aura = "rose".into();
+                 }
             }
         });
     });
@@ -3650,9 +3711,31 @@ pub fn run() {
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)", []);
 
             // Manage state
             app.manage(AppState { db: std::sync::Mutex::new(conn), config: OasisConfig::load() });
+
+            // Initialize Workforce if empty
+            {
+                let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                if registry.is_empty() {
+                    registry.insert("G-ALPHA".into(), GolemTask {
+                        id: "G-ALPHA".into(),
+                        name: "Golem Alpha".into(),
+                        status: "Awaiting Mission...".into(),
+                        progress: 0.0,
+                        aura: "indigo".into(),
+                    });
+                    registry.insert("G-BETA".into(), GolemTask {
+                        id: "G-BETA".into(),
+                        name: "Golem Beta".into(),
+                        status: "Collecting Intelligence...".into(),
+                        progress: 0.0,
+                        aura: "emerald".into(),
+                    });
+                }
+            }
 
             // Background threads
             std::thread::spawn(move || {

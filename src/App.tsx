@@ -2307,9 +2307,9 @@ export default function App() {
         onOpenSettings={() => setShowSettings(!showSettings)}
         onOpenDocs={() => setShowDocs(true)}
         onSnapshot={handleTemporalSnapshot}
-        proposalCount={activeProposals.length}
+        proposalCount={activeProposals?.length || 0}
         chronosIndex={chronosIndex}
-        chronosCount={pinnedContexts.length}
+        chronosCount={pinnedContexts?.length || 0}
         chronosLabel={chronosIndex >= 0 ? pinnedContexts[chronosIndex]?.name : undefined}
         onChronosChange={handleChronosSliderChange}
         onJumpToPresent={() => setChronosIndex(-1)}
@@ -2809,7 +2809,7 @@ export default function App() {
                 <button onClick={() => setShowNetwork(false)} className="w-10 h-10 glass rounded-full flex items-center justify-center text-white"><Plus className="w-6 h-6 rotate-45" /></button>
               </div>
               <div className="flex-1 w-full space-y-6 overflow-y-auto custom-scrollbar pr-4">
-                {ventureNetwork.map((v: any) => (
+                {ventureNetwork && ventureNetwork.map((v: any) => (
                   <div key={v.id} className="p-8 rounded-3xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-all group">
                     <div className="flex justify-between items-start mb-4">
                       <div>

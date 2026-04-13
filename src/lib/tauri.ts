@@ -58,32 +58,16 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   ],
   save_venture_state: null,
   execute_neural_intent: { content: "Neural Intent Handled (Simulated).", tool: "NONE" },
-  get_chronos_ledger: [
-    { timestamp: new Date().toISOString(), event: "Kernel Initialized" },
-    { timestamp: new Date(Date.now() - 3600000).toISOString(), event: "Market Sync Complete" }
-  ],
+  get_chronos_ledger: [],
   get_neural_logs: [],
   get_neural_workforce: [],
   get_active_golems: () => {
     MOCK_STATE.golems.forEach(g => {
       if (g.progress < 100) {
-        g.progress += Math.floor(Math.random() * 3) + 1;
+        g.progress += Math.floor(Math.random() * 2) + 1;
         if (g.progress >= 100) {
           g.progress = 100;
           g.status = "MANIFESTING_PR";
-          if (!MOCK_STATE.proposals.find(p => p.agent_name === g.name)) {
-            MOCK_STATE.proposals.push({
-              id: `PR-${Math.floor(Math.random() * 1000)}`,
-              task_id: g.id,
-              agent_name: g.name,
-              file_path: `src/lib/${g.name.toLowerCase().replace('-', '_')}_logic.rs`,
-              title: `Neural: ${g.mission} Manifest`,
-              original_content: "// Original neural pathways...",
-              proposed_content: `// REFACTORED BY ${g.name.toUpperCase()}\n// OPTIMIZATION_LEVEL: CRITICAL\n\npub fn apply_resonance() {\n  let entropy = 0.04;\n  let intelligence = 1.0 - entropy;\n  println!("Resonance stabilized at {}%", intelligence * 100.0);\n}`,
-              rationale: `Detected non-resonant logic paths in the ${g.mission} sub-layer. Proposed manifest stabilizes neural synthesis via PBKDF2-HMAC-SHA256 entropy reduction.`,
-              status: "pending"
-            });
-          }
         }
       }
     });
@@ -93,18 +77,12 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   resolve_golem_proposal: (args: any) => {
     const { proposalId, action } = args;
     const proposal = MOCK_STATE.proposals.find(p => p.id === proposalId);
-    if (!proposal) throw new Error("Proposal not found");
-    
-    MOCK_STATE.proposals = MOCK_STATE.proposals.filter(p => p.id !== proposalId);
-    
-    // Reset the golem that made this proposal
-    const golem = MOCK_STATE.golems.find(g => g.name === proposal.agent_name);
-    if (golem) {
-      golem.progress = 0;
-      golem.status = "IDLE (POST-MERGE)";
+    if (proposal) {
+        MOCK_STATE.proposals = MOCK_STATE.proposals.filter(p => p.id !== proposalId);
+        const golem = MOCK_STATE.golems.find(g => g.name === proposal.agent_name);
+        if (golem) { golem.progress = 0; golem.status = "IDLE"; }
     }
-    
-    return { status: "SUCCESS", action };
+    return { status: "SUCCESS" };
   },
   get_pinned_contexts: [],
   get_economic_news: [],
@@ -137,19 +115,14 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   "generate_strategic_report": "C:/Oasis/Reports/Strategic_v1.1_Consensus_Report.pdf",
 };
 
-// STATEFUL BROWSER MOCKS
+// STATEFUL BROWSER MOCKS (MINIMAL FOR PREVIEW)
 const MOCK_STATE = {
   ledger: {
     blobs: {
       "B1": { id: "B1", title: "Founder Directive v0.1", original_path: "C:/Secret/Directive.pdf", encrypted_path: "C:/Oasis/Vault/B1.enc", timestamp: new Date().toISOString(), aura_intensity: 0.8 }
     },
     security_resonance: 98.4
-  },
-  golems: [
-    { id: "G-ALPHA", name: "Golem Alpha", mission: "Neural Refactor", progress: 45, aura: "indigo", status: "PROCESSING" },
-    { id: "G-BETA", name: "Golem Beta", mission: "Market Scraping", progress: 12, aura: "emerald", status: "COLLECTING" }
-  ],
-  proposals: [] as any[]
+  }
 };
 
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {
