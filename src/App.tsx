@@ -75,7 +75,7 @@ interface FounderMetrics {
 }
 
 export default function App() {
-  const { playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
+  const { playClick, playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
   
   const {
     processes, setProcesses,
@@ -459,8 +459,11 @@ export default function App() {
         const dev = await invokeSafe("get_system_devices");
         if (dev) setDevices(dev);
 
-        const market = await invokeSafe("get_market_intel");
         if (market) setMarketIntel(market);
+
+        if (stats && stats.cpu_load !== undefined) {
+          updateEngine(stats.cpu_load);
+        }
 
         setSystemLastSync(new Date().toLocaleTimeString());
       } catch (err) { }
@@ -2078,7 +2081,10 @@ export default function App() {
 
 
   if (!isHandshakeSuccessful) {
-    return <BootSequence onSuccess={() => setIsHandshakeSuccessful(true)} />;
+    return <BootSequence onSuccess={() => {
+      setIsHandshakeSuccessful(true);
+      startEngine();
+    }} />;
   }
 
   return (
@@ -2226,7 +2232,9 @@ export default function App() {
             {notification && (
               <motion.div
                 exit={{ x: 300, opacity: 0 }}
-                onViewportEnter={() => playNotification()}
+                onViewportEnter={() => {
+                  playNotification();
+                }}
                 className="glass-bright border-emerald-500/30 rounded-2xl p-6 shadow-4xl flex items-center gap-5 relative"
               >
                 <button
@@ -2308,6 +2316,7 @@ export default function App() {
         pinnedContexts={pinnedContexts}
         onRestoreContext={handleRestoreContext}
         onActivateZenith={handleZenithPulse}
+        playClick={playClick}
         className={cn("transition-all duration-700", zenMode && "opacity-0 -translateX-24 pointer-events-none")}
       />
 
@@ -3667,6 +3676,8 @@ export default function App() {
       <WorkforcePanel
         isOpen={showWorkforce}
         onClose={() => setShowWorkforce(false)}
+        onPlayNotification={playNotification}
+        onPlayClick={playClick}
       />
 
       {/* NEURAL WORKSPACE PERSISTENCE (PILLAR 12) */}

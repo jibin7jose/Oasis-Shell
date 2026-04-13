@@ -28,6 +28,7 @@ interface LeftRailProps {
   pinnedContexts: any[];
   onRestoreContext: (pin: any) => void;
   onActivateZenith: () => void;
+  playClick: () => void;
   className?: string;
 }
 
@@ -56,6 +57,7 @@ export default function LeftRail({
   pinnedContexts,
   onRestoreContext,
   onActivateZenith,
+  playClick,
   proposalCount,
   className
 }: LeftRailProps) {
@@ -91,7 +93,10 @@ export default function LeftRail({
         ].map((item) => (
           <button
             key={item.id}
-            onClick={item.action}
+            onClick={() => {
+              item.action();
+              playClick();
+            }}
             aria-label={item.label}
             className={cn(
               "p-4 rounded-2xl transition-all group relative",

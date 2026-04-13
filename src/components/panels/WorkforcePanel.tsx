@@ -28,9 +28,11 @@ interface GolemProposal {
 interface WorkforcePanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onPlayNotification?: () => void;
+  onPlayClick?: () => void;
 }
 
-export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps) {
+export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, onPlayClick }: WorkforcePanelProps) {
   const [activeGolems, setActiveGolems] = useState<GolemTask[]>([]);
   const [proposals, setProposals] = useState<GolemProposal[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<GolemProposal | null>(null);
@@ -50,12 +52,16 @@ export default function WorkforcePanel({ isOpen, onClose }: WorkforcePanelProps)
           console.error("Failed to fetch workforce state", e);
         }
       }, 2000);
+      if (isOpen && onPlayNotification && proposals.length > 0) {
+        onPlayNotification();
+      }
       return () => clearInterval(interval);
     }
   }, [isOpen]);
 
   const handleResolve = async (id: string, action: 'merge' | 'discard') => {
     setIsResolving(true);
+    if (onPlayClick) onPlayClick();
     try {
       await invokeSafe('resolve_golem_proposal', { proposalId: id, action });
       setSelectedProposal(null);
