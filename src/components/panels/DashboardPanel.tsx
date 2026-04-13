@@ -23,6 +23,7 @@ interface DashboardPanelProps {
   strategicInventory: any[];
   activeGolems: any[];
   setSelectedGolem: (golem: any) => void;
+  onSealAsset: (asset: any) => void;
 }
 
 export const DashboardPanel: React.FC<DashboardPanelProps> = ({
@@ -43,6 +44,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   strategicInventory,
   activeGolems,
   setSelectedGolem,
+  onSealAsset,
 }) => {
   return (
     <>
@@ -75,6 +77,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           isVaultSealed={isVaultSealed}
           strategicInventory={strategicInventory}
           zenMode={zenMode}
+          onSealAsset={onSealAsset}
         />
 
         <GolemMatrix

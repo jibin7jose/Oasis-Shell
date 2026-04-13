@@ -20,7 +20,27 @@ export const TAURI_DEFAULTS: Record<string, any> = {
     ]
   },
   get_neural_wisdom: { recommendation: "Optimization recommended for neural nodes.", insight: "Browser mode detected. Displaying high-fidelity simulations.", confidence: 85 },
-  get_sentinel_ledger: { blobs: {}, security_resonance: 100 },
+  get_sentinel_ledger: () => (MOCK_STATE.ledger),
+  authenticate_founder: (args: any) => {
+    if (args.secret === "12345") return true;
+    throw new Error("Neural Handshake Refused: Invalid Founder Key");
+  },
+  seal_strategic_asset: (args: any) => {
+    const id = `B${Math.floor(Math.random() * 1000)}`;
+    (MOCK_STATE.ledger.blobs as any)[id] = {
+      id,
+      title: args.title || "Untitled Asset",
+      original_path: args.filePath || "Unknown",
+      encrypted_path: `C:/Oasis/Vault/${id}.enc`,
+      timestamp: new Date().toISOString(),
+      aura_intensity: 0.9
+    };
+    return id;
+  },
+  unseal_strategic_asset: (args: any) => {
+    delete (MOCK_STATE.ledger.blobs as any)[args.blobId];
+    return true;
+  },
   get_aegis_ledger: [],
   seek_chronos: [],
   search_semantic_nodes: [],
@@ -79,8 +99,22 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   "generate_strategic_report": "C:/Oasis/Reports/Strategic_v1.1_Consensus_Report.pdf",
 };
 
+// STATEFUL BROWSER MOCKS
+const MOCK_STATE = {
+  ledger: {
+    blobs: {
+      "B1": { id: "B1", title: "Founder Directive v0.1", original_path: "C:/Secret/Directive.pdf", encrypted_path: "C:/Oasis/Vault/B1.enc", timestamp: new Date().toISOString(), aura_intensity: 0.8 }
+    },
+    security_resonance: 98.4
+  }
+};
+
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {
-  if (!isTauri) return (TAURI_DEFAULTS[cmd] ?? null) as T;
+  if (!isTauri) {
+    const mockValue = TAURI_DEFAULTS[cmd];
+    if (typeof mockValue === "function") return mockValue(payload) as T;
+    return (mockValue ?? null) as T;
+  }
   return invoke(cmd, payload as any) as Promise<T>;
 };
 

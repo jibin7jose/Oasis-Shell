@@ -22,6 +22,7 @@ interface SentinelVaultProps {
   onClose: () => void;
   onPlayHandshake: () => void;
   onPlayNotification: () => void;
+  initialAsset?: any;
 }
 
 interface EncryptedBlob {
@@ -38,7 +39,7 @@ interface SentinelLedger {
   security_resonance: number;
 }
 
-export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlayNotification }: SentinelVaultProps) {
+export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlayNotification, initialAsset }: SentinelVaultProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [founderSecret, setFounderSecret] = useState("");
   const [ledger, setLedger] = useState<SentinelLedger | null>(null);
@@ -123,6 +124,13 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
       fetchLedger();
     }
   }, [isOpen, isAuthenticated]);
+
+  useEffect(() => {
+    if (initialAsset) {
+      setAssetPath(`C:/Strategic/Inventory/${initialAsset.name.toLowerCase().replace(/\s+/g, '_')}.dat`);
+      setAssetTitle(initialAsset.name);
+    }
+  }, [initialAsset]);
 
   if (!isOpen) return null;
 

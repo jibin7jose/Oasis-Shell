@@ -234,6 +234,7 @@ export default function App() {
   const [activeOracle, setActiveOracle] = useState<any>(null);
   const [sentinelVault, setSentinelVault] = useState<any>(null);
   const [showSentinel, setShowSentinel] = useState(false);
+  const [selectedVaultAsset, setSelectedVaultAsset] = useState<any>(null);
   const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [founderSecret, setFounderSecret] = useState("");
   const [showNetwork, setShowNetwork] = useState(false);
@@ -2403,6 +2404,11 @@ export default function App() {
               strategicInventory={strategicInventory}
               activeGolems={activeGolems}
               setSelectedGolem={setSelectedGolem}
+              onSealAsset={(asset) => {
+                setSelectedVaultAsset(asset);
+                setShowSentinel(true);
+                logEvent('security', `Initiating Neural Sealing for ${asset.name}...`);
+              }}
             />
           )}
 
@@ -3326,9 +3332,13 @@ export default function App() {
         {showSentinel && (
           <SentinelVault 
             isOpen={showSentinel} 
-            onClose={() => setShowSentinel(false)} 
+            onClose={() => {
+              setShowSentinel(false);
+              setSelectedVaultAsset(null);
+            }} 
             onPlayHandshake={playHandshake} 
             onPlayNotification={playNotification} 
+            initialAsset={selectedVaultAsset}
           />
         )}
 

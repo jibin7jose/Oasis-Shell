@@ -7,12 +7,14 @@ interface InventoryMatrixProps {
   isVaultSealed: boolean;
   strategicInventory: any[];
   zenMode: boolean;
+  onSealAsset?: (asset: any) => void;
 }
 
 export const InventoryMatrix: React.FC<InventoryMatrixProps> = ({
   isVaultSealed,
   strategicInventory,
   zenMode,
+  onSealAsset,
 }) => {
   return (
     <div className={cn(
@@ -43,21 +45,55 @@ export const InventoryMatrix: React.FC<InventoryMatrixProps> = ({
         </div>
         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full">Liquid: $1.8M</span>
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 relative">
         {strategicInventory.map((item, i) => (
-          <div key={`inventory-${item.id || item.name || i}`} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-pointer group">
+          <motion.div
+            key={`inventory-${item.id || item.name || i}`}
+            drag={!isVaultSealed}
+            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+            dragElastic={0.6}
+            onDragEnd={(_, info) => {
+              if (!isVaultSealed && Math.abs(info.offset.x) > 100 && onSealAsset) {
+                onSealAsset(item);
+              }
+            }}
+            whileDrag={{ scale: 1.05, zIndex: 100 }}
+            className="flex items-center justify-between p-5 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors cursor-grab active:cursor-grabbing group relative"
+          >
             <div className="flex items-center gap-4">
-              <div className={cn("w-2 h-2 rounded-full", `bg-${item.aura}-500 shadow-[0_0_8px_var(--${item.aura}-500)]`)} />
+              <div className={cn("w-2.5 h-2.5 rounded-full", `bg-${item.aura}-500 shadow-[0_0_10px_var(--${item.aura}-500)]`)} />
               <div>
                 <div className="text-sm font-bold text-white">{item.name}</div>
-                <div className="text-[10px] text-slate-500 uppercase font-black">{item.type}</div>
+                <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">{item.type}</div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm font-black text-emerald-400">{item.value}</div>
-              <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
+            
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="text-sm font-black text-emerald-400">{item.value}</div>
+                <div className="text-[9px] text-slate-600 font-bold">Health: {item.health}%</div>
+              </div>
+              
+              {!isVaultSealed && (
+                <button
+                  onClick={() => onSealAsset && onSealAsset(item)}
+                  className="p-3 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white rounded-xl transition-all border border-indigo-500/20 group-hover:scale-110 active:scale-90"
+                  title="Seal into Sentinel Vault"
+                >
+                  <Lock className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          </div>
+
+            {/* Drag Hint */}
+            <div className="absolute -right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none">
+              <div className="flex flex-col items-center gap-1">
+                 <div className="w-0.5 h-1 bg-white rounded-full mb-1" />
+                 <div className="w-0.5 h-1 bg-white rounded-full mb-1" />
+                 <div className="w-0.5 h-1 bg-white rounded-full" />
+              </div>
+            </div>
+          </motion.div>
         ))}
       </div>
     </div>
