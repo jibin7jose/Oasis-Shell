@@ -305,8 +305,10 @@ pub struct CollectiveNode {
     pub ip: String,
     pub port: u16,
     pub hostname: String,
-    pub status: String, // "Active", "Syncing", "Offline"
+    pub status: String, // "Active", "Offline", "Syncing"
     pub last_pulse: String,
+    pub aura: String,
+    pub latency_ms: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -390,43 +392,40 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
     Ok(history)
 }
 
-static COLLECTIVE_REGISTRY: LazyLock<Mutex<Vec<CollectiveNode>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[tauri::command]
-async fn register_remote_node(ip: String, port: u16, hostname: String) -> Result<String, String> {
+async fn register_remote_node(state: tauri::State<'_, AppState>, ip: String, port: u16, hostname: String) -> Result<String, String> {
     let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
     let node_id = format!("NODE_{}", hostname.to_uppercase());
     
-    // Check if exists
-    if let Some(existing) = registry.iter_mut().find(|n| n.id == node_id) {
-        existing.status = "Active".into();
-        existing.last_pulse = chrono::Local::now().to_rfc3339();
-        Ok(format!("Distributed Node {} Resynchronized.", node_id))
-    } else {
-        registry.push(CollectiveNode {
-            id: node_id.clone(),
-            ip,
-            port,
-            hostname,
-            status: "Active".into(),
-            last_pulse: chrono::Local::now().to_rfc3339(),
-        });
-        Ok(format!("New Collective Node {} Manifested.", node_id))
-    }
+    let peer = CollectiveNode {
+        id: node_id.clone(),
+        ip,
+        port,
+        hostname: hostname.clone(),
+        status: "Active".into(),
+        last_pulse: chrono::Local::now().to_rfc3339(),
+        aura: "amber".into(),
+        latency_ms: 0,
+    };
+
+    registry.insert(node_id.clone(), peer);
+    Ok(format!("Distributed Node {} Manifested.", node_id))
 }
 
 #[tauri::command]
 async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
     let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-    Ok(registry.clone())
+    Ok(registry.values().cloned().collect())
 }
 
 #[tauri::command]
 async fn broadcast_distributed_aura(message: String) -> Result<usize, String> {
     let registry = {
         let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-        registry.clone()
+        registry.values().cloned().collect::<Vec<CollectiveNode>>()
     };
     let client = reqwest::Client::new();
     let mut success_count = 0;
@@ -2576,6 +2575,16 @@ async fn get_neural_graph(state: tauri::State<'_, AppState>) -> Result<serde_jso
         }
     }
 
+    // 4. Distributed Collective Nodes
+    {
+        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+        for peer in registry.values() {
+            let group = if peer.status == "Active" { "collective_active" } else { "collective_offline" };
+            nodes.push(Node { id: peer.id.clone(), group: group.into(), val: 15.0 });
+            links.push(Link { source: "Oasis Core".into(), target: peer.id.clone(), value: 0.5 });
+        }
+    }
+
     Ok(serde_json::json!({ "nodes": nodes, "links": links }))
 }
 
@@ -2614,6 +2623,79 @@ async fn get_all_files(state: tauri::State<'_, AppState>) -> Result<serde_json::
 }
 
 #[tauri::command]
+async fn collective_pulse_loop(app: tauri::AppHandle) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(120)).await;
+        let mut peers_to_update = Vec::new();
+        
+        {
+            let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+            for (id, peer) in registry.iter() {
+                peers_to_update.push(peer.clone());
+            }
+        }
+
+        let client = reqwest::Client::new();
+        for mut peer in peers_to_update {
+            let url = format!("http://{}:{}/collective/pulse", peer.ip, peer.port);
+            let start = std::time::Instant::now();
+            match client.get(&url).timeout(Duration::from_secs(5)).send().await {
+                Ok(_) => {
+                    peer.status = "ONLINE".into();
+                    peer.latency_ms = start.elapsed().as_millis() as u32;
+                    peer.last_seen = chrono::Local::now().to_rfc3339();
+                }
+                Err(_) => {
+                    peer.status = "OFFLINE".into();
+                }
+            }
+            
+            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+            registry.insert(peer.id.clone(), peer.clone());
+            let _ = app.emit("collective-update", peer);
+        }
+    }
+}
+
+#[tauri::command]
+async fn register_peer_node(state: tauri::State<'_, AppState>, ip: String, name: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let port = state.config.broadcast_port;
+    let node_id = format!("NODE-{}", chrono::Local::now().timestamp());
+    
+    let peer = CollectiveNode {
+        id: node_id.clone(),
+        name,
+        ip: ip.clone(),
+        port,
+        status: "PENDING".into(),
+        last_seen: chrono::Local::now().to_rfc3339(),
+        aura: "amber".into(),
+        latency_ms: 0,
+    };
+
+    // Perform handshake
+    let url = format!("http://{}:{}/collective/handshake", ip, port);
+    match client.post(&url).json(&peer).send().await {
+        Ok(res) => {
+            if res.status().is_success() {
+                let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+                registry.insert(node_id.clone(), peer);
+                Ok(format!("Handshake Successful with Node {}", node_id))
+            } else {
+                Err("Handshake Refused by Remote Node".into())
+            }
+        }
+        Err(e) => Err(format!("Network Failure: {}", e))
+    }
+}
+
+#[tauri::command]
+async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
+    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
 fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         if let Ok(server) = tiny_http::Server::http("0.0.0.0:4040") {
@@ -2637,7 +2719,21 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                             let _ = app.emit("scout-telemetry", json);
                         }
                     }
-                } else if url == "/heartbeat" {
+                } else if url == "/collective/handshake" && request.method() == &tiny_http::Method::Post {
+                    let mut content = String::new();
+                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
+                        if let Ok(peer) = serde_json::from_str::<CollectiveNode>(&content) {
+                            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+                            registry.insert(peer.id.clone(), peer.clone());
+                            let _ = app.emit("collective-update", peer);
+                            
+                            let response = tiny_http::Response::from_string("{\"status\":\"SYNCED\"}")
+                                .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                            let _ = request.respond(response);
+                            continue;
+                        }
+                    }
+                } else if url == "/heartbeat" || url == "/collective/pulse" {
                     let response = tiny_http::Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                     let _ = request.respond(response);
@@ -3605,6 +3701,40 @@ async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde
     }
 }
 
+async fn collective_pulse_loop(app: tauri::AppHandle) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(120)).await;
+        let mut peers_to_update = Vec::new();
+        
+        {
+            let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+            for peer in registry.values() {
+                peers_to_update.push(peer.clone());
+            }
+        }
+
+        let client = reqwest::Client::new();
+        for mut peer in peers_to_update {
+            let url = format!("http://{}:{}/collective/pulse", peer.ip, peer.port);
+            let start = std::time::Instant::now();
+            match client.get(&url).timeout(Duration::from_secs(5)).send().await {
+                Ok(_) => {
+                    peer.status = "Active".into();
+                    peer.latency_ms = start.elapsed().as_millis() as u32;
+                    peer.last_pulse = chrono::Local::now().to_rfc3339();
+                }
+                Err(_) => {
+                    peer.status = "Offline".into();
+                }
+            }
+            
+            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+            registry.insert(peer.id.clone(), peer.clone());
+            let _ = app.emit("collective-update", peer);
+        }
+    }
+}
+
 pub fn run() {
     let context = tauri::generate_context!();
     
@@ -3800,6 +3930,10 @@ pub fn run() {
                     std::thread::sleep(std::time::Duration::from_secs(60));
                     let _ = app_handle.emit("chronos-pulse", ());
                 }
+            });
+            
+            tauri::async_runtime::spawn(async move {
+                collective_pulse_loop(app_handle).await;
             });
 
             Ok(())

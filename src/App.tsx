@@ -83,6 +83,17 @@ interface LatticePoint {
   category: "CODE" | "MARKET" | "SYSTEM" | "ERROR";
 }
 
+interface CollectiveNode {
+  id: String;
+  ip: String;
+  port: number;
+  hostname: String;
+  status: "Active" | "Offline" | "Syncing";
+  last_pulse: String;
+  aura: string;
+  latency_ms: number;
+}
+
 export default function App() {
   const { playClick, playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
   
@@ -181,6 +192,7 @@ export default function App() {
 
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
   const [latticePoints, setLatticePoints] = useState<LatticePoint[]>([]);
+  const [collectiveNodes, setCollectiveNodes] = useState<CollectiveNode[]>([]);
 
   useEffect(() => {
     if (!isHandshakeSuccessful) return;
@@ -211,8 +223,16 @@ export default function App() {
   useEffect(() => {
     if (isHandshakeSuccessful) {
         loadCrates();
+        loadCollectiveNodes();
     }
   }, [isHandshakeSuccessful]);
+
+  const loadCollectiveNodes = async () => {
+    try {
+      const nodes = await invokeSafe("get_collective_nodes") as CollectiveNode[];
+      setCollectiveNodes(nodes);
+    } catch (e) {}
+  };
 
   // Phase 9.2: Sensory Feedback Bridge (Dynamic Hum)
   useEffect(() => {
@@ -596,11 +616,25 @@ export default function App() {
       setNotification(`Spectral Breach: ${newAnoms[0].description}`);
     });
 
+    const unlistenCollective = listenSafe('collective-update', (event: { payload: CollectiveNode }) => {
+      setCollectiveNodes(prev => {
+        const index = prev.findIndex(n => n.id === event.payload.id);
+        if (index >= 0) {
+          const next = [...prev];
+          next[index] = event.payload;
+          return next;
+        }
+        return [...prev, event.payload];
+      });
+      playNotification();
+    });
+
     return () => {
       unlistenProactive.then((f: any) => f());
       unlistenCortexRefresh.then((f: any) => f());
       unlistenContextSync.then((f: any) => f());
       unlistenSpectral.then((f: any) => f());
+      unlistenCollective.then((f: any) => f());
     };
   }, [showGraph, activeContext, showSettings, showNexus]);
 
@@ -2316,6 +2350,8 @@ export default function App() {
               if (node.group === 'core') return "#6366f1";
               if (node.group === 'logic') return "#fbbf24";
               if (node.group === 'kernel') return "#f87171";
+              if (node.group === 'collective_active') return "#10b981"; // Emerald Sync
+              if (node.group === 'collective_offline') return "#475569"; // Slate Mute
               return "#94a3b8";
             }}
             nodeVal={(node: any) => {
