@@ -4,6 +4,7 @@ import { MarketTicker } from '../dashboard/MarketTicker';
 import { StatGrid } from '../dashboard/StatGrid';
 import { InventoryMatrix } from '../dashboard/InventoryMatrix';
 import { GolemMatrix } from '../dashboard/GolemMatrix';
+import { ForgePanel } from './ForgePanel';
 
 interface DashboardPanelProps {
   presentationMode: boolean;
@@ -24,6 +25,10 @@ interface DashboardPanelProps {
   activeGolems: any[];
   setSelectedGolem: (golem: any) => void;
   onSealAsset: (asset: any) => void;
+  strategicMacros: any[];
+  handleExecuteMacro: (id: string) => void;
+  handleSignMacro: (id: string) => void;
+  isForgingMacro: boolean;
 }
 
 export const DashboardPanel: React.FC<DashboardPanelProps> = ({
@@ -45,6 +50,10 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   activeGolems,
   setSelectedGolem,
   onSealAsset,
+  strategicMacros,
+  handleExecuteMacro,
+  handleSignMacro,
+  isForgingMacro,
 }) => {
   return (
     <>
@@ -84,6 +93,15 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           activeGolems={activeGolems}
           setSelectedGolem={setSelectedGolem}
           zenMode={zenMode}
+        />
+      </div>
+
+      <div className="w-full max-w-5xl mb-12">
+        <ForgePanel 
+          macros={strategicMacros}
+          onExecute={handleExecuteMacro}
+          onSign={handleSignMacro}
+          isForging={isForgingMacro}
         />
       </div>
     </>

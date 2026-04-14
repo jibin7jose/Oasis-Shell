@@ -83,6 +83,17 @@ interface LatticePoint {
   category: "CODE" | "MARKET" | "SYSTEM" | "ERROR";
 }
 
+interface StrategicMacro {
+  id: string;
+  name: string;
+  description: string;
+  script: string;
+  trigger_pattern: string;
+  signed: boolean;
+  aura: string;
+  status: string;
+}
+
 interface CollectiveNode {
   id: String;
   ip: String;
@@ -193,6 +204,8 @@ export default function App() {
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
   const [latticePoints, setLatticePoints] = useState<LatticePoint[]>([]);
   const [collectiveNodes, setCollectiveNodes] = useState<CollectiveNode[]>([]);
+  const [strategicMacros, setStrategicMacros] = useState<StrategicMacro[]>([]);
+  const [isLatticeActive, setIsLatticeActive] = useState(true);
 
   useEffect(() => {
     if (!isHandshakeSuccessful) return;
@@ -628,6 +641,9 @@ export default function App() {
       });
       playNotification();
     });
+
+    // Refresh macros on load
+    invokeSafe("get_macro_inventory").then((data: any) => setStrategicMacros(data));
 
     return () => {
       unlistenProactive.then((f: any) => f());
@@ -1897,16 +1913,57 @@ export default function App() {
   };
 
   const handleForgeIntent = async (node: any) => {
-    setNotification("Neural Forge: Orchestrating generative fix via Golem Alpha-9...");
-    setCortexMenu(null);
     try {
+      setNotification(`Neural Forge: Manifesting Synthesis for Anomaly ${node.id}...`);
       const manifest = await invokeSafe("manifest_forge_intent", { anomalyId: node.id, source: node.source || 'Manual' }) as any;
-      setActiveForge(manifest);
-      setNotification("Neural Forge: Stability Manifest Manifested.");
+      setForgeManifests((prev: any) => [{ ...manifest, node }, ...prev]);
+      setNotification(`Forge: Stability Manifest Generated.`);
+      playPulse();
     } catch (e: any) {
-      setNotification(`Forge Resonance Error: ${e}`);
+      setNotification(`Forge Error: ${e}`);
     }
-  };
+  }
+
+  const handleExecuteMacro = async (id: string) => {
+    try {
+      setNotification(`Neural Forge: Executing Strategic Macro...`);
+      const res = await invokeSafe("execute_macro_golem", { id }) as string;
+      setNotification(`Success: ${res}`);
+      logEvent(`Macro Execution: ${res}`, "system");
+      playNotification();
+    } catch (e: any) {
+      setNotification(`Forge Breach: ${e}`);
+    }
+  }
+
+  const handleSignMacro = async (id: string) => {
+    try {
+      await invokeSafe("sign_macro_golem", { id });
+      setNotification(`Forge: Macro Signed and Authorized.`);
+      const updated = await invokeSafe("get_macro_inventory") as StrategicMacro[];
+      setStrategicMacros(updated);
+      playHandshake();
+    } catch (e: any) {
+      setNotification(`Signature Error: ${e}`);
+    }
+  }
+
+  const forgeFromIntent = async (prompt: string, context: string) => {
+    setIsForging(true);
+    try {
+      setNotification(`Foundry: Synthesizing Macro from context...`);
+      const newMacro = await invokeSafe("forge_macro_intent", { prompt, visualContext: context }) as StrategicMacro;
+      setStrategicMacros(prev => [...prev, newMacro]);
+      setNotification(`Forge Complete: ${newMacro.name} manifested.`);
+      playPulse();
+    } catch (e: any) {
+      setNotification(`Forge Failed: ${e}`);
+    } finally {
+      setIsForging(false);
+    }
+  }
+
+  const [isForging, setIsForging] = useState(false);
 
   useEffect(() => {
     const syncCollective = async () => {
@@ -2499,6 +2556,10 @@ export default function App() {
                 setShowSentinel(true);
                 logEvent('security', `Initiating Neural Sealing for ${asset.name}...`);
               }}
+              strategicMacros={strategicMacros}
+              handleExecuteMacro={handleExecuteMacro}
+              handleSignMacro={handleSignMacro}
+              isForgingMacro={isForging}
             />
           )}
 

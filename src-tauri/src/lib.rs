@@ -56,7 +56,20 @@ pub struct GolemProposal {
 static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StrategicMacro {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub script: String,        // PowerShell or system directive
+    pub trigger_pattern: String, // Semantic context pattern
+    pub signed: bool,          // Founder approval flag
+    pub aura: String,          // emerald, amber, rose, indigo
+    pub status: String,        // "idle", "active", "cooldown"
+}
 
+static MACRO_REGISTRY: LazyLock<Mutex<HashMap<String, StrategicMacro>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Debug)]
 pub struct OasisConfig {
@@ -1666,19 +1679,7 @@ async fn run_system_diagnostic() -> Result<SystemStats, String> {
     })
 }
 
-#[tauri::command]
-async fn get_market_intel() -> Result<MarketIntelligence, String> {
-    let rng = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-    let drift = (rng % 100) as f32 / 50.0 - 1.0; 
-    
-    Ok(MarketIntelligence {
-        sentiment: "Bullish Consensus".into(),
-        index_change: format!("{:.2}%", drift * 0.5),
-        sectors_active: vec!["Neural Compute".into(), "Capital Guard".into(), "Strategic Edge".into()],
-        market_index: 142.5 + drift,
-        sector_divergence: 0.12,
-    })
-}
+
 
 #[tauri::command]
 async fn get_process_list() -> Result<Vec<ProcessInfo>, String> {
@@ -2622,80 +2623,6 @@ async fn get_all_files(state: tauri::State<'_, AppState>) -> Result<serde_json::
     Ok(serde_json::json!(entries))
 }
 
-#[tauri::command]
-async fn collective_pulse_loop(app: tauri::AppHandle) {
-    loop {
-        tokio::time::sleep(Duration::from_secs(120)).await;
-        let mut peers_to_update = Vec::new();
-        
-        {
-            let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-            for (id, peer) in registry.iter() {
-                peers_to_update.push(peer.clone());
-            }
-        }
-
-        let client = reqwest::Client::new();
-        for mut peer in peers_to_update {
-            let url = format!("http://{}:{}/collective/pulse", peer.ip, peer.port);
-            let start = std::time::Instant::now();
-            match client.get(&url).timeout(Duration::from_secs(5)).send().await {
-                Ok(_) => {
-                    peer.status = "ONLINE".into();
-                    peer.latency_ms = start.elapsed().as_millis() as u32;
-                    peer.last_seen = chrono::Local::now().to_rfc3339();
-                }
-                Err(_) => {
-                    peer.status = "OFFLINE".into();
-                }
-            }
-            
-            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
-            registry.insert(peer.id.clone(), peer.clone());
-            let _ = app.emit("collective-update", peer);
-        }
-    }
-}
-
-#[tauri::command]
-async fn register_peer_node(state: tauri::State<'_, AppState>, ip: String, name: String) -> Result<String, String> {
-    let client = reqwest::Client::new();
-    let port = state.config.broadcast_port;
-    let node_id = format!("NODE-{}", chrono::Local::now().timestamp());
-    
-    let peer = CollectiveNode {
-        id: node_id.clone(),
-        name,
-        ip: ip.clone(),
-        port,
-        status: "PENDING".into(),
-        last_seen: chrono::Local::now().to_rfc3339(),
-        aura: "amber".into(),
-        latency_ms: 0,
-    };
-
-    // Perform handshake
-    let url = format!("http://{}:{}/collective/handshake", ip, port);
-    match client.post(&url).json(&peer).send().await {
-        Ok(res) => {
-            if res.status().is_success() {
-                let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
-                registry.insert(node_id.clone(), peer);
-                Ok(format!("Handshake Successful with Node {}", node_id))
-            } else {
-                Err("Handshake Refused by Remote Node".into())
-            }
-        }
-        Err(e) => Err(format!("Network Failure: {}", e))
-    }
-}
-
-#[tauri::command]
-async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
-    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-    Ok(registry.values().cloned().collect())
-}
-
 fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         if let Ok(server) = tiny_http::Server::http("0.0.0.0:4040") {
@@ -3336,6 +3263,82 @@ async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Resul
 }
 
 #[tauri::command]
+async fn forge_macro_intent(state: tauri::State<'_, AppState>, prompt: String, visual_context: String) -> Result<StrategicMacro, String> {
+    let client = reqwest::Client::new();
+    let instruction = format!(
+        "Role: Oasis Strategic Forge. 
+         Input: Visual Context [{}], User Intent [{}].
+         Goal: Forge a strategic automation macro. 
+         Output ONLY JSON: {{ \"name\": \"MACRO NAME\", \"description\": \"STRATEGIC SUMMARY\", \"script\": \"POWERSHELL SCRIPT\", \"trigger\": \"SEMANTIC TRIGGER\", \"aura\": \"emerald|amber|rose|indigo\" }}",
+        visual_context, prompt
+    );
+
+    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": instruction, "stream": false });
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let resp_str = json["response"].as_str().unwrap_or("{}").trim_matches('`').replace("json", "").trim().to_string();
+    let mut macro_data: serde_json::Value = serde_json::from_str(&resp_str).map_err(|e| e.to_string())?;
+    
+    let id = format!("FORGE-{}", chrono::Local::now().timestamp());
+    let st_macro = StrategicMacro {
+        id: id.clone(),
+        name: macro_data["name"].as_str().unwrap_or("Unnamed Golem").into(),
+        description: macro_data["description"].as_str().unwrap_or("Neural automation forged from intent.").into(),
+        script: macro_data["script"].as_str().unwrap_or("echo 'Forge empty.'").into(),
+        trigger_pattern: macro_data["trigger"].as_str().unwrap_or("manual").into(),
+        signed: false,
+        aura: macro_data["aura"].as_str().unwrap_or("indigo").into(),
+        status: "idle".into(),
+    };
+
+    let mut registry = MACRO_REGISTRY.lock().unwrap();
+    registry.insert(id, st_macro.clone());
+    Ok(st_macro)
+}
+
+#[tauri::command]
+async fn execute_macro_golem(id: String) -> Result<String, String> {
+    let st_macro = {
+        let registry = MACRO_REGISTRY.lock().unwrap();
+        registry.get(&id).cloned().ok_or_else(|| "Macro not found in forge registry.")?
+    };
+
+    if !st_macro.signed {
+        return Err("Macro security breach: Founder Signature required for initial Forge execution.".into());
+    }
+
+    // Execute via PowerShell
+    use std::process::Command;
+    let output = Command::new("powershell")
+        .args(["-Command", &st_macro.script])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok(format!("Macro {} Executed.\nOutput: {}\nErrors: {}", st_macro.name, stdout, stderr))
+}
+
+#[tauri::command]
+async fn sign_macro_golem(id: String) -> Result<(), String> {
+    let mut registry = MACRO_REGISTRY.lock().unwrap();
+    if let Some(m) = registry.get_mut(&id) {
+        m.signed = true;
+        Ok(())
+    } else {
+        Err("Macro not found.".into())
+    }
+}
+
+#[tauri::command]
+async fn get_macro_inventory() -> Result<Vec<StrategicMacro>, String> {
+    let registry = MACRO_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
 async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().unwrap();
     conn.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
@@ -3778,7 +3781,7 @@ pub fn run() {
             transcribe_audio,
             get_neural_graph,
             get_all_files,
-            start_telemetry_server,
+
             synthesize_crate_aura,
             execute_neural_command,
             check_ai_status,
@@ -3792,8 +3795,8 @@ pub fn run() {
             query_lattice_points,
             get_logic_path,
             get_venture_metrics,
-            get_market_intel,
             get_market_intelligence,
+
             manifest_code_module,
             generate_venture_audit,
             analyze_work_context,
@@ -3873,6 +3876,10 @@ pub fn run() {
             vault_store_secret,
             vault_get_secret,
             vault_list_secrets,
+            forge_macro_intent,
+            execute_macro_golem,
+            sign_macro_golem,
+            get_macro_inventory,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
