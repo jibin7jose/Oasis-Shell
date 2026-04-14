@@ -7,7 +7,7 @@ use notify::Watcher;
 use std::time::Duration;
 use tauri::Emitter;
 use tauri::Manager;
-use sysinfo::{Disks, System};
+use sysinfo::{Disks, System, Components, Networks};
 use base64::Engine as _;
 use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
 use pbkdf2::pbkdf2_hmac;
@@ -1594,33 +1594,7 @@ async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntellig
     Ok("Chronos Snapshot Etched to Neural Ledger.".into())
 }
 
-#[tauri::command]
-async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
-    let path = ".chronos_ledger.json";
 
-#[tauri::command]
-async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
-    let path = ".chronos_ledger.json";
-    let mut snapshots = if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Vec<VentureSnapshot>>(&data).unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-
-    snapshots.push(VentureSnapshot {
-        id: format!("S_{}", snapshots.len()),
-        name: "Chronos Snapshot".to_string(),
-        timestamp: chrono::Local::now().to_rfc3339(),
-        metrics,
-        market,
-        dominance_index: 85.0, // Seed value
-    });
-
-    let data = serde_json::to_string(&snapshots).map_err(|e| e.to_string())?;
-    std::fs::write(path, data).map_err(|e| e.to_string())?;
-    Ok("Chronos Snapshot Etched to Neural Ledger.".into())
-}
 
 #[tauri::command]
 async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
@@ -1723,29 +1697,28 @@ async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
 
 #[tauri::command]
 async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_components_list();
-    sys.refresh_components();
-    sys.refresh_networks_list();
-    sys.refresh_networks();
-
-    let mut devices: Vec<DeviceInfo> = Vec::new();
-
-    for c in sys.components() {
+    let components = Components::new_with_refreshed_list();
+    let networks = Networks::new_with_refreshed_list();
+    
+    let mut devices = Vec::new();
+    
+    // Physical Components
+    for c in components.iter() {
         devices.push(DeviceInfo {
-            kind: "thermal".into(),
+            kind: "physical".into(),
             name: c.label().to_string(),
-            detail: format!("{:.1}°C", c.temperature()),
+            detail: format!("Temp: {:.1}°C", c.temperature().unwrap_or(0.0)),
         });
     }
 
-    for (name, data) in sys.networks() {
+    // Network Interfaces
+    for (name, data) in networks.iter() {
         let rx_kb = data.received() / 1024;
         let tx_kb = data.transmitted() / 1024;
         if rx_kb > 0 || tx_kb > 0 {
             devices.push(DeviceInfo {
                 kind: "network".into(),
-                name: name.to_string(),
+                name: name.clone(),
                 detail: format!("RX: {} KB | TX: {} KB", rx_kb, tx_kb),
             });
         }
@@ -1788,6 +1761,8 @@ async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String>
 
 #[tauri::command]
 async fn get_process_priority(pid: u32) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
         let cmd = format!("(Get-Process -Id {}).PriorityClass", pid);
         let output = std::process::Command::new("powershell")
             .args(["-Command", &cmd])
@@ -3932,15 +3907,17 @@ pub fn run() {
             }
 
             // Background threads
+            let pulse_handle = app_handle.clone();
             std::thread::spawn(move || {
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(60));
-                    let _ = app_handle.emit("chronos-pulse", ());
+                    let _ = pulse_handle.emit("chronos-pulse", ());
                 }
             });
             
+            let collective_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                collective_pulse_loop(app_handle).await;
+                collective_pulse_loop(collective_handle).await;
             });
 
             Ok(())
