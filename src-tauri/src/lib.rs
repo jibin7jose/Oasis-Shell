@@ -3365,6 +3365,15 @@ async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i
     Ok(results)
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LatticePoint {
+    pub label: String,
+    pub x_pct: f32,
+    pub y_pct: f32,
+    pub intensity: f32,
+    pub category: String, // "CODE", "MARKET", "SYSTEM", "ERROR"
+}
+
 #[tauri::command]
 async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
@@ -3385,6 +3394,34 @@ async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, p
         .map_err(|e| e.to_string())?;
 
     Ok(res["response"].as_str().unwrap_or("Vision Failure").to_string())
+}
+
+#[tauri::command]
+async fn query_lattice_points(state: tauri::State<'_, AppState>, image_base64: String) -> Result<Vec<LatticePoint>, String> {
+    let client = reqwest::Client::new();
+    let prompt = "Analyze this screen and identify 3-5 key points of strategic interest. For each point, provide a label, category (CODE, MARKET, SYSTEM, or ERROR), and rough screen coordinates as percentages (0-100). Return ONLY a JSON array of objects with keys: label, x_pct, y_pct, intensity (0.0-1.0), category.";
+    
+    let body = serde_json::json!({
+        "model": "llava",
+        "prompt": prompt,
+        "images": [image_base64],
+        "stream": false,
+        "format": "json"
+    });
+
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let response_str = res["response"].as_str().unwrap_or("[]");
+    let points: Vec<LatticePoint> = serde_json::from_str(response_str).unwrap_or_else(|_| vec![]);
+    
+    Ok(points)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -3622,6 +3659,7 @@ pub fn run() {
             manifest_temporal_log,
             capture_screenshot,
             query_vision,
+            query_lattice_points,
             get_logic_path,
             get_venture_metrics,
             get_market_intel,

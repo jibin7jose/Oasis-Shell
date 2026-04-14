@@ -22,6 +22,7 @@ import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
+import VisionaryLattice from "./components/visuals/VisionaryLattice";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
 import CrateGallery from "./components/panels/CrateGallery";
 import { cn } from "./lib/utils";
@@ -72,6 +73,14 @@ interface FounderMetrics {
   runway: string;
   momentum: string;
   stress_color: string;
+}
+
+interface LatticePoint {
+  label: string;
+  x_pct: number;
+  y_pct: number;
+  intensity: number;
+  category: "CODE" | "MARKET" | "SYSTEM" | "ERROR";
 }
 
 export default function App() {
@@ -171,20 +180,30 @@ export default function App() {
   } | null>(null);
 
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
+  const [latticePoints, setLatticePoints] = useState<LatticePoint[]>([]);
 
   useEffect(() => {
     if (!isHandshakeSuccessful) return;
     
     const triggerVision = async () => {
         try {
+            const ss = await invokeSafe("capture_screenshot") as string;
             const context = await invokeSafe("analyze_work_context") as string;
-            setNotification(`Vision: Resonance detected with "${context}".`);
+            const points = await invokeSafe("query_lattice_points", { imageBase64: ss }) as LatticePoint[];
+            
+            setNotification(`Lattice Synchronized: ${points.length} points of interest detected.`);
             setVisionaryContext(context);
+            setLatticePoints(points);
+            
+            // Phase 15.2: Sythesize vision nodes in graph
+            if (points.length > 0) {
+               handleInjectVisionNodes(points);
+            }
         } catch (e) { }
     };
     triggerVision();
 
-    const interval = setInterval(triggerVision, 300000); 
+    const interval = setInterval(triggerVision, 30000); 
     return () => clearInterval(interval);
   }, [isHandshakeSuccessful]);
 
@@ -846,6 +865,28 @@ export default function App() {
     } catch (e) {
       setNotification(`Manifest Failure: ${e}`);
     }
+  };
+
+  const handleInjectVisionNodes = (points: LatticePoint[]) => {
+    const visionNodes = points.map((p, i) => ({
+      id: `VISION-${i}`,
+      label: p.label,
+      group: "neural",
+      category: p.category,
+      val: 10 + (p.intensity * 20),
+      isVision: true,
+      x_pct: p.x_pct,
+      y_pct: p.y_pct
+    }));
+
+    setDynamicGraph((prev: any) => ({
+      ...prev,
+      nodes: [...prev.nodes.filter((n: any) => !n.isVision), ...visionNodes],
+      links: [
+        ...prev.links.filter((l: any) => !l.source.toString().startsWith("VISION")),
+        ...visionNodes.map(vn => ({ source: "FOUNDRY CORE", target: vn.id }))
+      ]
+    }));
   };
 
   const handleContextSwitch = (id: string) => {
@@ -3691,6 +3732,7 @@ export default function App() {
         onExport={handleExportCrate}
         isSaving={isSavingCrate}
       />
+      <VisionaryLattice points={latticePoints} show={true} />
     </div>
   );
 }
