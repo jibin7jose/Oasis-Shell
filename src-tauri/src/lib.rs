@@ -16,6 +16,15 @@ use std::collections::HashMap;
 use chrono::Timelike;
 use std::path::{Path, PathBuf};
 use std::fs;
+pub mod vault;
+pub mod macros;
+pub mod golems;
+pub mod system;
+use vault::vault_get_secret;
+use macros::StrategicMacro;
+use golems::{GolemTask, GOLEM_REGISTRY};
+use system::{SystemStats, BatteryHealthInfo, ProcessInfo, StorageInfo, DeviceInfo, WindowInfo, WindowSnapshot};
+
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 
@@ -28,48 +37,6 @@ pub struct PinnedContext {
     pub timestamp: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GolemTask {
-    pub id: String,
-    pub name: String,
-    pub status: String,
-    pub progress: f32, // 0.0 to 1.0
-    pub aura: String,   // emerald, amber, rose, indigo
-}
-
-static GOLEM_REGISTRY: LazyLock<Mutex<HashMap<String, GolemTask>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GolemProposal {
-    pub id: String,
-    pub task_id: String,
-    pub agent_name: String,
-    pub file_path: String,
-    pub title: String,
-    pub original_content: String,
-    pub proposed_content: String,
-    pub rationale: String,
-    pub status: String, // "pending", "merged", "discarded"
-}
-
-static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StrategicMacro {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub script: String,        // PowerShell or system directive
-    pub trigger_pattern: String, // Semantic context pattern
-    pub signed: bool,          // Founder approval flag
-    pub aura: String,          // emerald, amber, rose, indigo
-    pub status: String,        // "idle", "active", "cooldown"
-}
-
-static MACRO_REGISTRY: LazyLock<Mutex<HashMap<String, StrategicMacro>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Debug)]
 pub struct OasisConfig {
@@ -92,9 +59,9 @@ impl OasisConfig {
     }
 }
 
-struct AppState {
-    db: Mutex<Connection>,
-    config: OasisConfig,
+pub struct AppState {
+    pub db: Mutex<Connection>,
+    pub config: OasisConfig,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -170,52 +137,6 @@ pub struct CLIResponse {
     pub aura_color: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SystemStats {
-    pub oas_id: String,
-    pub path_status: String,
-    pub binary_sync: bool,
-    pub cpu_load: f32,
-    pub mem_used: f32,
-    pub battery_level: u32,
-    pub is_charging: bool,
-    pub battery_health: i32,
-    pub time_remaining_min: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BatteryHealthInfo {
-    pub health_percent: i32,
-    pub design_capacity: i32,
-    pub full_charge_capacity: i32,
-    pub cycle_count: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ProcessInfo {
-    pub pid: u32,
-    pub name: String,
-    pub cpu_usage: f32,
-    pub mem_usage: u64,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StorageInfo {
-    pub name: String,
-    pub mount: String,
-    pub total: u64,
-    pub available: u64,
-    pub health_score: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DeviceInfo {
-    pub id: String,
-    pub category: String,
-    pub status: String,
-    pub metadata: String,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SynthesisReport {
@@ -728,74 +649,7 @@ pub struct NeuralLog {
     pub message: String,
     pub timestamp: String,
 }
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct WindowInfo {
-    pub title: String,
-    pub pid: u32,
-    pub exe_path: String,
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-    pub is_maximized: bool,
-}
 
-#[tauri::command]
-fn get_running_windows() -> Vec<WindowInfo> {
-    let mut windows: Vec<WindowInfo> = Vec::new();
-
-    unsafe {
-        let _ = EnumWindows(Some(enum_window_callback), LPARAM(&mut windows as *mut Vec<WindowInfo> as isize));
-    }
-
-    windows
-}
-
-unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let windows = &mut *(lparam.0 as *mut Vec<WindowInfo>);
-
-    if IsWindowVisible(hwnd).as_bool() {
-        let mut buffer = [0u16; 512];
-        let length = GetWindowTextW(hwnd, &mut buffer);
-        let title = String::from_utf16_lossy(&buffer[..length as usize]);
-
-        if !title.is_empty() && title != "Program Manager" && title != "Settings" {
-            let mut pid = 0u32;
-            GetWindowThreadProcessId(hwnd, Some(&mut pid));
-            
-            use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
-            use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
-            
-            let mut exe_path = String::new();
-            if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
-                let mut path_buffer = [0u16; 1024];
-                let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
-                if path_len > 0 {
-                    exe_path = String::from_utf16_lossy(&path_buffer[..path_len as usize]);
-                }
-                let _ = windows::Win32::Foundation::CloseHandle(handle);
-            }
-
-            if !exe_path.is_empty() && !exe_path.contains("oasis-shell") {
-                let mut rect = RECT::default();
-                let _ = GetWindowRect(hwnd, &mut rect);
-                let is_maximized = IsZoomed(hwnd).as_bool();
-
-                windows.push(WindowInfo {
-                    title,
-                    pid,
-                    exe_path,
-                    x: rect.left,
-                    y: rect.top,
-                    width: rect.right - rect.left,
-                    height: rect.bottom - rect.top,
-                    is_maximized,
-                });
-            }
-        }
-    }
-    BOOL(1)
-}
 
 #[tauri::command]
 fn sync_project(message: Option<String>) -> Result<(), String> {
@@ -1009,26 +863,7 @@ fn export_crate_manifest(app: tauri::AppHandle, id: i32, target_path: String) ->
     fs::write(&final_path, content).map_err(|e| e.to_string())?;
     Ok(final_path.to_string_lossy().to_string())
 }
-#[tauri::command]
-fn launch_context_apps(apps: Vec<WindowInfo>) -> Result<Vec<String>, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_all();
-    let running_exes: Vec<String> = sys.processes().values()
-        .filter_map(|p| p.exe().map(|e| e.to_string_lossy().to_string()))
-        .collect();
 
-    let mut launched = Vec::new();
-    for app in apps {
-        if !app.exe_path.is_empty() {
-             if !running_exes.iter().any(|e| e.contains(&app.exe_path) || app.exe_path.contains(e)) {
-                 if std::process::Command::new(&app.exe_path).spawn().is_ok() {
-                    launched.push(app.title.clone());
-                 }
-             }
-        }
-    }
-    Ok(launched)
-}
 
 #[tauri::command]
 fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: String) -> Result<(), String> {
@@ -1277,36 +1112,6 @@ async fn get_market_intelligence() -> Result<MarketIntelligence, String> {
     })
 }
 
-#[tauri::command]
-async fn register_new_golem(agent: NeuralAgent) -> Result<String, String> {
-    let path = ".golem_registry.json";
-    let mut registry = if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Vec<NeuralAgent>>(&data).unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-
-    registry.push(agent.clone());
-    let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
-    std::fs::write(path, data).map_err(|e| e.to_string())?;
-    Ok(format!("Strategic Golem [{}] Forged into Registry.", agent.name))
-}
-
-#[tauri::command]
-async fn delete_golem(id: String) -> Result<String, String> {
-    let path = ".golem_registry.json";
-    if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let mut registry = serde_json::from_str::<Vec<NeuralAgent>>(&data).unwrap_or_default();
-        registry.retain(|a| a.id != id);
-        let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
-        std::fs::write(path, data).map_err(|e| e.to_string())?;
-        Ok("Golem purged from Registry.".into())
-    } else {
-        Err("No Registry found.".into())
-    }
-}
 
 #[tauri::command]
 async fn get_aegis_ledger() -> Result<AegisLedger, String> {
@@ -1413,31 +1218,6 @@ async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManife
     }
 }
 
-#[tauri::command]
-async fn execute_golem_manifest(_id: String, title: String, code: String) -> Result<String, String> {
-    // 1. Ensure Manifest Directory Exists
-    let dir_path = "manifested";
-    if !std::path::Path::new(dir_path).exists() {
-        std::fs::create_dir_all(dir_path).map_err(|e| e.to_string())?;
-    }
-
-    // 2. Write Manifestation
-    let file_basename = title.replace(" ", "_").to_lowercase();
-    let path = format!("{}/{}.ts", dir_path, file_basename);
-    std::fs::write(&path, &code).map_err(|e| e.to_string())?;
-
-    // 3. Neural Git Sync (Forensic Locking)
-    let _ = std::process::Command::new("git")
-        .args(["add", &path])
-        .output();
-    
-    let commit_msg = format!("Oasis Neural Manifest: {}", title);
-    let _ = std::process::Command::new("git")
-        .args(["commit", "-m", &commit_msg])
-        .output();
-
-    Ok(format!("Strategic Execution Complete: Neural Module '{}' manifested and forensically locked in Git repository.", title))
-}
 
 #[tauri::command]
 async fn trigger_oracle_audit(arr: f32, burn: f32) -> Result<OracleAlert, String> {
@@ -1608,283 +1388,6 @@ async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
     }
 }
 
-#[tauri::command]
-async fn run_system_diagnostic() -> Result<SystemStats, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_all();
-    
-    let cpu_load = sys.global_cpu_usage();
-    let mem_used = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
-
-    // Default battery telemetry
-    let mut battery_level = 100u32;
-    let mut is_charging = false;
-    let mut battery_health = -1;
-    let mut time_remaining_min = -1;
-
-    #[cfg(target_os = "windows")]
-    {
-        // Try to get battery status via PowerShell
-        let cmd = "Get-CimInstance -ClassName Win32_Battery | Select-Object -Property EstimatedChargeRemaining, BatteryStatus, ExpectedLife | ConvertTo-Json";
-        if let Ok(output) = std::process::Command::new("powershell").args(["-Command", cmd]).output() {
-            if output.status.success() {
-                if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-                    battery_level = json["EstimatedChargeRemaining"].as_u64().unwrap_or(100) as u32;
-                    is_charging = json["BatteryStatus"].as_u64().unwrap_or(1) != 2;
-                    time_remaining_min = json["ExpectedLife"].as_i64().unwrap_or(-1) as i32;
-                }
-            }
-        }
-        
-        if let Ok(health_info) = get_battery_health_wmi().await {
-            battery_health = health_info.health_percent;
-        }
-    }
-
-    Ok(SystemStats {
-        oas_id: "OAS_KRNL_4.5-SENTINEL".into(),
-        path_status: "Neural Link Established".into(),
-        binary_sync: true,
-        cpu_load,
-        mem_used,
-        battery_level,
-        is_charging,
-        battery_health,
-        time_remaining_min,
-    })
-}
-
-
-
-#[tauri::command]
-async fn get_process_list() -> Result<Vec<ProcessInfo>, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_all();
-    
-    let mut procs: Vec<ProcessInfo> = sys.processes().values().map(|p| {
-        ProcessInfo {
-            pid: p.pid().as_u32(),
-            name: p.name().to_string_lossy().into(),
-            cpu_usage: p.cpu_usage(),
-            mem_usage: p.memory(),
-            status: format!("{:?}", p.status()),
-        }
-    }).collect();
-
-    procs.sort_by(|a, b| b.cpu_usage.partial_cmp(&a.cpu_usage).unwrap());
-    Ok(procs.into_iter().take(15).collect())
-}
-
-#[tauri::command]
-async fn get_storage_map() -> Result<Vec<StorageInfo>, String> {
-    let disks = Disks::new_with_refreshed_list();
-
-    let disks: Vec<StorageInfo> = disks.list().iter().map(|d| {
-        let total = d.total_space();
-        let available = d.available_space();
-        let health = (available as f32 / total as f32) * 100.0;
-        
-        StorageInfo {
-            name: d.name().to_string_lossy().into(),
-            mount: d.mount_point().to_string_lossy().into(),
-            total,
-            available,
-            health_score: health,
-        }
-    }).collect();
-    
-    Ok(disks)
-}
-
-#[tauri::command]
-async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
-    let components = Components::new_with_refreshed_list();
-    let networks = Networks::new_with_refreshed_list();
-    
-    let mut devices = Vec::new();
-    
-    // Physical Components
-    for c in components.iter() {
-        devices.push(DeviceInfo {
-            id: format!("HW-{}", c.label()),
-            category: "Physical".into(),
-            status: "Online".into(),
-            metadata: format!("Temp: {:.1}°C", c.temperature().unwrap_or(0.0)),
-        });
-    }
-
-    // Network Interfaces
-    for (name, data) in networks.iter() {
-        let rx_kb = data.received() / 1024;
-        let tx_kb = data.transmitted() / 1024;
-        if rx_kb > 0 || tx_kb > 0 {
-            devices.push(DeviceInfo {
-                id: format!("NET-{}", name),
-                category: "Network".into(),
-                status: "Active".into(),
-                metadata: format!("RX: {} KB | TX: {} KB", rx_kb, tx_kb),
-            });
-        }
-    }
-
-    Ok(devices)
-}
-
-#[tauri::command]
-async fn kill_quarantine_process(pid: u32, seal: bool) -> Result<String, String> {
-    if seal {
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_all();
-        if let Some(process) = sys.process(sysinfo::Pid::from_u32(pid)) {
-            if let Some(exe_path) = process.exe() {
-                let path_str = exe_path.to_string_lossy().to_string();
-                let title = format!("Aegis Quarantine: {}", process.name().to_string_lossy());
-                let _ = seal_strategic_asset(path_str, title).await;
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let output = std::process::Command::new("taskkill")
-            .args(["/F", "/PID", &pid.to_string()])
-            .output()
-            .map_err(|e| e.to_string())?;
-            
-        if output.status.success() {
-            Ok(format!("Aegis Neutralization: PID {} purged from Host OS.", pid))
-        } else {
-            Err(format!("Aegis Failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-    #[cfg(not(target_os = "windows"))]
-    { Ok("Aegis synchronization only available on Windows for now.".into()) }
-}
-
-
-#[tauri::command]
-async fn get_process_priority(pid: u32) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let cmd = format!("(Get-Process -Id {}).PriorityClass", pid);
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", &cmd])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-        } else {
-            Err(format!("Priority readback failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok("UNKNOWN".into())
-    }
-}
-
-#[tauri::command]
-async fn get_battery_health_wmi() -> Result<BatteryHealthInfo, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let cmd = "$b=Get-CimInstance -ClassName Win32_Battery | Select-Object -First 1; if ($null -eq $b) { @{health_percent=-1;design_capacity=-1;full_charge_capacity=-1;cycle_count=-1} | ConvertTo-Json -Compress } else { $design=$b.DesignCapacity; $full=$b.FullChargeCapacity; $cycles=$b.CycleCount; $health=if ($design -gt 0) { [math]::Round($full/$design*100) } else { -1 }; @{health_percent=$health;design_capacity=$design;full_charge_capacity=$full;cycle_count=$cycles} | ConvertTo-Json -Compress }";
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", cmd])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            let json = String::from_utf8_lossy(&output.stdout);
-            let info: BatteryHealthInfo = serde_json::from_str(json.trim()).map_err(|e| e.to_string())?;
-            Ok(info)
-        } else {
-            Err(format!("WMI battery query failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok(BatteryHealthInfo { health_percent: -1, design_capacity: -1, full_charge_capacity: -1, cycle_count: -1 })
-    }
-}
-
-#[tauri::command]
-async fn suspend_process(pid: u32) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", &format!("Suspend-Process -Id {}", pid)])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            Ok(format!("Process PID {} suspended.", pid))
-        } else {
-            Err(format!("Suspend failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok("Suspend only available on Windows for now.".into())
-    }
-}
-
-#[tauri::command]
-async fn resume_process(pid: u32) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", &format!("Resume-Process -Id {}", pid)])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            Ok(format!("Process PID {} resumed.", pid))
-        } else {
-            Err(format!("Resume failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok("Resume only available on Windows for now.".into())
-    }
-}
-
-#[tauri::command]
-async fn set_process_priority(pid: u32, priority: String) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let class = match priority.to_lowercase().as_str() {
-            "idle" | "low" => "Idle",
-            "below_normal" | "below" => "BelowNormal",
-            "above_normal" | "above" => "AboveNormal",
-            "high" => "High",
-            "realtime" => "RealTime",
-            _ => "Normal",
-        };
-
-        let cmd = format!("$p = Get-Process -Id {}; $p.PriorityClass = '{}'", pid, class);
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", &cmd])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if output.status.success() {
-            Ok(format!("Process PID {} priority set to {}.", pid, class))
-        } else {
-            Err(format!("Priority change failure: {}", String::from_utf8_lossy(&output.stderr)))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok("Priority changes only available on Windows for now.".into())
-    }
-}
 
 #[tauri::command]
 async fn execute_cli_directive(
@@ -1894,7 +1397,7 @@ async fn execute_cli_directive(
 ) -> Result<CLIResponse, String> {
     match directive.cmd.as_str() {
         "status" => {
-            let stats = run_system_diagnostic().await?;
+            let stats = system::run_system_diagnostic().await?;
             let metrics = load_venture_state().await?;
             Ok(CLIResponse {
                 output: format!(
@@ -1914,8 +1417,8 @@ async fn execute_cli_directive(
             })
         }
         "audit" => {
-            let process_count = get_process_list().await?.len();
-            let disk_count = get_storage_map().await?.len();
+            let process_count = system::get_process_list().await?.len();
+            let disk_count = system::get_storage_map().await?.len();
             let asset_count = get_strategic_inventory().await?.len();
             let conn = state.db.lock().unwrap();
             let ledger_entries: i64 = conn
@@ -2463,7 +1966,7 @@ async fn execute_neural_intent(state: tauri::State<'_, AppState>, query: String)
                 return Ok(serde_json::json!({ "content": format!("Neural Intent: Asset successfully sealed in the Sentinel Vault: {}.", param), "tool": "VAULT_SEAL" }));
             },
             "SYSTEM_SCAN" => {
-                let stats = run_system_diagnostic().await.map_err(|e| format!("Diagnostic failure: {}", e))?;
+                let stats = system::run_system_diagnostic().await.map_err(|e| format!("Diagnostic failure: {}", e))?;
                 // Correctly mapping for UI consistency
                 let mut data = serde_json::to_value(stats).unwrap();
                 data["cpu_load"] = data["cpu_load"].clone();
@@ -2699,150 +2202,6 @@ async fn execute_neural_commission(state: tauri::State<'_, AppState>, task: Stri
    })
 }
 
-#[tauri::command]
-async fn release_golem_workforce(
-    _app: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
-    _agent_id: String,
-    agent_name: String,
-    target_path: String,
-    directive: String,
-) -> Result<String, String> {
-    let task_id = format!("GOLEM_{}", chrono::Local::now().timestamp());
-    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    registry.insert(task_id.clone(), GolemTask {
-        id: task_id.clone(),
-        name: format!("{} [{}]", agent_name, target_path.split('\\').last().unwrap_or(&target_path)),
-        status: "Neural Initialization...".into(),
-        progress: 0.0,
-        aura: "amber".into(),
-    });
-    drop(registry);
-
-    let config_clone = state.config.clone();
-    let task_id_clone = task_id.clone();
-    let agent_name_clone = agent_name.clone();
-    let path_clone = target_path.clone();
-
-    std::thread::spawn(move || {
-        tauri::async_runtime::block_on(async move {
-            let original_content = std::fs::read_to_string(&path_clone).unwrap_or_else(|_| "// New file manifestation...".into());
-            
-            // 1. Initial Resonance
-            {
-                let mut registry = GOLEM_REGISTRY.lock().unwrap();
-                if let Some(task) = registry.get_mut(&task_id_clone) {
-                    task.status = "Neural Initialization...".into();
-                    task.progress = 0.05;
-                }
-            }
-
-            // 2. Simulated Progress Loop (The "Forge" effect)
-            for i in 1..=8 {
-                std::thread::sleep(std::time::Duration::from_millis(1500));
-                let mut registry = GOLEM_REGISTRY.lock().unwrap();
-                if let Some(task) = registry.get_mut(&task_id_clone) {
-                    task.progress = 0.05 + (i as f32 * 0.1);
-                    task.status = match i {
-                        1 => "Analyzing Logic Layers...".into(),
-                        2 => "Indexing Contextual Nodes...".into(),
-                        3 => "Deriving Strategic Intent...".into(),
-                        4 => "Consulting Neural Oracle...".into(),
-                        5 => "Synthesizing Refactor Manifest...".into(),
-                        6 => "Optimizing Code Surface...".into(),
-                        7 => "Validating Integrity...".into(),
-                        _ => "Finalizing Neural Proposal...".into(),
-                    };
-                }
-            }
-
-            // 3. Construct prompt & call Ollama
-            let prompt = format!(
-                "You are an Oasis Neural Golem (Agent: {}). Objective: {}. File: {}. Content: {}. Respond ONLY in JSON: {{ \"rationale\": \"EXPLAIN\", \"code\": \"NEW_CONTENT\" }}",
-                agent_name_clone, directive, path_clone, original_content
-            );
-
-            let client = reqwest::Client::new();
-            let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-            
-            if let Ok(res) = client.post(format!("{}/api/generate", config_clone.ollama_url)).json(&body).send().await {
-                if let Ok(json) = res.json::<serde_json::Value>().await {
-                    let resp_str = json["response"].as_str().unwrap_or("{}");
-                    let clean_json = if resp_str.contains("```json") {
-                        resp_str.split("```json").nth(1).unwrap().split("```").next().unwrap().trim()
-                    } else { resp_str };
-
-                    let parsed: serde_json::Value = serde_json::from_str(clean_json).unwrap_or(serde_json::json!({
-                        "rationale": "Autonomous strategic refactor initiated.",
-                        "code": resp_str
-                    }));
-
-                    // 4. Register Proposal
-                    let proposal_id = format!("PROP_{}", chrono::Local::now().timestamp());
-                    let mut prop_registry = PROPOSAL_REGISTRY.lock().unwrap();
-                    prop_registry.insert(proposal_id.clone(), GolemProposal {
-                        id: proposal_id,
-                        task_id: task_id_clone.clone(),
-                        agent_name: agent_name_clone,
-                        file_path: path_clone,
-                        title: directive,
-                        original_content,
-                        proposed_content: parsed["code"].as_str().unwrap_or("").to_string(),
-                        rationale: parsed["rationale"].as_str().unwrap_or("").to_string(),
-                        status: "pending".into(),
-                    });
-
-                    // 5. Finalize Task
-                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-                    if let Some(task) = registry.get_mut(&task_id_clone) {
-                        task.status = "Proposal Manifested".into();
-                        task.progress = 1.0;
-                        task.aura = "emerald".into();
-                    }
-                }
-            } else {
-                // Fallback if AI offline
-                 let mut registry = GOLEM_REGISTRY.lock().unwrap();
-                 if let Some(task) = registry.get_mut(&task_id_clone) {
-                     task.status = "Neutral Edge Failure (LLM Offline)".into();
-                     task.aura = "rose".into();
-                 }
-            }
-        });
-    });
-
-    Ok(task_id)
-}
-
-#[tauri::command]
-async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
-    let registry = PROPOSAL_REGISTRY.lock().unwrap();
-    Ok(registry.values().cloned().collect())
-}
-
-#[tauri::command]
-async fn resolve_golem_proposal(proposal_id: String, action: String) -> Result<String, String> {
-    let mut prop_registry = PROPOSAL_REGISTRY.lock().unwrap();
-    if let Some(prop) = prop_registry.get_mut(&proposal_id) {
-        if action == "merge" {
-            std::fs::write(&prop.file_path, &prop.proposed_content).map_err(|e| e.to_string())?;
-            prop.status = "merged".into();
-            
-            // Cleanup task
-            let mut task_registry = GOLEM_REGISTRY.lock().unwrap();
-            task_registry.remove(&prop.task_id);
-            
-            Ok("Neural PR Merged Successfully.".into())
-        } else {
-            prop.status = "discarded".into();
-            let mut task_registry = GOLEM_REGISTRY.lock().unwrap();
-            task_registry.remove(&prop.task_id);
-            Ok("Neural PR Discarded.".into())
-        }
-    } else {
-        Err("Proposal not found".into())
-    }
-}
 
 #[tauri::command]
 fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, status: String) -> Result<(), String> {
@@ -3163,34 +2522,6 @@ async fn analyze_work_context(state: tauri::State<'_, AppState>) -> Result<Strin
     Ok("Generic Workflow".into())
 }
 
-#[tauri::command]
-async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
-    let registry = GOLEM_REGISTRY.lock().unwrap();
-    Ok(registry.values().cloned().collect())
-}
-
-#[tauri::command]
-async fn register_golem_task(id: String, name: String, aura: String) -> Result<(), String> {
-    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    registry.insert(id.clone(), GolemTask {
-        id,
-        name,
-        status: "Neural Initialization...".into(),
-        progress: 0.0,
-        aura,
-    });
-    Ok(())
-}
-
-#[tauri::command]
-async fn update_golem_task(id: String, status: String, progress: f32) -> Result<(), String> {
-    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    if let Some(task) = registry.get_mut(&id) {
-        task.status = status;
-        task.progress = progress;
-    }
-    Ok(())
-}
 
 #[tauri::command]
 async fn pin_context(state: tauri::State<'_, AppState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
@@ -3240,81 +2571,6 @@ async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Resul
     Ok(entries)
 }
 
-#[tauri::command]
-async fn forge_macro_intent(state: tauri::State<'_, AppState>, prompt: String, visual_context: String) -> Result<StrategicMacro, String> {
-    let client = reqwest::Client::new();
-    let instruction = format!(
-        "Role: Oasis Strategic Forge. 
-         Input: Visual Context [{}], User Intent [{}].
-         Goal: Forge a strategic automation macro. 
-         Output ONLY JSON: {{ \"name\": \"MACRO NAME\", \"description\": \"STRATEGIC SUMMARY\", \"script\": \"POWERSHELL SCRIPT\", \"trigger\": \"SEMANTIC TRIGGER\", \"aura\": \"emerald|amber|rose|indigo\" }}",
-        visual_context, prompt
-    );
-
-    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": instruction, "stream": false });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    let resp_str = json["response"].as_str().unwrap_or("{}").trim_matches('`').replace("json", "").trim().to_string();
-    let mut macro_data: serde_json::Value = serde_json::from_str(&resp_str).map_err(|e| e.to_string())?;
-    
-    let id = format!("FORGE-{}", chrono::Local::now().timestamp());
-    let st_macro = StrategicMacro {
-        id: id.clone(),
-        name: macro_data["name"].as_str().unwrap_or("Unnamed Golem").into(),
-        description: macro_data["description"].as_str().unwrap_or("Neural automation forged from intent.").into(),
-        script: macro_data["script"].as_str().unwrap_or("echo 'Forge empty.'").into(),
-        trigger_pattern: macro_data["trigger"].as_str().unwrap_or("manual").into(),
-        signed: false,
-        aura: macro_data["aura"].as_str().unwrap_or("indigo").into(),
-        status: "idle".into(),
-    };
-
-    let mut registry = MACRO_REGISTRY.lock().unwrap();
-    registry.insert(id, st_macro.clone());
-    Ok(st_macro)
-}
-
-#[tauri::command]
-async fn execute_macro_golem(id: String) -> Result<String, String> {
-    let st_macro = {
-        let registry = MACRO_REGISTRY.lock().unwrap();
-        registry.get(&id).cloned().ok_or_else(|| "Macro not found in forge registry.")?
-    };
-
-    if !st_macro.signed {
-        return Err("Macro security breach: Founder Signature required for initial Forge execution.".into());
-    }
-
-    // Execute via PowerShell
-    use std::process::Command;
-    let output = Command::new("powershell")
-        .args(["-Command", &st_macro.script])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-
-    Ok(format!("Macro {} Executed.\nOutput: {}\nErrors: {}", st_macro.name, stdout, stderr))
-}
-
-#[tauri::command]
-async fn sign_macro_golem(id: String) -> Result<(), String> {
-    let mut registry = MACRO_REGISTRY.lock().unwrap();
-    if let Some(m) = registry.get_mut(&id) {
-        m.signed = true;
-        Ok(())
-    } else {
-        Err("Macro not found.".into())
-    }
-}
-
-#[tauri::command]
-async fn get_macro_inventory() -> Result<Vec<StrategicMacro>, String> {
-    let registry = MACRO_REGISTRY.lock().unwrap();
-    Ok(registry.values().cloned().collect())
-}
 
 #[tauri::command]
 async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
@@ -3323,77 +2579,6 @@ async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Re
     Ok(())
 }
 
-#[tauri::command]
-fn vault_derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
-    let mut key = [0u8; 32];
-    pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, 100_000, &mut key);
-    key
-}
-
-#[tauri::command]
-async fn vault_store_secret(
-    state: tauri::State<'_, AppState>,
-    name: String,
-    value: String,
-    master_key: String,
-) -> Result<(), String> {
-    let mut salt = [0u8; 16];
-    let mut nonce_bytes = [0u8; 12];
-    use aes_gcm::aead::OsRng;
-    use aes_gcm::aead::rand_core::RngCore;
-    OsRng.fill_bytes(&mut salt);
-    OsRng.fill_bytes(&mut nonce_bytes);
-
-    let encryption_key_bytes = vault_derive_key(&master_key, &salt);
-    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&encryption_key_bytes);
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-
-    let ciphertext = cipher.encrypt(nonce, value.as_bytes()).map_err(|e| format!("Encryption failure: {}", e))?;
-    
-    let conn = state.db.lock().unwrap();
-    let timestamp = chrono::Local::now().to_rfc3339();
-
-    conn.execute(
-        "INSERT OR REPLACE INTO system_secrets (name, secret_blob, nonce, salt, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![name, ciphertext, nonce_bytes.to_vec(), salt.to_vec(), timestamp],
-    ).map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn vault_get_secret(
-    state: tauri::State<'_, AppState>,
-    name: String,
-    master_key: String,
-) -> Result<String, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT secret_blob, nonce, salt FROM system_secrets WHERE name = ?1").map_err(|e| e.to_string())?;
-    
-    let (ciphertext, nonce_bytes, salt): (Vec<u8>, Vec<u8>, Vec<u8>) = stmt.query_row([name], |row| {
-        Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-    }).map_err(|e| format!("Secret not found or access denied: {}", e))?;
-
-    let encryption_key_bytes = vault_derive_key(&master_key, &salt);
-    let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&encryption_key_bytes);
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-
-    let plaintext = cipher.decrypt(nonce, ciphertext.as_slice()).map_err(|e| format!("Decryption failure: {}", e))?;
-    String::from_utf8(plaintext).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn vault_list_secrets(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT name FROM system_secrets").map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| e.to_string())?;
-    
-    let mut names = Vec::new();
-    for r in rows { names.push(r.map_err(|e| e.to_string())?); }
-    Ok(names)
-}
 
 #[tauri::command]
 async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
@@ -3501,79 +2686,6 @@ async fn query_lattice_points(state: tauri::State<'_, AppState>, image_base64: S
     Ok(points)
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WindowSnapshot {
-    pub title: String,
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-}
-
-#[tauri::command]
-async fn get_active_windows() -> Result<Vec<WindowSnapshot>, String> {
-    let mut windows: Vec<WindowSnapshot> = Vec::new();
-    
-    extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        let windows_ptr = lparam.0 as *mut Vec<WindowSnapshot>;
-        let windows = unsafe { &mut *windows_ptr };
-        
-        unsafe {
-            if IsWindowVisible(hwnd).as_bool() {
-                let mut text = [0u16; 512];
-                let len = GetWindowTextW(hwnd, &mut text);
-                if len > 0 {
-                    let title = String::from_utf16_lossy(&text[..len as usize]);
-                    let mut rect = RECT::default();
-                    if GetWindowRect(hwnd, &mut rect).is_ok() {
-                        windows.push(WindowSnapshot {
-                            title,
-                            x: rect.left,
-                            y: rect.top,
-                            width: rect.right - rect.left,
-                            height: rect.bottom - rect.top,
-                        });
-                    }
-                }
-            }
-        }
-        BOOL::from(true)
-    }
-
-    unsafe {
-        let lparam = LPARAM(&mut windows as *mut Vec<WindowSnapshot> as isize);
-        let _ = EnumWindows(Some(enum_window_callback), lparam);
-    }
-
-    Ok(windows)
-}
-
-#[tauri::command]
-async fn set_window_layout(layout: Vec<WindowSnapshot>) -> Result<(), String> {
-    extern "system" fn set_layout_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-        let layout_ptr = lparam.0 as *const Vec<WindowSnapshot>;
-        let layout = unsafe { &*layout_ptr };
-        
-        unsafe {
-            let mut text = [0u16; 512];
-            let len = GetWindowTextW(hwnd, &mut text);
-            if len > 0 {
-                let title = String::from_utf16_lossy(&text[..len as usize]);
-                if let Some(target) = layout.iter().find(|w| w.title == title) {
-                   let _ = ShowWindow(hwnd, SW_RESTORE);
-                   let _ = SetWindowPos(hwnd, HWND::default(), target.x, target.y, target.width, target.height, SWP_NOZORDER | SWP_SHOWWINDOW);
-                }
-            }
-        }
-        BOOL::from(true)
-    }
-
-    unsafe {
-        let lparam = LPARAM(&layout as *const Vec<WindowSnapshot> as isize);
-        let _ = EnumWindows(Some(set_layout_callback), lparam);
-    }
-    Ok(())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[tauri::command]
@@ -3716,17 +2828,6 @@ async fn collective_pulse_loop(app: tauri::AppHandle) {
     }
 }
 
-#[tauri::command]
-async fn complete_golem_task(id: String) -> Result<String, String> {
-    let mut registry = GOLEM_REGISTRY.lock().unwrap();
-    if let Some(task) = registry.get_mut(&id) {
-        task.status = "Completed".into();
-        task.progress = 1.0;
-        Ok(format!("Task {} archived successfully.", id))
-    } else {
-        Err(format!("Task {} not found in registry.", id))
-    }
-}
 
 #[tauri::command]
 async fn install_oas_binary() -> Result<String, String> {
@@ -3756,7 +2857,7 @@ pub fn run() {
             .build()
         )
         .invoke_handler(tauri::generate_handler![
-            get_running_windows, 
+            system::get_running_windows, 
             sync_project, 
             save_crate, 
             get_crates,
@@ -3778,7 +2879,7 @@ pub fn run() {
             get_neural_graph,
             get_all_files,
 
-            complete_golem_task,
+            golems::complete_golem_task,
             install_oas_binary,
 
             synthesize_crate_aura,
@@ -3806,7 +2907,7 @@ pub fn run() {
             trigger_oracle_audit,
             get_neural_workforce,
             get_pending_manifests,
-            execute_golem_manifest,
+            golems::execute_golem_manifest,
             get_economic_news,
             trigger_hardware_symbiosis,
             create_restore_point,
@@ -3815,7 +2916,7 @@ pub fn run() {
             get_cross_venture_wisdom,
             execute_cli_directive,
             get_strategic_inventory,
-            run_system_diagnostic,
+            system::run_system_diagnostic,
             save_venture_state,
             load_venture_state,
             authorize_branch,
@@ -3829,8 +2930,8 @@ pub fn run() {
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,
-            register_new_golem,
-            delete_golem,
+            golems::register_new_golem,
+            golems::delete_golem,
             search_semantic_nodes,
             log_strategic_pulse,
             get_venture_integrity,
@@ -3842,29 +2943,29 @@ pub fn run() {
             derive_boardroom_debate,
             sync_physical_aura,
             execute_neural_intent,
-            get_process_list,
-            get_storage_map,
-            get_system_devices,
-            kill_quarantine_process,
-            suspend_process,
-            resume_process,
-            set_process_priority,
-            get_process_priority,
-            get_battery_health_wmi,
-            get_active_golems,
-            register_golem_task,
-            update_golem_task,
-            release_golem_workforce,
-            get_golem_proposals,
-            resolve_golem_proposal,
+            system::get_process_list,
+            system::get_storage_map,
+            system::get_system_devices,
+            system::kill_quarantine_process,
+            system::suspend_process,
+            system::resume_process,
+            system::set_process_priority,
+            system::get_process_priority,
+            system::get_battery_health_wmi,
+            golems::get_active_golems,
+            golems::register_golem_task,
+            golems::update_golem_task,
+            golems::release_golem_workforce,
+            golems::get_golem_proposals,
+            golems::resolve_golem_proposal,
             pin_context,
             get_pinned_contexts,
             delete_pinned_context,
             get_neural_logs,
             seek_chronos,
-            get_active_windows,
-            set_window_layout,
-            launch_context_apps,
+            system::get_active_windows,
+            system::set_window_layout,
+            system::launch_context_apps,
             get_spectral_anomalies,
             manifest_forge_intent,
             register_remote_node,
@@ -3872,13 +2973,13 @@ pub fn run() {
             broadcast_distributed_aura,
             capture_chronos_snapshot,
             seek_chronos_history,
-            vault_store_secret,
-            vault_get_secret,
-            vault_list_secrets,
-            forge_macro_intent,
-            execute_macro_golem,
-            sign_macro_golem,
-            get_macro_inventory,
+            vault::vault_store_secret,
+            vault::vault_get_secret,
+            vault::vault_list_secrets,
+            macros::forge_macro_intent,
+            macros::execute_macro_golem,
+            macros::sign_macro_golem,
+            macros::get_macro_inventory,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

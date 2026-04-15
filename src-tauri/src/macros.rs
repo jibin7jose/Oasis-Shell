@@ -1,0 +1,96 @@
+use crate::AppState;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+use chrono;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StrategicMacro {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub script: String,        // PowerShell or system directive
+    pub trigger_pattern: String, // Semantic context pattern
+    pub signed: bool,          // Founder approval flag
+    pub aura: String,          // emerald, amber, rose, indigo
+    pub status: String,        // "idle", "active", "cooldown"
+}
+
+static MACRO_REGISTRY: LazyLock<Mutex<HashMap<String, StrategicMacro>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+#[tauri::command]
+pub async fn forge_macro_intent(state: tauri::State<'_, AppState>, prompt: String, visual_context: String) -> Result<StrategicMacro, String> {
+    let client = reqwest::Client::new();
+    let instruction = format!(
+        "Role: Oasis Strategic Forge. 
+         Input: Visual Context [{}], User Intent [{}].
+         Goal: Forge a strategic automation macro. 
+         Output ONLY JSON: {{ \"name\": \"MACRO NAME\", \"description\": \"STRATEGIC SUMMARY\", \"script\": \"POWERSHELL SCRIPT\", \"trigger\": \"SEMANTIC TRIGGER\", \"aura\": \"emerald|amber|rose|indigo\" }}",
+        visual_context, prompt
+    );
+
+    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": instruction, "stream": false });
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    let resp_str = json["response"].as_str().unwrap_or("{}").trim_matches('`').replace("json", "").trim().to_string();
+    let macro_data: serde_json::Value = serde_json::from_str(&resp_str).map_err(|e| e.to_string())?;
+    
+    let id = format!("FORGE-{}", chrono::Local::now().timestamp());
+    let st_macro = StrategicMacro {
+        id: id.clone(),
+        name: macro_data["name"].as_str().unwrap_or("Unnamed Golem").into(),
+        description: macro_data["description"].as_str().unwrap_or("Neural automation forged from intent.").into(),
+        script: macro_data["script"].as_str().unwrap_or("echo 'Forge empty.'").into(),
+        trigger_pattern: macro_data["trigger"].as_str().unwrap_or("manual").into(),
+        signed: false,
+        aura: macro_data["aura"].as_str().unwrap_or("indigo").into(),
+        status: "idle".into(),
+    };
+
+    let mut registry = MACRO_REGISTRY.lock().unwrap();
+    registry.insert(id, st_macro.clone());
+    Ok(st_macro)
+}
+
+#[tauri::command]
+pub async fn execute_macro_golem(id: String) -> Result<String, String> {
+    let st_macro = {
+        let registry = MACRO_REGISTRY.lock().unwrap();
+        registry.get(&id).cloned().ok_or_else(|| "Macro not found in forge registry.")?
+    };
+
+    if !st_macro.signed {
+        return Err("Macro security breach: Founder Signature required for initial Forge execution.".into());
+    }
+
+    // Execute via PowerShell
+    use std::process::Command;
+    let output = Command::new("powershell")
+        .args(["-Command", &st_macro.script])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    Ok(format!("Macro {} Executed.\nOutput: {}\nErrors: {}", st_macro.name, stdout, stderr))
+}
+
+#[tauri::command]
+pub async fn sign_macro_golem(id: String) -> Result<(), String> {
+    let mut registry = MACRO_REGISTRY.lock().unwrap();
+    if let Some(m) = registry.get_mut(&id) {
+        m.signed = true;
+        Ok(())
+    } else {
+        Err("Macro not found.".into())
+    }
+}
+
+#[tauri::command]
+pub async fn get_macro_inventory() -> Result<Vec<StrategicMacro>, String> {
+    let registry = MACRO_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}

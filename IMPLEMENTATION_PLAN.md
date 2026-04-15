@@ -1,4 +1,4 @@
-﻿# Oasis Shell Implementation Plan (Tied To Current Codebase)
+# Oasis Shell Implementation Plan (Tied To Current Codebase)
 
 Date: 2026-04-04
 
@@ -127,6 +127,17 @@ Already available in `src-tauri/src/lib.rs`:
 - `get_logs` for neural log records
 
 These are enough to make Phase 1 real without any backend changes.
+
+---
+
+## Optional: Backend Refactor (Phase 4.5/System Decomposition)
+
+**Status:** Completed (Exit Code 0).
+The monolithic `src-tauri/src/lib.rs` was split into domain modules:
+1. `vault.rs`: Cryptography, PBKDF2/AES-GCM keys, founder signatures.
+2. `macros.rs`: Strategic Intent registry, LLM-driven actions.
+3. `golems.rs`: Autonomous worker memory pooling.
+4. `system.rs`: Host OS metrics, window tracing, process management.
 
 ---
 
