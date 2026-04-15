@@ -1,14 +1,8 @@
-import { create } from "zustand";
-import { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "../components/panels/SystemPanel";
-import { ContextCrate } from "../components/panels/CrateGallery";
-
-export interface FounderMetrics {
-  arr: string;
-  burn: string;
-  runway: string;
-  momentum: string;
-  stress_color: string;
-}
+import { create } from 'zustand';
+import { 
+  SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo, 
+  GolemTask, StrategicMacro, CollectiveNode, ContextCrate, FounderMetrics 
+} from "./contracts";
 
 export interface ChronosSnapshot {
   timestamp: string;
@@ -23,7 +17,7 @@ export interface SystemState {
   founderMetrics: FounderMetrics;
   systemStats: SystemStats | null;
   notification: string;
-  timeline: { id: number; type: string; message: string; timestamp: string }[];
+  timeline: { id: string; type: string; message: string; timestamp: string }[];
   activeDebate: any | null;
   activeSynthesis: any | null;
   showCortex: boolean;
@@ -66,6 +60,18 @@ export interface SystemState {
   setPendingManifests: (m: any[]) => void;
   oracleAlert: any | null;
   setOracleAlert: (a: any | null) => void;
+  
+  // Collective & Workforce
+  collectiveNodes: CollectiveNode[];
+  setCollectiveNodes: (nodes: CollectiveNode[]) => void;
+  strategicMacros: StrategicMacro[];
+  setStrategicMacros: (macros: StrategicMacro[]) => void;
+  activeGolems: GolemTask[];
+  setActiveGolems: (golems: GolemTask[]) => void;
+  activeProposals: any[];
+  setActiveProposals: (proposals: any[]) => void;
+  workforce: any[];
+  setWorkforce: (workforce: any[]) => void;
   
   // Actions
   setMarketIntel: (market: any) => void;
@@ -119,8 +125,8 @@ export const useSystemStore = create<SystemState>((set) => ({
   systemStats: null,
   notification: "",
   timeline: [
-    { id: 1, type: "system", message: "Oasis Foundry Kernel Initialized", timestamp: new Date().toISOString() },
-    { id: 2, type: "neural", message: "Venture Metrics Synced with Rust Kernel", timestamp: new Date().toISOString() },
+    { id: "init-1", type: "system", message: "Oasis Foundry Kernel Initialized", timestamp: new Date().toISOString() },
+    { id: "init-2", type: "neural", message: "Venture Metrics Synced with Rust Kernel", timestamp: new Date().toISOString() },
   ],
   activeDebate: null,
   activeSynthesis: null,
@@ -147,24 +153,30 @@ export const useSystemStore = create<SystemState>((set) => ({
   windows: [],
   storage: [],
   devices: [],
+  
+  collectiveNodes: [],
+  strategicMacros: [],
+  activeGolems: [],
+  activeProposals: [],
+  workforce: [],
 
-  setMarketIntel: (market) => set({ marketIntel: market }),
-  setFiscalBurn: (burn) => set({ fiscalBurn: burn }),
-  setVentureIntegrity: (integrity) => set({ ventureIntegrity: integrity }),
-  setStrategicInventory: (inventory) => set({ strategicInventory: inventory }),
-  setSparklinesEnabled: (enabled) => set({ sparklinesEnabled: enabled }),
-  setPerformanceOptimized: (optimized) => set({ performanceOptimized: optimized }),
-  setSystemLastSync: (time) => set({ systemLastSync: time }),
-  setFounderMetrics: (metrics) => set({ founderMetrics: metrics }),
-  setSystemStats: (stats) => set({ systemStats: stats }),
-  setProcesses: (procs) => set({ processes: procs }),
-  setWindows: (wins) => set({ windows: wins }),
-  setStorage: (storage) => set({ storage: storage }),
-  setDevices: (devices) => set({ devices: devices }),
-  setNotification: (msg) => set({ notification: msg }),
+  setMarketIntel: (market: any) => set({ marketIntel: market }),
+  setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),
+  setVentureIntegrity: (integrity: number) => set({ ventureIntegrity: integrity }),
+  setStrategicInventory: (inventory: any[]) => set({ strategicInventory: inventory }),
+  setSparklinesEnabled: (enabled: boolean) => set({ sparklinesEnabled: enabled }),
+  setPerformanceOptimized: (optimized: boolean) => set({ performanceOptimized: optimized }),
+  setSystemLastSync: (time: string) => set({ systemLastSync: time }),
+  setFounderMetrics: (metrics: FounderMetrics) => set({ founderMetrics: metrics }),
+  setSystemStats: (stats: SystemStats | null) => set({ systemStats: stats }),
+  setProcesses: (procs: ProcessInfo[]) => set({ processes: procs }),
+  setWindows: (wins: WindowInfo[]) => set({ windows: wins }),
+  setStorage: (storage: StorageInfo[]) => set({ storage: storage }),
+  setDevices: (devices: DeviceInfo[]) => set({ devices: devices }),
+  setNotification: (msg: string) => set({ notification: msg }),
   clearNotification: () => set({ notification: "" }),
-  logEvent: (message, type) =>
-    set((state) => ({
+  logEvent: (message: string, type: "neural" | "deploy" | "system") =>
+    set((state: SystemState) => ({
       timeline: [
         {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -175,25 +187,30 @@ export const useSystemStore = create<SystemState>((set) => ({
         ...state.timeline,
       ].slice(0, 50),
     })),
-  setActiveDebate: (debate) => set({ activeDebate: debate }),
-  setActiveSynthesis: (synthesis) => set({ activeSynthesis: synthesis }),
-  setShowCortex: (show) => set({ showCortex: show }),
-  setShowDocs: (show) => set({ showDocs: show }),
-  setShowGraph: (show) => set({ showGraph: show }),
-  setTravelIndex: (index) => set({ travelIndex: index }),
-  setIsTimeTraveling: (is) => set({ isTimeTraveling: is }),
-  setChronosHistory: (history) => set({ chronosHistory: history }),
-  setDynamicGraph: (graph) => set({ dynamicGraph: graph }),
-  setCortexResults: (results) => set({ cortexResults: results }),
-  setCortexQuery: (query) => set({ cortexQuery: query }),
-  setShowCLI: (show) => set({ showCLI: show }),
-  setShowCrates: (show) => set({ showCrates: show }),
-  setIsSavingCrate: (is) => set({ isSavingCrate: is }),
-  setCrates: (crates) => set({ crates }),
-  setActiveVenture: (v) => set({ activeVenture: v }),
-  setCliInput: (i) => set({ cliInput: i }),
-  setCliHistory: (h) => set({ cliHistory: h }),
-  setSearchQuery: (q) => set({ searchQuery: q }),
-  setPendingManifests: (m) => set({ pendingManifests: m }),
-  setOracleAlert: (a) => set({ oracleAlert: a }),
+  setActiveDebate: (debate: any | null) => set({ activeDebate: debate }),
+  setActiveSynthesis: (synthesis: any | null) => set({ activeSynthesis: synthesis }),
+  setShowCortex: (show: boolean) => set({ showCortex: show }),
+  setShowDocs: (show: boolean) => set({ showDocs: show }),
+  setShowGraph: (show: boolean) => set({ showGraph: show }),
+  setTravelIndex: (index: number) => set({ travelIndex: index }),
+  setIsTimeTraveling: (is: boolean) => set({ isTimeTraveling: is }),
+  setChronosHistory: (history: any[]) => set({ chronosHistory: history }),
+  setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => set({ dynamicGraph: graph }),
+  setCortexResults: (results: any[]) => set({ cortexResults: results }),
+  setCortexQuery: (query: string) => set({ cortexQuery: query }),
+  setShowCLI: (show: boolean) => set({ showCLI: show }),
+  setShowCrates: (show: boolean) => set({ showCrates: show }),
+  setIsSavingCrate: (is: boolean) => set({ isSavingCrate: is }),
+  setCrates: (crates: ContextCrate[]) => set({ crates }),
+  setActiveVenture: (v: string) => set({ activeVenture: v }),
+  setCliInput: (i: string) => set({ cliInput: i }),
+  setCliHistory: (h: any[]) => set({ cliHistory: h }),
+  setSearchQuery: (q: string) => set({ searchQuery: q }),
+  setPendingManifests: (m: any[]) => set({ pendingManifests: m }),
+  setOracleAlert: (a: any | null) => set({ oracleAlert: a }),
+  setCollectiveNodes: (nodes: CollectiveNode[]) => set({ collectiveNodes: nodes }),
+  setStrategicMacros: (macros: StrategicMacro[]) => set({ strategicMacros: macros }),
+  setActiveGolems: (golems: GolemTask[]) => set({ activeGolems: golems }),
+  setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
+  setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
 }));

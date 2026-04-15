@@ -3,7 +3,7 @@ import { Activity, Shield, Hash, Clock, Cpu } from 'lucide-react';
 import { cn } from "../../lib/utils";
 
 interface NeuralEntry {
-  id: number;
+  id: string;
   type: string;
   message: string;
   timestamp: string;

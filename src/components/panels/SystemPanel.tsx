@@ -3,50 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Usb, Filter, ArrowUpDown, History, Download, RefreshCcw, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 
-export interface SystemStats {
-  oas_id: string;
-  path_status: string;
-  binary_sync: boolean;
-  cpu_load: number;
-  mem_used: number;
-  battery_level: number;
-  is_charging: boolean;
-  battery_health: number;
-  time_remaining_min: number;
-}
+import { 
+  SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo 
+} from "../../lib/contracts";
 
-export interface WindowInfo {
-  title: string;
-  pid: number;
-  exe_path: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  is_maximized: boolean;
-}
-
-export interface ProcessInfo {
-  pid: number;
-  name: string;
-  cpu_usage: number;
-  mem_usage: number;
-  status: string;
-}
-
-export interface StorageInfo {
-  name: string;
-  mount: string;
-  total: number;
-  available: number;
-  health_score: number;
-}
-
-export interface DeviceInfo {
-  kind: string;
-  name: string;
-  detail: string;
-}
+export type { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo };
 
 interface SystemPanelProps {
   stats: SystemStats | null;
@@ -291,8 +252,8 @@ export default function SystemPanel({
   }, [sparklinesEnabled]);
 
   const thermalReadings = devices
-    .filter((d) => d.kind === "component")
-    .map((d) => parseFloat(d.detail.replace("°C", "")))
+    .filter((d) => d.category === "Physical")
+    .map((d) => parseFloat(d.metadata.replace("Temp: ", "").replace("°C", "")))
     .filter((v) => Number.isFinite(v));
   const avgTemp = thermalReadings.length > 0 ? thermalReadings.reduce((a, b) => a + b, 0) / thermalReadings.length : null;
 
@@ -562,13 +523,13 @@ export default function SystemPanel({
               </div>
             )}
             {(devices ?? []).map((dev, i) => (
-              <div key={`${dev.kind}-${dev.name}-${i}`} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+              <div key={`${dev.id}-${i}`} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-[11px] font-bold text-white">{dev.name}</div>
-                    <div className="text-[9px] font-mono text-slate-500 uppercase">{dev.kind}</div>
+                    <div className="text-[11px] font-bold text-white">{dev.id}</div>
+                    <div className="text-[9px] font-mono text-slate-500 uppercase">{dev.category}</div>
                   </div>
-                  <div className="text-[10px] text-slate-400">{dev.detail}</div>
+                  <div className="text-[10px] text-slate-400">{dev.status} | {dev.metadata}</div>
                 </div>
               </div>
             ))}

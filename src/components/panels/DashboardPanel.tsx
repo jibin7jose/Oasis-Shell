@@ -5,6 +5,7 @@ import { StatGrid } from '../dashboard/StatGrid';
 import { InventoryMatrix } from '../dashboard/InventoryMatrix';
 import { GolemMatrix } from '../dashboard/GolemMatrix';
 import { ForgePanel } from './ForgePanel';
+import { GolemTask, StrategicMacro, FounderMetrics } from '../../lib/contracts';
 
 interface DashboardPanelProps {
   presentationMode: boolean;
@@ -19,13 +20,13 @@ interface DashboardPanelProps {
   zenMode: boolean;
   simMode: boolean;
   simMetrics: any;
-  founderMetrics: any;
+  founderMetrics: FounderMetrics;
   isVaultSealed: boolean;
   strategicInventory: any[];
-  activeGolems: any[];
+  activeGolems: GolemTask[];
   setSelectedGolem: (golem: any) => void;
   onSealAsset: (asset: any) => void;
-  strategicMacros: any[];
+  strategicMacros: StrategicMacro[];
   handleExecuteMacro: (id: string) => void;
   handleSignMacro: (id: string) => void;
   isForgingMacro: boolean;

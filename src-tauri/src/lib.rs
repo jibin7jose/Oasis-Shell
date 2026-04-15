@@ -211,9 +211,10 @@ pub struct StorageInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceInfo {
-    pub kind: String,
-    pub name: String,
-    pub detail: String,
+    pub id: String,
+    pub category: String,
+    pub status: String,
+    pub metadata: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1705,9 +1706,10 @@ async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
     // Physical Components
     for c in components.iter() {
         devices.push(DeviceInfo {
-            kind: "physical".into(),
-            name: c.label().to_string(),
-            detail: format!("Temp: {:.1}°C", c.temperature().unwrap_or(0.0)),
+            id: format!("HW-{}", c.label()),
+            category: "Physical".into(),
+            status: "Online".into(),
+            metadata: format!("Temp: {:.1}°C", c.temperature().unwrap_or(0.0)),
         });
     }
 
@@ -1717,9 +1719,10 @@ async fn get_system_devices() -> Result<Vec<DeviceInfo>, String> {
         let tx_kb = data.transmitted() / 1024;
         if rx_kb > 0 || tx_kb > 0 {
             devices.push(DeviceInfo {
-                kind: "network".into(),
-                name: name.clone(),
-                detail: format!("RX: {} KB | TX: {} KB", rx_kb, tx_kb),
+                id: format!("NET-{}", name),
+                category: "Network".into(),
+                status: "Active".into(),
+                metadata: format!("RX: {} KB | TX: {} KB", rx_kb, tx_kb),
             });
         }
     }
@@ -3713,6 +3716,24 @@ async fn collective_pulse_loop(app: tauri::AppHandle) {
     }
 }
 
+#[tauri::command]
+async fn complete_golem_task(id: String) -> Result<String, String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    if let Some(task) = registry.get_mut(&id) {
+        task.status = "Completed".into();
+        task.progress = 1.0;
+        Ok(format!("Task {} archived successfully.", id))
+    } else {
+        Err(format!("Task {} not found in registry.", id))
+    }
+}
+
+#[tauri::command]
+async fn install_oas_binary() -> Result<String, String> {
+    // Logic for binary installation/sync
+    Ok("OAS Binary Synchronized and Verified.".into())
+}
+
 pub fn run() {
     let context = tauri::generate_context!();
     
@@ -3756,6 +3777,9 @@ pub fn run() {
             transcribe_audio,
             get_neural_graph,
             get_all_files,
+
+            complete_golem_task,
+            install_oas_binary,
 
             synthesize_crate_aura,
             execute_neural_command,

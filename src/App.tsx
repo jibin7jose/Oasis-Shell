@@ -19,6 +19,7 @@ import BoardroomPanel from "./components/panels/BoardroomPanel";
 import DocumentationPanel from "./components/panels/DocumentationPanel";
 import CortexLog from "./components/panels/CortexLog";
 import WorkforcePanel from "./components/panels/WorkforcePanel";
+import { CollectivePanel } from "./components/panels/CollectivePanel";
 import { useSoundscape } from "./hooks/useSoundscape";
 import CommandPalette, { CommandPermission } from "./components/overlays/CommandPalette";
 import SentinelVault from "./components/panels/SentinelVault";
@@ -29,6 +30,11 @@ import { cn } from "./lib/utils";
 import { useSystemStore } from "./lib/systemStore";
 import { ChronosSnapshot } from "./lib/systemStore";
 import { isTauri, invokeSafe, listenSafe } from "./lib/tauri";
+import { 
+  FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint, GolemTask 
+} from "./lib/contracts";
+
+export type { FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint };
 
 // New Modular Components
 import AdvisoryDebate from "./components/panels/AdvisoryDebate";
@@ -67,43 +73,7 @@ const buildFpsPath = (values: number[], width = 120, height = 40) => {
   return d;
 };
 
-interface FounderMetrics {
-  arr: string;
-  burn: string;
-  runway: string;
-  momentum: string;
-  stress_color: string;
-}
-
-interface LatticePoint {
-  label: string;
-  x_pct: number;
-  y_pct: number;
-  intensity: number;
-  category: "CODE" | "MARKET" | "SYSTEM" | "ERROR";
-}
-
-interface StrategicMacro {
-  id: string;
-  name: string;
-  description: string;
-  script: string;
-  trigger_pattern: string;
-  signed: boolean;
-  aura: string;
-  status: string;
-}
-
-interface CollectiveNode {
-  id: String;
-  ip: String;
-  port: number;
-  hostname: String;
-  status: "Active" | "Offline" | "Syncing";
-  last_pulse: String;
-  aura: string;
-  latency_ms: number;
-}
+// Interface definitions moved to contracts.ts
 
 export default function App() {
   const { playClick, playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
@@ -144,7 +114,12 @@ export default function App() {
     cliHistory, setCliHistory,
     searchQuery, setSearchQuery,
     pendingManifests, setPendingManifests,
-    oracleAlert, setOracleAlert
+    oracleAlert, setOracleAlert,
+    collectiveNodes, setCollectiveNodes,
+    strategicMacros, setStrategicMacros,
+    activeGolems, setActiveGolems,
+    activeProposals, setActiveProposals,
+    workforce, setWorkforce
   } = useSystemStore();
 
   // --- CORE STATE ---
@@ -184,9 +159,6 @@ export default function App() {
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isVaultSealed, setIsVaultSealed] = useState(false);
-  const [activeGolems, setActiveGolems] = useState<any[]>([]);
-  const [activeProposals, setActiveProposals] = useState<any[]>([]);
-  const [workforce, setWorkforce] = useState<any[]>([]);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showBoardroom, setShowBoardroom] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
@@ -203,8 +175,6 @@ export default function App() {
 
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
   const [latticePoints, setLatticePoints] = useState<LatticePoint[]>([]);
-  const [collectiveNodes, setCollectiveNodes] = useState<CollectiveNode[]>([]);
-  const [strategicMacros, setStrategicMacros] = useState<StrategicMacro[]>([]);
   const [isLatticeActive, setIsLatticeActive] = useState(true);
 
   useEffect(() => {
@@ -236,16 +206,9 @@ export default function App() {
   useEffect(() => {
     if (isHandshakeSuccessful) {
         loadCrates();
-        loadCollectiveNodes();
     }
   }, [isHandshakeSuccessful]);
 
-  const loadCollectiveNodes = async () => {
-    try {
-      const nodes = await invokeSafe("get_collective_nodes") as CollectiveNode[];
-      setCollectiveNodes(nodes);
-    } catch (e) {}
-  };
 
   // Phase 9.2: Sensory Feedback Bridge (Dynamic Hum)
   useEffect(() => {
@@ -377,8 +340,6 @@ export default function App() {
       setNotification(`Export Fault: ${err}`);
     }
   };
-  // DELETED: Duplicate Golem state removed
-  // const [golems, setGolems] = useState<any[]>([]);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [autoAura, setAutoAura] = useState(false);
   const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
@@ -388,7 +349,6 @@ export default function App() {
   const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
   const [cortexMenu, setCortexMenu] = useState<{ x: number, y: number, node: any } | null>(null);
   const [activeForge, setActiveForge] = useState<any>(null);
-  const [collectiveNodes, setCollectiveNodes] = useState<any[]>([]);
   const [performanceMode, setPerformanceMode] = useState(false);
 
   // Phase 9.0: Physical Aura Bridge
@@ -448,19 +408,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, [visionActive]);
   useEffect(() => {
-    const syncGolems = async () => {
+    const syncCoreData = async () => {
       try {
-        const active = await invokeSafe("get_active_golems") as any[];
-        setActiveGolems(active || []);
-        const props = await invokeSafe("get_golem_proposals") as any[];
-        setActiveProposals(props || []);
         const pins = await invokeSafe("get_pinned_contexts") as any[];
         setPinnedContexts(pins);
         const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
         setNeuralLogs(logs);
       } catch (err) { }
     };
-    const itv = setInterval(syncGolems, 2000);
+    const itv = setInterval(syncCoreData, 5000);
     return () => clearInterval(itv);
   }, []);
 
@@ -510,8 +466,6 @@ export default function App() {
         
         const dev = await invokeSafe("get_system_devices");
         if (dev) setDevices(dev);
-
-        if (market) setMarketIntel(market);
 
         if (stats && stats.cpu_load !== undefined) {
           updateEngine(stats.cpu_load);
@@ -629,19 +583,6 @@ export default function App() {
       setNotification(`Spectral Breach: ${newAnoms[0].description}`);
     });
 
-    const unlistenCollective = listenSafe('collective-update', (event: { payload: CollectiveNode }) => {
-      setCollectiveNodes(prev => {
-        const index = prev.findIndex(n => n.id === event.payload.id);
-        if (index >= 0) {
-          const next = [...prev];
-          next[index] = event.payload;
-          return next;
-        }
-        return [...prev, event.payload];
-      });
-      playNotification();
-    });
-
     // Refresh macros on load
     invokeSafe("get_macro_inventory").then((data: any) => setStrategicMacros(data));
 
@@ -650,7 +591,6 @@ export default function App() {
       unlistenCortexRefresh.then((f: any) => f());
       unlistenContextSync.then((f: any) => f());
       unlistenSpectral.then((f: any) => f());
-      unlistenCollective.then((f: any) => f());
     };
   }, [showGraph, activeContext, showSettings, showNexus]);
 
@@ -874,7 +814,7 @@ export default function App() {
           const newProgress = Math.min(100, g.progress + inc);
           if (newProgress >= 100 && g.progress < 100) {
             setNotification(`Oasis Pulse: ${g.name} MISSION ACCOMPLISHED.`);
-            logEvent(`Golem ${g.id} completed mission: "${g.mission}"`, 'deploy');
+            logEvent(`Golem ${g.id} completed mission: "${g.name}"`, 'deploy');
             return { ...g, progress: 100, status: 'Standby' };
           }
           return { ...g, progress: parseFloat(newProgress.toFixed(1)) };
@@ -929,14 +869,17 @@ export default function App() {
       y_pct: p.y_pct
     }));
 
-    setDynamicGraph((prev: any) => ({
-      ...prev,
-      nodes: [...prev.nodes.filter((n: any) => !n.isVision), ...visionNodes],
-      links: [
-        ...prev.links.filter((l: any) => !l.source.toString().startsWith("VISION")),
-        ...visionNodes.map(vn => ({ source: "FOUNDRY CORE", target: vn.id }))
-      ]
-    }));
+    const prev = useSystemStore.getState().dynamicGraph;
+    if (prev) {
+      setDynamicGraph({
+        ...prev,
+        nodes: [...prev.nodes.filter((n: any) => !n.isVision), ...visionNodes],
+        links: [
+          ...prev.links.filter((l: any) => !l.source.toString().startsWith("VISION")),
+          ...visionNodes.map(vn => ({ source: "FOUNDRY CORE", target: vn.id }))
+        ]
+      });
+    }
   };
 
   const handleContextSwitch = (id: string) => {
@@ -1916,7 +1859,8 @@ export default function App() {
     try {
       setNotification(`Neural Forge: Manifesting Synthesis for Anomaly ${node.id}...`);
       const manifest = await invokeSafe("manifest_forge_intent", { anomalyId: node.id, source: node.source || 'Manual' }) as any;
-      setForgeManifests((prev: any) => [{ ...manifest, node }, ...prev]);
+      const prev = useSystemStore.getState().pendingManifests;
+      setPendingManifests([{ ...manifest, node }, ...prev]);
       setNotification(`Forge: Stability Manifest Generated.`);
       playPulse();
     } catch (e: any) {
@@ -1953,7 +1897,8 @@ export default function App() {
     try {
       setNotification(`Foundry: Synthesizing Macro from context...`);
       const newMacro = await invokeSafe("forge_macro_intent", { prompt, visualContext: context }) as StrategicMacro;
-      setStrategicMacros(prev => [...prev, newMacro]);
+      const prev = useSystemStore.getState().strategicMacros;
+      setStrategicMacros([...prev, newMacro]);
       setNotification(`Forge Complete: ${newMacro.name} manifested.`);
       playPulse();
     } catch (e: any) {
@@ -2554,7 +2499,7 @@ export default function App() {
               onSealAsset={(asset) => {
                 setSelectedVaultAsset(asset);
                 setShowSentinel(true);
-                logEvent('security', `Initiating Neural Sealing for ${asset.name}...`);
+                logEvent(`Initiating Neural Sealing for ${asset.name}...`, "system");
               }}
               strategicMacros={strategicMacros}
               handleExecuteMacro={handleExecuteMacro}
@@ -2666,38 +2611,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Distributed Collective: Remote Foundry Nodes */}
-              <div className="glass-bright p-8 rounded-[3rem] border border-indigo-500/10 shadow-3xl shadow-black/40">
-                <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                  <Globe size={14} className="animate-pulse" /> Distributed Collective
-                </h3>
-                <div className="space-y-4">
-                  {collectiveNodes.length === 0 && (
-                    <p className="text-[10px] text-slate-500 italic uppercase">Searching for remote Foundry nodes...</p>
-                  )}
-                  {collectiveNodes.map((node) => (
-                    <div key={node.id} className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-white leading-none mb-1">{node.hostname}</p>
-                        <p className="text-[8px] text-slate-500 font-mono">{node.ip}:{node.port}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-500'}`} />
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">{node.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    onClick={async () => {
-                      const res = await invokeSafe("register_remote_node", { ip: "127.0.0.1", port: 1420, hostname: "LocalFoundry-Alpha" }) as string;
-                      setNotification(res);
-                    }}
-                    className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest hover:bg-white/10 transition-all"
-                  >
-                    Scan for Peer Nodes
-                  </button>
-                </div>
-              </div>
+              {/* Distributed Collective: Remote Foundry Nodes (Orchestrated by CollectivePanel) */}
+              <CollectivePanel />
             </div>
 
             {/* Phase 14: Chronos Temporal Scrubber */}

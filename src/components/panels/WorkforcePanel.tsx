@@ -5,13 +5,8 @@ import { invokeSafe } from "../../lib/tauri";
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
-interface GolemTask {
-  id: String;
-  name: String;
-  status: String;
-  progress: number;
-  aura: string;
-}
+import { GolemTask, FounderMetrics } from "../../lib/contracts";
+import { useSystemStore } from "../../lib/systemStore";
 
 interface GolemProposal {
   id: string;
@@ -33,40 +28,50 @@ interface WorkforcePanelProps {
 }
 
 export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, onPlayClick }: WorkforcePanelProps) {
-  const [activeGolems, setActiveGolems] = useState<GolemTask[]>([]);
-  const [proposals, setProposals] = useState<GolemProposal[]>([]);
+  const { 
+    activeGolems, setActiveGolems, 
+    activeProposals, setActiveProposals,
+    workforce, setWorkforce 
+  } = useSystemStore();
   const [selectedProposal, setSelectedProposal] = useState<GolemProposal | null>(null);
   const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      const interval = setInterval(async () => {
-        try {
-          const [tasks, props] = await Promise.all([
-            invokeSafe('get_active_golems') as Promise<GolemTask[]>,
-            invokeSafe('get_golem_proposals') as Promise<GolemProposal[]>
-          ]);
-          setActiveGolems(tasks);
-          setProposals(props.filter(p => p.status === 'pending'));
-        } catch (e) {
-          console.error("Failed to fetch workforce state", e);
+    const syncWorkforce = async () => {
+      try {
+        const [tasks, props, wf] = await Promise.all([
+          invokeSafe('get_active_golems') as Promise<GolemTask[]>,
+          invokeSafe('get_golem_proposals') as Promise<GolemProposal[]>,
+          invokeSafe("get_neural_workforce") as Promise<any[]>
+        ]);
+        setActiveGolems(tasks ?? []);
+        setActiveProposals(props.filter(p => p.status === 'pending') ?? []);
+        setWorkforce(wf ?? []);
+        
+        if (isOpen && onPlayNotification && props.length > 0) {
+          onPlayNotification();
         }
-      }, 2000);
-      if (isOpen && onPlayNotification && proposals.length > 0) {
-        onPlayNotification();
+      } catch (e) {
+        console.error("Failed to fetch workforce state", e);
       }
+    };
+
+    if (isOpen) {
+      syncWorkforce();
+      const interval = setInterval(syncWorkforce, 3000);
       return () => clearInterval(interval);
     }
-  }, [isOpen]);
+  }, [isOpen, onPlayNotification]);
 
   const handleResolve = async (id: string, action: 'merge' | 'discard') => {
     setIsResolving(true);
     if (onPlayClick) onPlayClick();
     
     // Optimistic status update for the golem
-    const currentProposal = proposals.find(p => p.id === id);
+    const currentProposal = activeProposals.find(p => p.id === id);
     if (currentProposal) {
-        setActiveGolems(prev => prev.map(g => 
+        const prev = useSystemStore.getState().activeGolems;
+        setActiveGolems(prev.map((g: GolemTask) => 
             g.name === currentProposal.agent_name 
             ? { ...g, status: action === 'merge' ? "Executing Neural Manifest..." : "Discarding Intent...", aura: action === 'merge' ? "emerald" : "rose" } 
             : g
@@ -143,7 +148,7 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activeGolems.map((golem, index) => (
+                    {activeGolems.map((golem: GolemTask, index: number) => (
                       <motion.div 
                         key={`${String(golem.id ?? golem.name ?? "golem")}-${index}`}
                         layout
@@ -183,11 +188,11 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
               <section className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Manifested Proposals</h2>
-                  <span className="px-2 py-0.5 bg-emerald-500/10 rounded-full text-[8px] font-black text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">{proposals.length} Neural PRs</span>
+                  <span className="px-2 py-0.5 bg-emerald-500/10 rounded-full text-[8px] font-black text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">{activeProposals.length} Neural PRs</span>
                 </div>
 
                 <div className="grid gap-4">
-                  {proposals.map((prop, index) => (
+                  {activeProposals.map((prop: GolemProposal, index: number) => (
                     <motion.button
                       key={`${prop.id ?? prop.file_path ?? "proposal"}-${index}`}
                       onClick={() => setSelectedProposal(prop)}
