@@ -199,23 +199,6 @@ export default function LeftRail({
           )}
         </div>
 
-        <button onClick={onOpenBoardroom} aria-label="Boardroom Debate" className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
-          <MessageSquareQuote className="w-6 h-6" />
-          <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
-            Boardroom Debate
-          </span>
-        </button>
-
-        <button onClick={onOpenDocs} aria-label="System Manual" className="p-4 text-slate-500 hover:text-indigo-400 transition-all group relative">
-          <MessageSquareQuote className="w-6 h-6" />
-          <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
-            System Manual
-          </span>
-        </button>
-
-        <button onClick={onOpenSettings} aria-label="Open System Settings" className="p-4 text-slate-500 hover:text-white transition-colors">
-          <Settings className="w-6 h-6" />
-        </button>
       </div>
     </motion.aside>
   );

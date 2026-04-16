@@ -60,6 +60,8 @@ export interface SystemState {
   setPendingManifests: (m: any[]) => void;
   oracleAlert: any | null;
   setOracleAlert: (a: any | null) => void;
+  economicNews: string[];
+  setEconomicNews: (news: string[]) => void;
   
   // Collective & Workforce
   collectiveNodes: CollectiveNode[];
@@ -165,6 +167,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   activeGolems: [],
   activeProposals: [],
   workforce: [],
+  economicNews: [],
   isVaultAuthenticated: false,
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   activeView: 'dash',
@@ -225,4 +228,5 @@ export const useSystemStore = create<SystemState>((set) => ({
   setActiveGolems: (golems: GolemTask[]) => set({ activeGolems: golems }),
   setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
   setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
+  setEconomicNews: (news: string[]) => set({ economicNews: news }),
 }));

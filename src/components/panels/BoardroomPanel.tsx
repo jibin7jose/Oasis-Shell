@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2 } from 'lucide-react';
 import { invokeSafe, isTauri } from "../../lib/tauri";
+import { useSystemStore } from "../../lib/systemStore";
 
 interface BoardroomPanelProps {
   isOpen: boolean;
@@ -16,11 +17,13 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
   const [oracleData, setOracleData] = useState<any>(null);
   const [isSummoning, setIsSummoning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [mission, setMission] = useState("Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.");
+  const { isVaultAuthenticated, setShowVault, setNotification } = useSystemStore();
 
   const triggerDebate = async () => {
     setIsSynthesizing(true);
     try {
-      const task = "Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.";
+      const task = mission;
       const context = JSON.stringify(metrics);
       const res = await invokeSafe("derive_boardroom_debate", { task, context });
       setDebate(res);
@@ -34,7 +37,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
   const summonOracle = async () => {
     setIsSummoning(true);
     try {
-      const task = "Strategic v1.1 Roadmap: Implement Remote Context Crates & Spectral Sound.";
+      const task = mission;
       const context = JSON.stringify({ ...metrics, boardroom_consensus: debate?.summary });
       const res = await invokeSafe("invoke_deep_oracle", { task, context });
       setOracleData(res);
@@ -48,16 +51,20 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
 
   const manifestReport = async () => {
     if (!debate) return;
+    if (!isVaultAuthenticated) {
+      setNotification("Founder Signature Required to manifest strategic assets.");
+      setShowVault(true);
+      return;
+    }
     setIsExporting(true);
     try {
       const path = await invokeSafe("generate_strategic_report", { 
         summary: debate.summary, 
         oracleAdvice: oracleData?.advice || "No Oracle directive present." 
       }) as string;
-      console.log("Strategic Report Manifested at:", path);
-      // In a real app, we might trigger a download or show a file link
+      setNotification(`Strategic Report Manifested: ${path}`);
     } catch (e) {
-      console.error("Report Manifestation Failed", e);
+      setNotification("Report Manifestation Breach.");
     } finally {
       setIsExporting(false);
     }
@@ -90,7 +97,12 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
              </div>
              <div>
                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Boardroom Debate</h2>
-                <p className="text-[10px] font-black text-indigo-500/60 uppercase tracking-[0.4em] mt-1">Founders Strategic Consensus Layer // V1.0</p>
+                <input 
+                  value={mission}
+                  onChange={(e) => setMission(e.target.value)}
+                  placeholder="Define Strategic Mission..."
+                  className="bg-transparent border-none text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] mt-1 w-full focus:outline-none placeholder:text-indigo-500/20"
+                />
              </div>
           </div>
           <button onClick={onClose} className="p-4 bg-white/5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-2xl border border-white/10 transition-all">

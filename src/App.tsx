@@ -125,7 +125,8 @@ export default function App() {
     workforce, setWorkforce,
     isVaultAuthenticated, setIsVaultAuthenticated,
     showVault, setShowVault,
-    activeView, setActiveView
+    activeView, setActiveView,
+    economicNews, setEconomicNews
   } = useSystemStore();
 
   const [activeContext, setActiveContext] = useState('dev');
@@ -486,6 +487,17 @@ export default function App() {
         await invokeSafe("start_watcher", { path: logicPath });
         await invokeSafe("start_proactive_sentience");
 
+        // Phase 6: Sync Economic News
+        const news = await invokeSafe("get_economic_news") as string[];
+        if (news) {
+          setEconomicNews(news);
+          setMarketIntel({
+            market_index: 15420,
+            index_change: "+1.2%",
+            ai_ticker: news
+          });
+        }
+
       } catch (e) {
         console.error("Neural Sync Failure:", e);
       }
@@ -588,6 +600,25 @@ export default function App() {
       } catch (e) { }
     };
     syncInventoryData();
+  }, []);
+
+  // Phase 6: Periodic Economic Sync
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const news = await invokeSafe("get_economic_news") as string[];
+        if (news) {
+          setEconomicNews(news);
+          setMarketIntel({
+            market_index: 15420,
+            index_change: "+1.2%",
+            ai_ticker: news
+          });
+        }
+      } catch (e) {}
+    };
+    const interval = setInterval(fetchNews, 1800000); // 30 minutes
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
