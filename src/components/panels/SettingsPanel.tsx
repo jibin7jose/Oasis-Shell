@@ -1,0 +1,237 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { 
+  Settings, 
+  Cpu, 
+  Eye, 
+  Zap, 
+  Shield, 
+  Lock, 
+  Cloud, 
+  Save, 
+  Trash2,
+  RefreshCcw,
+  Terminal,
+  BrainCircuit
+} from 'lucide-react';
+import { useSystemStore } from '../../lib/systemStore';
+import { cn } from '../../lib/utils';
+import { invokeSafe } from '../../lib/tauri';
+
+export const SettingsPanel: React.FC = () => {
+  const { 
+    sparklinesEnabled, setSparklinesEnabled,
+    performanceOptimized, setPerformanceOptimized,
+    isVaultAuthenticated,
+    logEvent
+  } = useSystemStore();
+
+  const handleClearCache = () => {
+    localStorage.clear();
+    logEvent("System Cache Purged", "system");
+    window.location.reload();
+  };
+
+  const handleLockVault = async () => {
+    try {
+      await invokeSafe("lock_sentinel");
+      window.location.reload(); // Force lock state UI refresh
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-4xl flex flex-col gap-12 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-4xl font-black text-white uppercase tracking-tighter">System Configuration</h2>
+        <p className="text-slate-500 font-medium tracking-widest text-[10px] uppercase">Kernel Parameters & Neural Engine Permissions</p>
+      </div>
+
+      {/* Security & Access Section */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Shield className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Security & Authentication</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="glass rounded-[2rem] border border-white/5 p-8 flex flex-col gap-6">
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-1">
+                <span className="text-lg font-black text-white">Sentinel Vault</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Master Lockdown</span>
+              </div>
+              <div className={cn(
+                "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                isVaultAuthenticated ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              )}>
+                {isVaultAuthenticated ? "Unlocked" : "Locked"}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              When locked, strategic assets are AES-256 encrypted and inaccessible to the host OS.
+            </p>
+            {isVaultAuthenticated && (
+              <button 
+                onClick={handleLockVault}
+                className="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-rose-500/20 flex items-center justify-center gap-2"
+              >
+                <Lock className="w-4 h-4" /> Immediate Lockdown
+              </button>
+            )}
+          </div>
+
+          <div className="glass rounded-[2rem] border border-white/5 p-8 flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <span className="text-lg font-black text-white">Founder Secret</span>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Environment Env Check</span>
+            </div>
+            <div className="space-y-4">
+              <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-500 font-bold">OASIS_FOUNDER_SECRET</span>
+                <span className="text-[10px] font-mono text-emerald-500">DETECTED</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed italic">
+                Presence of founder secret enables neural handshake deriving.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Performance Section */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Zap className="w-5 h-5 text-amber-400" />
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Performance Tuning</h3>
+        </div>
+
+        <div className="glass rounded-[2.5rem] border border-white/5 divide-y divide-white/5 overflow-hidden">
+          <div className="p-8 flex items-center justify-between group hover:bg-white/[0.02] transition-all">
+            <div className="flex gap-6">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white">Real-time Sparklines</p>
+                <p className="text-[10px] text-slate-500 font-medium">Render live micro-graphs for process load</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setSparklinesEnabled(!sparklinesEnabled)}
+              className={cn(
+                "w-12 h-6 rounded-full relative transition-all duration-500 p-1",
+                sparklinesEnabled ? "bg-amber-500" : "bg-white/10"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 bg-white rounded-full transition-all duration-500",
+                sparklinesEnabled ? "translate-x-6" : "translate-x-0"
+              )} />
+            </button>
+          </div>
+
+          <div className="p-8 flex items-center justify-between group hover:bg-white/[0.02] transition-all">
+            <div className="flex gap-6">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Cpu className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white">Extreme Performance Mode</p>
+                <p className="text-[10px] text-slate-500 font-medium">Bypass animation smoothing for maximum throughput</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setPerformanceOptimized(!performanceOptimized)}
+              className={cn(
+                "w-12 h-6 rounded-full relative transition-all duration-500 p-1",
+                performanceOptimized ? "bg-indigo-500" : "bg-white/10"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 bg-white rounded-full transition-all duration-500",
+                performanceOptimized ? "translate-x-6" : "translate-x-0"
+              )} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Neural Config Section */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <BrainCircuit className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Neural Engine config</h3>
+        </div>
+
+        <div className="glass rounded-[2.5rem] border border-white/5 p-8 space-y-8">
+           <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ollama Endpoint</label>
+                <span className="text-[10px] font-mono text-emerald-500 font-bold uppercase">Connected</span>
+              </div>
+              <div className="relative group">
+                <Terminal className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-400" />
+                <input 
+                  type="text" 
+                  defaultValue="http://localhost:11434"
+                  readOnly
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-14 pr-6 text-xs text-white font-mono outline-none focus:border-indigo-500/40 transition-all font-bold"
+                />
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Model</label>
+                <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                   <span className="text-xs font-black text-white tracking-widest uppercase">Gemma3:4b</span>
+                   <RefreshCcw className="w-3 h-3 text-slate-600 cursor-not-allowed" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Context Window</label>
+                <div className="p-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white tracking-widest uppercase text-center">
+                   4096 Tokens
+                </div>
+              </div>
+           </div>
+        </div>
+      </section>
+
+      {/* System Maintenance Section */}
+      <section className="space-y-6 pb-12">
+        <div className="flex items-center gap-3">
+          <Save className="w-5 h-5 text-rose-400" />
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Foundation Maintenance</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <button 
+             onClick={handleClearCache}
+             className="glass rounded-3xl border border-white/5 p-8 flex items-center gap-6 group hover:border-rose-500/30 transition-all text-left"
+           >
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 group-hover:bg-rose-500 group-hover:text-white transition-all">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white uppercase tracking-tight">Purge Cache</p>
+                <p className="text-[10px] text-slate-500 font-medium">Clear local state and neural context</p>
+              </div>
+           </button>
+           
+           <button className="glass rounded-3xl border border-white/5 p-8 flex items-center gap-6 group hover:border-indigo-500/30 transition-all text-left cursor-not-allowed opacity-50">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Cloud className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-white uppercase tracking-tight">Sync Cloud</p>
+                <p className="text-[10px] text-slate-500 font-medium italic">Pending distributed sync implementation</p>
+              </div>
+           </button>
+        </div>
+      </section>
+    </div>
+  );
+};

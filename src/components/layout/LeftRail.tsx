@@ -80,17 +80,18 @@ export default function LeftRail({
 
       <nav className="flex-1 flex flex-col gap-6 items-center">
         {[
-          { id: "dash", icon: LayoutDashboard, label: "Dash", action: () => onViewChange("dash") },
-          { id: "processes", icon: Cpu, label: "Nodes", action: () => onViewChange("processes") },
-          { id: "storage", icon: Shield, label: "Disk", action: () => onViewChange("storage") },
-          { id: "files", icon: HardDrive, label: "Files", action: () => onViewChange("files") },
-          { id: "timeline", icon: History, label: "Timeline", action: () => onViewChange("timeline") },
-          { id: "graph", icon: BrainCircuit, label: "Cortex", action: onOpenGraph },
-          { id: "vault", icon: FolderOpen, label: "Vault", action: onOpenVault },
+          { id: "dash", icon: LayoutDashboard, label: "Dashboard", action: () => onViewChange("dash") },
+          { id: "processes", icon: Cpu, label: "Core Nodes", action: () => onViewChange("processes") },
+          { id: "storage", icon: Shield, label: "Disk Atlas", action: () => onViewChange("storage") },
+          { id: "files", icon: HardDrive, label: "File Explorer", action: () => onViewChange("files") },
+          { id: 'settings', icon: Settings, label: 'Parameters', action: onOpenSettings },
+          { id: "timeline", icon: History, label: "Temporal Ledger", action: () => onViewChange("timeline") },
+          { id: "graph", icon: BrainCircuit, label: "Neural Cortex", action: onOpenGraph },
+          { id: "vault", icon: FolderOpen, label: "Sentinel Vault", action: onOpenVault },
           { id: 'boardroom', icon: MessageSquareQuote, label: 'Strategic Consensus', action: onOpenBoardroom },
           { id: 'workforce', icon: Users, label: 'Neural Workforce', action: onOpenWorkforce },
           { id: 'logs', icon: Activity, label: 'Temporal Logs', action: onOpenLogs },
-          { id: "zenith", icon: ShieldCheck, label: "Focus", action: onActivateZenith },
+          { id: "zenith", icon: ShieldCheck, label: "Focus Layer", action: onActivateZenith },
         ].map((item) => (
           <button
             key={item.id}

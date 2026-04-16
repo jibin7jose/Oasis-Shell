@@ -19,6 +19,7 @@ pub struct SystemStats {
     pub is_charging: bool,
     pub battery_health: i32,
     pub time_remaining_min: i32,
+    pub vault_locked: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -194,6 +195,7 @@ pub async fn run_system_diagnostic() -> Result<SystemStats, String> {
         is_charging,
         battery_health,
         time_remaining_min,
+        vault_locked: !crate::is_vault_session_valid(),
     })
 }
 

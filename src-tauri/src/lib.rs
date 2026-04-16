@@ -27,6 +27,22 @@ use system::{SystemStats, BatteryHealthInfo, ProcessInfo, StorageInfo, DeviceInf
 
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
+static LAST_AUTH_TIME: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
+
+pub fn is_vault_session_valid() -> bool {
+    let state = FOUNDER_KEY_STATE.lock().unwrap();
+    if state.is_none() { return false; }
+    
+    let last_auth = LAST_AUTH_TIME.lock().unwrap();
+    if let Some(time) = *last_auth {
+        let now = chrono::Local::now();
+        let diff = now.signed_duration_since(time);
+        if diff.num_minutes() < 15 {
+            return true;
+        }
+    }
+    false
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PinnedContext {
@@ -486,7 +502,24 @@ async fn authenticate_founder(secret: String) -> Result<String, String> {
     let mut state = FOUNDER_KEY_STATE.lock().unwrap();
     *state = Some(password_key);
     
+    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
+    *auth_time = Some(chrono::Local::now());
+    
     Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
+}
+
+#[tauri::command]
+async fn is_vault_unlocked() -> Result<bool, String> {
+    Ok(is_vault_session_valid())
+}
+
+#[tauri::command]
+async fn lock_sentinel() -> Result<(), String> {
+    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+    *state = None;
+    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
+    *auth_time = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -2930,6 +2963,8 @@ pub fn run() {
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,
+            is_vault_unlocked,
+            lock_sentinel,
             golems::register_new_golem,
             golems::delete_golem,
             search_semantic_nodes,

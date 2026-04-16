@@ -42,6 +42,8 @@ import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
+import { StoragePanel } from "./components/panels/StoragePanel";
+import { SettingsPanel } from "./components/panels/SettingsPanel";
 
 
 // Design Utility
@@ -120,10 +122,13 @@ export default function App() {
     strategicMacros, setStrategicMacros,
     activeGolems, setActiveGolems,
     activeProposals, setActiveProposals,
-    workforce, setWorkforce
+    workforce, setWorkforce,
+    isVaultAuthenticated, setIsVaultAuthenticated,
+    activeView, setActiveView
   } = useSystemStore();
 
-  // --- CORE STATE ---
+  const [activeContext, setActiveContext] = useState('dev');
+  const [commandOpen, setCommandOpen] = useState(false);
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
   const [isCortexSearching, setIsCortexSearching] = useState(false);
@@ -135,10 +140,7 @@ export default function App() {
   const [showVault, setShowVault] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showNexus, setShowNexus] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
-  const [activeContext, setActiveContext] = useState('dev');
-  const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
@@ -152,12 +154,54 @@ export default function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [resetConfirmAction, setResetConfirmAction] = useState<"reset" | "reset_clear" | null>(null);
+  
+  // Vault session check
+  useEffect(() => {
+    const checkVault = async () => {
+      try {
+        const unlocked = await invokeSafe("is_vault_unlocked") as boolean;
+        setIsVaultAuthenticated(unlocked);
+      } catch (e) {}
+    };
+    checkVault();
+    const interval = setInterval(checkVault, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
   const [fpsThreshold, setFpsThreshold] = useState(22);
   const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const fgRef = useRef<any>(null);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
+  
+  // Phase 16: Idle Timeout (Auto-Lock) Implementation
+  useEffect(() => {
+    let idleTimer: number;
+
+    const resetTimer = () => {
+      window.clearTimeout(idleTimer);
+      // 15 minutes = 15 * 60 * 1000 = 900,000ms
+      idleTimer = window.setTimeout(async () => {
+        if (isVaultAuthenticated) {
+          try {
+            await invokeSafe("lock_sentinel");
+            setIsVaultAuthenticated(false);
+            storeLog("Sentinel Vault auto-locked due to 15m inactivity", "system");
+          } catch (e) {}
+        }
+      }, 900000); 
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(name => document.addEventListener(name, resetTimer));
+    resetTimer();
+
+    return () => {
+      window.clearTimeout(idleTimer);
+      events.forEach(name => document.removeEventListener(name, resetTimer));
+    };
+  }, [isVaultAuthenticated]);
+
   const [isScanning, setIsScanning] = useState(false);
   const [isVaultSealed, setIsVaultSealed] = useState(false);
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
@@ -2384,7 +2428,7 @@ export default function App() {
         onOpenLogs={() => setShowLogs(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
-        onOpenSettings={() => setShowSettings(!showSettings)}
+        onOpenSettings={() => setActiveView('settings')}
         onOpenDocs={() => setShowDocs(true)}
         onSnapshot={handleTemporalSnapshot}
         proposalCount={activeProposals?.length || 0}
@@ -2429,19 +2473,18 @@ export default function App() {
           onToggleAutoAura={() => setAutoAura(!autoAura)}
           onAegisSync={handleAegisSync}
           onOpenNexus={() => setShowNexus(true)}
+          onOpenSettings={() => setActiveView('settings')}
           onDeepLink={(target: string) => resolveNeuralIntent(`Deep link Chronos timeline to market event for: ${target}`)}
         />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
-          {(activeView === 'processes' || activeView === 'storage') && (
+          {activeView === 'processes' && (
             <div className="w-full max-w-7xl flex flex-col items-start gap-12">
               <div className="flex items-center gap-6">
                 <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
                   <RotateCcw className="w-6 h-6" />
                 </button>
-                <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">
-                  {activeView === 'processes' ? 'Strategic Process HUD' : 'Host Storage Atlas'}
-                </h2>
+                <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Strategic Process HUD</h2>
               </div>
               <SystemPanel
                 stats={systemStats}
@@ -2476,6 +2519,14 @@ export default function App() {
                 onReapplyAll={handleReapplyAll}
               />
             </div>
+          )}
+
+          {activeView === 'storage' && (
+            <StoragePanel />
+          )}
+
+          {activeView === 'settings' && (
+            <SettingsPanel />
           )}
 
           {activeView === 'dash' && (

@@ -101,6 +101,10 @@ export interface SystemState {
   setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => void;
   setCortexResults: (results: any[]) => void;
   setCortexQuery: (query: string) => void;
+  isVaultAuthenticated: boolean;
+  setIsVaultAuthenticated: (is: boolean) => void;
+  activeView: string;
+  setActiveView: (view: string) => void;
 }
 
 export const useSystemStore = create<SystemState>((set) => ({
@@ -159,6 +163,10 @@ export const useSystemStore = create<SystemState>((set) => ({
   activeGolems: [],
   activeProposals: [],
   workforce: [],
+  isVaultAuthenticated: false,
+  setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
+  activeView: 'dash',
+  setActiveView: (view: string) => set({ activeView: view }),
 
   setMarketIntel: (market: any) => set({ marketIntel: market }),
   setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),
