@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive } from 'lucide-react';
+import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive, FolderOpen, Activity, Skull } from 'lucide-react';
 import { invokeSafe } from '../../lib/tauri';
 import { FileInfo } from '../../lib/contracts';
 import { useSystemStore } from '../../lib/systemStore';
@@ -63,7 +63,10 @@ export const FileExplorerPanel: React.FC = () => {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [inputPath, setInputPath] = useState<string>('');
-  const { setNotification } = useSystemStore();
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo } | null>(null);
+  const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
+  
+  const { setNotification, isVaultAuthenticated, setShowVault } = useSystemStore();
 
   const fetchDirectory = async (path: string = '') => {
     setLoading(true);
@@ -95,6 +98,61 @@ export const FileExplorerPanel: React.FC = () => {
   const handleNavigate = (file: FileInfo) => {
     if (file.is_dir) {
       fetchDirectory(file.path);
+    } else {
+      handleLaunch(file.path);
+    }
+  };
+
+  const handleLaunch = async (path: string) => {
+    try {
+      await invokeSafe('launch_path', { path });
+      setNotification(`Launched Executive Process: ${path.split(/[\\/]/).pop()}`);
+    } catch (e) {
+      setNotification(`Launch Failure: ${e}`);
+    }
+  };
+
+  const handleContextClick = (e: React.MouseEvent, file: FileInfo) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, file });
+  };
+
+  const handleDelete = async (file: FileInfo) => {
+    setContextMenu(null);
+    if (!isVaultAuthenticated) {
+      setNotification("FOUNDER SIGNATURE REQUIRED: Unlock Sentinel Vault to purge assets.");
+      setShowVault(true);
+      return;
+    }
+
+    try {
+      await invokeSafe('delete_path', { path: file.path });
+      setNotification(`Asset Purged: ${file.name}`);
+      fetchDirectory(currentPath);
+    } catch (e) {
+      setNotification(`Purge Failure: ${e}`);
+    }
+  };
+
+  const startRename = (file: FileInfo) => {
+    setContextMenu(null);
+    if (!isVaultAuthenticated) {
+      setNotification("FOUNDER SIGNATURE REQUIRED: Unlock Sentinel Vault to re-designate assets.");
+      setShowVault(true);
+      return;
+    }
+    setIsRenaming({ path: file.path, name: file.name });
+  };
+
+  const submitRename = async () => {
+    if (!isRenaming) return;
+    try {
+      await invokeSafe('rename_path', { path: isRenaming.path, newName: isRenaming.name });
+      setNotification(`Asset Re-designated: ${isRenaming.name}`);
+      setIsRenaming(null);
+      fetchDirectory(currentPath);
+    } catch (e) {
+      setNotification(`Re-designation Failure: ${e}`);
     }
   };
 
@@ -185,13 +243,26 @@ export const FileExplorerPanel: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.01, 0.5) }}
                   onDoubleClick={() => handleNavigate(file)}
-                  className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors items-center group"
+                  onContextMenu={(e) => handleContextClick(e, file)}
+                  className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors items-center group relative"
                 >
                   <div className="w-6 flex items-center justify-center group-hover:scale-110 transition-transform">
                     {getFileIcon(file.name, file.is_dir)}
                   </div>
                   <div className="text-sm font-medium text-slate-200 truncate pr-4">
-                    {file.name}
+                    {isRenaming?.path === file.path ? (
+                      <input 
+                        autoFocus
+                        value={isRenaming.name}
+                        onChange={(e) => setIsRenaming({ ...isRenaming, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') submitRename();
+                          if (e.key === 'Escape') setIsRenaming(null);
+                        }}
+                        onBlur={() => setIsRenaming(null)}
+                        className="bg-indigo-500/20 border border-indigo-500/40 rounded px-2 py-0.5 outline-none w-full text-white"
+                      />
+                    ) : file.name}
                   </div>
                   <div className="text-[10px] text-slate-500 text-right w-24 tabular-nums">
                     {formatDate(file.last_modified)}
@@ -205,6 +276,47 @@ export const FileExplorerPanel: React.FC = () => {
           </AnimatePresence>
         )}
       </div>
+
+      {/* Context Menu Overlay */}
+      <AnimatePresence>
+        {contextMenu && (
+          <>
+            <div 
+              className="fixed inset-0 z-[100]" 
+              onClick={() => setContextMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              className="fixed z-[101] w-48 glass rounded-xl border border-white/10 shadow-2xl p-2 flex flex-col gap-1 overflow-hidden"
+            >
+              <button 
+                onClick={() => { handleNavigate(contextMenu.file); setContextMenu(null); }}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <FolderOpen className="w-3 h-3 text-indigo-400" /> Open / Launch
+              </button>
+              <div className="h-px bg-white/5 mx-2 my-1" />
+              <button 
+                onClick={() => startRename(contextMenu.file)}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <Activity className="w-3 h-3 text-emerald-400" /> Re-designate
+              </button>
+              <button 
+                onClick={() => handleDelete(contextMenu.file)}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-all"
+              >
+                <Skull className="w-3 h-3" /> Purge Asset
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
 
       <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
         <div className="text-[10px] text-slate-500 flex items-center gap-2 uppercase tracking-widest font-bold">

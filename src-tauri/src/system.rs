@@ -559,3 +559,63 @@ pub async fn read_directory(path: Option<String>) -> Result<Vec<FileInfo>, Strin
     Ok(files)
 }
 
+#[tauri::command]
+pub async fn launch_path(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        // For macOS/Linux if we ever target them
+        #[cfg(target_os = "macos")]
+        std::process::Command::new("open").arg(&path).spawn().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "linux")]
+        std::process::Command::new("xdg-open").arg(&path).spawn().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_path(path: String) -> Result<String, String> {
+    // Security Gate
+    if !crate::is_vault_session_valid() {
+        return Err("Sentinel Vault Locked. Founder Signature Required for deletion.".into());
+    }
+
+    let target = std::path::Path::new(&path);
+    if !target.exists() {
+        return Err("Target path does not exist.".into());
+    }
+
+    if target.is_dir() {
+        std::fs::remove_dir_all(target).map_err(|e| e.to_string())?;
+    } else {
+        std::fs::remove_file(target).map_err(|e| e.to_string())?;
+    }
+
+    Ok(format!("Strategic asset purged: {}", path))
+}
+
+#[tauri::command]
+pub async fn rename_path(path: String, new_name: String) -> Result<String, String> {
+    // Security Gate
+    if !crate::is_vault_session_valid() {
+        return Err("Sentinel Vault Locked. Founder Signature Required for renaming.".into());
+    }
+
+    let old_path = std::path::Path::new(&path);
+    if !old_path.exists() {
+        return Err("Source path does not exist.".into());
+    }
+
+    let mut new_path = old_path.parent().unwrap_or(std::path::Path::new("")).to_path_buf();
+    new_path.push(new_name);
+
+    std::fs::rename(old_path, &new_path).map_err(|e| e.to_string())?;
+
+    Ok(format!("Asset Re-designated: {} to {}", path, new_path.display()))
+}

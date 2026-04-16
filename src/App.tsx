@@ -124,6 +124,7 @@ export default function App() {
     activeProposals, setActiveProposals,
     workforce, setWorkforce,
     isVaultAuthenticated, setIsVaultAuthenticated,
+    showVault, setShowVault,
     activeView, setActiveView
   } = useSystemStore();
 
@@ -137,7 +138,6 @@ export default function App() {
   const [assistantInput, setAssistantInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
-  const [showVault, setShowVault] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showNexus, setShowNexus] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
@@ -387,7 +387,6 @@ export default function App() {
   };
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [autoAura, setAutoAura] = useState(false);
-  const [activeView, setActiveView] = useState<'dash' | 'processes' | 'storage' | 'timeline'>('dash');
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [zenithActive, setZenithActive] = useState(false);
@@ -2422,7 +2421,7 @@ export default function App() {
         simMode={simMode}
         onDash={() => setActiveView("dash")}
         onOpenGraph={() => setShowGraph(true)}
-        onOpenVault={() => setShowSentinel(true)}
+        onOpenVault={() => setShowVault(true)}
         onOpenBoardroom={() => setShowBoardroom(true)}
         onOpenWorkforce={() => setShowWorkforce(true)}
         onOpenLogs={() => setShowLogs(true)}
@@ -2463,7 +2462,7 @@ export default function App() {
           lastSync={systemLastSync}
           presentationMode={presentationMode}
           performanceMode={performanceMode}
-          onOpenSentinel={() => setShowSentinel(true)}
+          onOpenVault={() => setShowVault(true)}
           onVoiceIntent={handleVoiceIntent}
           onToggleVision={() => setVisionActive(!visionActive)}
           onToggleZen={() => setZenMode(!zenMode)}
@@ -2550,7 +2549,7 @@ export default function App() {
               setSelectedGolem={setSelectedGolem}
               onSealAsset={(asset) => {
                 setSelectedVaultAsset(asset);
-                setShowSentinel(true);
+                setShowVault(true);
                 logEvent(`Initiating Neural Sealing for ${asset.name}...`, "system");
               }}
               strategicMacros={strategicMacros}
@@ -2978,7 +2977,7 @@ export default function App() {
                 <p className="text-sm text-slate-500 font-medium">Internal Strategic Archive & File Ledger</p>
               </div>
               <div className="flex gap-4">
-                <button onClick={() => setShowSentinel(true)} className="px-8 py-3 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3">
+                <button onClick={() => setShowVault(true)} className="px-8 py-3 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3">
                   <Shield className="w-4 h-4" /> Sentinel Archive
                 </button>
                 {manifestHistory.length > 0 && (

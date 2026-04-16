@@ -38,7 +38,7 @@ interface TopBarProps {
   lastSync: string;
   presentationMode: boolean;
   performanceMode: boolean;
-  onOpenSentinel: () => void;
+  onOpenVault: () => void;
   onVoiceIntent: () => void;
   onToggleVision: () => void;
   onToggleZen: () => void;
@@ -68,7 +68,7 @@ export default function TopBar({
   lastSync,
   presentationMode,
   performanceMode,
-  onOpenSentinel,
+  onOpenVault,
   onVoiceIntent,
   onToggleVision,
   onToggleZen,
@@ -203,7 +203,7 @@ export default function TopBar({
               </div>
             </div>
             <button
-              onClick={onOpenSentinel}
+              onClick={onOpenVault}
               className={cn("ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3 duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}
             >
               <Shield className="w-4 h-4" /> Sentinel Archive

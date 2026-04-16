@@ -103,6 +103,8 @@ export interface SystemState {
   setCortexQuery: (query: string) => void;
   isVaultAuthenticated: boolean;
   setIsVaultAuthenticated: (is: boolean) => void;
+  showVault: boolean;
+  setShowVault: (show: boolean) => void;
   activeView: string;
   setActiveView: (view: string) => void;
 }
@@ -167,6 +169,8 @@ export const useSystemStore = create<SystemState>((set) => ({
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   activeView: 'dash',
   setActiveView: (view: string) => set({ activeView: view }),
+  showVault: false,
+  setShowVault: (show: boolean) => set({ showVault: show }),
 
   setMarketIntel: (market: any) => set({ marketIntel: market }),
   setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),
