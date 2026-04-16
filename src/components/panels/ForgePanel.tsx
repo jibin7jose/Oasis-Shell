@@ -47,7 +47,7 @@ export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSig
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-        {macros.length === 0 ? (
+        {!macros || macros.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-40 grayscale">
             <Terminal className="w-12 h-12 text-slate-500 mb-4" />
             <p className="text-sm text-slate-400">Forge currently cold. Synthesis pending.</p>

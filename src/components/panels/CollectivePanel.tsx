@@ -67,10 +67,10 @@ export const CollectivePanel: React.FC = () => {
         <Globe size={14} className="animate-pulse" /> Distributed Collective
       </h3>
       <div className="space-y-4">
-        {collectiveNodes.length === 0 && (
+        {(!collectiveNodes || collectiveNodes.length === 0) && (
           <p className="text-[10px] text-slate-500 italic uppercase">Searching for remote Foundry nodes...</p>
         )}
-        {collectiveNodes.map((node) => (
+        {(collectiveNodes || []).map((node) => (
           <motion.div 
             key={node.id} 
             initial={{ opacity: 0, y: 10 }}
