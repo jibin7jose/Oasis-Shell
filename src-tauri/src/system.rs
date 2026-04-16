@@ -491,3 +491,69 @@ pub async fn set_window_layout(layout: Vec<WindowSnapshot>) -> Result<(), String
 
     Ok(())
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileInfo {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub last_modified: u64,
+}
+
+#[tauri::command]
+pub async fn read_directory(path: Option<String>) -> Result<Vec<FileInfo>, String> {
+    let target_path = match path {
+        Some(p) if !p.trim().is_empty() => p,
+        _ => {
+            // Default to home directory
+            if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
+                home
+            } else {
+                "C:\\".to_string()
+            }
+        }
+    };
+
+    let mut files = Vec::new();
+
+    let entries = std::fs::read_dir(&target_path).map_err(|e| format!("Failed to read directory {}: {}", target_path, e))?;
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let metadata = entry.metadata().ok();
+            
+            let is_dir = metadata.as_ref().map(|rn| rn.is_dir()).unwrap_or(false);
+            let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+            
+            let last_modified = metadata
+                .as_ref()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            files.push(FileInfo {
+                name: entry.file_name().to_string_lossy().into_owned(),
+                path: entry.path().to_string_lossy().into_owned(),
+                is_dir,
+                size,
+                last_modified,
+            });
+        }
+    }
+
+    // Sort: directories first, then files alphabetically
+    files.sort_by(|a, b| {
+        if a.is_dir && !b.is_dir {
+            std::cmp::Ordering::Less
+        } else if !a.is_dir && b.is_dir {
+            std::cmp::Ordering::Greater
+        } else {
+            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+        }
+    });
+
+    Ok(files)
+}
+

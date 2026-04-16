@@ -2946,6 +2946,7 @@ pub fn run() {
             system::get_process_list,
             system::get_storage_map,
             system::get_system_devices,
+            system::read_directory,
             system::kill_quarantine_process,
             system::suspend_process,
             system::resume_process,

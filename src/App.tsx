@@ -41,6 +41,7 @@ import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
+import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
 
 
 // Design Utility
@@ -2513,6 +2514,19 @@ export default function App() {
               logs={timeline}
               onRefresh={refreshSystemSnapshot}
             />
+          )}
+
+          {activeView === 'files' && (
+            <div className="w-full max-w-7xl flex flex-col items-start gap-12 h-full">
+              <div className="flex items-center gap-6 mt-4">
+                <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
+                  <RotateCcw className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="w-full flex-1">
+                <FileExplorerPanel />
+              </div>
+            </div>
           )}
 
           <div className="flex gap-8 pb-12">

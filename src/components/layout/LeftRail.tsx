@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera, MessageSquareQuote, Users } from "lucide-react";
+import { Bot, LayoutDashboard, BrainCircuit, FolderOpen, Activity, Zap, Settings, Cpu, Shield, History, ShieldCheck, Book, Camera, MessageSquareQuote, Users, HardDrive } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -83,6 +83,7 @@ export default function LeftRail({
           { id: "dash", icon: LayoutDashboard, label: "Dash", action: () => onViewChange("dash") },
           { id: "processes", icon: Cpu, label: "Nodes", action: () => onViewChange("processes") },
           { id: "storage", icon: Shield, label: "Disk", action: () => onViewChange("storage") },
+          { id: "files", icon: HardDrive, label: "Files", action: () => onViewChange("files") },
           { id: "timeline", icon: History, label: "Timeline", action: () => onViewChange("timeline") },
           { id: "graph", icon: BrainCircuit, label: "Cortex", action: onOpenGraph },
           { id: "vault", icon: FolderOpen, label: "Vault", action: onOpenVault },

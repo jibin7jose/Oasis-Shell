@@ -103,3 +103,11 @@ export interface WindowInfo {
   height: number;
   is_maximized: boolean;
 }
+
+export interface FileInfo {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  last_modified: number;
+}
