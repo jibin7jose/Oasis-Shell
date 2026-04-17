@@ -38,6 +38,7 @@ interface DashboardPanelProps {
   onSynthesize: () => void;
   isSynthesizing: boolean;
   NeuralBridgeComponent?: React.ComponentType<any>;
+  TemporalExplorerComponent?: React.ComponentType<any>;
 }
 
 export const DashboardPanel: React.FC<DashboardPanelProps> = ({
@@ -69,6 +70,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   onSynthesize,
   isSynthesizing,
   NeuralBridgeComponent,
+  TemporalExplorerComponent,
 }) => {
   return (
     <>
@@ -139,6 +141,8 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           isForging={isForgingMacro}
         />
       </div>
+
+      {TemporalExplorerComponent && <TemporalExplorerComponent />}
     </>
   );
 };

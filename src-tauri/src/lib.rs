@@ -282,6 +282,7 @@ async fn capture_chronos_snapshot(
   links: Vec<serde_json::Value>,
   metrics: Option<VentureMetrics>,
   market: Option<MarketIntelligence>,
+  windows: Vec<serde_json::Value>,
   integrity: f32
 ) -> Result<String, String> {
     let timestamp = chrono::Local::now().to_rfc3339();
@@ -290,6 +291,7 @@ async fn capture_chronos_snapshot(
         "links": links,
         "metrics": metrics,
         "market": market,
+        "windows": windows,
         "integrity": integrity,
     });
     

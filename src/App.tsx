@@ -41,6 +41,8 @@ import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
+import { GhostWindows } from "./components/visuals/GhostWindows";
+import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
 import { NeuralRipple } from "./components/ui/NeuralRipple";
 import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
@@ -1074,11 +1076,14 @@ export default function App() {
       try {
         const nodes = dynamicGraph.nodes.length > 0 ? dynamicGraph.nodes : graphData.nodes;
         const links = dynamicGraph.links.length > 0 ? dynamicGraph.links : graphData.links;
+        const wins = await invokeSafe("system::get_active_windows") as any[];
+        
         await invokeSafe("capture_chronos_snapshot", { 
           nodes, 
           links,
           metrics: founderMetrics,
           market: marketIntel,
+          windows: wins,
           integrity: ventureIntegrity
         });
         const history = await invokeSafe("seek_chronos_history") as any[];
@@ -2472,6 +2477,10 @@ export default function App() {
         ) : null}
       </AnimatePresence>
 
+      <GhostWindows 
+        active={isTimeTraveling && travelIndex >= 0} 
+        windows={travelIndex >= 0 ? (chronosHistory[travelIndex] as any)?.windows || [] : []} 
+      />
       <NeuralRipple active={isRippling} color={rippleColor} />
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
@@ -2660,7 +2669,7 @@ export default function App() {
               activeSynthesis={activeSynthesis}
               onSynthesize={handleTriggerSynthesis}
               isSynthesizing={isSynthesizing}
-              NeuralBridgeComponent={(props: any) => (
+               NeuralBridgeComponent={(props: any) => (
                 <NeuralBridge 
                   {...props}
                   searchQuery={searchQuery}
@@ -2669,6 +2678,14 @@ export default function App() {
                   isRecording={isRecording}
                   toggleVoiceRecording={toggleVoiceRecording}
                   handleSearchIntent={handleSearchIntent}
+                />
+              )}
+              TemporalExplorerComponent={() => (
+                <TemporalExplorer 
+                  history={chronosHistory}
+                  currentIndex={travelIndex}
+                  onSelect={handleTimeTravel}
+                  active={isTimeTraveling}
                 />
               )}
             />
