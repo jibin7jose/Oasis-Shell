@@ -12,6 +12,7 @@ interface LeftRailProps {
   onOpenGraph: () => void;
   onOpenVault: () => void;
   onOpenLogs: () => void;
+  onOpenNexus: () => void;
   onActivateSim: () => void;
   onToggleSim: () => void;
   onOpenSettings: () => void;
@@ -42,6 +43,7 @@ export default function LeftRail({
   onOpenGraph,
   onOpenVault,
   onOpenLogs,
+  onOpenNexus,
   onActivateSim,
   onToggleSim,
   onOpenSettings,
@@ -91,6 +93,7 @@ export default function LeftRail({
           { id: 'boardroom', icon: MessageSquareQuote, label: 'Strategic Consensus', action: onOpenBoardroom },
           { id: 'workforce', icon: Users, label: 'Neural Workforce', action: onOpenWorkforce },
           { id: 'logs', icon: Activity, label: 'Temporal Logs', action: onOpenLogs },
+          { id: 'nexus', icon: ShieldCheck, label: 'Aegis Nexus', action: onOpenNexus },
           { id: "zenith", icon: ShieldCheck, label: "Focus Layer", action: onActivateZenith },
         ].map((item) => (
           <button

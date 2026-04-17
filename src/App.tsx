@@ -44,6 +44,7 @@ import { DashboardPanel } from "./components/panels/DashboardPanel";
 import { GhostWindows } from "./components/visuals/GhostWindows";
 import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
 import { VisualForge } from "./components/panels/VisualForge";
+import { AegisNexus } from "./components/panels/AegisNexus";
 import { NeuralRipple } from "./components/ui/NeuralRipple";
 import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
@@ -350,12 +351,16 @@ export default function App() {
       // We also save internal state: activeView and activeContext
       const internalState = JSON.stringify({ activeView, activeContext, timestamp: Date.now() });
       
-      // save_crate now takes description and aura_color
+      // save_crate now takes strategic metrics for the portfolio hub
       await invokeSafe('save_crate', { 
         name: aura.name, 
         description: aura.description,
         aura_color: aura.aura_color,
-        apps: currentWindows 
+        apps: currentWindows,
+        integrity: ventureIntegrity,
+        arr: simMetrics.arr, // Or founderMetrics.peak_arr float
+        burn: simMetrics.burn,
+        status: "Active"
       });
       
       setNotification(`Context Manifested: "${aura.name}" saved with ${aura.aura_color} aura.`);
@@ -2499,6 +2504,15 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showNexus && (
+            <AegisNexus 
+                onLaunch={handleLaunchCrate}
+                onClose={() => setShowNexus(false)}
+            />
+        )}
+      </AnimatePresence>
+
       <GhostWindows 
         active={isTimeTraveling && travelIndex >= 0} 
         windows={travelIndex >= 0 ? (chronosHistory[travelIndex] as any)?.windows || [] : []} 
@@ -2555,6 +2569,7 @@ export default function App() {
         onOpenBoardroom={() => setShowBoardroom(true)}
         onOpenWorkforce={() => setShowWorkforce(true)}
         onOpenLogs={() => setShowLogs(true)}
+        onOpenNexus={() => setShowNexus(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
         onOpenSettings={() => setActiveView('settings')}

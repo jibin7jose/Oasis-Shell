@@ -88,6 +88,10 @@ pub struct ContextCrate {
     pub aura_color: String,
     pub apps: String,
     pub timestamp: String,
+    pub integrity: i32,
+    pub arr: f32,
+    pub burn: f32,
+    pub status: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -773,49 +777,76 @@ fn get_crates_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 #[tauri::command]
-async fn save_crate(app: tauri::AppHandle, state: tauri::State<'_, AppState>, name: String, description: String, aura_color: String, apps: Vec<WindowInfo>) -> Result<(), String> {
-    let crates_dir = get_crates_dir(&app);
+#[tauri::command]
+async fn save_crate(
+    state: tauri::State<'_, AppState>, 
+    name: String, 
+    description: String, 
+    aura_color: String, 
+    apps: Vec<WindowInfo>,
+    integrity: i32,
+    arr: f32,
+    burn: f32,
+    status: String
+) -> Result<(), String> {
     let id = chrono::Local::now().timestamp();
     let timestamp = chrono::Local::now().to_rfc3339();
-    
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     
-    let crate_data = ContextCrate {
-        id: Some(id as i32),
-        name: name.clone(),
-        description: description.clone(),
-        aura_color: aura_color.clone(),
-        apps: apps_json,
-        timestamp,
-    };
-
-    let file_path = crates_dir.join(format!("{}.json", id));
-    let json = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
-    fs::write(file_path, json).map_err(|e| e.to_string())?;
+    let db = state.db.lock().unwrap();
+    db.execute(
+        "INSERT INTO context_crates (name, description, aura_color, apps, timestamp, integrity, arr, burn, status) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        (name, description, aura_color, apps_json, timestamp, integrity, arr, burn, status),
+    ).map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-async fn get_crates(app: tauri::AppHandle) -> Result<Vec<ContextCrate>, String> {
-    let crates_dir = get_crates_dir(&app);
-    let mut crates = Vec::new();
+async fn get_crates(state: tauri::State<'_, AppState>) -> Result<Vec<ContextCrate>, String> {
+    let db = state.db.lock().unwrap();
+    let mut stmt = db.prepare("SELECT id, name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates ORDER BY id DESC")
+        .map_err(|e| e.to_string())?;
+    
+    let crates = stmt.query_map([], |row| {
+        Ok(ContextCrate {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            aura_color: row.get(3)?,
+            apps: row.get(4)?,
+            timestamp: row.get(5)?,
+            integrity: row.get(6)?,
+            arr: row.get(7)?,
+            burn: row.get(8)?,
+            status: row.get(9)?,
+        })
+    }).map_err(|e| e.to_string())?
+    .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
 
-    if crates_dir.exists() {
-        for entry in fs::read_dir(crates_dir).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-                if let Ok(c) = serde_json::from_str::<ContextCrate>(&content) {
-                    crates.push(c);
-                }
-            }
-        }
-    }
-
-    crates.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     Ok(crates)
+}
+
+#[tauri::command]
+async fn get_nexus_pulse(state: tauri::State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let crates = get_crates(state).await?;
+    let mut pulse = Vec::new();
+    
+    for c in crates {
+        pulse.push(serde_json::json!({
+            "id": c.id,
+            "name": c.name,
+            "integrity": c.integrity,
+            "arr": c.arr,
+            "burn": c.burn,
+            "status": c.status,
+            "aura": c.aura_color,
+            "timestamp": c.timestamp
+        }));
+    }
+    
+    Ok(pulse)
 }
 
 #[tauri::command]
@@ -3073,6 +3104,7 @@ pub fn run() {
             macros::execute_visual_macro,
             macros::sign_macro_golem,
             macros::get_macro_inventory,
+            get_nexus_pulse,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -3093,7 +3125,18 @@ pub fn run() {
             let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
             
             // DB Table Initialization
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (id INTEGER PRIMARY KEY, name TEXT NOT NULL, apps TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+            let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (
+                id INTEGER PRIMARY KEY, 
+                name TEXT NOT NULL, 
+                description TEXT,
+                aura_color TEXT,
+                apps TEXT NOT NULL, 
+                timestamp TEXT NOT NULL,
+                integrity INTEGER DEFAULT 100,
+                arr REAL DEFAULT 0.0,
+                burn REAL DEFAULT 0.0,
+                status TEXT DEFAULT 'Offline'
+            )", []);
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
             let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
