@@ -41,6 +41,8 @@ import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
+import { NeuralRipple } from "./components/ui/NeuralRipple";
+import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
 import { StoragePanel } from "./components/panels/StoragePanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
@@ -144,6 +146,8 @@ export default function App() {
   const [assistantInput, setAssistantInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
+  const [isRippling, setIsRippling] = useState(false);
+  const [rippleColor, setRippleColor] = useState("#6366f1");
   const [showLogs, setShowLogs] = useState(false);
   const [showNexus, setShowNexus] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
@@ -689,11 +693,42 @@ export default function App() {
 
   // --- LOGIC: MEMORY & INTENT ---
 
+  // --- NEURAL SHORTCUTS ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setActiveView('dash');
+        // We'll use a custom event or ref to focus the bridge if needed
+        setNotification("Neural Shortcut: Bridge Focus Initiated.");
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const triggerRipple = () => {
+    const ctx = contexts.find(c => c.id === activeContext);
+    const color = ctx?.aura ? ctx.aura.replace('rgba(', '').split(',')[0] + ',' + ctx.aura.replace('rgba(', '').split(',')[1] + ',' + ctx.aura.replace('rgba(', '').split(',')[2] : '99, 102, 241';
+    
+    // Attempting a cleaner hex/rgb conversion or just using safe defaults
+    const hexMap: Record<string, string> = {
+        'dev': '#6366f1',
+        'design': '#a855f7',
+        'growth': '#10b981'
+    };
+    
+    setRippleColor(hexMap[activeContext] || "#6366f1");
+    setIsRippling(true);
+    setTimeout(() => setIsRippling(false), 1500);
+  };
+
   const resolveNeuralIntent = async (query: string) => {
     const q = query.toLowerCase();
     setMessages(prev => [...prev, { role: "user", content: query }]);
     setIsThinking(true);
     logEvent(`Neural Intent Captured: "${query}"`, 'neural');
+    triggerRipple();
 
     // Phase 7.3: Strategic Macro Routing
     if (q.includes("scan") || q.includes("diagnostic")) {
@@ -770,9 +805,9 @@ export default function App() {
   };
 
 
-  const handleSearchIntent = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && searchQuery.trim()) {
-      resolveNeuralIntent(searchQuery);
+  const handleSearchIntent = (query: string) => {
+    if (query.trim()) {
+      resolveNeuralIntent(query);
     }
   };
 
@@ -2437,6 +2472,7 @@ export default function App() {
         ) : null}
       </AnimatePresence>
 
+      <NeuralRipple active={isRippling} color={rippleColor} />
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
           animate={{ background: simMode ? '#f59e0b' : founderMetrics.stress_color, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
@@ -2624,6 +2660,17 @@ export default function App() {
               activeSynthesis={activeSynthesis}
               onSynthesize={handleTriggerSynthesis}
               isSynthesizing={isSynthesizing}
+              NeuralBridgeComponent={(props: any) => (
+                <NeuralBridge 
+                  {...props}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  isThinking={isThinking}
+                  isRecording={isRecording}
+                  toggleVoiceRecording={toggleVoiceRecording}
+                  handleSearchIntent={handleSearchIntent}
+                />
+              )}
             />
           )}
 

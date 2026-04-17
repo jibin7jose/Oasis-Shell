@@ -37,6 +37,7 @@ interface DashboardPanelProps {
   activeSynthesis: any | null;
   onSynthesize: () => void;
   isSynthesizing: boolean;
+  NeuralBridgeComponent?: React.ComponentType<any>;
 }
 
 export const DashboardPanel: React.FC<DashboardPanelProps> = ({
@@ -67,18 +68,21 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   activeSynthesis,
   onSynthesize,
   isSynthesizing,
+  NeuralBridgeComponent,
 }) => {
   return (
     <>
       {!presentationMode && (
-        <SearchIntent
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          isThinking={isThinking}
-          isRecording={isRecording}
-          toggleVoiceRecording={toggleVoiceRecording}
-          handleSearchIntent={handleSearchIntent}
-        />
+        NeuralBridgeComponent ? <NeuralBridgeComponent /> : (
+            <SearchIntent
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            isThinking={isThinking}
+            isRecording={isRecording}
+            toggleVoiceRecording={toggleVoiceRecording}
+            handleSearchIntent={handleSearchIntent}
+            />
+        )
       )}
 
       <MarketTicker

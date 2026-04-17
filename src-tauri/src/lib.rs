@@ -2248,6 +2248,56 @@ fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, statu
 }
 
 #[tauri::command]
+async fn get_predictive_intents(state: tauri::State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let mut intents = Vec::new();
+
+    // 1. Check Venture Integrity
+    let integrity = get_venture_integrity(state.clone())?;
+    if integrity < 70.0 {
+        intents.push(serde_json::json!({
+            "label": "Neural Venture Stabilization",
+            "intent": "stabilize venture integrity",
+            "type": "warning"
+        }));
+    }
+
+    // 2. Check CPU Load
+    let mut sys = sysinfo::System::new_all();
+    sys.refresh_cpu_usage();
+    let cpu_load = sys.global_cpu_usage();
+    if cpu_load > 60.0 {
+        intents.push(serde_json::json!({
+            "label": "Strategic Process Culling",
+            "intent": "optimize high cpu processes",
+            "type": "performance"
+        }));
+    }
+
+    // 3. Vault Status
+    if !is_vault_session_valid() {
+        intents.push(serde_json::json!({
+            "label": "Unseal Strategic Vault",
+            "intent": "open vault",
+            "type": "security"
+        }));
+    }
+
+    // 4. Default Strategic Options
+    intents.push(serde_json::json!({
+        "label": "Context Crate Synthesis",
+        "intent": "create context crate",
+        "type": "default"
+    }));
+    intents.push(serde_json::json!({
+        "label": "Market Intelligence Sync",
+        "intent": "sync market news",
+        "type": "growth"
+    }));
+
+    Ok(intents.into_iter().take(3).collect())
+}
+
+#[tauri::command]
 fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
     let conn = state.db.lock().unwrap();
     let mut stmt = match conn.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
@@ -3000,6 +3050,7 @@ pub fn run() {
             pin_context,
             get_pinned_contexts,
             delete_pinned_context,
+            get_predictive_intents,
             get_neural_logs,
             seek_chronos,
             system::get_active_windows,
