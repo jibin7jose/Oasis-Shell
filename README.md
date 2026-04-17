@@ -1,113 +1,55 @@
-# Oasis Shell
+# 🌌 Oasis Shell: Master Manifest v3.4.0
 
-Oasis Shell is a Tauri + React desktop shell with a local-first AI workflow. The current setup is tuned for free local inference through `Ollama`, with desktop-only system integrations handled by the Rust/Tauri backend.
+## 🔭 Architectural Philosophy
+The Oasis Shell is a high-fidelity, high-concurrency operating environment designed for strategic founders. It transitions the workspace from a series of disconnected tools into a unified, thread-safe, and forensically audited command center.
 
-## Local Dev
+---
 
-Requirements:
-- Node.js
-- Rust toolchain
-- `Ollama` running locally on `http://localhost:11434`
+## 🛠 Core Internal Hardening
 
-Install dependencies:
+### 1. High-Concurrency Ledger Engine (`r2d2`)
+The backend has been migrated from a single-threaded `Mutex<Connection>` to a production-grade **SQLite Connection Pool** powered by `r2d2`.
+- **WAL Mode**: Write-Ahead Logging is enabled by default to allow concurrent reads and writes.
+- **Synchronous NORMAL**: Optimized for high-speed SSD throughput while maintaining forensic integrity.
+- **Pooled Access**: All Tauri commands now utilize `state.pool.get()` for non-blocking database interactions.
 
-```powershell
-npm install
-```
+### 2. Forensic Persistence Layer
+All system state is now consolidated into the centralized `oasis_shell.db` ledger:
+- **Chronos Snapshots**: Every world-state change is etched into the ledger for temporal navigation.
+- **Sentinel Vault**: High-risk assets are sealed via AES-256-GCM, with keys derived from the Founder Signature.
+- **Neural Logs**: Real-time behavioral telemetry and AI synthesis events are forensically tracked.
+- **Strategic Golems**: The autonomous workforce registry is now a SQL-backed inventory, purging legacy JSON dependencies.
 
-Run the desktop app:
+### 3. Structural Resilience (`SpectralBoundary`)
+The frontend implements a **Isolationist Panel Strategy**.
+- Each major dashboard node (Forge, Workforce, Dashboard, Nexus) is wrapped in a `SpectralBoundary`.
+- Component-level entropy or JS crashes are isolated, allowing the Founder to "reconstruct" specific panels without crashing the entire Shell.
 
-```powershell
-npm run dev
-```
+---
 
-Run with a clean log:
+## 🛰 Neural Endpoints
 
-```powershell
-npm run dev:clean
-```
+| Endpoint | Logic | Persistence |
+| :--- | :--- | :--- |
+| `get_nexus_pulse` | Portfolio Integrity Aggregation | `context_crates` |
+| `register_new_golem` | Autonomous Agent Enrollment | `golem_registry` |
+| `execute_neural_intent` | LLM-Driven System Routing | `neural_logs` |
+| `vault_seal_asset` | AES-256 Forensic Sealing | `system_secrets` |
+| `get_chronos_ledger` | Temporal Buffer Navigation | `chronos_history` |
 
-## Environment
+---
 
-Local env is loaded from `.env`.
+## 🛡 Security Protocol
+- **Vault Gating**: Sensitive operations (Refactor, Purge, Vault Access) require an active `OASIS_FOUNDER_SECRET` handshake.
+- **Signed Macros**: AI-synthesized PowerShell macros must be signed by the founder before execution.
+- **Path Isolation**: All persistence is localized to the `app_local_data_dir`, isolated from system-wide temp folders.
 
-Current local dev example:
+---
 
-```env
-OLLAMA_URL=http://localhost:11434
-NEURAL_ENGINE_ENDPOINT=http://localhost:11434
-OASIS_FOUNDER_SECRET=oasis-local-founder
-```
+## 🚀 Deployment Status
+- **Backend Status**: Hardened (r2d2 / WAL)
+- **Persistence Status**: Consolidated (SQL-Centric)
+- **UI Status**: Resilient (SpectralBoundaries Active)
+- **Neural Lattice**: Synchronized (Gemma3 / LLava)
 
-Template:
-- [.env.example](./.env.example)
-
-Notes:
-- `.env` is ignored by git
-- Sentinel Vault authentication requires `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY`
-
-## Smoke Check
-
-Run the local health check:
-
-```powershell
-npm run smoke
-npm run smoke:web
-```
-
-This verifies:
-- frontend dev server
-- `Ollama` API availability
-- live local generation through `gemma3:4b`
-- founder secret presence
-- running Tauri desktop process
-- Tauri log presence
-- browser-side UI load and runtime/asset sanity via Playwright
-
-## Real-Data Mode
-
-This project is configured to avoid fake browser/demo data where possible.
-
-Current behavior:
-- Local Oracle uses `Ollama` when cloud keys are not configured
-- Sentinel Vault requires a real configured secret
-- Terminal `status`, `audit`, and `ls --strategic` use live backend state
-- Browser mode is limited; desktop Tauri mode is the real target for system features
-
-## Recommended Manual Checks
-
-After `npm run dev`, test these in the desktop app:
-
-1. Boardroom
-- Trigger `SUMMON LOCAL ORACLE`
-
-2. Sentinel Vault
-- Login with the configured founder secret
-- Seal a real local file path
-- Unseal it again
-
-3. Terminal
-- Run `status`
-- Run `audit`
-- Run `ls --strategic`
-
-4. Workforce
-- Open the panel and confirm it loads without runtime errors
-
-Detailed checklist:
-- [MANUAL_SMOKE_CHECKLIST.md](./MANUAL_SMOKE_CHECKLIST.md)
-- [MANUAL_SMOKE_RESULTS.md](./MANUAL_SMOKE_RESULTS.md)
-
-## Build
-
-Frontend production build:
-
-```powershell
-npm exec vite build
-```
-
-Desktop build:
-
-```powershell
-npm run build
-```
+**"In entropy, we forge the order of the venture."**

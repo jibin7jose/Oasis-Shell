@@ -40,34 +40,22 @@ pub static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
 // I will create the file first without register_new_golem and delete_golem, or I'll just copy them.
 
 #[tauri::command]
-pub async fn register_new_golem(agent: crate::NeuralAgent) -> Result<String, String> {
-    let path = ".golem_registry.json";
-    let mut registry = if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Vec<crate::NeuralAgent>>(&data).unwrap_or_default()
-    } else {
-        Vec::new()
-    };
+pub async fn register_new_golem(state: tauri::State<'_, AppState>, agent: crate::NeuralAgent) -> Result<String, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    
+    db.execute(
+        "INSERT OR REPLACE INTO golem_registry (id, name, aura, status, progress) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![agent.id, agent.name, "indigo", "Ready", 0.0],
+    ).map_err(|e| e.to_string())?;
 
-    registry.push(agent.clone());
-    let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
-    std::fs::write(path, data).map_err(|e| e.to_string())?;
     Ok(format!("Strategic Golem [{}] Forged into Registry.", agent.name))
 }
 
 #[tauri::command]
-pub async fn delete_golem(id: String) -> Result<String, String> {
-    let path = ".golem_registry.json";
-    if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let mut registry = serde_json::from_str::<Vec<crate::NeuralAgent>>(&data).unwrap_or_default();
-        registry.retain(|a| a.id != id);
-        let data = serde_json::to_string(&registry).map_err(|e| e.to_string())?;
-        std::fs::write(path, data).map_err(|e| e.to_string())?;
-        Ok("Golem purged from Registry.".into())
-    } else {
-        Err("No Registry found.".into())
-    }
+pub async fn delete_golem(state: tauri::State<'_, AppState>, id: String) -> Result<String, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    db.execute("DELETE FROM golem_registry WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    Ok("Golem purged from Registry.".into())
 }
 
 #[tauri::command]

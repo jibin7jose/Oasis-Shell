@@ -2,6 +2,8 @@ use serde::{Serialize, Deserialize};
 use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE};
 use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
 use rusqlite::{params, Connection};
+use r2d2_sqlite::SqliteConnectionManager;
+use r2d2::Pool;
 use std::sync::{LazyLock, Mutex};
 use notify::Watcher;
 use std::time::Duration;
@@ -76,7 +78,7 @@ impl OasisConfig {
 }
 
 pub struct AppState {
-    pub db: Mutex<Connection>,
+    pub pool: Pool<SqliteConnectionManager>,
     pub config: OasisConfig,
 }
 
@@ -301,14 +303,14 @@ async fn capture_chronos_snapshot(
     
     let json_str = serde_json::to_string(&snapshot_data).map_err(|e| e.to_string())?;
     
-    let conn = state.db.lock().unwrap();
-    conn.execute(
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    db.execute(
         "INSERT INTO chronos_history (timestamp, data, integrity) VALUES (?1, ?2, ?3)",
         rusqlite::params![timestamp, json_str, integrity],
     ).map_err(|e| e.to_string())?;
     
     // Prune history to keep last 100 for performance
-    let _ = conn.execute(
+    let _ = db.execute(
         "DELETE FROM chronos_history WHERE id NOT IN (SELECT id FROM chronos_history ORDER BY id DESC LIMIT 100)",
         []
     );
@@ -318,8 +320,8 @@ async fn capture_chronos_snapshot(
 
 #[tauri::command]
 async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<ChronosSnapshot>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT timestamp, data, integrity FROM chronos_history ORDER BY id DESC").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT timestamp, data, integrity FROM chronos_history ORDER BY id DESC").map_err(|e| e.to_string())?;
     
     let rows = stmt.query_map([], |row| {
         let timestamp: String = row.get(0)?;
@@ -768,15 +770,6 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
     Ok(())
 }
 
-fn get_crates_dir(app: &tauri::AppHandle) -> PathBuf {
-    let path = app.path().app_local_data_dir().expect("failed to get app data dir").join("crates");
-    if !path.exists() {
-        let _ = fs::create_dir_all(&path);
-    }
-    path
-}
-
-#[tauri::command]
 #[tauri::command]
 async fn save_crate(
     state: tauri::State<'_, AppState>, 
@@ -789,11 +782,10 @@ async fn save_crate(
     burn: f32,
     status: String
 ) -> Result<(), String> {
-    let id = chrono::Local::now().timestamp();
     let timestamp = chrono::Local::now().to_rfc3339();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     
-    let db = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     db.execute(
         "INSERT INTO context_crates (name, description, aura_color, apps, timestamp, integrity, arr, burn, status) 
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -805,7 +797,7 @@ async fn save_crate(
 
 #[tauri::command]
 async fn get_crates(state: tauri::State<'_, AppState>) -> Result<Vec<ContextCrate>, String> {
-    let db = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = db.prepare("SELECT id, name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
     
@@ -850,12 +842,9 @@ async fn get_nexus_pulse(state: tauri::State<'_, AppState>) -> Result<Vec<serde_
 }
 
 #[tauri::command]
-fn delete_crate(app: tauri::AppHandle, id: i32) -> Result<(), String> {
-    let crates_dir = get_crates_dir(&app);
-    let file_path = crates_dir.join(format!("{}.json", id));
-    if file_path.exists() {
-        let _ = fs::remove_file(file_path);
-    }
+async fn delete_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    db.execute("DELETE FROM context_crates WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -890,17 +879,12 @@ async fn synthesize_crate_aura(state: tauri::State<'_, AppState>, apps: Vec<Wind
 
 
 #[tauri::command]
-fn launch_crate(app: tauri::AppHandle, id: i32) -> Result<(), String> {
-    let crates_dir = get_crates_dir(&app);
-    let file_path = crates_dir.join(format!("{}.json", id));
+async fn launch_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
     
-    if !file_path.exists() {
-        return Err("Neural Crate Variant Not Found in Local Storage.".into());
-    }
-
-    let content = fs::read_to_string(file_path).map_err(|e| e.to_string())?;
-    let crate_data: ContextCrate = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    let apps: Vec<WindowInfo> = serde_json::from_str(&crate_data.apps).map_err(|e| e.to_string())?;
+    let apps_json: String = stmt.query_row([id], |row| row.get(0)).map_err(|e| format!("Crate {} not found in ledger: {}", id, e))?;
+    let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
 
     for app_info in apps {
         if !app_info.exe_path.is_empty() {
@@ -912,17 +896,27 @@ fn launch_crate(app: tauri::AppHandle, id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn export_crate_manifest(app: tauri::AppHandle, id: i32, target_path: String) -> Result<String, String> {
-    let crates_dir = get_crates_dir(&app);
-    let file_path = crates_dir.join(format!("{}.json", id));
+async fn export_crate_manifest(state: tauri::State<'_, AppState>, id: i32, target_path: String) -> Result<String, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
     
-    if !file_path.exists() {
-        return Err("Neural Source Missing.".into());
-    }
+    let crate_data: ContextCrate = stmt.query_row([id], |row| {
+        Ok(ContextCrate {
+            id: Some(id),
+            name: row.get(0)?,
+            description: row.get(1)?,
+            aura_color: row.get(2)?,
+            apps: row.get(3)?,
+            timestamp: row.get(4)?,
+            integrity: row.get(5)?,
+            arr: row.get(6)?,
+            burn: row.get(7)?,
+            status: row.get(8)?,
+        })
+    }).map_err(|e| e.to_string())?;
 
-    let content = fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
-    let crate_data: ContextCrate = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    
+    let content = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
     let filename = format!("crate_{}_{}.json", crate_data.name.replace(" ", "_"), id);
     let final_path = std::path::Path::new(&target_path).join(filename);
     
@@ -933,10 +927,10 @@ fn export_crate_manifest(app: tauri::AppHandle, id: i32, target_path: String) ->
 
 #[tauri::command]
 fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: String) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
 
-    conn.execute(
+    db.execute(
         "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
         params![event_type, message, timestamp],
     ).map_err(|e| e.to_string())?;
@@ -946,8 +940,8 @@ fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: Str
 
 #[tauri::command]
 fn oas_save_resume_analysis(state: tauri::State<'_, AppState>, role: String, score: i32) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
-    conn.execute(
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    db.execute(
         "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
         [role, score.to_string()],
     ).map_err(|e| e.to_string())?;
@@ -1486,8 +1480,8 @@ async fn execute_cli_directive(
             let process_count = system::get_process_list().await?.len();
             let disk_count = system::get_storage_map().await?.len();
             let asset_count = get_strategic_inventory().await?.len();
-            let conn = state.db.lock().unwrap();
-            let ledger_entries: i64 = conn
+            let db = state.pool.get().map_err(|e| e.to_string())?;
+            let ledger_entries: i64 = db
                 .query_row("SELECT COUNT(*) FROM neural_logs", [], |row| row.get(0))
                 .unwrap_or(0);
 
@@ -2271,9 +2265,9 @@ async fn execute_neural_commission(state: tauri::State<'_, AppState>, task: Stri
 
 #[tauri::command]
 fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, status: String) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
-    let _ = conn.execute(
+    let _ = db.execute(
         "INSERT INTO strategic_pulses (node_id, status, timestamp) VALUES (?1, ?2, ?3)",
         rusqlite::params![node_id, status, timestamp],
     );
@@ -2332,8 +2326,8 @@ async fn get_predictive_intents(state: tauri::State<'_, AppState>) -> Result<Vec
 
 #[tauri::command]
 fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = match conn.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = match db.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
         Ok(s) => s,
         Err(_) => return Ok(100.0),
     };
@@ -2347,8 +2341,8 @@ fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, Strin
 
 #[tauri::command]
 fn get_fiscal_report(state: tauri::State<'_, AppState>) -> Result<FiscalReport, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = match conn.prepare("SELECT SUM(cost), SUM(tokens) FROM compute_ledger") {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = match db.prepare("SELECT SUM(cost), SUM(tokens) FROM compute_ledger") {
         Ok(s) => s,
         Err(_) => return Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() }),
     };
@@ -2578,8 +2572,8 @@ fn get_nearby_projects() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 fn get_logs(state: tauri::State<'_, AppState>) -> Result<Vec<NeuralLog>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
     
     let log_iter = stmt.query_map([], |row| {
         Ok(NeuralLog {
@@ -2641,19 +2635,22 @@ async fn analyze_work_context(state: tauri::State<'_, AppState>) -> Result<Strin
 
 #[tauri::command]
 async fn pin_context(state: tauri::State<'_, AppState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
-    let conn = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
-    conn.execute(
+    db.execute(
         "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![name, state_blob, aura, timestamp],
     ).map_err(|e| e.to_string())?;
-    Ok(conn.last_insert_rowid())
+    
+    // We can't use conn.last_insert_rowid() directly if we don't hold the connection
+    let id: i64 = db.query_row("SELECT last_insert_rowid()", [], |row| row.get(0)).unwrap_or(0);
+    Ok(id)
 }
 
 #[tauri::command]
 async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<PinnedContext>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([], |row| {
         Ok(PinnedContext {
             id: row.get(0)?,
@@ -2671,8 +2668,8 @@ async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<Pi
 
 #[tauri::command]
 async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT ?1").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT ?1").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([limit], |row| {
         Ok(serde_json::json!({
             "id": row.get::<_, i64>(0)?,
@@ -2690,15 +2687,15 @@ async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Resul
 
 #[tauri::command]
 async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
-    conn.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    db.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 
 #[tauri::command]
 async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let conn = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     // High-Fidelity Neural Search across logs and contexts
     let mut results = Vec::new();
     
@@ -3122,29 +3119,46 @@ pub fn run() {
             }
 
             let db_path = app_data_dir.join("oasis_shell.db");
-            let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
+            let manager = SqliteConnectionManager::file(&db_path);
+            let pool = Pool::new(manager).expect("failed to create db pool");
             
-            // DB Table Initialization
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (
-                id INTEGER PRIMARY KEY, 
-                name TEXT NOT NULL, 
-                description TEXT,
-                aura_color TEXT,
-                apps TEXT NOT NULL, 
-                timestamp TEXT NOT NULL,
-                integrity INTEGER DEFAULT 100,
-                arr REAL DEFAULT 0.0,
-                burn REAL DEFAULT 0.0,
-                status TEXT DEFAULT 'Offline'
-            )", []);
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
-            let _ = conn.execute("CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)", []);
+            // Enable WAL Mode and other hardeners
+            {
+                let conn = pool.get().expect("failed to get conn from pool");
+                let _ = conn.execute("PRAGMA journal_mode=WAL", []);
+                let _ = conn.execute("PRAGMA synchronous=NORMAL", []);
+                
+                // DB Table Initialization
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (
+                    id INTEGER PRIMARY KEY, 
+                    name TEXT NOT NULL, 
+                    description TEXT,
+                    aura_color TEXT,
+                    apps TEXT NOT NULL, 
+                    timestamp TEXT NOT NULL,
+                    integrity INTEGER DEFAULT 100,
+                    arr REAL DEFAULT 0.0,
+                    burn REAL DEFAULT 0.0,
+                    status TEXT DEFAULT 'Offline'
+                )", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)", []);
+                
+                // Golem Consolidation Table
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS golem_registry (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    aura TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    progress REAL DEFAULT 0.0
+                )", []);
+            }
 
             // Manage state
-            app.manage(AppState { db: std::sync::Mutex::new(conn), config: OasisConfig::load() });
+            app.manage(AppState { pool, config: OasisConfig::load() });
 
             // Initialize Workforce if empty
             {

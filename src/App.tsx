@@ -50,6 +50,7 @@ import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
 import { StoragePanel } from "./components/panels/StoragePanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
+import { SpectralBoundary } from "./components/shared/SpectralBoundary";
 
 
 // Design Utility
@@ -2522,19 +2523,23 @@ export default function App() {
 
       <AnimatePresence>
         {showVisualForge && (
+          <SpectralBoundary fallbackTitle="Visual Forge Breach">
             <VisualForge 
                 onSave={handleSaveVisualMacro}
                 onClose={() => setShowVisualForge(false)}
             />
+          </SpectralBoundary>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {showNexus && (
+          <SpectralBoundary fallbackTitle="Aegis Nexus Breach">
             <AegisNexus 
                 onLaunch={handleLaunchCrate}
                 onClose={() => setShowNexus(false)}
             />
+          </SpectralBoundary>
         )}
       </AnimatePresence>
 
@@ -2648,130 +2653,142 @@ export default function App() {
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
           {activeView === 'processes' && (
-            <div className="w-full max-w-7xl flex flex-col items-start gap-12">
-              <div className="flex items-center gap-6">
-                <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
-                  <RotateCcw className="w-6 h-6" />
-                </button>
-                <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Strategic Process HUD</h2>
+            <SpectralBoundary fallbackTitle="System Panel Breach">
+              <div className="w-full max-w-7xl flex flex-col items-start gap-12">
+                <div className="flex items-center gap-6">
+                  <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
+                    <RotateCcw className="w-6 h-6" />
+                  </button>
+                  <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Strategic Process HUD</h2>
+                </div>
+                <SystemPanel
+                  stats={systemStats}
+                  windows={windows}
+                  processes={processes}
+                  storage={storage}
+                  devices={devices}
+                  lastSync={systemLastSync}
+                  processPriorities={processPriorities}
+                  priorityAudit={priorityAudit}
+                  priorityCache={priorityCache}
+                  autoApplyPriorities={autoApplyPriorities}
+                  defaultTtlDays={defaultTtlDays}
+                  batteryHealth={batteryHealth}
+                  sparklinesEnabled={sparklinesEnabled}
+                  isScanning={isScanning}
+                  externalConfirmAction={resetConfirmAction}
+                  onClearExternalConfirm={() => setResetConfirmAction(null)}
+                  onRefresh={refreshSystemSnapshot}
+                  onKillProcess={handleKillProcess}
+                  onSuspendProcess={handleSuspendProcess}
+                  onResumeProcess={handleResumeProcess}
+                  onSetPriority={handleSetPriority}
+                  onClearCacheReset={handleClearCacheReset}
+                  onToggleIgnoreProcess={handleToggleIgnoreProcess}
+                  onSetProcessTtl={handleSetProcessTtl}
+                  onToggleIgnoreAll={handleToggleIgnoreAll}
+                  onExportAudit={handleExportAudit}
+                  onClearAllCache={handleClearAllCache}
+                  onResetAllPriorities={handleResetAllPriorities}
+                  onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
+                  onReapplyAll={handleReapplyAll}
+                />
               </div>
-              <SystemPanel
-                stats={systemStats}
-                windows={windows}
-                processes={processes}
-                storage={storage}
-                devices={devices}
-                lastSync={systemLastSync}
-                processPriorities={processPriorities}
-                priorityAudit={priorityAudit}
-                priorityCache={priorityCache}
-                autoApplyPriorities={autoApplyPriorities}
-                defaultTtlDays={defaultTtlDays}
-                batteryHealth={batteryHealth}
-                sparklinesEnabled={sparklinesEnabled}
-                isScanning={isScanning}
-                externalConfirmAction={resetConfirmAction}
-                onClearExternalConfirm={() => setResetConfirmAction(null)}
-                onRefresh={refreshSystemSnapshot}
-                onKillProcess={handleKillProcess}
-                onSuspendProcess={handleSuspendProcess}
-                onResumeProcess={handleResumeProcess}
-                onSetPriority={handleSetPriority}
-                onClearCacheReset={handleClearCacheReset}
-                onToggleIgnoreProcess={handleToggleIgnoreProcess}
-                onSetProcessTtl={handleSetProcessTtl}
-                onToggleIgnoreAll={handleToggleIgnoreAll}
-                onExportAudit={handleExportAudit}
-                onClearAllCache={handleClearAllCache}
-                onResetAllPriorities={handleResetAllPriorities}
-                onResetAllPrioritiesAndClear={handleResetAllPrioritiesAndClear}
-                onReapplyAll={handleReapplyAll}
-              />
-            </div>
+            </SpectralBoundary>
           )}
 
           {activeView === 'storage' && (
-            <StoragePanel />
+            <SpectralBoundary fallbackTitle="Storage Matrix Breach">
+              <StoragePanel />
+            </SpectralBoundary>
           )}
 
           {activeView === 'settings' && (
-            <SettingsPanel />
+            <SpectralBoundary fallbackTitle="Settings Core Breach">
+              <SettingsPanel />
+            </SpectralBoundary>
           )}
 
           {activeView === 'dash' && (
-            <DashboardPanel
-              presentationMode={presentationMode}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              isThinking={isThinking}
-              isRecording={isRecording}
-              toggleVoiceRecording={toggleVoiceRecording}
-              handleSearchIntent={handleSearchIntent}
-              displayedMarket={displayedMarket}
-              marketIntel={marketIntel}
-              zenMode={zenMode}
-              simMode={simMode}
-              simMetrics={simMetrics}
-              founderMetrics={founderMetrics}
-              isVaultSealed={isVaultSealed}
-              strategicInventory={strategicInventory}
-              activeGolems={activeGolems}
-              setSelectedGolem={setSelectedGolem}
-              onSealAsset={(asset) => {
-                setSelectedVaultAsset(asset);
-                setShowVault(true);
-                logEvent(`Initiating Neural Sealing for ${asset.name}...`, "system");
-              }}
-              strategicMacros={strategicMacros}
-              handleExecuteMacro={handleExecuteMacro}
-              handleSignMacro={handleSignMacro}
-              isForgingMacro={isForging}
-              ventureIntegrity={ventureIntegrity}
-              fiscalBurn={fiscalBurn}
-              activeSynthesis={activeSynthesis}
-              onSynthesize={handleTriggerSynthesis}
-              isSynthesizing={isSynthesizing}
-              onLaunchVisualForge={() => setShowVisualForge(true)}
-               NeuralBridgeComponent={(props: any) => (
-                <NeuralBridge 
-                  {...props}
-                  searchQuery={searchQuery}
-                  setSearchQuery={setSearchQuery}
-                  isThinking={isThinking}
-                  isRecording={isRecording}
-                  toggleVoiceRecording={toggleVoiceRecording}
-                  handleSearchIntent={handleSearchIntent}
-                />
-              )}
-              TemporalExplorerComponent={() => (
-                <TemporalExplorer 
-                  history={chronosHistory}
-                  currentIndex={travelIndex}
-                  onSelect={handleTimeTravel}
-                  active={isTimeTraveling}
-                />
-              )}
-            />
+            <SpectralBoundary fallbackTitle="Dashboard Reconstruction">
+              <DashboardPanel
+                presentationMode={presentationMode}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                isThinking={isThinking}
+                isRecording={isRecording}
+                toggleVoiceRecording={toggleVoiceRecording}
+                handleSearchIntent={handleSearchIntent}
+                displayedMarket={displayedMarket}
+                marketIntel={marketIntel}
+                zenMode={zenMode}
+                simMode={simMode}
+                simMetrics={simMetrics}
+                founderMetrics={founderMetrics}
+                isVaultSealed={isVaultSealed}
+                strategicInventory={strategicInventory}
+                activeGolems={activeGolems}
+                setSelectedGolem={setSelectedGolem}
+                onSealAsset={(asset) => {
+                  setSelectedVaultAsset(asset);
+                  setShowVault(true);
+                  logEvent(`Initiating Neural Sealing for ${asset.name}...`, "system");
+                }}
+                strategicMacros={strategicMacros}
+                handleExecuteMacro={handleExecuteMacro}
+                handleSignMacro={handleSignMacro}
+                isForgingMacro={isForging}
+                ventureIntegrity={ventureIntegrity}
+                fiscalBurn={fiscalBurn}
+                activeSynthesis={activeSynthesis}
+                onSynthesize={handleTriggerSynthesis}
+                isSynthesizing={isSynthesizing}
+                onLaunchVisualForge={() => setShowVisualForge(true)}
+                 NeuralBridgeComponent={(props: any) => (
+                  <NeuralBridge 
+                    {...props}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    isThinking={isThinking}
+                    isRecording={isRecording}
+                    toggleVoiceRecording={toggleVoiceRecording}
+                    handleSearchIntent={handleSearchIntent}
+                  />
+                )}
+                TemporalExplorerComponent={() => (
+                  <TemporalExplorer 
+                    history={chronosHistory}
+                    currentIndex={travelIndex}
+                    onSelect={handleTimeTravel}
+                    active={isTimeTraveling}
+                  />
+                )}
+              />
+            </SpectralBoundary>
           )}
 
           {activeView === 'timeline' && (
-            <CortexLog
-              logs={timeline}
-              onRefresh={refreshSystemSnapshot}
-            />
+            <SpectralBoundary fallbackTitle="Chronos Timeline Breach">
+              <CortexLog
+                logs={timeline}
+                onRefresh={refreshSystemSnapshot}
+              />
+            </SpectralBoundary>
           )}
 
           {activeView === 'files' && (
-            <div className="w-full max-w-7xl flex flex-col items-start gap-12 h-full">
-              <div className="flex items-center gap-6 mt-4">
-                <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
-                  <RotateCcw className="w-6 h-6" />
-                </button>
+            <SpectralBoundary fallbackTitle="File Explorer Breach">
+              <div className="w-full max-w-7xl flex flex-col items-start gap-12 h-full">
+                <div className="flex items-center gap-6 mt-4">
+                  <button onClick={() => setActiveView('dash')} className="p-4 glass rounded-[1.5rem] hover:bg-white/5 text-slate-500 hover:text-white transition-all">
+                    <RotateCcw className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="w-full flex-1">
+                  <FileExplorerPanel />
+                </div>
               </div>
-              <div className="w-full flex-1">
-                <FileExplorerPanel />
-              </div>
-            </div>
+            </SpectralBoundary>
           )}
 
           <div className="flex gap-8 pb-12">
@@ -2871,7 +2888,9 @@ export default function App() {
               </div>
 
               {/* Distributed Collective: Remote Foundry Nodes (Orchestrated by CollectivePanel) */}
-              <CollectivePanel />
+              <SpectralBoundary fallbackTitle="Collective Registry Breach">
+                <CollectivePanel />
+              </SpectralBoundary>
             </div>
 
             {/* Phase 14: Chronos Temporal Scrubber */}
@@ -3563,12 +3582,16 @@ export default function App() {
           </motion.div>
         )}
 
-        <SynthesisPanel />
-        <BoardroomPanel
-          isOpen={showBoardroom}
-          onClose={() => setShowBoardroom(false)}
-          metrics={founderMetrics}
-        />
+        <SpectralBoundary fallbackTitle="Neural Synthesis Breakdown">
+          <SynthesisPanel />
+        </SpectralBoundary>
+        <SpectralBoundary fallbackTitle="Boardroom Consensus Bridge Breach">
+          <BoardroomPanel
+            isOpen={showBoardroom}
+            onClose={() => setShowBoardroom(false)}
+            metrics={founderMetrics}
+          />
+        </SpectralBoundary>
         {/* <AdvisoryDebate /> */}
 
         {activeOracle && (

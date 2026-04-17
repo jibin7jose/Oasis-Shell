@@ -31,10 +31,10 @@ pub async fn vault_store_secret(
 
     let ciphertext = cipher.encrypt(nonce, value.as_bytes()).map_err(|e| format!("Encryption failure: {}", e))?;
     
-    let conn = state.db.lock().unwrap();
+    let db = state.pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
 
-    conn.execute(
+    db.execute(
         "INSERT OR REPLACE INTO system_secrets (name, secret_blob, nonce, salt, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![name, ciphertext, nonce_bytes.to_vec(), salt.to_vec(), timestamp],
     ).map_err(|e| e.to_string())?;
@@ -48,8 +48,8 @@ pub async fn vault_get_secret(
     name: String,
     master_key: String,
 ) -> Result<String, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT secret_blob, nonce, salt FROM system_secrets WHERE name = ?1").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT secret_blob, nonce, salt FROM system_secrets WHERE name = ?1").map_err(|e| e.to_string())?;
     
     let (ciphertext, nonce_bytes, salt): (Vec<u8>, Vec<u8>, Vec<u8>) = stmt.query_row([name], |row| {
         Ok((row.get(0)?, row.get(1)?, row.get(2)?))
@@ -66,8 +66,8 @@ pub async fn vault_get_secret(
 
 #[tauri::command]
 pub async fn vault_list_secrets(state: tauri::State<'_, AppState>) -> Result<Vec<String>, String> {
-    let conn = state.db.lock().unwrap();
-    let mut stmt = conn.prepare("SELECT name FROM system_secrets").map_err(|e| e.to_string())?;
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT name FROM system_secrets").map_err(|e| e.to_string())?;
     let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| e.to_string())?;
     
     let mut names = Vec::new();
