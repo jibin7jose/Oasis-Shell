@@ -126,8 +126,13 @@ export default function App() {
     isVaultAuthenticated, setIsVaultAuthenticated,
     showVault, setShowVault,
     activeView, setActiveView,
-    economicNews, setEconomicNews
+    economicNews, setEconomicNews,
+    ventureIntegrity, setVentureIntegrity,
+    fiscalBurn, setFiscalBurn,
+    marketIntel, setMarketIntel
   } = useSystemStore();
+
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   const [activeContext, setActiveContext] = useState('dev');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -498,11 +503,24 @@ export default function App() {
           });
         }
 
+        const integrity = await invokeSafe("get_venture_integrity") as number;
+        setVentureIntegrity(integrity);
+
       } catch (e) {
         console.error("Neural Sync Failure:", e);
       }
     };
     initializeOasis();
+    
+    // Integrity Polling
+    const integrityItv = setInterval(async () => {
+       try {
+         const integrity = await invokeSafe("get_venture_integrity") as number;
+         setVentureIntegrity(integrity);
+       } catch (e) {}
+    }, 15000);
+
+    return () => clearInterval(integrityItv);
   }, []);
 
   useEffect(() => {
@@ -1477,6 +1495,20 @@ export default function App() {
     a.download = `fps_history_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleTriggerSynthesis = async () => {
+    setIsSynthesizing(true);
+    setNotification("Neural Golem: Re-synthesizing Venture Narrative...");
+    try {
+      const report = await invokeSafe("generate_venture_synthesis");
+      setActiveSynthesis(report);
+      setNotification("Synthesis Complete: Strategic Neural Pulse Etched.");
+    } catch (e) {
+      setNotification(`Synthesis Failed: ${e}`);
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   const handleCommandExecute = async (query: string) => {
@@ -2587,6 +2619,11 @@ export default function App() {
               handleExecuteMacro={handleExecuteMacro}
               handleSignMacro={handleSignMacro}
               isForgingMacro={isForging}
+              ventureIntegrity={ventureIntegrity}
+              fiscalBurn={fiscalBurn}
+              activeSynthesis={activeSynthesis}
+              onSynthesize={handleTriggerSynthesis}
+              isSynthesizing={isSynthesizing}
             />
           )}
 

@@ -5,6 +5,8 @@ import { StatGrid } from '../dashboard/StatGrid';
 import { InventoryMatrix } from '../dashboard/InventoryMatrix';
 import { GolemMatrix } from '../dashboard/GolemMatrix';
 import { ForgePanel } from './ForgePanel';
+import { VentureHealthRadar } from '../dashboard/VentureHealthRadar';
+import { NeuralWisdomFeed } from '../dashboard/NeuralWisdomFeed';
 import { GolemTask, StrategicMacro, FounderMetrics } from '../../lib/contracts';
 
 interface DashboardPanelProps {
@@ -30,6 +32,11 @@ interface DashboardPanelProps {
   handleExecuteMacro: (id: string) => void;
   handleSignMacro: (id: string) => void;
   isForgingMacro: boolean;
+  ventureIntegrity: number;
+  fiscalBurn: { total_burn: number; token_load: number; status: string };
+  activeSynthesis: any | null;
+  onSynthesize: () => void;
+  isSynthesizing: boolean;
 }
 
 export const DashboardPanel: React.FC<DashboardPanelProps> = ({
@@ -55,6 +62,11 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   handleExecuteMacro,
   handleSignMacro,
   isForgingMacro,
+  ventureIntegrity,
+  fiscalBurn,
+  activeSynthesis,
+  onSynthesize,
+  isSynthesizing,
 }) => {
   return (
     <>
@@ -94,6 +106,24 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           activeGolems={activeGolems}
           setSelectedGolem={setSelectedGolem}
           zenMode={zenMode}
+        />
+      </div>
+
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <VentureHealthRadar 
+          data={[
+            { label: "Integrity", value: ventureIntegrity },
+            { label: "Fiscal", value: Math.max(0, 100 - (fiscalBurn.total_burn * 10)) },
+            { label: "System", value: 92 }, // Placeholder for now
+            { label: "Security", value: isVaultSealed ? 100 : 40 },
+            { label: "Market", value: activeSynthesis ? (activeSynthesis.confidence_score * 100) : 50 }
+          ]}
+        />
+        
+        <NeuralWisdomFeed 
+          report={activeSynthesis}
+          onSynthesize={onSynthesize}
+          isSynthesizing={isSynthesizing}
         />
       </div>
 
