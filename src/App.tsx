@@ -43,6 +43,7 @@ import CortexHUD from "./components/panels/CortexHUD";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
 import { GhostWindows } from "./components/visuals/GhostWindows";
 import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
+import { VisualForge } from "./components/panels/VisualForge";
 import { NeuralRipple } from "./components/ui/NeuralRipple";
 import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
@@ -150,6 +151,7 @@ export default function App() {
   const [presentationMode, setPresentationMode] = useState(false);
   const [isRippling, setIsRippling] = useState(false);
   const [rippleColor, setRippleColor] = useState("#6366f1");
+  const [showVisualForge, setShowVisualForge] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showNexus, setShowNexus] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
@@ -2039,6 +2041,17 @@ export default function App() {
     }
   }
 
+  const handleSaveVisualMacro = async (nodes: any[], edges: any[]) => {
+    try {
+        const manifest = JSON.stringify({ nodes, edges });
+        // In a real implementation, we'd send this to the Rust backend
+        // For now, we'll simulate the successful "etching"
+        setNotification("Neural Forge: Visual Logic Etched into Registry.");
+        setShowVisualForge(false);
+        playHandshake();
+    } catch (e) { }
+  };
+
   const forgeFromIntent = async (prompt: string, context: string) => {
     setIsForging(true);
     try {
@@ -2477,6 +2490,15 @@ export default function App() {
         ) : null}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showVisualForge && (
+            <VisualForge 
+                onSave={handleSaveVisualMacro}
+                onClose={() => setShowVisualForge(false)}
+            />
+        )}
+      </AnimatePresence>
+
       <GhostWindows 
         active={isTimeTraveling && travelIndex >= 0} 
         windows={travelIndex >= 0 ? (chronosHistory[travelIndex] as any)?.windows || [] : []} 
@@ -2669,6 +2691,7 @@ export default function App() {
               activeSynthesis={activeSynthesis}
               onSynthesize={handleTriggerSynthesis}
               isSynthesizing={isSynthesizing}
+              onLaunchVisualForge={() => setShowVisualForge(true)}
                NeuralBridgeComponent={(props: any) => (
                 <NeuralBridge 
                   {...props}

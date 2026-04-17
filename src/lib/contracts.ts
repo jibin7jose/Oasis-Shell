@@ -71,6 +71,25 @@ export interface StrategicMacro {
   signed: boolean;
   aura: string;
   status: string;
+  node_manifest?: string;
+}
+
+export interface ForgeNode {
+  id: string;
+  type: 'action' | 'trigger' | 'logic';
+  label: string;
+  data: {
+    command?: string;
+    condition?: string;
+    outcome?: string;
+  };
+  position: { x: number; y: number };
+}
+
+export interface ForgeEdge {
+  id: string;
+  source: string;
+  target: string;
 }
 
 export interface CollectiveNode {

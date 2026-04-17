@@ -14,6 +14,7 @@ pub struct StrategicMacro {
     pub signed: bool,          // Founder approval flag
     pub aura: String,          // emerald, amber, rose, indigo
     pub status: String,        // "idle", "active", "cooldown"
+    pub node_manifest: Option<String>, // Serialized JSON of ForgeNode[]
 }
 
 static MACRO_REGISTRY: LazyLock<Mutex<HashMap<String, StrategicMacro>>> =
@@ -24,9 +25,15 @@ pub async fn forge_macro_intent(state: tauri::State<'_, AppState>, prompt: Strin
     let client = reqwest::Client::new();
     let instruction = format!(
         "Role: Oasis Strategic Forge. 
-         Input: Visual Context [{}], User Intent [{}].
-         Goal: Forge a strategic automation macro. 
-         Output ONLY JSON: {{ \"name\": \"MACRO NAME\", \"description\": \"STRATEGIC SUMMARY\", \"script\": \"POWERSHELL SCRIPT\", \"trigger\": \"SEMANTIC TRIGGER\", \"aura\": \"emerald|amber|rose|indigo\" }}",
+          Input: Visual Context [{}], User Intent [{}].
+          Goal: Forge a strategic automation macro with a visual node manifest. 
+          Output ONLY JSON: {{ 
+            \"name\": \"MACRO NAME\", 
+            \"description\": \"STRATEGIC SUMMARY\", 
+            \"nodes\": [ {{ \"id\": \"node-1\", \"type\": \"trigger|action|logic\", \"label\": \"LABEL\", \"data\": {{ \"command\": \"PS SCRIPT\" }}, \"position\": {{ \"x\": 100, \"y\": 100 }} }} ],
+            \"edges\": [ {{ \"id\": \"e1\", \"source\": \"node-1\", \"target\": \"node-2\" }} ],
+            \"aura\": \"emerald|amber|rose|indigo\" 
+          }}",
         visual_context, prompt
     );
 
@@ -47,6 +54,10 @@ pub async fn forge_macro_intent(state: tauri::State<'_, AppState>, prompt: Strin
         signed: false,
         aura: macro_data["aura"].as_str().unwrap_or("indigo").into(),
         status: "idle".into(),
+        node_manifest: Some(serde_json::to_string(&serde_json::json!({
+            "nodes": macro_data["nodes"],
+            "edges": macro_data["edges"]
+        })).unwrap_or_default()),
     };
 
     let mut registry = MACRO_REGISTRY.lock().unwrap();
@@ -90,7 +101,40 @@ pub async fn sign_macro_golem(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[tauri::command]
 pub async fn get_macro_inventory() -> Result<Vec<StrategicMacro>, String> {
     let registry = MACRO_REGISTRY.lock().unwrap();
     Ok(registry.values().cloned().collect())
 }
+
+#[tauri::command]
+pub async fn execute_visual_macro(id: String) -> Result<String, String> {
+    let st_macro = {
+        let registry = MACRO_REGISTRY.lock().unwrap();
+        registry.get(&id).cloned().ok_or_else(|| "Macro not found.")?
+    };
+
+    if let Some(manifest_str) = st_macro.node_manifest {
+        let manifest: serde_json::Value = serde_json::from_str(&manifest_str).map_err(|e| e.to_string())?;
+        let nodes = manifest["nodes"].as_array().ok_or("Invalid node manifest")?;
+        
+        // Simple sequential execution for MVP (Topological sort would be better)
+        let mut results = Vec::new();
+        for node in nodes {
+            if node["type"] == "action" {
+                if let Some(cmd) = node["data"]["command"].as_str() {
+                    let output = std::process::Command::new("powershell")
+                        .args(["-Command", cmd])
+                        .output()
+                        .map_err(|e| e.to_string())?;
+                    results.push(String::from_utf8_lossy(&output.stdout).trim().to_string());
+                }
+            }
+        }
+        Ok(format!("Visual Macro Executed: {}", results.join(" -> ")))
+    } else {
+        Err("No visual manifest found for this macro.".into())
+    }
+}
+
+pub fn run() {

@@ -18,10 +18,11 @@ interface ForgePanelProps {
   onExecute: (id: string) => void;
   onSign: (id: string) => void;
   onDelete?: (id: string) => void;
+  onLaunchForge?: () => void;
   isForging: boolean;
 }
 
-export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSign, onDelete, isForging }) => {
+export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSign, onDelete, onLaunchForge, isForging }) => {
   return (
     <div className="h-full flex flex-col p-4 bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
       <div className="flex items-center justify-between mb-6">
@@ -43,6 +44,15 @@ export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSig
             <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
             <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Forging Intent...</span>
           </motion.div>
+        )}
+        {onLaunchForge && (
+          <button 
+            onClick={onLaunchForge}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-xl hover:bg-indigo-500/20 transition-all group"
+          >
+            <Zap className="w-3 h-3 text-indigo-400 group-hover:scale-125 transition-transform" />
+            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Visual Forge</span>
+          </button>
         )}
       </div>
 

@@ -138,6 +138,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           macros={strategicMacros}
           onExecute={handleExecuteMacro}
           onSign={handleSignMacro}
+          onLaunchForge={onLaunchVisualForge}
           isForging={isForgingMacro}
         />
       </div>

@@ -3070,6 +3070,7 @@ pub fn run() {
             vault::vault_list_secrets,
             macros::forge_macro_intent,
             macros::execute_macro_golem,
+            macros::execute_visual_macro,
             macros::sign_macro_golem,
             macros::get_macro_inventory,
         ])
