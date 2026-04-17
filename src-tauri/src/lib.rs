@@ -269,6 +269,43 @@ pub struct CollectiveNode {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RiskScenario {
+    pub id: Option<i32>,
+    pub scenario: String,
+    pub probability: f32,
+    pub impact_rating: String,
+    pub defensive_strategy: String,
+    pub associated_venture: String,
+    pub timestamp: String,
+}
+
+#[tauri::command]
+async fn get_risk_simulations(state: tauri::State<'_, AppState>) -> Result<Vec<RiskScenario>, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, scenario, probability, impact_rating, defensive_strategy, associated_venture, timestamp FROM risk_simulations ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        Ok(RiskScenario {
+            id: Some(row.get(0)?),
+            scenario: row.get(1)?,
+            probability: row.get(2)?,
+            impact_rating: row.get(3)?,
+            defensive_strategy: row.get(4)?,
+            associated_venture: row.get(5)?,
+            timestamp: row.get(6)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut simulations = Vec::new();
+    for r in rows {
+        if let Ok(sim) = r {
+            simulations.push(sim);
+        }
+    }
+    Ok(simulations)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChronosSnapshot {
     pub timestamp: String,
     pub nodes: Vec<serde_json::Value>,
@@ -426,6 +463,57 @@ async fn manifest_forge_intent(state: tauri::State<'_, AppState>, anomaly_id: St
         Ok(manifest)
     } else {
         Err("Forge Resonance Failed: LLM unreachable.".into())
+    }
+}
+
+#[tauri::command]
+async fn derive_predictive_simulation(
+    state: tauri::State<'_, AppState>,
+    venture_id: String,
+    metrics: VentureMetrics
+) -> Result<RiskScenario, String> {
+    let client = reqwest::Client::new();
+    let config = &state.config;
+    
+    let prompt = format!(
+        "Role: Oasis Neural Oracle (Strategic Risk Simulation).
+        Venture: {}.
+        Current Metrics: ARR: {}, Burn: {}, Runway: {}, Momentum: {}.
+        Goal: Synthesize a high-fidelity 'Black Swan' risk scenario (a non-obvious systemic failure).
+        
+        Return ONLY valid JSON with these exact keys:
+        'scenario' (3-sentence narrative of the failure),
+        'probability' (float 0.0-1.0),
+        'impact_rating' (e.g., 'CRITICAL', 'SEVERE', 'CATASTROPHIC'),
+        'defensive_strategy' (a clear technical or strategic directive to mitigate).",
+        venture_id, metrics.arr, metrics.burn, metrics.runway, metrics.momentum
+    );
+
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        // Clean and parse
+        let clean_json = resp.trim_matches('`').replace("json", "").trim().to_string();
+        let mut sim: RiskScenario = serde_json::from_str(&clean_json).map_err(|e| format!("Oracle Parse Error: {}. Response: {}", e, clean_json))?;
+        
+        sim.associated_venture = venture_id;
+        sim.timestamp = chrono::Local::now().to_rfc3339();
+        
+        // Persist to Ledger
+        let db = state.pool.get().map_err(|e| e.to_string())?;
+        db.execute(
+            "INSERT INTO risk_simulations (scenario, probability, impact_rating, defensive_strategy, associated_venture, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![sim.scenario, sim.probability, sim.impact_rating, sim.defensive_strategy, sim.associated_venture, sim.timestamp],
+        ).map_err(|e| e.to_string())?;
+        
+        let last_id: i32 = db.query_row("SELECT last_insert_rowid()", [], |r| r.get(0)).unwrap_or(0);
+        sim.id = Some(last_id);
+
+        Ok(sim)
+    } else {
+        Err("Oracle Resonance Failed: Simulation engine unreachable.".into())
     }
 }
 
@@ -3102,6 +3190,8 @@ pub fn run() {
             macros::sign_macro_golem,
             macros::get_macro_inventory,
             get_nexus_pulse,
+            derive_predictive_simulation,
+            get_risk_simulations,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -3154,6 +3244,17 @@ pub fn run() {
                     aura TEXT NOT NULL,
                     status TEXT NOT NULL,
                     progress REAL DEFAULT 0.0
+                )", []);
+
+                // Risk Oracle Forge Table
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS risk_simulations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scenario TEXT NOT NULL,
+                    probability REAL,
+                    impact_rating TEXT,
+                    defensive_strategy TEXT,
+                    associated_venture TEXT,
+                    timestamp TEXT NOT NULL
                 )", []);
             }
 
