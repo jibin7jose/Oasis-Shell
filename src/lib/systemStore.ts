@@ -62,12 +62,17 @@ export interface SystemState {
   setOracleAlert: (a: any | null) => void;
   economicNews: string[];
   setEconomicNews: (news: string[]) => void;
+  isMirroring: boolean;
+  setIsMirroring: (is: boolean) => void;
+  activeMirrorNode: string | null;
+  setActiveMirrorNode: (nodeId: string | null) => void;
   riskSimulations: any[];
   setRiskSimulations: (s: any[]) => void;
   activeSimulation: any | null;
   setActiveSimulation: (s: any | null) => void;
   isSimulating: boolean;
   setIsSimulating: (is: boolean) => void;
+
   
   
   // Collective & Workforce
@@ -175,12 +180,17 @@ export const useSystemStore = create<SystemState>((set) => ({
   activeProposals: [],
   workforce: [],
   economicNews: [],
+  isMirroring: false,
+  setIsMirroring: (is: boolean) => set({ isMirroring: is }),
+  activeMirrorNode: null,
+  setActiveMirrorNode: (node: string | null) => set({ activeMirrorNode: node }),
   riskSimulations: [],
   setRiskSimulations: (s: any[]) => set({ riskSimulations: s }),
   activeSimulation: null,
   setActiveSimulation: (s: any | null) => set({ activeSimulation: s }),
   isSimulating: false,
   setIsSimulating: (is: boolean) => set({ isSimulating: is }),
+
   isVaultAuthenticated: false,
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   activeView: 'dash',

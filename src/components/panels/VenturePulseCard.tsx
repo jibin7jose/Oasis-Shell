@@ -24,7 +24,9 @@ export const VenturePulseCard: React.FC<VenturePulseCardProps> = ({
   status,
   aura,
   timestamp,
-  onLaunch
+  onLaunch,
+  onMirror,
+  isMirroring
 }) => {
   const runway = burn > 0 ? (arr / 12 / burn).toFixed(1) : "∞";
 
@@ -106,8 +108,15 @@ export const VenturePulseCard: React.FC<VenturePulseCardProps> = ({
         >
           <Zap size={14} style={{ color: aura }} /> Restore Core
         </button>
-        <button className="w-14 h-14 glass rounded-2xl flex items-center justify-center text-slate-500 hover:text-white transition-all border border-white/10">
-          <ExternalLink size={18} />
+        <button 
+          onClick={() => onMirror?.(name)}
+          disabled={isMirroring}
+          className={cn(
+            "w-14 h-14 glass rounded-2xl flex items-center justify-center transition-all border border-white/10",
+            isMirroring ? "text-indigo-400 animate-pulse bg-indigo-500/10 border-indigo-500/20" : "text-slate-500 hover:text-white"
+          )}
+        >
+          <ExternalLink size={18} className={cn(isMirroring && "animate-spin")} />
         </button>
       </footer>
     </motion.div>

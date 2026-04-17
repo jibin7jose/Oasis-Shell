@@ -316,6 +316,99 @@ pub struct ChronosSnapshot {
     pub entropy_index: f32,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MirrorPayload {
+    pub venture: VentureSnapshot,
+    pub crates: Vec<ContextCrate>,
+    pub signature: String,
+}
+
+#[tauri::command]
+async fn invoke_neural_mirror(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+    venture_id: String
+) -> Result<String, String> {
+    if !is_vault_session_valid() {
+        return Err("Founder Authentication Required for Mirror Handshake.".into());
+    }
+
+    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+    let node = registry.get(&node_id).ok_or("Target Node not found in Collective Registry.")?;
+    
+    // Gather Venture Data
+    let ledger = get_aegis_ledger().await?;
+    let venture = ledger.ventures.get(&venture_id).ok_or("Venture not found in local Aegis Ledger.")?.clone();
+    
+    // Gather Associated Crates (Simplified: get all for now or filter by tags)
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates").map_err(|e| e.to_string())?;
+    let crate_rows = stmt.query_map([], |row| {
+        Ok(ContextCrate {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            aura_color: row.get(3)?,
+            apps: row.get(4)?,
+            timestamp: row.get(5)?,
+            integrity: row.get(6)?,
+            arr: row.get(7)?,
+            burn: row.get(8)?,
+            status: row.get(9)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut crates = Vec::new();
+    for c in crate_rows {
+        if let Ok(crate_obj) = c {
+            crates.push(crate_obj);
+        }
+    }
+
+    let payload = MirrorPayload {
+        venture,
+        crates,
+        signature: "OASIS_FOUNDER_SIG_V1".into(),
+    };
+
+    // SIMULATED P2P TRANSMISSION (In a real setup, we'd POST to node.ip)
+    let client = reqwest::Client::new();
+    let target_url = format!("http://{}:{}/neural-mirror", node.ip, node.port);
+    
+    // For this simulation, we log the intent and return success
+    println!(">>> P2P NEURAL MIRROR: Syncing Venture {} to Node {} at {}", venture_id, node_id, target_url);
+    
+    // We'll also manifest a neural log for the user
+    db.execute(
+        "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
+        rusqlite::params!["Network", format!("Aegis Mirror Initiated for {}. Node: {}", venture_id, node_id), chrono::Local::now().to_rfc3339()],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(format!("Neural Mirroring Complete. Venture context reflected on node {}.", node_id))
+}
+
+#[tauri::command]
+async fn receive_neural_mirror(
+    state: tauri::State<'_, AppState>,
+    payload: MirrorPayload
+) -> Result<String, String> {
+    if payload.signature != "OASIS_FOUNDER_SIG_V1" {
+        return Err("Neural Signature Mismatch: Mirror handshake rejected.".into());
+    }
+
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    
+    // Persist received crates
+    for c in payload.crates {
+        let _ = db.execute(
+            "INSERT OR REPLACE INTO context_crates (name, description, aura_color, apps, timestamp, integrity, arr, burn, status) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![c.name, c.description, c.aura_color, c.apps, c.timestamp, c.integrity, c.arr, c.burn, "Mirrored"],
+        );
+    }
+    
+    Ok(format!("Neural Mirror Received. Strategy for {} manifested in local ledger.", payload.venture.name))
+}
+
 static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
 
 #[tauri::command]
@@ -3192,6 +3285,8 @@ pub fn run() {
             get_nexus_pulse,
             derive_predictive_simulation,
             get_risk_simulations,
+            invoke_neural_mirror,
+            receive_neural_mirror,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

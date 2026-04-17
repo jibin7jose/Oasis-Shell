@@ -4,6 +4,7 @@ import { ShieldCheck, BarChart3, Search, Play, Filter, LayoutGrid, Plus, BrainCi
 import { VenturePulseCard } from './VenturePulseCard';
 import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
+import { useSystemStore } from '../../lib/systemStore';
 
 interface AegisNexusProps {
   onLaunch: (id: number) => void;
@@ -14,6 +15,10 @@ export const AegisNexus: React.FC<AegisNexusProps> = ({ onLaunch, onClose }) => 
   const [ventures, setVentures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const { 
+    isMirroring, setIsMirroring, collectiveNodes, 
+    isVaultAuthenticated, setShowVault, setNotification 
+  } = useSystemStore();
 
   const loadNexus = async () => {
     try {
@@ -23,6 +28,31 @@ export const AegisNexus: React.FC<AegisNexusProps> = ({ onLaunch, onClose }) => 
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMirror = async (ventureName: string) => {
+    if (!isVaultAuthenticated) {
+        setNotification("Founder Signature Required for P2P Mirroring.");
+        setShowVault(true);
+        return;
+    }
+
+    if (collectiveNodes.length === 0) {
+        setNotification("No Distributed Nodes detected in the Collective.");
+        return;
+    }
+
+    setIsMirroring(true);
+    try {
+        const nodeId = collectiveNodes[0].id; // Target the first active node for simulation
+        const res = await invokeSafe("invoke_neural_mirror", { node_id: nodeId, venture_id: ventureName });
+        setNotification(res as string);
+    } catch (e) {
+        console.error("Mirror Breach", e);
+        setNotification("Mirror Handshake Failed: Connection Refused.");
+    } finally {
+        setIsMirroring(false);
     }
   };
 
@@ -93,6 +123,8 @@ export const AegisNexus: React.FC<AegisNexusProps> = ({ onLaunch, onClose }) => 
                   key={v.id}
                   {...v}
                   onLaunch={onLaunch}
+                  onMirror={handleMirror}
+                  isMirroring={isMirroring}
                 />
               ))}
             </div>
