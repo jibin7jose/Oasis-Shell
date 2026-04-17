@@ -27,7 +27,10 @@ export const SearchIntent: React.FC<SearchIntentProps> = ({
       className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
     >
       <div className="flex items-center gap-5 px-4 py-2">
-        <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
+        <Search 
+          className={cn("w-7 h-7 transition-colors", isThinking && "animate-pulse")} 
+          style={{ color: isThinking ? 'var(--accent-primary)' : '#475569' }}
+        />
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

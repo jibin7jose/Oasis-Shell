@@ -32,7 +32,10 @@ export const StatGrid: React.FC<StatGridProps> = ({
           key={`founder-metric-${m.label}-${i}`} 
           className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3 hover:border-white/10 transition-all group"
         >
-          <m.icon className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition-transform" />
+          <m.icon 
+            className="w-5 h-5 group-hover:scale-110 transition-transform" 
+            style={{ color: 'var(--accent-primary)' }}
+          />
           <div>
             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
             <div className="text-xl font-bold text-white">{m.val}</div>

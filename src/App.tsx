@@ -2143,10 +2143,35 @@ export default function App() {
     };
   }, [simMode, simMetrics.arr, simMetrics.burn]);
 
+  // --- ATMOSPHERIC INTELLIGENCE (PHASE 7) ---
+  useEffect(() => {
+    const auraColors: Record<string, { hex: string, rgb: string }> = {
+      indigo: { hex: '#6366f1', rgb: '99, 102, 241' },
+      emerald: { hex: '#10b981', rgb: '16, 185, 129' },
+      rose: { hex: '#f43f5e', rgb: '244, 63, 94' },
+      amber: { hex: '#f59e0b', rgb: '245, 158, 11' },
+      purple: { hex: '#a855f7', rgb: '168, 85, 247' },
+      slate: { hex: '#94a3b8', rgb: '148, 163, 184' },
+      dev: { hex: '#6366f1', rgb: '99, 102, 241' },
+      design: { hex: '#a855f7', rgb: '168, 85, 247' },
+      growth: { hex: '#10b981', rgb: '16, 185, 129' }
+    };
+
+    const config = auraColors[activeContext] || auraColors.indigo;
+    const root = document.documentElement;
+    
+    root.style.setProperty('--accent-primary', config.hex);
+    root.style.setProperty('--accent-primary-rgb', config.rgb);
+    root.style.setProperty('--accent-glow', `rgba(${config.rgb}, 0.4)`);
+    root.style.setProperty('--aura-glow', `rgba(${config.rgb}, 0.4)`);
+    root.style.setProperty('--background-accent', config.hex);
+    
+    // Sync Neural Bridge Ripple
+    setRippleColor(config.hex);
+  }, [activeContext]);
+
   // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
-
-  // --- HELPERS: COMMAND PALETTE & SYSTEM HUD ---
 
   const handleZenithPulse = () => {
     setZenithActive(true);

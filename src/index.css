@@ -9,7 +9,15 @@
   font-family: 'Outfit', Inter, system-ui, sans-serif;
   background-color: #020617;
   color: #f8fafc;
+  
+  /* DYNAMIC AURA VARIABLES - Controlled by AtmosphereManager */
+  --accent-primary: #6366f1;
+  --accent-primary-rgb: 99, 102, 241;
+  --accent-glow: rgba(99, 102, 241, 0.4);
+  --background-accent: #6366f1;
   --aura-glow: rgba(99, 102, 241, 0.4);
+
+  transition: --accent-primary 0.8s ease, --accent-glow 0.8s ease;
 }
 
 body {

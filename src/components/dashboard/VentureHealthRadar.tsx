@@ -70,8 +70,8 @@ export const VentureHealthRadar: React.FC<VentureHealthRadarProps> = ({
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           d={pathData}
-          fill="rgba(99, 102, 241, 0.2)"
-          stroke="#6366f1"
+          fill="rgba(var(--accent-primary-rgb), 0.2)"
+          stroke="var(--accent-primary)"
           strokeWidth={2}
           className="transition-all duration-1000 ease-in-out"
         />
@@ -83,7 +83,7 @@ export const VentureHealthRadar: React.FC<VentureHealthRadarProps> = ({
             cx={p.x}
             cy={p.y}
             r={4}
-            fill="#818cf8"
+            fill="var(--accent-primary)"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: i * 0.1 }}
@@ -112,7 +112,8 @@ export const VentureHealthRadar: React.FC<VentureHealthRadarProps> = ({
         <motion.div
           animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
           transition={{ duration: 3, repeat: Infinity }}
-          className="w-12 h-12 rounded-full bg-indigo-500 blur-xl"
+          className="w-12 h-12 rounded-full blur-xl"
+          style={{ backgroundColor: 'var(--accent-primary)' }}
         />
       </div>
     </div>

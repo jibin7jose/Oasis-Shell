@@ -91,7 +91,10 @@ export default function TopBar({
             )}
           >
             <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-indigo-500 animate-pulse shadow-[0_0_10px_#6366f1]" />
+              <div 
+                className="w-3 h-3 rounded-full animate-pulse transition-all duration-1000" 
+                style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 10px var(--accent-primary)' }}
+              />
               <span className="uppercase tracking-tighter">{activeVenture}</span>
             </div>
 
@@ -99,7 +102,7 @@ export default function TopBar({
               <div className="flex flex-col">
                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Host Pulse</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-indigo-400 font-black">{(systemStats?.cpu_load ?? 0).toFixed(1)}% CPU</span>
+                  <span className="text-[10px] font-mono font-black" style={{ color: 'var(--accent-primary)' }}>{(systemStats?.cpu_load ?? 0).toFixed(1)}% CPU</span>
                   <span className="text-[10px] font-mono text-purple-400 font-black">{(systemStats?.mem_used ?? 0).toFixed(1)}% RAM</span>
                 </div>
               </div>
@@ -114,7 +117,8 @@ export default function TopBar({
                         cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2.5" 
                         strokeDasharray="63" 
                         strokeDashoffset={63 - (63 * Math.max(0, Math.min(100, systemStats?.battery_level ?? 0))) / 100}
-                        className={cn("transition-all duration-1000", systemStats?.is_charging ? "text-emerald-400" : "text-indigo-400")}
+                        className={cn("transition-all duration-1000")}
+                        style={{ color: systemStats?.is_charging ? '#10b981' : 'var(--accent-primary)' }}
                       />
                     </svg>
                     <span className="absolute text-[7px] font-black text-white">{systemStats?.battery_level ?? "0"}</span>
@@ -129,7 +133,10 @@ export default function TopBar({
               </div>
             </div>
 
-            <span className="text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-3 py-1 rounded-lg font-black tracking-widest uppercase bg-indigo-500/5">
+            <span 
+              className="text-[9px] font-mono border px-3 py-1 rounded-lg font-black tracking-widest uppercase"
+              style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-glow)', backgroundColor: 'rgba(var(--accent-primary-rgb), 0.05)' }}
+            >
               OAS_KRNL_4.5 // SENTINEL CORE
             </span>
 
@@ -212,10 +219,9 @@ export default function TopBar({
               onClick={onVoiceIntent}
               className={cn(
                 "ml-8 p-2 glass rounded-lg transition-all",
-                voiceActive
-                  ? "text-indigo-400 scale-125 border-indigo-500/50 shadow-[0_0_20px_#6366f1]"
-                  : "text-slate-400"
+                voiceActive && "scale-125 shadow-[0_0_20px_var(--accent-primary)]"
               )}
+              style={{ color: voiceActive ? 'var(--accent-primary)' : '#94a3b8', borderColor: voiceActive ? 'var(--accent-glow)' : 'rgba(255,255,255,0.1)' }}
             >
               {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
             </button>
@@ -234,8 +240,9 @@ export default function TopBar({
               onClick={onToggleZen}
               className={cn(
                 "ml-4 p-2 glass rounded-lg transition-all",
-                zenMode ? "text-indigo-400 scale-125 border-indigo-500/50" : "text-slate-400"
+                zenMode && "scale-125"
               )}
+              style={{ color: zenMode ? 'var(--accent-primary)' : '#94a3b8', borderColor: zenMode ? 'var(--accent-glow)' : 'rgba(255,255,255,0.1)' }}
             >
               <Eye className="w-4 h-4" />
             </button>
@@ -258,9 +265,16 @@ export default function TopBar({
             >
               <LayoutDashboard className="w-4 h-4" />
             </button>
-            <button onClick={onToggleNetwork} className={cn("ml-4 p-2 glass rounded-lg text-indigo-400 group relative transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
+            <button 
+              onClick={onToggleNetwork} 
+              className={cn("ml-4 p-2 glass rounded-lg group relative transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}
+              style={{ color: 'var(--accent-primary)' }}
+            >
               <Globe className="w-3.5 h-3.5" />
-              <span className="absolute left-full ml-3 px-3 py-1.5 bg-indigo-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <span 
+                className="absolute left-full ml-3 px-3 py-1.5 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                style={{ backgroundColor: 'var(--accent-primary)' }}
+              >
                 Venture Network Registry
               </span>
             </button>
@@ -271,11 +285,12 @@ export default function TopBar({
                   <div
                     onClick={onToggleAutoAura}
                     className={cn(
-                      "w-10 h-5 rounded-full p-1 cursor-pointer transition-all border border-white/10 shadow-inner",
-                      autoAura ? "bg-indigo-600 border-indigo-500/50" : "bg-white/5"
+                      "w-10 h-5 rounded-full p-1 cursor-pointer transition-all border shadow-inner",
+                      autoAura ? "border-white/20" : "bg-white/5 border-white/10"
                     )}
+                    style={{ backgroundColor: autoAura ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)' }}
                   >
-                    <div className="w-3 h-3 rounded-full bg-white shadow-xl" style={{ transform: `translateX(${autoAura ? 20 : 0}px)` }} />
+                    <div className="w-3 h-3 rounded-full bg-white shadow-xl transition-transform" style={{ transform: `translateX(${autoAura ? 20 : 0}px)` }} />
                   </div>
                 </div>
                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter opacity-40">WLED Bridge Active</span>
@@ -350,7 +365,8 @@ export default function TopBar({
         </button>
         <button
           onClick={onOpenNexus}
-          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+          className="px-6 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg"
+          style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 10px 20px -5px var(--accent-glow)' }}
         >
           Nexus View
         </button>

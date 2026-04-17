@@ -106,9 +106,14 @@ export default function LeftRail({
             className={cn(
               "p-4 rounded-2xl transition-all group relative",
               activeView === item.id
-                ? "bg-indigo-500/20 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]"
+                ? "text-white"
                 : "text-slate-500 hover:text-white hover:bg-white/5"
             )}
+            style={{ 
+              backgroundColor: activeView === item.id ? 'rgba(var(--accent-primary-rgb), 0.2)' : 'transparent',
+              color: activeView === item.id ? 'var(--accent-primary)' : '',
+              boxShadow: activeView === item.id ? '0 0 15px rgba(var(--accent-primary-rgb), 0.2)' : 'none'
+            }}
           >
             <item.icon className="w-6 h-6" />
             {item.id === 'workforce' && proposalCount > 0 && (
