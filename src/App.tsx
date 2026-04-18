@@ -62,6 +62,7 @@ import { RefractionManager } from "./components/shared/RefractionManager";
 import { RealityBridge } from "./components/shared/RealityBridge";
 import { SandboxHUD } from "./components/shared/SandboxHUD";
 import { KernelForge } from "./components/shared/KernelForge";
+import { SingularityHUD } from "./components/shared/SingularityHUD";
 
 
 // Design Utility
@@ -152,6 +153,7 @@ export default function App() {
   const [realityBridgeOpen, setRealityBridgeOpen] = useState(false);
   const [realityBridgeQuery, setRealityBridgeQuery] = useState("");
   const [sandboxOpen, setSandboxOpen] = useState(false);
+  const [singularityOpen, setSingularityOpen] = useState(false);
   const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
   const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
 

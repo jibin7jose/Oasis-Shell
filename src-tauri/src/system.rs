@@ -619,3 +619,71 @@ pub async fn rename_path(path: String, new_name: String) -> Result<String, Strin
 
     Ok(format!("Asset Re-designated: {} to {}", path, new_path.display()))
 }
+#[tauri::command]
+pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: String, intent: String) -> Result<String, String> {
+    // 1. Path Management
+    let venture_dir = format!("ventures/{}", name);
+    let mut path = std::path::PathBuf::from(&venture_dir);
+    if path.exists() {
+        return Err("Strategic Protocol Breach: Venture identity already exists.".into());
+    }
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+
+    // 2. Scaffolding Phase (Vite React-TS)
+    // We use npx create-vite to ensure latest best practices
+    let output = std::process::Command::new("npx")
+        .args(["-y", "create-vite@latest", ".", "--template", "react-ts"])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        return Err(format!("Scaffolding Failure: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    // 3. Subsidiary Manifest Synthesis (Theming & Intent Integration)
+    // We rewrite the generated files to align with the Oasis Aesthetic
+    let app_tsx = format!(
+        "import React from 'react';\n\
+        export default function App() {{\n\
+          return (\n\
+            <div className='oasis-subsidiary'>\n\
+              <h1>Oasis Subsidiary: {}</h1>\n\
+              <p>Manifested via Neural Singularity.</p>\n\
+              <div className='intent-core'>Intent: {}</div>\n\
+            </div>\n\
+          );\n\
+        }}",
+        name, intent
+    );
+    
+    let index_css = "body { background: #020617; color: #6366f1; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; }\n\
+                     .oasis-subsidiary { border: 1px solid rgba(99, 102, 241, 0.2); padding: 4rem; border-radius: 3rem; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); text-align: center; }\n\
+                     h1 { text-transform: uppercase; letter-spacing: 0.5em; font-weight: 900; margin-bottom: 2rem; }\n\
+                     .intent-core { opacity: 0.5; font-size: 0.8rem; font-style: italic; }";
+
+    std::fs::write(path.join("src/App.tsx"), app_tsx).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src/index.css"), index_css).map_err(|e| e.to_string())?;
+
+    Ok(format!("Strategic Venture [{}] Manifested in /ventures/.", name))
+}
+
+#[tauri::command]
+pub async fn launch_sub_venture(name: String) -> Result<u32, String> {
+    let venture_dir = format!("ventures/{}", name);
+    let path = std::path::PathBuf::from(&venture_dir);
+    if !path.exists() {
+        return Err("Ventures path not found.".into());
+    }
+
+    // Spawning Dev Server (npm run dev)
+    // We look for port conflicts manually or let Vite handle it
+    let child = std::process::Command::new("npm")
+        .args(["run", "dev"])
+        .current_dir(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(child.id())
+}
+ Arkansas Arkansas
