@@ -12,7 +12,8 @@ import {
   Trash2,
   RefreshCcw,
   Terminal,
-  BrainCircuit
+  BrainCircuit,
+  Fingerprint
 } from 'lucide-react';
 import { useSystemStore } from '../../lib/systemStore';
 import { cn } from '../../lib/utils';
@@ -23,6 +24,7 @@ export const SettingsPanel: React.FC = () => {
     sparklinesEnabled, setSparklinesEnabled,
     performanceOptimized, setPerformanceOptimized,
     isVaultAuthenticated,
+    hardwareAnchorActive, setHardwareAnchorActive,
     logEvent
   } = useSystemStore();
 
@@ -82,20 +84,34 @@ export const SettingsPanel: React.FC = () => {
             )}
           </div>
 
+            </div>
+          </div>
+
           <div className="glass rounded-[2rem] border border-white/5 p-8 flex flex-col gap-6">
-            <div className="flex flex-col gap-1">
-              <span className="text-lg font-black text-white">Founder Secret</span>
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Environment Env Check</span>
-            </div>
-            <div className="space-y-4">
-              <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-500 font-bold">OASIS_FOUNDER_SECRET</span>
-                <span className="text-[10px] font-mono text-emerald-500">DETECTED</span>
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-indigo-400" />
+                  <span className="text-lg font-black text-white">Hardware Anchor</span>
+                </div>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Biometric (Windows Hello/TPM)</span>
               </div>
-              <p className="text-[10px] text-slate-500 leading-relaxed italic">
-                Presence of founder secret enables neural handshake deriving.
-              </p>
+              <button 
+                onClick={() => setHardwareAnchorActive(!hardwareAnchorActive)}
+                className={cn(
+                  "w-12 h-6 rounded-full relative transition-all duration-500 p-1",
+                  hardwareAnchorActive ? "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full transition-all duration-500",
+                  hardwareAnchorActive ? "translate-x-6" : "translate-x-0"
+                )} />
+              </button>
             </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed uppercase font-bold tracking-tight">
+              Bind high-signature strategic manifestations to physical biometric presence check.
+            </p>
           </div>
         </div>
       </section>

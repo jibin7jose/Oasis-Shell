@@ -58,6 +58,11 @@ export interface SystemState {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   pendingManifests: any[];
+  hardwareAnchorActive: boolean;
+  setHardwareAnchorActive: (active: boolean) => void;
+  isBiometricScanning: boolean;
+  setIsBiometricScanning: (is: boolean) => void;
+
   setPendingManifests: (m: any[]) => void;
   oracleAlert: any | null;
   setOracleAlert: (a: any | null) => void;
@@ -169,6 +174,11 @@ export const useSystemStore = create<SystemState>((set) => ({
   cliHistory: [],
   searchQuery: "",
   pendingManifests: [],
+  hardwareAnchorActive: false,
+  setHardwareAnchorActive: (active: boolean) => set({ hardwareAnchorActive: active }),
+  isBiometricScanning: false,
+  setIsBiometricScanning: (is: boolean) => set({ isBiometricScanning: is }),
+
   oracleAlert: null,
   processes: [],
   windows: [],

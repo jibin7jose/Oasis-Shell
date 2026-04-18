@@ -13,9 +13,9 @@ import {
   AlertTriangle,
   ChevronRight,
   Database,
-  Fingerprint
-} from 'lucide-react';
+import { Fingerprint, Scan, Target, Cpu } from 'lucide-react';
 import { invokeSafe } from "../../lib/tauri";
+import { useSystemStore } from "../../lib/systemStore";
 
 interface SentinelVaultProps {
   isOpen: boolean;
@@ -48,8 +48,12 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
   const [activeTab, setActiveTab] = useState<'vault' | 'logs'>('vault');
   const [scanQuery, setScanQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [assetPath, setAssetPath] = useState("");
   const [assetTitle, setAssetTitle] = useState("");
+
+  const { 
+    hardwareAnchorActive, isBiometricScanning, setIsBiometricScanning,
+    setNotification, logEvent 
+  } = useSystemStore();
 
   const fetchLedger = async () => {
     try {
@@ -71,6 +75,28 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
     } catch (e: any) {
       setError(e.toString());
       setFounderSecret("");
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      setError(null);
+      setIsBiometricScanning(true);
+      const verified = await invokeSafe("trigger_biometric_scan", { reason: "Founder Signature Required for Vault Manifestation" });
+      
+      if (verified) {
+        setIsAuthenticated(true);
+        setNotification("Nexus Scan Verified: Founder Presence Confirmed.");
+        logEvent("Hardware Identity Handshake Successful", "system");
+        onPlayNotification();
+        fetchLedger();
+      } else {
+        setError("Nexus Scan Rejected: Signature Mismatch.");
+      }
+    } catch (e: any) {
+      setError("Biometric Interface Failure: OS Link Refused.");
+    } finally {
+      setIsBiometricScanning(false);
     }
   };
 
@@ -209,6 +235,42 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                   className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 pl-16 pr-6 text-white text-sm font-black tracking-[0.3em] outline-none focus:border-indigo-500/50 focus:bg-indigo-500/5 transition-all"
                 />
               </div>
+
+              {hardwareAnchorActive && (
+                <div className="relative flex flex-col items-center gap-6">
+                    <div className="flex items-center gap-4 w-full">
+                       <div className="h-px flex-1 bg-white/5" />
+                       <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Or Use Hardware Anchor</span>
+                       <div className="h-px flex-1 bg-white/5" />
+                    </div>
+
+                    <button 
+                      onClick={handleBiometricLogin}
+                      disabled={isBiometricScanning}
+                      className="w-full py-8 border-2 border-dashed border-indigo-500/20 hover:border-indigo-500/40 rounded-[2.5rem] flex flex-col items-center gap-4 group transition-all relative overflow-hidden"
+                    >
+                       <AnimatePresence>
+                         {isBiometricScanning && (
+                           <motion.div 
+                             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                             className="absolute inset-0 bg-indigo-500/5 flex items-center justify-center"
+                           >
+                              <motion.div 
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="w-48 h-48 rounded-full border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.2)]" 
+                              />
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+
+                       <div className="relative z-10 p-4 bg-indigo-500/10 rounded-2xl group-hover:scale-110 transition-transform">
+                          {isBiometricScanning ? <Target className="w-8 h-8 text-indigo-400 animate-spin" /> : <Scan className="w-8 h-8 text-indigo-400" />}
+                       </div>
+                       <span className="relative z-10 text-[10px] font-black text-white uppercase tracking-[0.4em]">Initialize Nexus Scan</span>
+                    </button>
+                </div>
+              )}
 
               {error && (
                 <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-4 text-rose-400">

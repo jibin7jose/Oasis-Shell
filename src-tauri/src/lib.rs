@@ -535,6 +535,61 @@ async fn derive_mitigation_macro(
     Ok(manifest)
 }
 
+static BIOMETRIC_SESSION: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
+
+#[tauri::command]
+async fn check_biometric_status() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let cmd = "Add-Type -AssemblyName System.Runtime.WindowsRuntime; [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials, ContentType=WindowsRuntime]::CheckAvailabilityAsync().GetAwaiter().GetResult() -eq 'Available'";
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", cmd])
+            .output()
+            .map_err(|e| e.to_string())?;
+        
+        Ok(String::from_utf8_lossy(&output.stdout).trim() == "True")
+    }
+    #[cfg(not(target_os = "windows"))]
+    { Ok(false) }
+}
+
+#[tauri::command]
+async fn trigger_biometric_scan(reason: String) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        println!(">>> Triggering Biometric Gate: {}", reason);
+        let cmd = format!(
+            "Add-Type -AssemblyName System.Runtime.WindowsRuntime; $res = [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials, ContentType=WindowsRuntime]::RequestVerificationAsync('{}').GetAwaiter().GetResult(); $res -eq 'Verified'",
+            reason
+        );
+        
+        let output = std::process::Command::new("powershell")
+            .args(["-Command", &cmd])
+            .output()
+            .map_err(|e| e.to_string())?;
+        
+        let verified = String::from_utf8_lossy(&output.stdout).trim() == "True";
+        if verified {
+            let mut session = BIOMETRIC_SESSION.lock().unwrap();
+            *session = Some(chrono::Local::now());
+        }
+        Ok(verified)
+    }
+    #[cfg(not(target_os = "windows"))]
+    { Ok(true) } // Simulation fallback for non-windows
+}
+
+#[tauri::command]
+async fn is_biometric_session_valid() -> bool {
+    let session = BIOMETRIC_SESSION.lock().unwrap();
+    if let Some(timestamp) = *session {
+        let now = chrono::Local::now();
+        let diff = now.signed_duration_since(timestamp);
+        return diff.num_minutes() < 5;
+    }
+    false
+}
+
 static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -3343,6 +3398,9 @@ pub fn run() {
             receive_neural_mirror,
             resuscitate_ghost_snapshot,
             derive_mitigation_macro,
+            check_biometric_status,
+            trigger_biometric_scan,
+            is_biometric_session_valid,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
