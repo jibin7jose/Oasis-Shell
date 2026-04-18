@@ -51,6 +51,7 @@ import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
 import { StoragePanel } from "./components/panels/StoragePanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { SpectralBoundary } from "./components/shared/SpectralBoundary";
+import { GhostOverlay } from "./components/shared/GhostOverlay";
 
 
 // Design Utility
@@ -4027,6 +4028,9 @@ export default function App() {
         isSaving={isSavingCrate}
       />
       <VisionaryLattice points={latticePoints} show={true} />
+      <SpectralBoundary fallbackTitle="Ghost Manifest Breach">
+        <GhostOverlay />
+      </SpectralBoundary>
     </div>
   );
 }

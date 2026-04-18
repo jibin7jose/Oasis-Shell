@@ -312,6 +312,7 @@ pub struct ChronosSnapshot {
     pub links: Vec<serde_json::Value>,
     pub metrics: Option<VentureMetrics>,
     pub market: Option<MarketIntelligence>,
+    pub windows: Vec<serde_json::Value>,
     pub integrity: f32,
     pub entropy_index: f32,
 }
@@ -466,6 +467,7 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
             links: data["links"].as_array().cloned().unwrap_or_default(),
             metrics: serde_json::from_value(data["metrics"].clone()).ok(),
             market: serde_json::from_value(data["market"].clone()).ok(),
+            windows: data["windows"].as_array().cloned().unwrap_or_default(),
             integrity,
             entropy_index: 0.0,
         })
@@ -479,6 +481,12 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
     }
     
     Ok(history)
+}
+
+#[tauri::command]
+async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Result<String, String> {
+    system::set_window_layout(windows).await?;
+    Ok("Temporal Resuscitation Complete: Ghost Layout manifested on Physical OS.".into())
 }
 
 static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
@@ -3287,6 +3295,7 @@ pub fn run() {
             get_risk_simulations,
             invoke_neural_mirror,
             receive_neural_mirror,
+            resuscitate_ghost_snapshot,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

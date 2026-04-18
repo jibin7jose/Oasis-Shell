@@ -10,6 +10,7 @@ export interface ChronosSnapshot {
   links: any[];
   metrics: FounderMetrics | null;
   market: any | null;
+  windows: any[];
   integrity: number;
 }
 

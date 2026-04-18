@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSystemStore, ChronosSnapshot } from "../../lib/systemStore";
 import { cn } from "../../lib/utils";
 import { invokeSafe } from "../../lib/tauri";
-import { FileText, Clock, HardDrive, Share2, Sparkles, X, Search, Zap, BrainCircuit } from "lucide-react";
+import { FileText, Clock, HardDrive, Share2, Sparkles, X, Search, Zap, BrainCircuit, RotateCcw, Ghost } from "lucide-react";
 
 const CortexHUD: React.FC = () => {
   const {
@@ -71,6 +71,19 @@ const CortexHUD: React.FC = () => {
       setShowCortex(false); // Close to view synthesis
     } catch (err) {
       setNotification("Neuralization Failure. Check LLM Bridge.");
+    }
+  };
+
+  const handleResuscitate = async () => {
+    if (travelIndex < 0 || !chronosHistory[travelIndex]) return;
+    try {
+      setNotification("Initiating Temporal Resuscitation...");
+      const snap = chronosHistory[travelIndex];
+      await invokeSafe("resuscitate_ghost_snapshot", { windows: snap.windows || [] });
+      setNotification("System Resuscitation Complete: Windows manifest restored.");
+      logEvent(`System Resuscitation Manifested for snapshot vector ${snap.timestamp}`, "system");
+    } catch (err) {
+      setNotification("Resuscitation Failure: OS Link Refused.");
     }
   };
 
@@ -230,6 +243,17 @@ const CortexHUD: React.FC = () => {
                     <span className="text-[9px] font-black text-slate-600 uppercase">Live</span>
                     <span className="text-[9px] font-black text-slate-600 uppercase">Archival Origin</span>
                   </div>
+                  {isTimeTraveling && (
+                    <div className="mt-8 flex justify-center">
+                       <button 
+                         onClick={handleResuscitate}
+                         className="px-10 py-4 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-amber-900/40 flex items-center gap-3 group"
+                       >
+                         <RotateCcw size={16} className="group-hover:rotate-[-180deg] transition-transform duration-500" />
+                         Resuscitate System State
+                       </button>
+                    </div>
+                  )}
                 </div>
               )}
 
