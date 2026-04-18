@@ -60,6 +60,7 @@ import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
 import { RealityBridge } from "./components/shared/RealityBridge";
+import { SandboxHUD } from "./components/shared/SandboxHUD";
 
 
 // Design Utility
@@ -149,6 +150,7 @@ export default function App() {
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [realityBridgeOpen, setRealityBridgeOpen] = useState(false);
   const [realityBridgeQuery, setRealityBridgeQuery] = useState("");
+  const [sandboxOpen, setSandboxOpen] = useState(false);
 
   const [activeContext, setActiveContext] = useState('dev');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -2376,6 +2378,11 @@ export default function App() {
         handleRealityBridgeSynthesis(commandQuery);
         return;
     }
+    if (id === 'sandbox') {
+        setSandboxOpen(true);
+        setCommandOpen(false);
+        return;
+    }
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
@@ -2450,7 +2457,6 @@ export default function App() {
         shellMode === 'command' ? "bg-black/60 backdrop-blur-sm" : "bg-transparent",
         (hardwareStatus?.focus_mode || "").includes("Survival") ? "grayscale-lockdown" : ""
       )}
- Arkansas Arkansas
     >
       <RefractionManager />
       {!isTauri && (
@@ -4139,13 +4145,8 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+      <SandboxHUD isOpen={sandboxOpen} onClose={() => setSandboxOpen(false)} />
     </motion.div>
- Arkansas Arkansas
   );
-}
-
-
-
-
 
 

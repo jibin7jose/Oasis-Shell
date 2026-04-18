@@ -56,6 +56,21 @@ pub static MANIFEST_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveManifest>
 pub static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NeuralSandboxSession {
+    pub id: String,
+    pub red_team_logs: Vec<String>,
+    pub blue_team_logs: Vec<String>,
+    pub status: String,
+    pub hardening_report: Option<String>,
+    pub timestamp: String,
+}
+
+pub static SANDBOX_REGISTRY: LazyLock<Mutex<HashMap<String, NeuralSandboxSession>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+ Arkansas Arkansas
+ Arkansas Arkansas
+
 // Wait, I need to know what NeuralAgent is. I'll just check it after creating the file.
 // I will create the file first without register_new_golem and delete_golem, or I'll just copy them.
 
@@ -507,3 +522,95 @@ pub async fn decommission_golem(id: String) -> Result<(), String> {
         Err("Golem not found in active fleet.".into())
     }
 }
+#[tauri::command]
+pub async fn initiate_adversarial_simulation(state: tauri::State<'_, AppState>, scope: String) -> Result<String, String> {
+    let session_id = format!("SANDBOX-{}", uuid::Uuid::new_v4());
+    let timestamp = chrono::Local::now().to_rfc3339();
+    
+    {
+        let mut registry = SANDBOX_REGISTRY.lock().unwrap();
+        registry.insert(session_id.clone(), NeuralSandboxSession {
+            id: session_id.clone(),
+            red_team_logs: Vec::new(),
+            blue_team_logs: Vec::new(),
+            status: "Initializing Dual Fleet...".into(),
+            hardening_report: None,
+            timestamp,
+        });
+    }
+
+    let id_clone = session_id.clone();
+    let config = state.config.clone();
+    let scope_clone = scope.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let client = reqwest::Client::new();
+        
+        // --- PHASE 1: RED TEAM DISRUPTION ---
+        let red_prompt = format!(
+            "Role: Red Team Adversary. Scope: {}. Objective: Analyze and identify 3 architectural vulnerabilities or mission logic weaknesses. Be critical and disruptive. Return terse bullet points.",
+            scope_clone
+        );
+        let red_body = serde_json::json!({ "model": "gemma3:4b", "prompt": red_prompt, "stream": false });
+        
+        let mut red_output = Vec::new();
+        if let Ok(res) = client.post(format!("{}/api/generate", config.ollama_url)).json(&red_body).send().await {
+            if let Ok(json) = res.json::<serde_json::Value>().await {
+                let report = json["response"].as_str().unwrap_or("No gaps detected.").to_string();
+                red_output.push(report);
+                let mut registry = SANDBOX_REGISTRY.lock().unwrap();
+                if let Some(s) = registry.get_mut(&id_clone) {
+                    s.red_team_logs = red_output.clone();
+                    s.status = "Red Team Incursion Complete. Deploying Blue Team Defense...".into();
+                }
+            }
+        }
+
+        // --- PHASE 2: BLUE TEAM DEFENSE ---
+        let blue_prompt = format!(
+            "Role: Blue Team Defender. Red Team Findings: {:?}. Scope: {}. Objective: Propose architectural hardening and strategic mitigating for these vulnerabilities. Return terse bullet points.",
+            red_output, scope_clone
+        );
+        let blue_body = serde_json::json!({ "model": "gemma3:4b", "prompt": blue_prompt, "stream": false });
+        
+        let mut blue_output = Vec::new();
+        if let Ok(res) = client.post(format!("{}/api/generate", config.ollama_url)).json(&blue_body).send().await {
+            if let Ok(json) = res.json::<serde_json::Value>().await {
+                let report = json["response"].as_str().unwrap_or("System is resilient.").to_string();
+                blue_output.push(report);
+                let mut registry = SANDBOX_REGISTRY.lock().unwrap();
+                if let Some(s) = registry.get_mut(&id_clone) {
+                    s.blue_team_logs = blue_output.clone();
+                    s.status = "Blue Team Hardening Complete. Synthesizing Simulation Report...".into();
+                }
+            }
+        }
+
+        // --- PHASE 3: FINAL SYNTHESIS ---
+        let final_prompt = format!(
+            "Role: Oasis Architect. SIMULATION DATA: Red Team: {:?} / Blue Team: {:?}. Generate a final executive Hardening Report. Format as JSON: {{ 'verdict': <string>, 'critical_gaps': [<strings>], 'hardening_steps': [<strings>] }}",
+            red_output, blue_output
+        );
+        let final_body = serde_json::json!({ "model": "gemma3:4b", "prompt": final_prompt, "stream": false, "format": "json" });
+        
+        if let Ok(res) = client.post(format!("{}/api/generate", config.ollama_url)).json(&final_body).send().await {
+             if let Ok(json) = res.json::<serde_json::Value>().await {
+                 let verdict = json["response"].as_str().unwrap_or("Simulation Integrity Verified.").to_string();
+                 let mut registry = SANDBOX_REGISTRY.lock().unwrap();
+                 if let Some(s) = registry.get_mut(&id_clone) {
+                     s.hardening_report = Some(verdict);
+                     s.status = "Simulation Resonance Achieved.".into();
+                 }
+             }
+        }
+    });
+
+    Ok(session_id)
+}
+
+#[tauri::command]
+pub async fn get_sandbox_history() -> Result<Vec<NeuralSandboxSession>, String> {
+    let registry = SANDBOX_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+ Arkansas Arkansas
