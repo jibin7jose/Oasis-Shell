@@ -61,6 +61,7 @@ import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
 import { RealityBridge } from "./components/shared/RealityBridge";
 import { SandboxHUD } from "./components/shared/SandboxHUD";
+import { KernelForge } from "./components/shared/KernelForge";
 
 
 // Design Utility
@@ -151,6 +152,8 @@ export default function App() {
   const [realityBridgeOpen, setRealityBridgeOpen] = useState(false);
   const [realityBridgeQuery, setRealityBridgeQuery] = useState("");
   const [sandboxOpen, setSandboxOpen] = useState(false);
+  const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
+  const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
 
   const [activeContext, setActiveContext] = useState('dev');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -2373,6 +2376,17 @@ export default function App() {
     }
   };
 
+  const handleInitiateKernelReForge = async (sessionId: string) => {
+    try {
+        const proposal = await invokeSafe("manifest_kernel_mutation", { session_id: sessionId, target_file: "lib.rs" });
+        setActiveMutationProposal(proposal);
+        setKernelForgeOpen(true);
+        setSandboxOpen(false);
+    } catch (e) {
+        setNotification(`Kernel Manifest Breach: ${e}`);
+    }
+  };
+
   const handlePaletteAction = async (id: string) => {
     if (id === 'reality-bridge') {
         handleRealityBridgeSynthesis(commandQuery);
@@ -2803,7 +2817,7 @@ export default function App() {
           {activeView === 'settings' && (
             <SpectralBoundary fallbackTitle="Settings Core Breach">
               <SettingsPanel />
-            </SpectralBoundary>
+            </SettingsPanel>
           )}
 
           {activeView === 'dash' && (
@@ -4145,8 +4159,11 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-      <SandboxHUD isOpen={sandboxOpen} onClose={() => setSandboxOpen(false)} />
+      <SandboxHUD 
+        isOpen={sandboxOpen} 
+        onClose={() => setSandboxOpen(false)} 
+        onInitiateMutation={handleInitiateKernelReForge}
+      />
+      <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>
   );
-
-

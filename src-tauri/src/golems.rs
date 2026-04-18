@@ -613,4 +613,73 @@ pub async fn get_sandbox_history() -> Result<Vec<NeuralSandboxSession>, String> 
     let registry = SANDBOX_REGISTRY.lock().unwrap();
     Ok(registry.values().cloned().collect())
 }
+#[tauri::command]
+pub async fn manifest_kernel_mutation(state: tauri::State<'_, AppState>, session_id: String, target_file: String) -> Result<GolemProposal, String> {
+    // 1. Read Sandbox Report
+    let report = {
+        let registry = SANDBOX_REGISTRY.lock().unwrap();
+        registry.get(&session_id).and_then(|s| s.hardening_report.clone()).ok_or("The targeted Sandbox Hardening Report has not been manifested.")?
+    };
+
+    // 2. Security Gate: Path Validation
+    if target_file.contains("..") || target_file.contains("/") || target_file.contains("\\") {
+        return Err("Strategic Protocol Breach: Path traversal detected. Mutate only within the local /src/ context.".into());
+    }
+
+    // 3. Read Source Code
+    let full_path = format!("src/{}", target_file);
+    let original_content = std::fs::read_to_string(format!("src-tauri/{}", full_path)).map_err(|e| e.to_string())?;
+
+    // 4. Recursive Synthesis via Gemma3
+    let prompt = format!(
+        "Role: Recursive Kernel Architect. \n\
+        HARDENING CONTEXT: {} \n\
+        TARGET FILE: {} \n\
+        CURRENT SOURCE: \n```rust\n{}\n``` \n\n\
+        ACTION: Rewrite the provided Rust source code to implement the hardening steps. \n\
+        Maintain total structural integrity. Do NOT remove existing logic unless instructed. \n\
+        Return ONLY the full updated code block. No explanations.",
+        report, target_file, original_content
+    );
+
+    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let client = reqwest::Client::new();
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let resp_str = json["response"].as_str().unwrap_or("").trim_matches('`').replace("rust", "").trim().to_string();
+
+    let proposal = GolemProposal {
+        id: format!("RECURSIVE-{}", uuid::Uuid::new_v4()),
+        task_id: session_id,
+        agent_name: "Kernel-Architect-Gemma3".into(),
+        file_path: format!("src-tauri/src/{}", target_file),
+        title: format!("Kernel Re-Forge: {}", target_file),
+        original_content,
+        proposed_content: resp_str,
+        rationale: format!("Manifested via Neural Sandbox Hardening cycle for session {}.", target_file),
+        status: "pending".into(),
+    };
+
+    Ok(proposal)
+}
+
+#[tauri::command]
+pub async fn validate_kernel_integrity() -> Result<String, String> {
+    let output = std::process::Command::new("cargo")
+        .args(["check"])
+        .current_dir("src-tauri")
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok("Kernel Integrity Verified: Zero compilation errors detected across the recursive layer.".into())
+    } else {
+        Err(format!("Kernel Integrity Breach: Compilation failures found within the proposed mutation.\n{}", String::from_utf8_lossy(&output.stderr)))
+    }
+}
  Arkansas Arkansas

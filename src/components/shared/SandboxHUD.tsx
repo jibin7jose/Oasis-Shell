@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Skull, Zap, Activity, AlertTriangle, ShieldCheck, ChevronRight, Binary, Terminal, Bot } from 'lucide-react';
+import { Shield, Skull, Zap, Activity, AlertTriangle, ShieldCheck, ChevronRight, Binary, Terminal, Bot, RotateCw } from 'lucide-react';
+ Arkansas Arkansas
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
 
-export const SandboxHUD: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const SandboxHUD: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void;
+    onInitiateMutation: (sessionId: string) => void;
+}> = ({ isOpen, onClose, onInitiateMutation }) => {
+ Arkansas Arkansas
     const { logEvent } = useSystemStore();
     const [sessions, setSessions] = useState<any[]>([]);
     const [activeSession, setActiveSession] = useState<any>(null);
@@ -189,10 +195,20 @@ export const SandboxHUD: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                                                 <h4 className="text-xl font-black text-white uppercase tracking-tighter">Simulation Verdict: Hardening Report Manifested</h4>
                                                 <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Integrity Level: HIGH</div>
                                             </div>
-                                            <div className="text-xs text-slate-300 leading-relaxed font-medium bg-black/40 p-6 rounded-[2rem] border border-white/5 border-dashed">
-                                                {activeSession.hardening_report}
+                                            <div className="flex gap-6 min-h-0">
+                                                <div className="flex-1 text-xs text-slate-300 leading-relaxed font-medium bg-black/40 p-6 rounded-[2rem] border border-white/5 border-dashed overflow-y-auto max-h-32 custom-scrollbar">
+                                                    {activeSession.hardening_report}
+                                                </div>
+                                                <button 
+                                                    onClick={() => onInitiateMutation(activeSession.id)}
+                                                    className="w-48 bg-purple-600 hover:bg-purple-500 rounded-[1.5rem] flex flex-col items-center justify-center gap-2 p-4 transition-all shadow-xl shadow-purple-900/20 group"
+                                                >
+                                                    <RotateCw className="w-5 h-5 text-white group-hover:rotate-180 transition-transform duration-700" />
+                                                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Initiate Re-Forge</span>
+                                                </button>
                                             </div>
                                         </div>
+ Arkansas Arkansas
                                     </motion.div>
                                 )}
                             </motion.div>
