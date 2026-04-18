@@ -490,6 +490,36 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
 }
 
 #[tauri::command]
+async fn manifest_chronos_voyage(state: tauri::State<'_, AppState>, timestamp: String) -> Result<serde_json::Value, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT data FROM chronos_history WHERE timestamp = ?1").map_err(|e| e.to_string())?;
+    let data_str: String = stmt.query_row([timestamp], |row| row.get(0)).map_err(|e| e.to_string())?;
+    
+    let snapshot: serde_json::Value = serde_json::from_str(&data_str).map_err(|e| e.to_string())?;
+    
+    // 1. Restore Windows (Physical Shift)
+    if let Some(windows) = snapshot["windows"].as_array() {
+        for win in windows {
+            if let (Some(hwnd_val), Some(x), Some(y), Some(w), Some(h)) = (
+                win["hwnd"].as_u64(),
+                win["position"]["x"].as_i64(),
+                win["position"]["y"].as_i64(),
+                win["size"]["width"].as_i64(),
+                win["size"]["height"].as_i64(),
+            ) {
+                let hwnd = HWND(hwnd_val as *mut _);
+                unsafe {
+                    let _ = SetWindowPos(hwnd, HWND(0 as *mut _), x as i32, y as i32, w as i32, h as i32, SWP_NOZORDER | SWP_SHOWWINDOW);
+                }
+            }
+        }
+    }
+
+    Ok(snapshot)
+}
+ Arkansas Arkansas
+
+#[tauri::command]
 async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Result<String, String> {
     system::set_window_layout(windows).await?;
     Ok("Temporal Resuscitation Complete: Ghost Layout manifested on Physical OS.".into())
@@ -3759,6 +3789,7 @@ pub fn run() {
             golems::decommission_golem,
             golems::manifest_architectural_blueprint,
             golems::get_architectural_manifests,
+            manifest_chronos_voyage,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

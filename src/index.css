@@ -17,7 +17,13 @@
   --background-accent: #6366f1;
   --aura-glow: rgba(99, 102, 241, 0.4);
 
-  transition: --accent-primary 0.8s ease, --accent-glow 0.8s ease;
+  /* REFRACTION SYSTEM */
+  --refraction-blur: 32px;
+  --refraction-saturation: 100%;
+  --refraction-border-opacity: 0.08;
+  --refraction-grain: 0;
+  
+  transition: --accent-primary 0.8s ease, --accent-glow 0.8s ease, --refraction-blur 0.8s ease;
 }
 
 body {
@@ -39,18 +45,21 @@ body {
   border-radius: 10px;
 }
 
-/* Glassmorphism Utilities */
+/* Refractive Glassmorphism */
 .glass {
   background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(var(--refraction-blur)) saturate(var(--refraction-saturation));
+  border: 1px solid rgba(255, 255, 255, var(--refraction-border-opacity));
+  transition: all 0.8s ease;
 }
 
 .glass-bright {
   background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(32px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(var(--refraction-blur)) saturate(var(--refraction-saturation));
+  border: 1px solid rgba(255, 255, 255, calc(var(--refraction-border-opacity) * 1.5));
+  transition: all 0.8s ease;
 }
+ Arkansas Arkansas
 
 .neon-border {
   border-color: var(--aura-glow);

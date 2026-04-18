@@ -57,6 +57,8 @@ import { GlobalTerminal } from "./components/shared/GlobalTerminal";
 import { CollectivePanel } from "./components/panels/CollectivePanel";
 import { HatcheryPanel } from "./components/panels/HatcheryPanel";
 import { BlueprintPanel } from "./components/panels/BlueprintPanel";
+import { ChronosHUD } from "./components/shared/ChronosHUD";
+import { RefractionManager } from "./components/shared/RefractionManager";
 
 
 // Design Utility
@@ -2401,6 +2403,7 @@ export default function App() {
         (hardwareStatus?.focus_mode || "").includes("Survival") ? "grayscale-lockdown" : ""
       )}
     >
+      <RefractionManager />
       {!isTauri && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2600] px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-black uppercase tracking-widest text-amber-300">
           Browser Dev Mode: Tauri Disabled
@@ -4077,6 +4080,7 @@ export default function App() {
       <CollectivePanel isOpen={showCollective} onClose={() => setShowCollective(false)} />
       <HatcheryPanel isOpen={showHatchery} onClose={() => setShowHatchery(false)} />
       <BlueprintPanel isOpen={showBlueprint} onClose={() => setShowBlueprint(false)} />
+      <ChronosHUD />
     </motion.div>
   );
 }
