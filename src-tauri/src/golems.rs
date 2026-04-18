@@ -18,6 +18,8 @@ pub struct GolemTask {
     pub mission: Option<String>,
     pub thought_trace: Option<String>,
     pub is_autonomous: bool,
+    pub evolution_history: Vec<String>,
+    pub evolution_count: u32,
 }
 
 pub static GOLEM_REGISTRY: LazyLock<Mutex<HashMap<String, GolemTask>>> =
@@ -302,6 +304,8 @@ pub async fn hatch_autonomous_golem(state: tauri::State<'_, AppState>, name: Str
             mission: Some(mission.clone()),
             thought_trace: Some("I am manifesting my digital form.".into()),
             is_autonomous: true,
+            evolution_history: Vec::new(),
+            evolution_count: 0,
         });
     }
 
@@ -349,7 +353,56 @@ pub async fn hatch_autonomous_golem(state: tauri::State<'_, AppState>, name: Str
 
             // Pulse interval (Resources conservation)
             tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+            // --- SELF-EVOLUTION PHASE (Every 5th Pulse) ---
+            let current_count = {
+                let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                if let Some(task) = registry.get_mut(&id_clone) {
+                    task.evolution_count += 1;
+                    task.evolution_count
+                } else { 0 }
+            };
+
+            if current_count % 5 == 0 {
+                let current_mission = {
+                    let registry = GOLEM_REGISTRY.lock().unwrap();
+                    registry.get(&id_clone).and_then(|t| t.mission.clone()).unwrap_or_default()
+                };
+                let current_trace = {
+                    let registry = GOLEM_REGISTRY.lock().unwrap();
+                    registry.get(&id_clone).and_then(|t| t.thought_trace.clone()).unwrap_or_default()
+                };
+
+                let evolution_prompt = format!(
+                    "Role: Meta-Intelligence Architect. 
+                     Subject: Golem {}.
+                     Original Mission: {}.
+                     Latest Thinking: {}.
+                     ACTION: Evaluate the subject's efficiency. Should the mission evolve to be more sharp, granular, or aggressive? 
+                     Return only the NEW mission string, or 'STABLE' if no drift is required. 
+                     Terse, executive response only.",
+                     name_clone, current_mission, current_trace
+                );
+
+                let evo_body = serde_json::json!({ "model": "gemma3:4b", "prompt": evolution_prompt, "stream": false });
+                if let Ok(res) = client.post(format!("{}/api/generate", config.ollama_url)).json(&evo_body).send().await {
+                    if let Ok(json) = res.json::<serde_json::Value>().await {
+                        let proposal = json["response"].as_str().unwrap_or("STABLE").trim().to_string();
+                        if proposal != "STABLE" && proposal.len() > 5 {
+                            let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                            if let Some(task) = registry.get_mut(&id_clone) {
+                                let old_mission = task.mission.clone().unwrap_or_default();
+                                task.mission = Some(proposal.clone());
+                                task.evolution_history.push(format!("Evolution {}: Mission re-forged from [{}] to [{}]. Reason: Dynamic strategic shift.", current_count / 5, old_mission, proposal));
+                                task.status = "Mission Re-Forged (Autonomous Evolution)".into();
+                                task.aura = "purple".into(); // Evolution aura
+                            }
+                        }
+                    }
+                }
+            }
         }
+ Arkansas Arkansas
 
         // Cleanup on death
         let mut registry = GOLEM_REGISTRY.lock().unwrap();

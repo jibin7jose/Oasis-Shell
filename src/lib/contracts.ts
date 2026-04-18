@@ -60,6 +60,11 @@ export interface GolemTask {
   status: string;
   progress: number;
   aura: string; // emerald, amber, rose, indigo
+  mission?: string;
+  thought_trace?: string;
+  is_autonomous?: boolean;
+  evolution_history?: string[];
+  evolution_count?: number;
 }
 
 export interface StrategicMacro {

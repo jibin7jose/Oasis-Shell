@@ -59,6 +59,7 @@ import { HatcheryPanel } from "./components/panels/HatcheryPanel";
 import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
+import { RealityBridge } from "./components/shared/RealityBridge";
 
 
 // Design Utility
@@ -142,12 +143,12 @@ export default function App() {
     showBlueprint, setShowBlueprint,
     shellMode, setShellMode,
   } = useSystemStore();
- Arkansas Arkansas
- Arkansas Arkansas
 
   useHeuristicGuardian();
 
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [realityBridgeOpen, setRealityBridgeOpen] = useState(false);
+  const [realityBridgeQuery, setRealityBridgeQuery] = useState("");
 
   const [activeContext, setActiveContext] = useState('dev');
   const [commandOpen, setCommandOpen] = useState(false);
@@ -2354,7 +2355,27 @@ export default function App() {
     }
   };
 
+  const handleRealityBridgeSynthesis = async (query: string) => {
+    setRealityBridgeQuery(query);
+    setRealityBridgeOpen(true);
+    setCommandOpen(false);
+    try {
+        const result = await invokeSafe("manifest_reality_bridge_thought", { query });
+        // The RealityBridge component listens for the completion
+        // But we cast it into the UI via an event or direct state if needed
+        // For simplicity, we can just emit a local complete event if we don't have a listener for result
+           window.dispatchEvent(new CustomEvent('reality-bridge-complete', { detail: result }));
+    } catch (e) {
+        setNotification("Reality Bridge Collapse: Synthesis failed.");
+        setRealityBridgeOpen(false);
+    }
+  };
+
   const handlePaletteAction = async (id: string) => {
+    if (id === 'reality-bridge') {
+        handleRealityBridgeSynthesis(commandQuery);
+        return;
+    }
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
@@ -4109,7 +4130,17 @@ export default function App() {
       <HatcheryPanel isOpen={showHatchery} onClose={() => setShowHatchery(false)} />
       <BlueprintPanel isOpen={showBlueprint} onClose={() => setShowBlueprint(false)} />
       <ChronosHUD />
+      <AnimatePresence>
+        {realityBridgeOpen && (
+          <RealityBridge 
+            isOpen={realityBridgeOpen} 
+            onClose={() => setRealityBridgeOpen(false)} 
+            query={realityBridgeQuery}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
+ Arkansas Arkansas
   );
 }
 

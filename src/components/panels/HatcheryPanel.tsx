@@ -189,10 +189,34 @@ export const HatcheryPanel: React.FC<{ isOpen: boolean; onClose: () => void }> =
                                                     <MessageSquare className="w-3 h-3" />
                                                     <span className="text-[9px] font-black uppercase tracking-widest">Current Thought Trace</span>
                                                 </div>
-                                                <div className="text-[11px] text-slate-300 font-mono leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5">
+                                                <div className="text-[11px] text-slate-300 font-mono leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5 relative overflow-hidden group">
+                                                    {golem.evolution_count > 0 && (
+                                                        <motion.div 
+                                                            animate={{ opacity: [0.1, 0.3, 0.1] }}
+                                                            transition={{ duration: 2, repeat: Infinity }}
+                                                            className="absolute inset-0 bg-purple-500/10 pointer-events-none"
+                                                        />
+                                                    )}
                                                     {golem.thought_trace || "Initializing neural pathways..."}
                                                 </div>
                                             </div>
+
+                                            {golem.evolution_history && golem.evolution_history.length > 0 && (
+                                                <div className="p-5 rounded-2xl bg-purple-500/5 border border-purple-500/10 space-y-3">
+                                                    <div className="flex items-center gap-2 text-purple-400">
+                                                        <Activity className="w-3 h-3" />
+                                                        <span className="text-[9px] font-black uppercase tracking-widest">Evolution History ({golem.evolution_count})</span>
+                                                    </div>
+                                                    <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                                                        {golem.evolution_history.map((evo: string, i: number) => (
+                                                            <div key={i} className="text-[10px] text-slate-500 leading-tight p-2 bg-white/5 rounded-lg border border-white/5">
+                                                                {evo}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+ Arkansas Arkansas
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>
