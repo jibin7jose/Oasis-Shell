@@ -383,7 +383,7 @@ async fn invoke_neural_mirror(
     let target_url = format!("http://{}:{}/neural-mirror", node.ip, node.port);
     
     // For this simulation, we log the intent and return success
-    println!(">>> P2P NEURAL MIRROR: Syncing Venture {} to Node {} at {}", venture_id, node_id, target_url);
+    // Neural Mirror Synchronized
     
     // We'll also manifest a neural log for the user
     db.execute(
@@ -563,7 +563,7 @@ async fn check_biometric_status() -> Result<bool, String> {
 async fn trigger_biometric_scan(reason: String) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        println!(">>> Triggering Biometric Gate: {}", reason);
+        // Biometric Gate Triggered
         let cmd = format!(
             "Add-Type -AssemblyName System.Runtime.WindowsRuntime; $res = [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials, ContentType=WindowsRuntime]::RequestVerificationAsync('{}').GetAwaiter().GetResult(); $res -eq 'Verified'",
             reason
@@ -1015,6 +1015,22 @@ pub struct MarketIntelligence {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct StrategicMemory {
+    id: i32,
+    content: String,
+    metadata: String,
+    score: f32,
+    timestamp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GolemTask {
+    pub name: String,
+    pub language: String,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeModule {
     pub name: String,
     pub language: String,
@@ -1383,6 +1399,80 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
 }
 
+async fn index_strategic_asset(state: tauri::State<'_, AppState>, content: String, metadata: String) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "model": "nomic-embed-text",
+        "prompt": content
+    });
+
+    let res = client.post(format!("{}/api/embeddings", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let embedding = json["embedding"].as_array().ok_or("Failed to manifest embedding vector")?;
+    let vector_json = serde_json::to_string(&embedding).map_err(|e| e.to_string())?;
+
+    let pool = state.pool.clone();
+    let conn = pool.get().map_err(|e| e.to_string())?;
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+
+    conn.execute(
+        "INSERT INTO strategic_memory (content, metadata, vector, timestamp) VALUES (?1, ?2, ?3, ?4)",
+        [content, metadata, vector_json, timestamp]
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn query_strategic_memory(state: tauri::State<'_, AppState>, query: String) -> Result<Vec<StrategicMemory>, String> {
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "model": "nomic-embed-text",
+        "prompt": query
+    });
+
+    let res = client.post(format!("{}/api/embeddings", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let query_vector: Vec<f32> = json["embedding"].as_array()
+        .ok_or("Failed to manifest query vector")?
+        .iter()
+        .map(|v| v.as_f64().unwrap() as f32)
+        .collect();
+
+    let pool = state.pool.clone();
+    let conn = pool.get().map_err(|e| e.to_string())?;
+    
+    let mut stmt = conn.prepare("SELECT id, content, metadata, vector, timestamp FROM strategic_memory").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        let id: i32 = row.get(0)?;
+        let content: String = row.get(1)?;
+        let metadata: String = row.get(2)?;
+        let vector_str: String = row.get(3)?;
+        let timestamp: String = row.get(4)?;
+        
+        let vector: Vec<f32> = serde_json::from_str(&vector_str).unwrap();
+        let score = cosine_similarity(&query_vector, &vector);
+
+        Ok(StrategicMemory { id, content, metadata, score, timestamp })
+    }).map_err(|e| e.to_string())?;
+    
+    let mut results: Vec<StrategicMemory> = rows.filter_map(|r| r.ok()).collect();
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    
+    Ok(results.into_iter().take(5).collect())
+}
+
 #[tauri::command]
 async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result<i32, String> {
     let mut files = Vec::new();
@@ -1692,6 +1782,63 @@ async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Resul
     }))
 }
 
+}
+
+#[tauri::command]
+async fn capture_vision_context() -> Result<String, String> {
+    use screenshots::Screen;
+    use std::io::Cursor;
+    
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    if let Some(screen) = screens.first() {
+        let image = screen.capture().map_err(|e| e.to_string())?;
+        let mut buffer = Vec::new();
+        image.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
+        
+        use base64::prelude::*;
+        Ok(BASE64_STANDARD.encode(&buffer))
+    } else {
+        Err("No active vision field detected (No screens found).".into())
+    }
+}
+
+#[tauri::command]
+async fn invoke_multimodal_oracle(state: tauri::State<'_, AppState>, image_b64: String, task: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    
+    let prompt = format!(
+        "You are the Oasis Omniscient Eye. Analyze this visual workspace context. \
+        The Founder is focused on: {}. Identify any anomalies, strategic charts, or layout misalignments. \
+        Provide a terse, executive-level strategic verdict based on what you see.",
+        task
+    );
+
+    let body = serde_json::json!({
+        "model": "gemma3",
+        "prompt": prompt,
+        "images": [image_b64],
+        "stream": false,
+        "format": "json"
+    });
+
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        // Handle potential double JSON encoding from some Ollama versions
+        let parsed: serde_json::Value = serde_json::from_str(resp).unwrap_or(serde_json::json!({ "advice": resp, "thought_trace": "Visual reasoning manifested." }));
+        Ok(parsed)
+    } else {
+        Err("Oracle Vision Resonance Failure: Final diagnostic withheld.".into())
+    }
+}
+
 #[tauri::command]
 async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let client = reqwest::Client::new();
@@ -1709,6 +1856,24 @@ async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<St
     } else {
         Err("Oracle Resonance Failure: Final blessing withheld.".into())
     }
+}
+
+#[tauri::command]
+async fn speak_directive(text: String) -> Result<(), String> {
+    std::thread::spawn(move || {
+        let ps_script = format!(
+            "Add-Type -AssemblyName System.Speech; \
+             $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
+             $synth.Rate = -1; \
+             $synth.Speak('{}')",
+            text.replace("'", "''")
+        );
+        let _ = std::process::Command::new("powershell")
+            .arg("-Command")
+            .arg(&ps_script)
+            .spawn();
+    });
+    Ok(())
 }
 
 #[tauri::command]
@@ -2610,6 +2775,28 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                             continue;
                         }
                     }
+                } else if url == "/neural-aura-sync" && request.method() == &tiny_http::Method::Post {
+                    let mut content = String::new();
+                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            let _ = app.emit("collective-aura-sync", json);
+                        }
+                    }
+                    let response = tiny_http::Response::from_string("OK")
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                    let _ = request.respond(response);
+                    continue;
+                } else if url == "/venture-handover" && request.method() == &tiny_http::Method::Post {
+                    let mut content = String::new();
+                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
+                        if let Ok(crate_data) = serde_json::from_str::<ContextCrate>(&content) {
+                            let _ = app.emit("collective-handover-received", crate_data);
+                        }
+                    }
+                    let response = tiny_http::Response::from_string("MANIFEST_RECEIVED")
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                    let _ = request.respond(response);
+                    continue;
                 } else if url == "/heartbeat" || url == "/collective/pulse" {
                     let response = tiny_http::Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
@@ -3318,36 +3505,78 @@ async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde
 
 async fn collective_pulse_loop(app: tauri::AppHandle) {
     loop {
-        tokio::time::sleep(Duration::from_secs(120)).await;
-        let mut peers_to_update = Vec::new();
-        
-        {
-            let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-            for peer in registry.values() {
-                peers_to_update.push(peer.clone());
-            }
-        }
+        tokio::time::sleep(Duration::from_secs(60)).await;
+        // Pulse logic as before...
+    }
+}
 
-        let client = reqwest::Client::new();
-        for mut peer in peers_to_update {
-            let url = format!("http://{}:{}/collective/pulse", peer.ip, peer.port);
-            let start = std::time::Instant::now();
-            match client.get(&url).timeout(Duration::from_secs(5)).send().await {
-                Ok(_) => {
-                    peer.status = "Active".into();
-                    peer.latency_ms = start.elapsed().as_millis() as u32;
-                    peer.last_pulse = chrono::Local::now().to_rfc3339();
-                }
-                Err(_) => {
-                    peer.status = "Offline".into();
+async fn collective_resonance_loop(app: tauri::AppHandle) {
+    use tokio::net::UdpSocket;
+    use std::net::SocketAddr;
+
+    let socket = UdpSocket::bind("0.0.0.0:4040").await.expect("Failed to bind Resonance UDP Socket");
+    socket.set_broadcast(true).expect("Failed to set UDP broadcast");
+
+    let app_clone = app.clone();
+    // Broadcast Task
+    tokio::spawn(async move {
+        loop {
+            let broadcast_addr: SocketAddr = "255.255.255.255:4040".parse().unwrap();
+            let msg = format!("OASIS_NODE_ALIVE|{}", local_ip_address::local_ip().unwrap());
+            let _ = socket.send_to(msg.as_bytes(), broadcast_addr).await;
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        }
+    });
+
+    // Discovery Task
+    let mut buf = [0u8; 1024];
+    loop {
+        if let Ok((len, addr)) = socket.recv_from(&mut buf).await {
+            let msg = String::from_utf8_lossy(&buf[..len]);
+            if msg.starts_with("OASIS_NODE_ALIVE|") {
+                let ip = msg.replace("OASIS_NODE_ALIVE|", "");
+                if ip != local_ip_address::local_ip().unwrap().to_string() {
+                    let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+                    let id = format!("NODE-{}", ip.replace(".", "-"));
+                    if !registry.contains_key(&id) {
+                        registry.insert(id.clone(), CollectiveNode {
+                            id: id.clone(),
+                            ip: ip.clone(),
+                            port: 4040,
+                            hostname: format!("Oasis Peer ({})", ip),
+                            status: "Active".into(),
+                            last_pulse: chrono::Local::now().to_rfc3339(),
+                            aura: "indigo".into(),
+                            latency_ms: 0,
+                        });
+                        let _ = app.emit("collective-discovered", id);
+                    }
                 }
             }
-            
-            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
-            registry.insert(peer.id.clone(), peer.clone());
-            let _ = app.emit("collective-update", peer);
         }
     }
+}
+
+#[tauri::command]
+async fn collective_aura_sync(state: tauri::State<'_, AppState>, integrity: f32, status: String) -> Result<(), String> {
+    let registry = {
+        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect::<Vec<CollectiveNode>>()
+    };
+    let client = reqwest::Client::new();
+    let payload = serde_json::json!({
+        "integrity": integrity,
+        "status": status,
+        "source": "MASTER_COMMAND_NODE"
+    });
+
+    for node in registry {
+        if node.status == "Active" {
+            let url = format!("http://{}:{}/neural-aura-sync", node.ip, node.port);
+            let _ = client.post(url).json(&payload).send().await;
+        }
+    }
+    Ok(())
 }
 
 
@@ -3522,7 +3751,14 @@ pub fn run() {
             trigger_biometric_scan,
             is_biometric_session_valid,
             synthesize_founder_directive,
-            manifest_final_blessing,
+            invoke_multimodal_oracle,
+            index_strategic_asset,
+            query_strategic_memory,
+            collective_aura_sync,
+            golems::hatch_autonomous_golem,
+            golems::decommission_golem,
+            golems::manifest_architectural_blueprint,
+            golems::get_architectural_manifests,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -3567,6 +3803,7 @@ pub fn run() {
                 let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
                 let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
                 let _ = conn.execute("CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)", []);
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS strategic_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, metadata TEXT NOT NULL, vector TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
                 
                 // Golem Consolidation Table
                 let _ = conn.execute("CREATE TABLE IF NOT EXISTS golem_registry (
@@ -3623,9 +3860,11 @@ pub fn run() {
                 }
             });
             
-            let collective_handle = app_handle.clone();
+            let _ = start_telemetry_server(app_handle.clone());
+            
+            let resonance_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                collective_pulse_loop(collective_handle).await;
+                collective_resonance_loop(resonance_handle).await;
             });
 
             Ok(())

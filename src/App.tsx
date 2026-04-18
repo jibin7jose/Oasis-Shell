@@ -54,6 +54,9 @@ import { SpectralBoundary } from "./components/shared/SpectralBoundary";
 import { GhostOverlay } from "./components/shared/GhostOverlay";
 import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
 import { GlobalTerminal } from "./components/shared/GlobalTerminal";
+import { CollectivePanel } from "./components/panels/CollectivePanel";
+import { HatcheryPanel } from "./components/panels/HatcheryPanel";
+import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 
 
 // Design Utility
@@ -136,10 +139,11 @@ export default function App() {
     isVaultAuthenticated, setIsVaultAuthenticated,
     showVault, setShowVault,
     activeView, setActiveView,
-    economicNews, setEconomicNews,
-    ventureIntegrity, setVentureIntegrity,
-    fiscalBurn, setFiscalBurn,
-    marketIntel, setMarketIntel
+    isVisionScanning, visionPreview,
+    showLibrary, setShowLibrary,
+    showCollective, setShowCollective,
+    showHatchery, setShowHatchery,
+    showBlueprint, setShowBlueprint,
   } = useSystemStore();
 
   useHeuristicGuardian();
@@ -151,7 +155,28 @@ export default function App() {
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
   const [isCortexSearching, setIsCortexSearching] = useState(false);
-  const [showAI, setShowAI] = useState(false);
+  useEffect(() => {
+    const unlistenAura = listen("collective-aura-sync", (event: any) => {
+      const { integrity, status, source } = event.payload;
+      setNotification(`Neural Resonance Received: ${source} status is ${status}`);
+      setVentureIntegrity(integrity);
+      logEvent(`Collective Resonance: Synchronized with ${source}`, "neural");
+    });
+
+    const unlistenHandover = listen("collective-handover-received", (event: any) => {
+      const crate = event.payload;
+      setNotification(`Strategic Crate Received via Handover: ${crate.name}`);
+      setCollectiveNodes(prev => prev.map(n => n.id === "HANDOVER" ? { ...n, status: "Syncing" } : n));
+      logEvent(`Venture Handover manifested from remote node`, "deploy");
+    });
+
+    return () => {
+      unlistenAura.then(f => f());
+      unlistenHandover.then(f => f());
+    };
+  }, []);
+
+  const [lastSync, setLastSync] = useState(Date.now());
   const [messages, setMessages] = useState<any[]>([]);
   const [assistantInput, setAssistantInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -2361,9 +2386,18 @@ export default function App() {
   }
 
   return (
-    <div
+    <motion.div
+      animate={{ 
+        x: founderMetrics.stress_color === '#ef4444' ? [-1, 1, -1, 1, 0] : 0,
+        filter: founderMetrics.stress_color === '#ef4444' ? "grayscale(0.5) contrast(1.1)" : "grayscale(0) contrast(1.0)"
+      }}
+      transition={{ 
+        duration: 0.1, 
+        repeat: founderMetrics.stress_color === '#ef4444' ? Infinity : 0,
+        repeatType: "reverse"
+      }}
       className={cn(
-        "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000",
+        "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000 h-screen",
         (hardwareStatus?.focus_mode || "").includes("Survival") ? "grayscale-lockdown" : ""
       )}
     >
@@ -4037,7 +4071,13 @@ export default function App() {
         <GhostOverlay />
       </SpectralBoundary>
       <GlobalTerminal />
-    </div>
+      <SoundscapeManager />
+      <VisionScanner isScanning={isVisionScanning} imagePreview={visionPreview || undefined} />
+      <LibraryPanel isOpen={showLibrary} onClose={() => setShowLibrary(false)} />
+      <CollectivePanel isOpen={showCollective} onClose={() => setShowCollective(false)} />
+      <HatcheryPanel isOpen={showHatchery} onClose={() => setShowHatchery(false)} />
+      <BlueprintPanel isOpen={showBlueprint} onClose={() => setShowBlueprint(false)} />
+    </motion.div>
   );
 }
 

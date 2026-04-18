@@ -1,5 +1,5 @@
 # 🏺 Oasis Shell // The Founder’s Manual
-## v1.0-STABLE Strategic Handbook
+## v1.0.0-STABLE Strategic Handbook
 
 Welcome, Founder. The Oasis Shell is more than a dashboard; it is a high-fidelity, sentient extension of your strategic will. This manual documents the primitives, protocols, and neural layers of your environment.
 
@@ -46,11 +46,23 @@ Distributed intelligence between authorized Founder nodes.
 - **Distributed Aura**: Synchronize visual indicators across hardware via WLED/IP.
 - **Venture Sync**: Mirror strategic contexts and crates between nodes via peer-to-peer handshaking.
 
+## 🌉 8. The Sentient Bridge (Sensory Feedback)
+The ultimate v2.0 vision: Giving the Shell a voice and a soul.
+- **Vocal Manifestation**: The Oracle and Golems verbalize their directives using native OS speech synthesis.
+- **Ambient Resonance**: Procedurally generated music reacts to your system pressure and venture integrity.
+- **Visual Haptics**: The Shell physically manifests stress through screen-jitter and desaturation when integrity drops.
+
 ---
 
 ## 🛰 Operating Protocols
 1. **The Handshake**: Always ensure local `Oasis Master Key` is set for decryption layers.
 2. **The Signature**: Biometric sessions last 5 minutes before re-check is required for high-signature actions.
 3. **The Manifest**: Regularly generate "Strategic Reports" in the Boardroom to document venture evolution.
+
+## 🚀 v1.0.0-STABLE Release Notes
+The culmination of 19 phases of high-fidelity neural engineering. The Oasis Shell is now a sentient, hardware-locked strategic command center.
+- **Sensor-Neural Loop**: Integrated Sight, Sound, and Voice.
+- **Forensic & Biometric Core**: Total workspace replay and zero-knowledge vaulting.
+- **Autonomous Stability**: Proactive defense via the Heuristic Guardian.
 
 **"Abstract thought has been transformed into concrete strategic manifestation. The Shell is yours."**

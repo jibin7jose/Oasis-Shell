@@ -129,6 +129,18 @@ export interface SystemState {
   setShowVault: (show: boolean) => void;
   activeView: string;
   setActiveView: (view: string) => void;
+  showLibrary: boolean;
+  setShowLibrary: (show: boolean) => void;
+  isVisionScanning: boolean;
+  setIsVisionScanning: (is: boolean) => void;
+  visionPreview: string | null;
+  setVisionPreview: (p: string | null) => void;
+  showCollective: boolean;
+  setShowCollective: (show: boolean) => void;
+  showHatchery: boolean;
+  setShowHatchery: (show: boolean) => void;
+  showBlueprint: boolean;
+  setShowBlueprint: (show: boolean) => void;
 }
 
 export const useSystemStore = create<SystemState>((set) => ({
@@ -213,12 +225,23 @@ export const useSystemStore = create<SystemState>((set) => ({
   isSimulating: false,
   setIsSimulating: (is: boolean) => set({ isSimulating: is }),
 
-  isVaultAuthenticated: false,
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   activeView: 'dash',
   setActiveView: (view: string) => set({ activeView: view }),
   showVault: false,
   setShowVault: (show: boolean) => set({ showVault: show }),
+  showLibrary: false,
+  setShowLibrary: (show: boolean) => set({ showLibrary: show }),
+  isVisionScanning: false,
+  setIsVisionScanning: (is: boolean) => set({ isVisionScanning: is }),
+  visionPreview: null,
+  setVisionPreview: (p: string | null) => set({ visionPreview: p }),
+  showCollective: false,
+  setShowCollective: (show: boolean) => set({ showCollective: show }),
+  showHatchery: false,
+  setShowHatchery: (show: boolean) => set({ showHatchery: show }),
+  showBlueprint: false,
+  setShowBlueprint: (show: boolean) => set({ showBlueprint: show }),
 
   setMarketIntel: (market: any) => set({ marketIntel: market }),
   setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),

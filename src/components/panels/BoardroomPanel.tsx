@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2, AlertTriangle, Activity, Shield } from 'lucide-react';
+import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2, AlertTriangle, Activity, Shield, ShieldCheck } from 'lucide-react';
 import { SpectralBoundary } from '../shared/SpectralBoundary';
 import { invokeSafe, isTauri } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
@@ -25,7 +25,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     isVaultAuthenticated, setShowVault, setNotification, 
     activeSimulation, setActiveSimulation, riskSimulations, setRiskSimulations,
     isSimulating, setIsSimulating, logEvent, pendingManifests, setPendingManifests,
-    fetchResilienceAudit
+    fetchResilienceAudit, setIsVisionScanning, setVisionPreview
   } = useSystemStore();
 
   const triggerDebate = async () => {
@@ -45,11 +45,22 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
   const summonOracle = async () => {
     setIsSummoning(true);
     try {
+      setNotification("Retrieving Neural Memories...");
+      const pastInsights = await invokeSafe("query_strategic_memory", { query: mission }) as any[];
+      const memoryString = pastInsights.map(m => `[Memory ${m.timestamp}]: ${m.content}`).join("\n");
+      
       const task = mission;
-      const context = JSON.stringify({ ...metrics, boardroom_consensus: debate?.summary });
+      const context = JSON.stringify({ 
+        ...metrics, 
+        boardroom_consensus: debate?.summary,
+        infinite_archive_recall: memoryString 
+      });
       const res = await invokeSafe("invoke_deep_oracle", { task, context });
       setOracleData(res);
       setActivePersona(99); // Magic index for Oracle
+      if (res.advice) {
+        invokeSafe("speak_directive", { text: res.advice });
+      }
     } catch (e) {
       console.error("Oracle Summoning Failed", e);
     } finally {
@@ -70,12 +81,20 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
         summary: debate.summary, 
         oracleAdvice: oracleData?.advice || "No Oracle directive present." 
       }) as string;
-      setNotification(`Strategic Report Manifested: ${path}`);
+      
+      // Index into Infinite Archive
+      const report_content = `BOARDROOM REPORT: ${debate.summary}\nORACLE ADVICE: ${oracleData?.advice || "N/A"}`;
+      await invokeSafe("index_strategic_asset", { content: report_content, metadata: `Report Manifest: ${path}` });
+      
+      setNotification(`Strategic Report Manifested & Indexed: ${path}`);
+      logEvent(`Strategic Memory Indexed: ${path}`, "neural");
     } catch (e) {
       setNotification("Report Manifestation Breach.");
     } finally {
       setIsExporting(false);
     }
+  };
+
   const triggerRiskSimulation = async () => {
     setIsSimulating(true);
     try {
@@ -93,6 +112,38 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     }
   };
 
+  const manifestVisionScan = async () => {
+    setIsVisionScanning(true);
+    setIsSummoning(true);
+    try {
+      setNotification("Initiating Spectral Vision Scan...");
+      const image = await invokeSafe("capture_vision_context") as string;
+      setVisionPreview(image);
+      
+      // Delay for aesthetic scanning resonance
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      const res = await invokeSafe("invoke_multimodal_oracle", { 
+        image_b64: image, 
+        task: mission 
+      });
+      setOracleData(res);
+      setActivePersona(99);
+      if (res.advice) {
+        invokeSafe("speak_directive", { text: `Vision Manifested. ${res.advice}` });
+      }
+      setNotification("Oracle Sight Synchronized.");
+    } catch (e) {
+      console.error("Vision Breach", e);
+      setNotification("Oracle Vision Failure: Optical sync lost.");
+    } finally {
+      setIsSummoning(false);
+      setIsVisionScanning(false);
+      // Keep preview for a moment then clear
+      setTimeout(() => setVisionPreview(null), 5000);
+    }
+  };
+
   const manifestBlessing = async () => {
     setIsSummoning(true);
     try {
@@ -100,6 +151,7 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
       setOracleData({ advice: res, thought_trace: "v1.0-STABLE Final Production Audit: RESONATING..." });
       setActivePersona(99);
       setNotification("Oasis Shell v1.0-STABLE Status: OPERATIONAL ZENITH.");
+      invokeSafe("speak_directive", { text: `Operational Zenith Achieved. ${res}` });
       fetchResilienceAudit();
     } catch (e) {
       setNotification("Blessing Withheld: Neural Engine Timeout.");
@@ -227,6 +279,14 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                    )}
 
                    <div className="mt-auto flex flex-col gap-3">
+                     <button 
+                        onClick={manifestVisionScan}
+                        disabled={isSummoning}
+                        className="py-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-[9px] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-rose-900/20 transition-all flex items-center justify-center gap-3 border border-rose-400/20"
+                     >
+                        <Camera className="w-4 h-4" /> SYNC VISION CONTEXT
+                     </button>
+
                      <button 
                         onClick={manifestBlessing}
                         disabled={isSummoning}
