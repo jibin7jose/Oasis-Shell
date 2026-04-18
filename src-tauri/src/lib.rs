@@ -3790,9 +3790,32 @@ pub fn run() {
             golems::manifest_architectural_blueprint,
             golems::get_architectural_manifests,
             manifest_chronos_voyage,
+            set_shell_clickthrough,
+            get_active_host_window,
         ])
         .setup(|app| {
+            use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code};
             let app_handle = app.handle().clone();
+            
+            // Register Manifestation Hotkey (Alt+Space)
+            let overlay_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
+            app.global_shortcut().on_shortcut(overlay_shortcut, move |_app, _shortcut, event| {
+                if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    let window = _app.get_webview_window("main").unwrap();
+                    let is_visible = window.is_visible().unwrap();
+                    if is_visible {
+                        let _ = window.hide();
+                    } else {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            }).unwrap();
+
+            // Initial Ambient Mode configuration
+            let main_window = app.get_webview_window("main").expect("failed to get main window");
+            let _ = main_window.set_ignore_cursor_events(true);
+            let _ = main_window.set_shadow(false);
             
             // Resolve storage paths
             let app_data_dir = app_handle.path().app_local_data_dir().expect("failed to resolve app data dir");
@@ -3905,3 +3928,23 @@ pub fn run() {
 
     app.run(|_app_handle, _event| {});
 }
+#[tauri::command]
+pub async fn set_shell_clickthrough(window: tauri::Window, ignore: bool) -> Result<(), String> {
+    window.set_ignore_cursor_events(ignore).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_active_host_window() -> Result<WindowInfo, String> {
+    Ok(WindowInfo {
+        title: "Host Workspace".into(),
+        name: "explorer.exe".into(),
+        is_visible: true,
+        is_focused: true,
+        process_id: 0,
+        hwnd: 0,
+        position: (0, 0),
+        size: (1920, 1080),
+    })
+}
+ Arkansas Arkansas

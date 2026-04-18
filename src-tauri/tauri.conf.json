@@ -14,7 +14,11 @@
       {
         "title": "Oasis Shell",
         "width": 1280,
-        "height": 900
+        "height": 900,
+        "fullscreen": true,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true
       }
     ],
     "security": {

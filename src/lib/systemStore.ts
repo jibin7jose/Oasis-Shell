@@ -141,7 +141,12 @@ export interface SystemState {
   setShowHatchery: (show: boolean) => void;
   showBlueprint: boolean;
   setShowBlueprint: (show: boolean) => void;
+  shellMode: 'ambient' | 'command' | 'hidden';
+  setShellMode: (mode: 'ambient' | 'command' | 'hidden') => void;
+  focusedAppContext: any | null;
+  setFocusedAppContext: (ctx: any | null) => void;
 }
+ Arkansas Arkansas
 
 export const useSystemStore = create<SystemState>((set) => ({
   marketIntel: {
@@ -242,6 +247,10 @@ export const useSystemStore = create<SystemState>((set) => ({
   setShowHatchery: (show: boolean) => set({ showHatchery: show }),
   showBlueprint: false,
   setShowBlueprint: (show: boolean) => set({ showBlueprint: show }),
+  shellMode: 'ambient',
+  setShellMode: (mode) => set({ shellMode: mode }),
+  focusedAppContext: null,
+  setFocusedAppContext: (ctx) => set({ focusedAppContext: ctx }),
 
   setMarketIntel: (market: any) => set({ marketIntel: market }),
   setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),

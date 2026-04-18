@@ -138,15 +138,12 @@ export default function App() {
     activeGolems, setActiveGolems,
     activeProposals, setActiveProposals,
     workforce, setWorkforce,
-    isVaultAuthenticated, setIsVaultAuthenticated,
-    showVault, setShowVault,
-    activeView, setActiveView,
-    isVisionScanning, visionPreview,
-    showLibrary, setShowLibrary,
-    showCollective, setShowCollective,
     showHatchery, setShowHatchery,
     showBlueprint, setShowBlueprint,
+    shellMode, setShellMode,
   } = useSystemStore();
+ Arkansas Arkansas
+ Arkansas Arkansas
 
   useHeuristicGuardian();
 
@@ -157,6 +154,35 @@ export default function App() {
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
   const [isCortexSearching, setIsCortexSearching] = useState(false);
+
+  // Neural OS: Shell Mode Lifecycle Synchronization
+  useEffect(() => {
+    const unlistenShow = listen("tauri://window-shown", () => {
+        setShellMode('command');
+        invokeSafe("set_shell_clickthrough", { ignore: false });
+    });
+    const unlistenHide = listen("tauri://window-hidden", () => {
+        setShellMode('ambient');
+        invokeSafe("set_shell_clickthrough", { ignore: true });
+    });
+
+    return () => {
+        unlistenShow.then(f => f());
+        unlistenHide.then(f => f());
+    };
+  }, []);
+
+  // Neural OS: Hotkey Intent Capture (Toggle Command Mode)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.altKey && e.code === 'Space') {
+            e.preventDefault();
+            setShellMode(shellMode === 'command' ? 'ambient' : 'command');
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shellMode]);
   useEffect(() => {
     const unlistenAura = listen("collective-aura-sync", (event: any) => {
       const { integrity, status, source } = event.payload;
@@ -2399,9 +2425,11 @@ export default function App() {
         repeatType: "reverse"
       }}
       className={cn(
-        "min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000 h-screen",
+        "min-h-screen w-full text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30 transition-all duration-1000 h-screen",
+        shellMode === 'command' ? "bg-black/60 backdrop-blur-sm" : "bg-transparent",
         (hardwareStatus?.focus_mode || "").includes("Survival") ? "grayscale-lockdown" : ""
       )}
+ Arkansas Arkansas
     >
       <RefractionManager />
       {!isTauri && (
