@@ -97,6 +97,12 @@ pub struct ContextCrate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ShellAction {
+    pub r#type: String,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EconomicSignal {
     pub trend: String,
     pub impact: f32,
@@ -588,6 +594,48 @@ async fn is_biometric_session_valid() -> bool {
         return diff.num_minutes() < 5;
     }
     false
+}
+
+#[tauri::command]
+async fn synthesize_founder_directive(
+    query: String
+) -> Result<Vec<ShellAction>, String> {
+    if !is_vault_session_valid() {
+        return Err("Founder Authentication required for Strategic Directives.".into());
+    }
+
+    let prompt = format!(
+        "You are the Oasis Shell Kernel. Translate this user directive into a JSON array of Shell actions: '{}'.
+        Supported actions: 
+        - SWITCH_VIEW (payload: {{ view_id: string }})
+        - OPEN_VAULT (payload: null)
+        - LOCK_VAULT (payload: null)
+        - SYSTEM_NOTIFICATION (payload: {{ message: string }})
+        - RESUSCITATE_LATEST (payload: null)
+        - INITIATE_P2P (payload: {{ node_id: string }})
+        - EXECUTE_MACRO (payload: {{ macro_id: string }})
+        - SEAL_ASSET (payload: {{ path: string, title: string }})
+
+        Response MUST be a strict JSON array of ShellAction objects with 'type' and 'payload' fields.",
+        query
+    );
+
+    let client = reqwest::Client::new();
+    let res = client.post("http://localhost:11434/api/generate")
+        .json(&serde_json::json!({
+            "model": "gemma3",
+            "prompt": prompt,
+            "stream": false,
+            "format": "json"
+        }))
+        .send().await.map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let response_content = json["response"].as_str().ok_or("Invalid LLM response")?.trim();
+    
+    let actions: Vec<ShellAction> = serde_json::from_str(response_content).map_err(|e| format!("Parsing Directive Failed: {}", e))?;
+
+    Ok(actions)
 }
 
 static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
@@ -3401,6 +3449,7 @@ pub fn run() {
             check_biometric_status,
             trigger_biometric_scan,
             is_biometric_session_valid,
+            synthesize_founder_directive,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

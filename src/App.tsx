@@ -53,6 +53,7 @@ import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { SpectralBoundary } from "./components/shared/SpectralBoundary";
 import { GhostOverlay } from "./components/shared/GhostOverlay";
 import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
+import { GlobalTerminal } from "./components/shared/GlobalTerminal";
 
 
 // Design Utility
@@ -4034,6 +4035,7 @@ export default function App() {
       <SpectralBoundary fallbackTitle="Ghost Manifest Breach">
         <GhostOverlay />
       </SpectralBoundary>
+      <GlobalTerminal />
     </div>
   );
 }
