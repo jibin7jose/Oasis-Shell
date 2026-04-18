@@ -1,4 +1,6 @@
 import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera } from "lucide-react";
+import { OracleHub } from "../shared/OracleHub";
+ Arkansas Arkansas
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -180,35 +182,11 @@ export default function TopBar({
               </div>
             )}
             
-            <div className={cn("flex items-center gap-6 bg-white/[0.03] border border-white/5 px-6 py-2 rounded-2xl ml-8 hidden lg:flex animate-in fade-in slide-in-from-left-4 transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
-              <div className="flex flex-col items-start mr-4">
-                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Foundry Market Registry</span>
-                 <div className="flex items-center gap-2">
-                    <span className={cn("text-xs font-black font-mono tracking-tighter", (displayedMarket?.market_index || 0) > 140 ? "text-emerald-500" : "text-rose-500")}>
-                      {(displayedMarket?.market_index || 0).toFixed(1)}
-                    </span>
-                    <span className="text-[9px] text-slate-600 font-bold tracking-tighter">{displayedMarket?.index_change}</span>
-                 </div>
-              </div>
-              <div className="h-8 w-[1px] bg-white/10" />
-              <div className="flex items-center gap-8 pl-2">
-                 {(displayedMarket?.ai_ticker || []).map((t: any, index: number) => (
-                    <div 
-                      key={`ticker-${t.id || t.name || index}`} 
-                      onClick={() => onDeepLink && onDeepLink(t.name)}
-                      className="flex flex-col cursor-pointer hover:scale-110 transition-all duration-300"
-                    >
-                       <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-black text-white uppercase tracking-widest">{t.id}</span>
-                          <span className={cn("text-[7px] font-black tracking-widest px-1.5 py-0.5 rounded-sm", t.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' : t.color === 'rose' ? 'bg-rose-500/10 text-rose-400' : 'bg-indigo-500/10 text-indigo-400')}>
-                            {t.change}
-                          </span>
-                       </div>
-                       <span className="text-[9px] font-mono font-bold text-slate-400 tracking-tighter">${(t.price ?? 0).toFixed(1)}</span>
-                    </div>
-                 ))}
-              </div>
+            <div className={cn("ml-8 h-10 border border-white/5 rounded-2xl overflow-hidden hidden lg:flex transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
+              <OracleHub />
             </div>
+ Arkansas Arkansas
+ Arkansas Arkansas
             <button
               onClick={onOpenVault}
               className={cn("ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3 duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}

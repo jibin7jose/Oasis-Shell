@@ -94,9 +94,25 @@ pub struct KnowledgeCrate {
     pub name: String,
     pub telemetry: SystemStats,
     pub active_processes: Vec<String>,
+    pub oracle: Option<OraclePulse>,
     pub metadata: String,
     pub timestamp: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OraclePulse {
+    pub btc_usd: f32,
+    pub eth_usd: f32,
+    pub sentiment: String,
+    pub tech_momentum: f32,
+    pub timestamp: String,
+}
+
+static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
+static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
+ Arkansas Arkansas
+ Arkansas Arkansas
+ Arkansas Arkansas
  Arkansas Arkansas
  Arkansas Arkansas
  Arkansas Arkansas
@@ -721,10 +737,13 @@ pub async fn manifest_knowledge_crate(name: String) -> Result<String, String> {
     let processes = get_process_list().await?;
     let active_names = processes.iter().take(5).map(|p| p.name.clone()).collect();
 
+    let oracle = get_oracle_pulse().await.ok();
+
     let crate_data = KnowledgeCrate {
         name: name.clone(),
         telemetry: stats,
         active_processes: active_names,
+        oracle,
         metadata: "Oasis Subsidiary Context Brick".into(),
         timestamp: chrono::Local::now().to_rfc3339(),
     };
@@ -735,6 +754,56 @@ pub async fn manifest_knowledge_crate(name: String) -> Result<String, String> {
 
     Ok(format!("Knowledge Crate Injected into [{}].", name))
 }
+
+#[tauri::command]
+pub async fn get_oracle_pulse() -> Result<OraclePulse, String> {
+    // 1. Check Cache
+    {
+        let cache = ORACLE_CACHE.lock().unwrap();
+        let last_update = LAST_ORACLE_UPDATE.lock().unwrap();
+        if let (Some(pulse), Some(time)) = (cache.as_ref(), *last_update) {
+            let diff = chrono::Local::now().signed_duration_since(time);
+            if diff.num_minutes() < 15 {
+                return Ok(pulse.clone());
+            }
+        }
+    }
+
+    // 2. Fetch Fresh Data (CoinGecko Simple API)
+    let url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd";
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+
+    let btc = json["bitcoin"]["usd"].as_f64().unwrap_or(0.0) as f32;
+    let eth = json["ethereum"]["usd"].as_f64().unwrap_or(0.0) as f32;
+
+    // 3. Synthesize Sentiment (Basic Logic)
+    let sentiment = if btc > 60000.0 { "STRATEGIC BULL" } else if btc < 40000.0 { "MARKET BREACH" } else { "STABLE" };
+    
+    let pulse = OraclePulse {
+        btc_usd: btc,
+        eth_usd: eth,
+        sentiment: sentiment.into(),
+        tech_momentum: 0.85, // Placeholder for GitHub trends for now
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
+    // 4. Update Cache
+    {
+        let mut cache = ORACLE_CACHE.lock().unwrap();
+        let mut last_update = LAST_ORACLE_UPDATE.lock().unwrap();
+        *cache = Some(pulse.clone());
+        *last_update = Some(chrono::Local::now());
+    }
+
+    Ok(pulse)
+}
+ Arkansas Arkansas
 }
 
 #[tauri::command]
