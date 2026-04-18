@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Box, Rocket, Terminal, X, Plus, Layers, Loader2, ExternalLink, Globe, Monitor } from 'lucide-react';
+import { Sparkles, Box, Rocket, Terminal, X, Plus, Layers, Loader2, ExternalLink, Globe, Monitor, Square, Play, Trash2, Power } from 'lucide-react';
+ Arkansas Arkansas
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
 
@@ -8,7 +9,55 @@ export const SingularityHUD: React.FC<{ isOpen: boolean; onClose: () => void }> 
     const { logEvent, setNotification } = useSystemStore();
     const [isManifesting, setIsManifesting] = useState(false);
     const [newVenture, setNewVenture] = useState({ name: "", intent: "" });
-    const [activeVentures, setActiveVentures] = useState<{name: string, status: string, pid?: number}[]>([]);
+    const [activeVentures, setActiveVentures] = useState<any[]>([]);
+
+    const fetchVentures = async () => {
+        try {
+            const list = await invokeSafe("list_active_ventures") as any[];
+            setActiveVentures(list);
+        } catch (e) {
+            console.error("Venture Bridge Failure", e);
+        }
+    };
+
+    React.useEffect(() => {
+        if (isOpen) {
+            fetchVentures();
+            const interval = setInterval(fetchVentures, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [isOpen]);
+    const handleStop = async (name: string) => {
+        try {
+            await invokeSafe("stop_sub_venture", { name });
+            logEvent(`Venture Neutralized: ${name}`, "system");
+            fetchVentures();
+        } catch (e) {
+            setNotification(`Stop Failure: ${e}`);
+        }
+    };
+
+    const handleStart = async (name: string) => {
+        try {
+            await invokeSafe("launch_sub_venture", { name });
+            logEvent(`Venture Re-Kindled: ${name}`, "system");
+            fetchVentures();
+        } catch (e) {
+            setNotification(`Restart Failure: ${e}`);
+        }
+    };
+
+    const handlePurge = async (name: string) => {
+        try {
+            await invokeSafe("purge_sub_venture", { name });
+            logEvent(`Venture Purged: ${name}`, "warning");
+            setNotification(`Venture ${name} removed from reality.`);
+            fetchVentures();
+        } catch (e) {
+            setNotification(`Purge Failure: ${e}`);
+        }
+    };
+ Arkansas Arkansas
 
     const handleManifest = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -101,41 +150,68 @@ export const SingularityHUD: React.FC<{ isOpen: boolean; onClose: () => void }> 
                                         key={v.name}
                                         initial={{ opacity: 0, scale: 0.9, y: 30 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        delay={i * 0.1}
-                                        className="p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/10 flex flex-col gap-6 hover:border-emerald-500/30 transition-all group"
+                                        delay={i * 0.05}
+                                        className={`p-8 rounded-[2.5rem] bg-white/[0.03] border transition-all group ${
+                                            v.pid ? 'border-emerald-500/20 shadow-lg shadow-emerald-500/5' : 'border-slate-800 opacity-60'
+                                        }`}
                                     >
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-5">
-                                                <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400">
+                                                <div className={`p-4 rounded-2xl ${v.pid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
                                                     <Monitor className="w-7 h-7" />
                                                 </div>
                                                 <div>
                                                     <h4 className="text-lg font-black text-white tracking-tight">{v.name}</h4>
-                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{v.status}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${v.pid ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{v.status}</p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="p-3 bg-white/5 rounded-xl text-slate-600 group-hover:text-emerald-400 transition-colors">
-                                                <ExternalLink className="w-4 h-4" />
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {v.pid ? (
+                                                    <button onClick={() => handleStop(v.name)} className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all" title="Stop Venture">
+                                                        <Square className="w-4 h-4 fill-current" />
+                                                    </button>
+                                                ) : (
+                                                    <button onClick={() => handleStart(v.name)} className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all" title="Start Venture">
+                                                        <Play className="w-4 h-4 fill-current" />
+                                                    </button>
+                                                )}
+                                                <button onClick={() => handlePurge(v.name)} className="p-3 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all" title="Purge Venture">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </div>
                                         
                                         <div className="space-y-4">
-                                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                                                <span className="text-slate-500">Neural Sync</span>
-                                                <span className="text-emerald-400">99.9%</span>
+                                            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+                                                <span className="text-slate-500">PID: {v.pid || 'NULL'}</span>
+                                                <span className={v.pid ? 'text-emerald-400' : 'text-slate-600'}>UPTIME: {v.pid ? 'STABLE' : 'OFFLINE'}</span>
                                             </div>
-                                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-emerald-500 w-[99.9%] shadow-[0_0_15px_rgba(16,185,129,0.4)]" />
+                                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: v.pid ? '100%' : '0%' }}
+                                                    className={`h-full ${v.pid ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-700'}`}
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="flex gap-3">
                                             <button className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest transition-all">
-                                                Open Workspace
+                                                View Source
                                             </button>
-                                            <button className="px-5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-xl text-emerald-400 transition-all">
+                                            <a 
+                                                href={`http://localhost:${v.port || 5173}`} 
+                                                target="_blank" 
+                                                rel="noreferrer"
+                                                className={`px-5 flex items-center justify-center rounded-xl transition-all ${
+                                                    v.pid ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-600 pointer-events-none'
+                                                }`}
+                                            >
                                                 <Globe className="w-4 h-4" />
-                                            </button>
+                                            </a>
                                         </div>
                                     </motion.div>
                                 ))}

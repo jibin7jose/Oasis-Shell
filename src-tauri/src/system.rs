@@ -77,6 +77,20 @@ pub struct WindowSnapshot {
     pub height: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VentureActiveState {
+    pub name: String,
+    pub pid: Option<u32>,
+    pub port: Option<u16>,
+    pub status: String,
+    pub timestamp: String,
+}
+
+pub static VENTURE_REGISTRY: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, VentureActiveState>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+ Arkansas Arkansas
+ Arkansas Arkansas
+
 #[tauri::command]
 pub fn get_running_windows() -> Vec<WindowInfo> {
     let mut windows: Vec<WindowInfo> = Vec::new();
@@ -677,13 +691,84 @@ pub async fn launch_sub_venture(name: String) -> Result<u32, String> {
     }
 
     // Spawning Dev Server (npm run dev)
-    // We look for port conflicts manually or let Vite handle it
     let child = std::process::Command::new("npm")
         .args(["run", "dev"])
         .current_dir(&path)
         .spawn()
         .map_err(|e| e.to_string())?;
 
-    Ok(child.id())
+    let pid = child.id();
+    let state = VentureActiveState {
+        name: name.clone(),
+        pid: Some(pid),
+        port: Some(5173), // Default Vite port, detection can be improved
+        status: "Active".into(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
+    {
+        let mut registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.insert(name, state);
+    }
+
+    Ok(pid)
+}
+
+#[tauri::command]
+pub async fn stop_sub_venture(name: String) -> Result<String, String> {
+    let pid = {
+        let mut registry = VENTURE_REGISTRY.lock().unwrap();
+        if let Some(state) = registry.get_mut(&name) {
+            let pid = state.pid;
+            state.pid = None;
+            state.status = "Offline".into();
+            pid
+        } else {
+            return Err("Venture not found in active registry.".into());
+        }
+    };
+
+    if let Some(pid) = pid {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/PID", &pid.to_string(), "/T"]) // /T to kill child processes (npm + vite)
+                .output();
+        }
+    }
+    
+    Ok(format!("Strategic Venture [{}] Terminated.", name))
+}
+
+#[tauri::command]
+pub async fn list_active_ventures() -> Result<Vec<VentureActiveState>, String> {
+    let registry = VENTURE_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
+pub async fn purge_sub_venture(name: String) -> Result<String, String> {
+    // 1. Security Gate
+    if !crate::is_vault_session_valid() {
+        return Err("Strategic Protocol Breach: Founder Signature Required for Venture Purge.".into());
+    }
+
+    // 2. Stop Process
+    let _ = stop_sub_venture(name.clone()).await;
+
+    // 3. Delete Files
+    let venture_dir = format!("ventures/{}", name);
+    let path = std::path::PathBuf::from(&venture_dir);
+    if path.exists() {
+        std::fs::remove_dir_all(path).map_err(|e| e.to_string())?;
+    }
+
+    // 4. Clear Registry
+    {
+        let mut registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.remove(&name);
+    }
+
+    Ok(format!("Strategic Venture [{}] Purged from Reality.", name))
 }
  Arkansas Arkansas
