@@ -62,6 +62,8 @@ export interface SystemState {
   setHardwareAnchorActive: (active: boolean) => void;
   isBiometricScanning: boolean;
   setIsBiometricScanning: (is: boolean) => void;
+  resilienceData: any | null;
+  fetchResilienceAudit: () => Promise<void>;
 
   setPendingManifests: (m: any[]) => void;
   oracleAlert: any | null;
@@ -178,6 +180,15 @@ export const useSystemStore = create<SystemState>((set) => ({
   setHardwareAnchorActive: (active: boolean) => set({ hardwareAnchorActive: active }),
   isBiometricScanning: false,
   setIsBiometricScanning: (is: boolean) => set({ isBiometricScanning: is }),
+  resilienceData: null,
+  fetchResilienceAudit: async () => {
+    try {
+      const data = await invokeSafe("get_system_resilience_audit");
+      set({ resilienceData: data });
+    } catch (e) {
+      console.error("Resilience Audit Sync Failed", e);
+    }
+  },
 
   oracleAlert: null,
   processes: [],

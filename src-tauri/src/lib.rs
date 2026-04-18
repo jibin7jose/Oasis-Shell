@@ -1618,26 +1618,78 @@ async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManife
 
 
 #[tauri::command]
-async fn trigger_oracle_audit(arr: f32, burn: f32) -> Result<OracleAlert, String> {
+async fn trigger_oracle_audit(state: tauri::State<'_, AppState>, arr: f32, burn: f32) -> Result<OracleAlert, String> {
     let monthly_rev = arr / 12.0;
     let net_burn = (burn - monthly_rev).max(0.1);
     let runway = 24.0 / net_burn;
 
-    if runway < 6.0 {
-        Ok(OracleAlert {
+    let alert = if runway < 6.0 {
+        OracleAlert {
             title: "CRITICAL RUNWAY DEPLETION".into(),
             body: format!("Current cash burn rate predicts total bankruptcy in {:.1} months. Emergency Pivot Manifest required.", runway),
             divergence_level: "High Risk".into(),
             economic_signal: "Market Beta Sector: RECOVERY FOCUS".into(),
-        })
+        }
     } else {
-        Ok(OracleAlert {
+        OracleAlert {
             title: "STRATEGIC EQUILIBRIUM".into(),
             body: format!("Venture stability confirmed with {:.1} months of runway. Scaling directives optimal.", runway),
             divergence_level: "Minimal".into(),
             economic_signal: "Market Beta Sector: GROWTH FOCUS".into(),
-        })
-    }
+        }
+    };
+
+    // PERSIST PREDICTION
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let timestamp = chrono::Local::now().to_rfc3339();
+    let _ = db.execute(
+        "INSERT INTO oracle_predictions (title, divergence_level, timestamp) VALUES (?1, ?2, ?3)",
+        rusqlite::params![alert.title, alert.divergence_level, timestamp],
+    );
+
+    Ok(alert)
+}
+
+#[tauri::command]
+async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    
+    // 1. Fetch Predictions
+    let mut stmt = db.prepare("SELECT title, divergence_level, timestamp FROM oracle_predictions ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+    let predictions: Vec<serde_json::Value> = stmt.query_map([], |row| {
+        Ok(serde_json::json!({
+            "title": row.get::<_, String>(0)?,
+            "level": row.get::<_, String>(1)?,
+            "timestamp": row.get::<_, String>(2)?
+        }))
+    }).map_err(|e| e.to_string())?.flatten().collect();
+
+    // 2. Fetch Mitigations (Anomalies resolved in Chronos)
+    let mut stmt = db.prepare("SELECT timestamp, integrity FROM chronos_history ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+    let history: Vec<serde_json::Value> = stmt.query_map([], |row| {
+        Ok(serde_json::json!({
+            "timestamp": row.get::<_, String>(0)?,
+            "integrity": row.get::<_, f32>(1)?
+        }))
+    }).map_err(|e| e.to_string())?.flatten().collect();
+
+    // 3. Logic: Calculate Resilience
+    // We assume high integrity (>85) in consecutive snapshots following a High Risk prediction = Success
+    let total_risks = predictions.iter().filter(|p| p["level"] != "Minimal").count();
+    let mitigated = if total_risks == 0 { 0 } else { 
+        // Heuristic: If we have history > 90 integrity, we assume stabilized
+        history.iter().filter(|h| h["integrity"].as_f64().unwrap_or(0.0) > 90.0).count().min(total_risks)
+    };
+
+    let score = if total_risks == 0 { 100.0 } else { (mitigated as f32 / total_risks as f32) * 100.0 };
+
+    Ok(serde_json::json!({
+        "score": score,
+        "predictions_count": predictions.len(),
+        "mitigated_count": mitigated,
+        "history": history,
+        "recent_predictions": predictions.iter().take(5).collect::<Vec<_>>()
+    }))
 }
 
 #[tauri::command]
@@ -3446,6 +3498,7 @@ pub fn run() {
             receive_neural_mirror,
             resuscitate_ghost_snapshot,
             derive_mitigation_macro,
+            get_system_resilience_audit,
             check_biometric_status,
             trigger_biometric_scan,
             is_biometric_session_valid,
@@ -3505,13 +3558,14 @@ pub fn run() {
                 )", []);
 
                 // Risk Oracle Forge Table
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS risk_simulations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    scenario TEXT NOT NULL,
-                    probability REAL,
-                    impact_rating TEXT,
-                    defensive_strategy TEXT,
                     associated_venture TEXT,
+                    timestamp TEXT NOT NULL
+                )", []);
+
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS oracle_predictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    divergence_level TEXT NOT NULL,
                     timestamp TEXT NOT NULL
                 )", []);
             }

@@ -4,6 +4,7 @@ import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, Scroll
 import { SpectralBoundary } from '../shared/SpectralBoundary';
 import { invokeSafe, isTauri } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
+import { ResilienceScoreboard } from '../dashboard/ResilienceScoreboard';
 
 interface BoardroomPanelProps {
   isOpen: boolean;
@@ -345,6 +346,8 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                         animate={{ opacity: 1, y: 0 }}
                         className="space-y-12"
                       >
+                         <ResilienceScoreboard />
+
                          <div className="flex items-center gap-4">
                             <div className="w-1.5 h-10 bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.5)]" />
                             <h3 className="text-5xl font-black text-white uppercase tracking-tighter">Black Swan Manifest</h3>
