@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Box, Rocket, Terminal, X, Plus, Layers, Loader2, ExternalLink, Globe, Monitor, Square, Play, Trash2, Power } from 'lucide-react';
+import { Sparkles, Box, Rocket, Terminal, X, Plus, Layers, Loader2, ExternalLink, Globe, Monitor, Square, Play, Trash2, Power, BrainCircuit } from 'lucide-react';
+ Arkansas Arkansas
  Arkansas Arkansas
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
@@ -55,6 +56,16 @@ export const SingularityHUD: React.FC<{ isOpen: boolean; onClose: () => void }> 
             fetchVentures();
         } catch (e) {
             setNotification(`Purge Failure: ${e}`);
+        }
+    };
+
+    const handleSyncIntelligence = async (name: string) => {
+        try {
+            await invokeSafe("manifest_knowledge_crate", { name });
+            logEvent(`Semantic Mosaic Sync: ${name} context updated.`, "neural");
+            setNotification(`Intelligence Bridge synchronized for ${name}.`);
+        } catch (e) {
+            setNotification(`Sync Failure: ${e}`);
         }
     };
  Arkansas Arkansas
@@ -170,14 +181,20 @@ export const SingularityHUD: React.FC<{ isOpen: boolean; onClose: () => void }> 
                                             </div>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 {v.pid ? (
-                                                    <button onClick={() => handleStop(v.name)} className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all" title="Stop Venture">
-                                                        <Square className="w-4 h-4 fill-current" />
-                                                    </button>
+                                                    <>
+                                                        <button onClick={() => handleSyncIntelligence(v.name)} className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all" title="Sync Intelligence">
+                                                            <BrainCircuit className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleStop(v.name)} className="p-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all" title="Stop Venture">
+                                                            <Square className="w-4 h-4 fill-current" />
+                                                        </button>
+                                                    </>
                                                 ) : (
                                                     <button onClick={() => handleStart(v.name)} className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl transition-all" title="Start Venture">
                                                         <Play className="w-4 h-4 fill-current" />
                                                     </button>
                                                 )}
+ bitumen bitumen
                                                 <button onClick={() => handlePurge(v.name)} className="p-3 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all" title="Purge Venture">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>

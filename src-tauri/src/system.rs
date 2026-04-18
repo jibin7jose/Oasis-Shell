@@ -88,6 +88,17 @@ pub struct VentureActiveState {
 
 pub static VENTURE_REGISTRY: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, VentureActiveState>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct KnowledgeCrate {
+    pub name: String,
+    pub telemetry: SystemStats,
+    pub active_processes: Vec<String>,
+    pub metadata: String,
+    pub timestamp: String,
+}
+ Arkansas Arkansas
+ Arkansas Arkansas
  Arkansas Arkansas
  Arkansas Arkansas
 
@@ -658,28 +669,72 @@ pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: Strin
     // 3. Subsidiary Manifest Synthesis (Theming & Intent Integration)
     // We rewrite the generated files to align with the Oasis Aesthetic
     let app_tsx = format!(
-        "import React from 'react';\n\
-        export default function App() {{\n\
+        "import React, {{ useEffect, useState }} from 'react';\n\
+        export default function App() {{ \n\
+          const [context, setContext] = useState<any>(null);\n\
+          useEffect(() => {{ \n\
+            fetch('/src/assets/knowledge.json').then(res => res.json()).then(setContext).catch(console.error);\n\
+          }}, []);\n\
           return (\n\
             <div className='oasis-subsidiary'>\n\
               <h1>Oasis Subsidiary: {}</h1>\n\
+              <div className='context-badge'>{{context ? `SYNCED: ${context.timestamp.split('T')[1].split('.')[0]}` : 'CONNECTING...'}}</div>\n\
               <p>Manifested via Neural Singularity.</p>\n\
               <div className='intent-core'>Intent: {}</div>\n\
+              {{context && (\n\
+                <div className='telemetry-stream'>\n\
+                  CPU: {{context.telemetry.cpu_load.toFixed(1)}}% | MEM: {{context.telemetry.mem_used.toFixed(1)}}%\n\
+                </div>\n\
+              )}}\n\
             </div>\n\
           );\n\
         }}",
         name, intent
     );
-    
-    let index_css = "body { background: #020617; color: #6366f1; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; }\n\
-                     .oasis-subsidiary { border: 1px solid rgba(99, 102, 241, 0.2); padding: 4rem; border-radius: 3rem; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); text-align: center; }\n\
-                     h1 { text-transform: uppercase; letter-spacing: 0.5em; font-weight: 900; margin-bottom: 2rem; }\n\
-                     .intent-core { opacity: 0.5; font-size: 0.8rem; font-style: italic; }";
+    let index_css = "body { background: #020617; color: #6366f1; font-family: 'Inter', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }\n\
+                     .oasis-subsidiary { border: 1px solid rgba(99, 102, 241, 0.2); padding: 4rem; border-radius: 3rem; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); text-align: center; border-left: 4px solid #10b981; }\n\
+                     h1 { text-transform: uppercase; letter-spacing: 0.5em; font-weight: 900; margin-bottom: 2rem; color: white; }\n\
+                     .context-badge { font-size: 10px; font-weight: 900; color: #10b981; letter-spacing: 0.2em; margin-bottom: 2rem; opacity: 0.6; }\n\
+                     .intent-core { opacity: 0.5; font-size: 0.8rem; font-style: italic; margin-bottom: 2rem; }\n\
+                     .telemetry-stream { font-family: monospace; font-size: 10px; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 1rem; border: 1px solid rgba(255,255,255,0.05); }";
 
-    std::fs::write(path.join("src/App.tsx"), app_tsx).map_err(|e| e.to_string())?;
-    std::fs::write(path.join("src/index.css"), index_css).map_err(|e| e.to_string())?;
+    let assets_dir = path.join("src/assets");
+    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+    // Initial Knowledge Injection
+    let _ = manifest_knowledge_crate(name.clone()).await;
 
     Ok(format!("Strategic Venture [{}] Manifested in /ventures/.", name))
+}
+
+#[tauri::command]
+pub async fn manifest_knowledge_crate(name: String) -> Result<String, String> {
+    let venture_dir = format!("ventures/{}", name);
+    let path = std::path::PathBuf::from(&venture_dir);
+    if !path.exists() {
+        return Err("Venture trajectory not found.".into());
+    }
+
+    // 1. Capture Telemetry
+    let stats = run_system_diagnostic().await?;
+    
+    // 2. Capture Active Context (Recent Processes)
+    let processes = get_process_list().await?;
+    let active_names = processes.iter().take(5).map(|p| p.name.clone()).collect();
+
+    let crate_data = KnowledgeCrate {
+        name: name.clone(),
+        telemetry: stats,
+        active_processes: active_names,
+        metadata: "Oasis Subsidiary Context Brick".into(),
+        timestamp: chrono::Local::now().to_rfc3339(),
+    };
+
+    // 3. Inject into Assets
+    let json = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src/assets/knowledge.json"), json).map_err(|e| e.to_string())?;
+
+    Ok(format!("Knowledge Crate Injected into [{}].", name))
+}
 }
 
 #[tauri::command]
