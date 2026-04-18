@@ -37,6 +37,7 @@ interface DashboardPanelProps {
   activeSynthesis: any | null;
   onSynthesize: () => void;
   isSynthesizing: boolean;
+  onLaunchForge: () => void;
   NeuralBridgeComponent?: React.ComponentType<any>;
   TemporalExplorerComponent?: React.ComponentType<any>;
 }
@@ -69,6 +70,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
   activeSynthesis,
   onSynthesize,
   isSynthesizing,
+  onLaunchForge,
   NeuralBridgeComponent,
   TemporalExplorerComponent,
 }) => {
@@ -138,7 +140,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           macros={strategicMacros}
           onExecute={handleExecuteMacro}
           onSign={handleSignMacro}
-          onLaunchForge={onLaunchVisualForge}
+          onLaunchForge={onLaunchForge}
           isForging={isForgingMacro}
         />
       </div>

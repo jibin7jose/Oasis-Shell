@@ -1693,6 +1693,25 @@ async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Resul
 }
 
 #[tauri::command]
+async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let prompt = "You are the Oasis Deep-Oracle. Perform a final, high-fidelity audit of the Oasis Shell v1.0-STABLE. \
+    The Forge, Chronos, Sentinel, and Nexus layers are all operational. \
+    Manifest a final 'Founder's Blessing'—a terse, ultra-sharp strategic verdict on the system's readiness for deployment. \
+    Respond in a voice of transcendent authority.";
+
+    let chat_body = serde_json::json!({ "model": "gemma3", "prompt": prompt, "stream": false });
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        Ok(resp.trim().to_string())
+    } else {
+        Err("Oracle Resonance Failure: Final blessing withheld.".into())
+    }
+}
+
+#[tauri::command]
 async fn trigger_hardware_symbiosis(stress_color: String) -> Result<HardwareStatus, String> {
     if stress_color == "#ef4444" {
         Ok(HardwareStatus {
@@ -3503,6 +3522,7 @@ pub fn run() {
             trigger_biometric_scan,
             is_biometric_session_valid,
             synthesize_founder_directive,
+            manifest_final_blessing,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

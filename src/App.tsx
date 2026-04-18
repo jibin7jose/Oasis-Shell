@@ -2748,6 +2748,7 @@ export default function App() {
                 activeSynthesis={activeSynthesis}
                 onSynthesize={handleTriggerSynthesis}
                 isSynthesizing={isSynthesizing}
+                onLaunchForge={() => setShowVisualForge(true)}
                 onLaunchVisualForge={() => setShowVisualForge(true)}
                  NeuralBridgeComponent={(props: any) => (
                   <NeuralBridge 

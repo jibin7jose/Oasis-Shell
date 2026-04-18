@@ -24,7 +24,8 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
   const { 
     isVaultAuthenticated, setShowVault, setNotification, 
     activeSimulation, setActiveSimulation, riskSimulations, setRiskSimulations,
-    isSimulating, setIsSimulating, logEvent, pendingManifests, setPendingManifests 
+    isSimulating, setIsSimulating, logEvent, pendingManifests, setPendingManifests,
+    fetchResilienceAudit
   } = useSystemStore();
 
   const triggerDebate = async () => {
@@ -89,6 +90,21 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
       setNotification("Oracle Forge Failure: Synthesis interrupted.");
     } finally {
       setIsSimulating(false);
+    }
+  };
+
+  const manifestBlessing = async () => {
+    setIsSummoning(true);
+    try {
+      const res = await invokeSafe("manifest_final_blessing") as string;
+      setOracleData({ advice: res, thought_trace: "v1.0-STABLE Final Production Audit: RESONATING..." });
+      setActivePersona(99);
+      setNotification("Oasis Shell v1.0-STABLE Status: OPERATIONAL ZENITH.");
+      fetchResilienceAudit();
+    } catch (e) {
+      setNotification("Blessing Withheld: Neural Engine Timeout.");
+    } finally {
+      setIsSummoning(false);
     }
   };
 
@@ -210,13 +226,23 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                      </button>
                    )}
 
-                   <button 
-                     onClick={triggerDebate}
-                     disabled={isSynthesizing}
-                     className="mt-auto py-5 bg-white/5 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl border border-white/10 transition-all disabled:opacity-50"
-                   >
-                     {isSynthesizing ? "Resonating Perspectives..." : "RE-ITERATE DEBATE"}
-                   </button>
+                   <div className="mt-auto flex flex-col gap-3">
+                     <button 
+                        onClick={manifestBlessing}
+                        disabled={isSummoning}
+                        className="py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[9px] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-purple-900/20 transition-all flex items-center justify-center gap-3 border border-purple-400/20"
+                     >
+                        <ShieldCheck className="w-4 h-4" /> REVEAL FINAL BLESSING
+                     </button>
+
+                     <button 
+                       onClick={triggerDebate}
+                       disabled={isSynthesizing}
+                       className="py-4 bg-white/5 hover:bg-indigo-500 text-white text-[9px] font-black uppercase tracking-[0.3em] rounded-2xl border border-white/10 transition-all disabled:opacity-50"
+                     >
+                       {isSynthesizing ? "Resonating Perspectives..." : "RE-ITERATE DEBATE"}
+                     </button>
+                   </div>
                  </>
                ) : (
                  <>

@@ -137,7 +137,7 @@ export default function TopBar({
               className="text-[9px] font-mono border px-3 py-1 rounded-lg font-black tracking-widest uppercase"
               style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-glow)', backgroundColor: 'rgba(var(--accent-primary-rgb), 0.05)' }}
             >
-              OAS_KRNL_4.5 // SENTINEL CORE
+              OAS_KRNL_4.5 // SENTINEL CORE // v1.0-STABLE
             </span>
 
             {performanceMode && (
