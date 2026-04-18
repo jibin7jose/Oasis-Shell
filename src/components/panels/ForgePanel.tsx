@@ -11,6 +11,8 @@ interface StrategicMacro {
   signed: boolean;
   aura: string;
   status: string;
+  source?: string;
+  anomaly?: string;
 }
 
 interface ForgePanelProps {
@@ -82,11 +84,18 @@ export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSig
                     </h3>
                     <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{macro.description}</p>
                   </div>
-                  <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${
-                    macro.aura === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' : 
-                    macro.aura === 'amber' ? 'bg-amber-500/20 text-amber-400' : 'bg-indigo-500/20 text-indigo-400'
-                  }`}>
-                    {macro.aura}
+                  <div className="flex flex-col items-end gap-1">
+                    <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${
+                      macro.aura === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' : 
+                      macro.aura === 'amber' ? 'bg-amber-500/20 text-amber-400' : 'bg-indigo-500/20 text-indigo-400'
+                    }`}>
+                      {macro.aura}
+                    </div>
+                    {macro.source === 'Heuristic Guardian' && (
+                       <span className="text-[8px] font-black text-amber-500/60 uppercase tracking-widest whitespace-nowrap">
+                         Heuristic Guard
+                       </span>
+                    )}
                   </div>
                 </div>
 

@@ -489,6 +489,52 @@ async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Res
     Ok("Temporal Resuscitation Complete: Ghost Layout manifested on Physical OS.".into())
 }
 
+#[tauri::command]
+async fn derive_mitigation_macro(
+    anomaly_category: String,
+    current_metrics: serde_json::Value
+) -> Result<serde_json::Value, String> {
+    if !is_vault_session_valid() {
+        return Err("Founder Authentication required for Neural Mitigation.".into());
+    }
+
+    let prompt = match anomaly_category.as_str() {
+        "CPU_SPIKE" => "Detected a critical CPU spike (>85%). Synthesize a localized PowerShell defensive macro to identify the top 3 resource-intensive user processes and demote their priority to 'BelowNormal'. Rationale: Resource Balancing.",
+        "MEM_LEAK" => "Detected memory saturation. Synthesize a PowerShell macro to clear the system standby list and restart the non-essential Oasis caching service. Rationale: Memory Reclamation.",
+        "INTEGRITY_DROP" => "Detected Venture Integrity breach. Synthesize a PowerShell macro to perform a deep-scan of the active Context Crate directories and verify neural checksums. Rationale: Integrity Restoration.",
+        _ => "Synthesize a generic system stability optimization macro. Rationale: Preventive Maintenance."
+    };
+
+    let client = reqwest::Client::new();
+    let res = client.post("http://localhost:11434/api/generate")
+        .json(&serde_json::json!({
+            "model": "gemma3",
+            "prompt": format!("{} Provide the response as a JSON object with: title, rationale, and code_draft (PowerShell).", prompt),
+            "stream": false,
+            "format": "json"
+        }))
+        .send().await.map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let mut response_content = json["response"].as_str().ok_or("Invalid LLM response")?.trim();
+    
+    // Clean potential markdown wrap
+    if response_content.starts_with("```json") {
+        response_content = response_content.trim_start_matches("```json").trim_end_matches("```");
+    }
+
+    let mut manifest: serde_json::Value = serde_json::from_str(response_content).map_err(|_| "Synthesis Parsing Failure")?;
+    
+    // Inject metadata
+    if let Some(obj) = manifest.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(format!("HEURISTIC_{}", chrono::Local::now().timestamp())));
+        obj.insert("source".to_string(), serde_json::json!("Heuristic Guardian"));
+        obj.insert("anomaly".to_string(), serde_json::json!(anomaly_category));
+    }
+
+    Ok(manifest)
+}
+
 static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -3296,6 +3342,7 @@ pub fn run() {
             invoke_neural_mirror,
             receive_neural_mirror,
             resuscitate_ghost_snapshot,
+            derive_mitigation_macro,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

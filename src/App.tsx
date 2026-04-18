@@ -52,6 +52,7 @@ import { StoragePanel } from "./components/panels/StoragePanel";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { SpectralBoundary } from "./components/shared/SpectralBoundary";
 import { GhostOverlay } from "./components/shared/GhostOverlay";
+import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
 
 
 // Design Utility
@@ -139,6 +140,8 @@ export default function App() {
     fiscalBurn, setFiscalBurn,
     marketIntel, setMarketIntel
   } = useSystemStore();
+
+  useHeuristicGuardian();
 
   const [isSynthesizing, setIsSynthesizing] = useState(false);
 
