@@ -52,4 +52,4 @@ The frontend implements a **Isolationist Panel Strategy**.
 - **UI Status**: Resilient (SpectralBoundaries Active)
 - **Neural Lattice**: Synchronized (Gemma3 / LLava)
 
-**"In entropy, we forge the order of the venture."**
+**"In entropy, we forge the order of the venture."**.
