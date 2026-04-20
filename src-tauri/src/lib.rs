@@ -3798,6 +3798,10 @@ pub fn run() {
             system::purge_sub_venture,
             system::manifest_knowledge_crate,
             system::get_oracle_pulse,
+            system::run_sandbox_audit,
+            system::run_adversarial_simulation,
+            system::sweep_venture_health,
+            system::recover_dead_ventures,
         ])
  Arkansas Arkansas
  Arkansas Arkansas

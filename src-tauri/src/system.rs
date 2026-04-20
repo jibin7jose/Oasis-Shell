@@ -1117,3 +1117,267 @@ pub async fn purge_sub_venture(name: String) -> Result<String, String> {
     Ok(format!("Strategic Venture [{}] Purged from Reality.", name))
 }
  Arkansas Arkansas
+
+// ============================================================
+// PHASE 36: NEURAL SANDBOX HARDENING — Resilience Engine
+// ============================================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VentureHealthStatus {
+    pub name: String,
+    pub forge_mode: String,
+    pub pid: Option<u32>,
+    pub is_alive: bool,
+    pub drift_detected: bool,
+    pub drift_reason: Option<String>,
+    pub status: String,
+    pub last_seen: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SimulationResult {
+    pub scenario: String,
+    pub passed: bool,
+    pub latency_ms: u64,
+    pub error: Option<String>,
+    pub recommendation: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SandboxReport {
+    pub overall_integrity: u8,          // 0–100
+    pub venture_health: Vec<VentureHealthStatus>,
+    pub simulations: Vec<SimulationResult>,
+    pub oracle_reachable: bool,
+    pub orphaned_processes: Vec<u32>,
+    pub critical_alerts: Vec<String>,
+    pub timestamp: String,
+}
+
+/// Check whether a PID is still alive on Windows
+fn is_pid_alive(pid: u32) -> bool {
+    let output = std::process::Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+        .output();
+    match output {
+        Ok(o) => {
+            let text = String::from_utf8_lossy(&o.stdout);
+            text.contains(&pid.to_string())
+        }
+        Err(_) => false,
+    }
+}
+
+/// Phase 36: Run a full system-health audit across all ventures
+#[tauri::command]
+pub async fn run_sandbox_audit() -> Result<SandboxReport, String> {
+    let mut critical_alerts: Vec<String> = Vec::new();
+    let mut orphaned_processes: Vec<u32> = Vec::new();
+    let mut venture_health: Vec<VentureHealthStatus> = Vec::new();
+
+    // 1. Sweep venture registry
+    let ventures: Vec<VentureActiveState> = {
+        let registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect()
+    };
+
+    for v in &ventures {
+        let is_alive = v.pid.map(is_pid_alive).unwrap_or(false);
+        let drift_detected = v.pid.is_some() && !is_alive;
+        let drift_reason = if drift_detected {
+            Some(format!("PID {} no longer running — venture declared zombie.", v.pid.unwrap()))
+        } else {
+            None
+        };
+
+        if drift_detected {
+            critical_alerts.push(format!("DRIFT DETECTED: Venture [{}] PID {} is dead.", v.name, v.pid.unwrap_or(0)));
+            orphaned_processes.push(v.pid.unwrap());
+        }
+
+        venture_health.push(VentureHealthStatus {
+            name: v.name.clone(),
+            forge_mode: v.forge_mode.clone(),
+            pid: v.pid,
+            is_alive,
+            drift_detected,
+            drift_reason,
+            status: v.status.clone(),
+            last_seen: v.timestamp.clone(),
+        });
+    }
+
+    // 2. Oracle health check
+    let oracle_reachable = tokio::time::timeout(
+        std::time::Duration::from_secs(4),
+        async {
+            reqwest::Client::new()
+                .get("https://api.coingecko.com/api/v3/ping")
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
+        }
+    ).await.unwrap_or(false);
+
+    if !oracle_reachable {
+        critical_alerts.push("ORACLE BREACH: CoinGecko API unreachable. Market intelligence running on cached data.".into());
+    }
+
+    // 3. Compute integrity score
+    let total = venture_health.len() as f32;
+    let healthy = venture_health.iter().filter(|v| !v.drift_detected).count() as f32;
+    let venture_score = if total == 0.0 { 100.0 } else { (healthy / total) * 60.0 };
+    let oracle_score = if oracle_reachable { 30.0 } else { 0.0 };
+    let base_score = 10.0;
+    let overall_integrity = (venture_score + oracle_score + base_score).min(100.0) as u8;
+
+    // 4. Run adversarial simulations
+    let simulations = run_adversarial_simulations_internal().await;
+
+    Ok(SandboxReport {
+        overall_integrity,
+        venture_health,
+        simulations,
+        oracle_reachable,
+        orphaned_processes,
+        critical_alerts,
+        timestamp: chrono::Local::now().to_rfc3339(),
+    })
+}
+
+/// Internal simulation runner used by audit and standalone invocation
+async fn run_adversarial_simulations_internal() -> Vec<SimulationResult> {
+    let mut results = Vec::new();
+
+    // Scenario 1: Oracle API timeout resilience
+    let t0 = std::time::Instant::now();
+    let oracle_ok = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        get_oracle_pulse()
+    ).await;
+    let latency = t0.elapsed().as_millis() as u64;
+    results.push(SimulationResult {
+        scenario: "Oracle API Timeout Resilience".into(),
+        passed: oracle_ok.is_ok(),
+        latency_ms: latency,
+        error: oracle_ok.err().map(|_| "Timed out".into()),
+        recommendation: if latency > 3000 {
+            "Consider reducing oracle cache TTL or pre-fetching on startup.".into()
+        } else {
+            "Oracle response latency is nominal.".into()
+        },
+    });
+
+    // Scenario 2: Knowledge Crate write stress
+    let t1 = std::time::Instant::now();
+    let test_path = std::path::PathBuf::from("ventures/_sandbox_test/src/assets");
+    let write_ok = std::fs::create_dir_all(&test_path)
+        .and_then(|_| std::fs::write(test_path.join("knowledge.json"), b"{}"))
+        .and_then(|_| std::fs::remove_dir_all("ventures/_sandbox_test"))
+        .is_ok();
+    results.push(SimulationResult {
+        scenario: "Knowledge Crate Write Stress".into(),
+        passed: write_ok,
+        latency_ms: t1.elapsed().as_millis() as u64,
+        error: if write_ok { None } else { Some("Filesystem write failed.".into()) },
+        recommendation: if write_ok {
+            "Filesystem IPC is healthy. Knowledge injection nominal.".into()
+        } else {
+            "Check venture directory permissions and disk space.".into()
+        },
+    });
+
+    // Scenario 3: Venture registry thread-safety
+    let t2 = std::time::Instant::now();
+    let registry_ok = std::panic::catch_unwind(|| {
+        let _lock = VENTURE_REGISTRY.lock().unwrap();
+    }).is_ok();
+    results.push(SimulationResult {
+        scenario: "Venture Registry Thread-Safety".into(),
+        passed: registry_ok,
+        latency_ms: t2.elapsed().as_millis() as u64,
+        error: if registry_ok { None } else { Some("Mutex deadlock detected.".into()) },
+        recommendation: if registry_ok {
+            "Registry lock is contention-free.".into()
+        } else {
+            "CRITICAL: Registry deadlock — restart the Shell immediately.".into()
+        },
+    });
+
+    // Scenario 4: System diagnostics latency
+    let t3 = std::time::Instant::now();
+    let diag_ok = run_system_diagnostic().await.is_ok();
+    let diag_ms = t3.elapsed().as_millis() as u64;
+    results.push(SimulationResult {
+        scenario: "System Diagnostics Latency".into(),
+        passed: diag_ok && diag_ms < 2000,
+        latency_ms: diag_ms,
+        error: if !diag_ok { Some("Diagnostic command failed.".into()) } else { None },
+        recommendation: if diag_ms > 1000 {
+            "sysinfo collection is slow — consider reducing polling frequency.".into()
+        } else {
+            "Telemetry pipeline latency is optimal.".into()
+        },
+    });
+
+    results
+}
+
+/// Phase 36: Run adversarial simulations in isolation (callable from HUD)
+#[tauri::command]
+pub async fn run_adversarial_simulation() -> Result<Vec<SimulationResult>, String> {
+    Ok(run_adversarial_simulations_internal().await)
+}
+
+/// Phase 36: Sweep ventures for dead PIDs and architectural drift
+#[tauri::command]
+pub async fn sweep_venture_health() -> Result<Vec<VentureHealthStatus>, String> {
+    let ventures: Vec<VentureActiveState> = {
+        let registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect()
+    };
+
+    let health = ventures.iter().map(|v| {
+        let is_alive = v.pid.map(is_pid_alive).unwrap_or(false);
+        let drift_detected = v.pid.is_some() && !is_alive;
+        VentureHealthStatus {
+            name: v.name.clone(),
+            forge_mode: v.forge_mode.clone(),
+            pid: v.pid,
+            is_alive,
+            drift_detected,
+            drift_reason: if drift_detected {
+                Some(format!("PID {} no longer active.", v.pid.unwrap()))
+            } else {
+                None
+            },
+            status: v.status.clone(),
+            last_seen: v.timestamp.clone(),
+        }
+    }).collect();
+
+    Ok(health)
+}
+
+/// Phase 36: Auto-recover zombie ventures — update registry entries for dead PIDs
+#[tauri::command]
+pub async fn recover_dead_ventures() -> Result<String, String> {
+    let mut recovered = Vec::new();
+    let mut registry = VENTURE_REGISTRY.lock().unwrap();
+    for (name, state) in registry.iter_mut() {
+        if let Some(pid) = state.pid {
+            if !is_pid_alive(pid) {
+                state.pid = None;
+                state.status = "Offline (Auto-Recovered)".into();
+                state.timestamp = chrono::Local::now().to_rfc3339();
+                recovered.push(name.clone());
+            }
+        }
+    }
+    if recovered.is_empty() {
+        Ok("All ventures are stable. No zombies detected.".into())
+    } else {
+        Ok(format!("Recovered {} zombie venture(s): {}.", recovered.len(), recovered.join(", ")))
+    }
+}

@@ -60,9 +60,9 @@ import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
 import { RealityBridge } from "./components/shared/RealityBridge";
-import { SandboxHUD } from "./components/shared/SandboxHUD";
 import { KernelForge } from "./components/shared/KernelForge";
 import { SingularityHUD } from "./components/shared/SingularityHUD";
+import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
 
 
 // Design Utility
@@ -2399,6 +2399,11 @@ export default function App() {
         setCommandOpen(false);
         return;
     }
+    if (id === 'forge') {
+        setSingularityOpen(true);
+        setCommandOpen(false);
+        return;
+    }
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
@@ -4161,10 +4166,14 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-      <SandboxHUD 
+      <NeuralSandboxPanel 
         isOpen={sandboxOpen} 
         onClose={() => setSandboxOpen(false)} 
         onInitiateMutation={handleInitiateKernelReForge}
+      />
+      <SingularityHUD 
+        isOpen={singularityOpen} 
+        onClose={() => setSingularityOpen(false)} 
       />
       <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>

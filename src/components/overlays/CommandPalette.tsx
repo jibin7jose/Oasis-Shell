@@ -41,6 +41,8 @@ const BASE_COMMANDS: CommandItem[] = [
   { id: "open_logs", label: "Open Logs", hint: "Event history timeline" },
   { id: "presentation", label: "Start Presentation Mode", hint: "Full-screen executive view" },
   { id: "sync_workspace", label: "Sync Workspace", hint: "Git sync + status", permission: "system_control" },
+  { id: "forge", label: "Omni-Vent Forge", hint: "Manifest polyglot sub-ventures (Phase 35)", permission: "system_control" },
+  { id: "sandbox", label: "Neural Sandbox Hardening", hint: "Adversarial audit & resilience (Phase 36)", permission: "system_control" },
   { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },
   { id: "process_quarantine", label: "Quarantine Process", hint: "Kill a process by PID", permission: "process_control" },
   { id: "pin_context", label: "Pin Context Snapshot", hint: "Freeze current workspace metrics", permission: "system_control" },
