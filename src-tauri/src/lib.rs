@@ -23,6 +23,7 @@ pub mod macros;
 pub mod golems;
 pub mod system;
 pub mod ai;
+pub mod mirror;
 use vault::vault_get_secret;
 use macros::StrategicMacro;
 use golems::{GolemTask, GOLEM_REGISTRY};
@@ -3840,6 +3841,10 @@ pub fn run() {
             system::trigger_system_lockdown,
             ai::get_agent_collective,
             ai::invoke_golem_debate,
+            mirror::get_neural_mutations,
+            mirror::analyze_system_genome,
+            mirror::verify_system_mutation,
+            mirror::apply_neural_mutation,
         ])
  Arkansas Arkansas
  Arkansas Arkansas

@@ -40,7 +40,8 @@ export type { FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint };
 import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
-import { DashboardPanel } from "./components/panels/DashboardPanel";
+import { PortalDashboard } from "./components/shared/PortalDashboard";
+import { NeuralMirrorPanel } from "./components/shared/NeuralMirrorPanel";
 import { GhostWindows } from "./components/visuals/GhostWindows";
 import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
 import { VisualForge } from "./components/panels/VisualForge";
@@ -160,6 +161,7 @@ export default function App() {
   const [exodusOpen, setExodusOpen] = useState(false);
   const [consortiumOpen, setConsortiumOpen] = useState(false);
   const [sentinelOpen, setSentinelOpen] = useState(false);
+  const [mirrorOpen, setMirrorOpen] = useState(false);
   const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
   const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
 
@@ -2424,6 +2426,11 @@ export default function App() {
         setCommandOpen(false);
         return;
     }
+    if (id === 'mirror') {
+        setMirrorOpen(true);
+        setCommandOpen(false);
+        return;
+    }
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
@@ -4206,6 +4213,10 @@ export default function App() {
       <NeuralSentinelPanel 
         isOpen={sentinelOpen} 
         onClose={() => setSentinelOpen(false)} 
+      />
+      <NeuralMirrorPanel 
+        isOpen={mirrorOpen} 
+        onClose={() => setMirrorOpen(false)} 
       />
       <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>
