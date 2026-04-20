@@ -83,6 +83,7 @@ pub struct VentureActiveState {
     pub pid: Option<u32>,
     pub port: Option<u16>,
     pub status: String,
+    pub forge_mode: String,
     pub timestamp: String,
 }
 
@@ -659,19 +660,41 @@ pub async fn rename_path(path: String, new_name: String) -> Result<String, Strin
     std::fs::rename(old_path, &new_path).map_err(|e| e.to_string())?;
 
     Ok(format!("Asset Re-designated: {} to {}", path, new_path.display()))
+}/// Phase 35: Omni-Vent Forge — Polyglot Scaffolding Engine
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum VentureForgeMode {
+    ReactVite,
+    RustTauri,
 }
+
 #[tauri::command]
-pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: String, intent: String) -> Result<String, String> {
-    // 1. Path Management
+pub async fn manifest_new_venture(
+    state: tauri::State<'_, AppState>,
+    name: String,
+    intent: String,
+    forge_mode: Option<VentureForgeMode>,
+) -> Result<String, String> {
+    let mode = forge_mode.unwrap_or(VentureForgeMode::ReactVite);
+    match mode {
+        VentureForgeMode::ReactVite  => scaffold_react_vite_venture(state, name, intent).await,
+        VentureForgeMode::RustTauri  => scaffold_tauri_venture(state, name, intent).await,
+    }
+}
+
+/// React / Vite sub-venture (existing path, now a named helper)
+async fn scaffold_react_vite_venture(
+    _state: tauri::State<'_, AppState>,
+    name: String,
+    intent: String,
+) -> Result<String, String> {
     let venture_dir = format!("ventures/{}", name);
-    let mut path = std::path::PathBuf::from(&venture_dir);
+    let path = std::path::PathBuf::from(&venture_dir);
     if path.exists() {
         return Err("Strategic Protocol Breach: Venture identity already exists.".into());
     }
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
 
-    // 2. Scaffolding Phase (Vite React-TS)
-    // We use npx create-vite to ensure latest best practices
     let output = std::process::Command::new("npx")
         .args(["-y", "create-vite@latest", ".", "--template", "react-ts"])
         .current_dir(&path)
@@ -682,8 +705,6 @@ pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: Strin
         return Err(format!("Scaffolding Failure: {}", String::from_utf8_lossy(&output.stderr)));
     }
 
-    // 3. Subsidiary Manifest Synthesis (Theming & Intent Integration)
-    // We rewrite the generated files to align with the Oasis Aesthetic
     let app_tsx = format!(
         "import React, {{ useEffect, useState }} from 'react';\n\
         export default function App() {{ \n\
@@ -694,7 +715,7 @@ pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: Strin
           return (\n\
             <div className='oasis-subsidiary'>\n\
               <h1>Oasis Subsidiary: {}</h1>\n\
-              <div className='context-badge'>{{context ? `SYNCED: ${context.timestamp.split('T')[1].split('.')[0]}` : 'CONNECTING...'}}</div>\n\
+              <div className='context-badge'>{{context ? `SYNCED: ${{context.timestamp.split('T')[1].split('.')[0]}}` : 'CONNECTING...'}}</div>\n\
               <p>Manifested via Neural Singularity.</p>\n\
               <div className='intent-core'>Intent: {}</div>\n\
               {{context && (\n\
@@ -707,6 +728,7 @@ pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: Strin
         }}",
         name, intent
     );
+
     let index_css = "body { background: #020617; color: #6366f1; font-family: 'Inter', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }\n\
                      .oasis-subsidiary { border: 1px solid rgba(99, 102, 241, 0.2); padding: 4rem; border-radius: 3rem; background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); text-align: center; border-left: 4px solid #10b981; }\n\
                      h1 { text-transform: uppercase; letter-spacing: 0.5em; font-weight: 900; margin-bottom: 2rem; color: white; }\n\
@@ -716,11 +738,204 @@ pub async fn manifest_new_venture(state: tauri::State<'_, AppState>, name: Strin
 
     let assets_dir = path.join("src/assets");
     std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    // Initial Knowledge Injection
+    std::fs::write(path.join("src/App.tsx"), app_tsx).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src/index.css"), index_css).map_err(|e| e.to_string())?;
     let _ = manifest_knowledge_crate(name.clone()).await;
 
-    Ok(format!("Strategic Venture [{}] Manifested in /ventures/.", name))
+    // Register in Venture Registry
+    {
+        let mut registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.insert(name.clone(), VentureActiveState {
+            name: name.clone(),
+            pid: None,
+            port: Some(5173),
+            status: "Scaffolded (React/Vite)".into(),
+            forge_mode: "react-vite".into(),
+            timestamp: chrono::Local::now().to_rfc3339(),
+        });
+    }
+
+    Ok(format!("Strategic Venture [{}] Manifested (React/Vite) in /ventures/.", name))
 }
+
+/// Rust / Tauri sub-venture scaffold (Phase 35: Omni-Vent Forge)
+async fn scaffold_tauri_venture(
+    _state: tauri::State<'_, AppState>,
+    name: String,
+    intent: String,
+) -> Result<String, String> {
+    let venture_dir = format!("ventures/{}", name);
+    let path = std::path::PathBuf::from(&venture_dir);
+    if path.exists() {
+        return Err("Strategic Protocol Breach: Venture identity already exists.".into());
+    }
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+
+    // 1. Inner web frontend (Vite HTML)
+    let src_dir = path.join("src");
+    let src_tauri_dir = path.join("src-tauri/src");
+    let assets_dir = path.join("src/assets");
+    std::fs::create_dir_all(&src_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&src_tauri_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(path.join("src-tauri")).map_err(|e| e.to_string())?;
+
+    // 2. index.html
+    let index_html = format!(r#"<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oasis Subsidiary: {name}</title>
+    <style>
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+      body {{ background: #010409; color: #e2e8f0; font-family: Inter, sans-serif;
+             height: 100vh; display: flex; align-items: center; justify-content: center;
+             overflow: hidden; }}
+      .shell {{ border: 1px solid rgba(139,92,246,0.2); padding: 5rem; border-radius: 3rem;
+               backdrop-filter: blur(40px); background: rgba(0,0,0,0.5);
+               border-left: 4px solid #8b5cf6; text-align: center; max-width: 700px; width: 90%; }}
+      h1 {{ text-transform: uppercase; letter-spacing: 0.4em; font-weight: 900;
+            font-size: 1.4rem; margin-bottom: 1rem; color: #fff; }}
+      .badge {{ font-size: 9px; font-weight: 900; color: #8b5cf6; letter-spacing: 0.3em;
+               text-transform: uppercase; margin-bottom: 2rem; opacity: 0.7; }}
+      .intent {{ opacity: 0.4; font-size: 0.85rem; font-style: italic; margin-bottom: 3rem; }}
+      .telemetry {{ font-family: monospace; font-size: 11px; background: rgba(0,0,0,0.5);
+                   padding: 1.5rem 2rem; border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.04);
+                   text-align: left; line-height: 2; color: #94a3b8; }}
+      .telemetry span {{ color: #8b5cf6; font-weight: 900; }}
+      .oracle-row {{ margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); color: #f59e0b; }}
+    </style>
+  </head>
+  <body>
+    <div class="shell" id="app">
+      <div class="badge">⬡ Oasis Subsidiary // Tauri Kernel // Phase 35</div>
+      <h1>{name}</h1>
+      <div class="intent">{intent}</div>
+      <div class="telemetry" id="telem">Loading Knowledge Crate...</div>
+    </div>
+    <script>
+      async function loadCrate() {{
+        try {{
+          const r = await fetch('./assets/knowledge.json');
+          const c = await r.json();
+          const t = c.telemetry;
+          const o = c.oracle;
+          let html = `
+            CPU: <span>${{t.cpu_load.toFixed(1)}}%</span> &nbsp;|&nbsp;
+            RAM: <span>${{t.mem_used.toFixed(1)}}%</span><br/>
+            Synced: <span>${{c.timestamp.split('T')[0]}}</span> &nbsp;|&nbsp;
+            Processes: <span>${{c.active_processes.slice(0,3).join(', ')}}</span>`;
+          if (o) {{
+            html += `<div class="oracle-row">
+              🔮 Oracle // BTC: <span>$${{o.btc_usd.toLocaleString()}}</span> &nbsp;|&nbsp;
+              ETH: <span>$${{o.eth_usd.toLocaleString()}}</span> &nbsp;|&nbsp;
+              Sentiment: <span>${{o.sentiment}}</span></div>`;
+          }}
+          document.getElementById('telem').innerHTML = html;
+        }} catch(e) {{
+          document.getElementById('telem').textContent = 'Knowledge Bridge offline.';
+        }}
+      }}
+      loadCrate();
+      setInterval(loadCrate, 30000);
+    </script>
+  </body>
+</html>"#, name = name, intent = intent);
+
+    // 3. Cargo.toml for sub-venture
+    let cargo_toml = format!(r#"[package]
+name = "{name}"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "{lib_name}_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = {{ version = "2", features = [] }}
+
+[dependencies]
+tauri = {{ version = "2", features = [] }}
+serde = {{ version = "1", features = ["derive"] }}
+serde_json = "1"
+"#, name = name, lib_name = name.replace('-', "_"));
+
+    // 4. Main Rust kernel (lib.rs)
+    let lib_rs = format!(r#"// Oasis Sub-Venture: {name}
+// Gestated via Phase 35: Omni-Vent Forge
+// Intent: {intent}
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {{
+    tauri::Builder::default()
+        .setup(|app| {{
+            #[cfg(debug_assertions)]
+            app.get_webview_window("main").unwrap().open_devtools();
+            Ok(())
+        }})
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}}
+"#, name = name, intent = intent);
+
+    let main_rs = "// Oasis Sub-Venture — Entry Point\n#![cfg_attr(not(debug_assertions), windows_subsystem = \"windows\")]\nfn main() { app_lib::run(); }\n"
+        .replace("app_lib", &format!("{}_lib", name.replace('-', "_")));
+
+    // 5. tauri.conf.json
+    let tauri_conf = format!(r#"{{
+  "productName": "{name}",
+  "version": "0.1.0",
+  "identifier": "com.oasis.{safe_name}",
+  "build": {{
+    "frontendDist": "../src",
+    "devUrl": "../src/index.html"
+  }},
+  "app": {{
+    "windows": [{{
+      "title": "Oasis :: {name}",
+      "width": 1100,
+      "height": 700,
+      "resizable": true,
+      "fullscreen": false
+    }}]
+  }},
+  "bundle": {{
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }}
+}}"#, name = name, safe_name = name.to_lowercase().replace('-', ""));
+
+    // Write all files
+    std::fs::write(path.join("src/index.html"), index_html).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src-tauri/Cargo.toml"), cargo_toml).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src-tauri/src/lib.rs"), lib_rs).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src-tauri/src/main.rs"), main_rs).map_err(|e| e.to_string())?;
+    std::fs::write(path.join("src-tauri/tauri.conf.json"), tauri_conf).map_err(|e| e.to_string())?;
+
+    // 6. Inject Knowledge Crate
+    let _ = manifest_knowledge_crate(name.clone()).await;
+
+    // 7. Register in Venture Registry
+    {
+        let mut registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.insert(name.clone(), VentureActiveState {
+            name: name.clone(),
+            pid: None,
+            port: Some(1420),
+            status: "Scaffolded (Rust/Tauri)".into(),
+            forge_mode: "rust-tauri".into(),
+            timestamp: chrono::Local::now().to_rfc3339(),
+        });
+    }
+
+    Ok(format!("Strategic Venture [{}] Manifested (Rust/Tauri Desktop) in /ventures/.", name))
+}
+
+
 
 #[tauri::command]
 pub async fn manifest_knowledge_crate(name: String) -> Result<String, String> {
@@ -822,11 +1037,17 @@ pub async fn launch_sub_venture(name: String) -> Result<u32, String> {
         .map_err(|e| e.to_string())?;
 
     let pid = child.id();
+    // Detect forge mode from existing registry entry if available
+    let existing_mode = {
+        let registry = VENTURE_REGISTRY.lock().unwrap();
+        registry.get(&name).map(|s| s.forge_mode.clone()).unwrap_or_else(|| "react-vite".into())
+    };
     let state = VentureActiveState {
         name: name.clone(),
         pid: Some(pid),
-        port: Some(5173), // Default Vite port, detection can be improved
+        port: Some(5173),
         status: "Active".into(),
+        forge_mode: existing_mode,
         timestamp: chrono::Local::now().to_rfc3339(),
     };
 

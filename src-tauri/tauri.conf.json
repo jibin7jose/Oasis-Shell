@@ -34,15 +34,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "windows": {
-      "nsis": {
-        "oneClick": false,
-        "allowToChangeInstallationDirectory": true,
-        "shortcutName": "Oasis Shell",
-        "displayLanguageSelector": true,
-        "compression": "lcm"
-      }
-    }
+    ]
   }
 }

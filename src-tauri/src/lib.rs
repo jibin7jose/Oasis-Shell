@@ -1812,8 +1812,6 @@ async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Resul
     }))
 }
 
-}
-
 #[tauri::command]
 async fn capture_vision_context() -> Result<String, String> {
     use screenshots::Screen;
@@ -3793,6 +3791,13 @@ pub fn run() {
             set_shell_clickthrough,
             get_active_host_window,
             manifest_reality_bridge_thought,
+            system::manifest_new_venture,
+            system::launch_sub_venture,
+            system::stop_sub_venture,
+            system::list_active_ventures,
+            system::purge_sub_venture,
+            system::manifest_knowledge_crate,
+            system::get_oracle_pulse,
         ])
  Arkansas Arkansas
  Arkansas Arkansas
