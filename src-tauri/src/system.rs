@@ -1,12 +1,8 @@
-use crate::AppState;
-use serde::{Deserialize, Serialize};
-use sysinfo::{Disks, System, Components, Networks};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId,
-    GetWindowRect, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE
-};
-use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
 use crate::seal_strategic_asset;
+use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemStats {
@@ -108,6 +104,29 @@ pub struct OraclePulse {
     pub tech_momentum: f32,
     pub timestamp: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum BuildStatus {
+    Idle,
+    Queued,
+    Compiling,
+    Packaging,
+    Success,
+    Failed,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BuildManifest {
+    pub name: String,
+    pub status: BuildStatus,
+    pub logs: Vec<String>,
+    pub output_path: Option<String>,
+    pub duration_ms: u64,
+    pub timestamp: String,
+}
+
+pub static BUILD_REGISTRY: std::sync::LazyLock<std::sync::Mutex<HashMap<String, BuildManifest>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
@@ -1381,3 +1400,131 @@ pub async fn recover_dead_ventures() -> Result<String, String> {
         Ok(format!("Recovered {} zombie venture(s): {}.", recovered.len(), recovered.join(", ")))
     }
 }
+
+// ============================================================
+// PHASE 37: THE EXODUS PROTOCOL — Binary Forge Engine
+// ============================================================
+
+#[tauri::command]
+pub async fn get_all_build_manifests() -> Result<Vec<BuildManifest>, String> {
+    let registry = BUILD_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
+pub async fn get_build_manifest(name: String) -> Result<Option<BuildManifest>, String> {
+    let registry = BUILD_REGISTRY.lock().unwrap();
+    Ok(registry.get(&name).cloned())
+}
+
+#[tauri::command]
+pub async fn forge_venture_binary(name: String) -> Result<String, String> {
+    // 1. Identify Venture
+    let (forge_mode, venture_dir) = {
+        let registry = VENTURE_REGISTRY.lock().unwrap();
+        let v = registry.get(&name).ok_or_else(|| format!("Venture [{}] not found in registry.", name))?;
+        (v.forge_mode.clone(), format!("ventures/{}", name))
+    };
+
+    // 2. Initialize Build Manifest
+    {
+        let mut build_reg = BUILD_REGISTRY.lock().unwrap();
+        build_reg.insert(name.clone(), BuildManifest {
+            name: name.clone(),
+            status: BuildStatus::Queued,
+            logs: vec![format!("Initiating Exodus for [{}]...", name)],
+            output_path: None,
+            duration_ms: 0,
+            timestamp: chrono::Local::now().to_rfc3339(),
+        });
+    }
+
+    let name_clone = name.clone();
+    
+    // 3. Spawn Background Build Task
+    tokio::spawn(async move {
+        let start_time = std::time::Instant::now();
+        let update_status = |status: BuildStatus, log: Option<String>| {
+            let mut reg = BUILD_REGISTRY.lock().unwrap();
+            if let Some(m) = reg.get_mut(&name_clone) {
+                m.status = status;
+                if let Some(l) = log {
+                    m.logs.push(l);
+                }
+            }
+        };
+
+        update_status(BuildStatus::Compiling, Some("Spawning compiler process...".into()));
+
+        // Determine Command
+        let mut cmd = if forge_mode == "rust-tauri" {
+            let mut c = tokio::process::Command::new("cargo");
+            c.args(["tauri", "build"]);
+            c.current_dir(format!("{}/src-tauri", venture_dir));
+            c
+        } else {
+            let mut c = tokio::process::Command::new("npm.cmd");
+            c.args(["run", "build"]);
+            c.current_dir(&venture_dir);
+            c
+        };
+
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        match cmd.spawn() {
+            Ok(mut child) => {
+                let stdout = child.stdout.take().unwrap();
+                let stderr = child.stderr.take().unwrap();
+                let mut stdout_reader = BufReader::new(stdout).lines();
+                let mut stderr_reader = BufReader::new(stderr).lines();
+
+                // Stream Logs
+                loop {
+                    tokio::select! {
+                        line = stdout_reader.next_line() => {
+                            if let Ok(Some(l)) = line {
+                                let mut reg = BUILD_REGISTRY.lock().unwrap();
+                                if let Some(m) = reg.get_mut(&name_clone) {
+                                    m.logs.push(l);
+                                    if m.logs.len() > 1000 { m.logs.remove(0); }
+                                }
+                            } else { break; }
+                        }
+                        line = stderr_reader.next_line() => {
+                            if let Ok(Some(l)) = line {
+                                let mut reg = BUILD_REGISTRY.lock().unwrap();
+                                if let Some(m) = reg.get_mut(&name_clone) {
+                                    m.logs.push(format!("ERR: {}", l));
+                                }
+                            }
+                        }
+                        status = child.wait() => {
+                            match status {
+                                Ok(s) if s.success() => {
+                                    let duration = start_time.elapsed().as_millis() as u64;
+                                    let mut reg = BUILD_REGISTRY.lock().unwrap();
+                                    if let Some(m) = reg.get_mut(&name_clone) {
+                                        m.status = BuildStatus::Success;
+                                        m.duration_ms = duration;
+                                        m.logs.push(format!("Exodus Successful. Assets Manifested in {}ms.", duration));
+                                        m.output_path = Some(if forge_mode == "rust-tauri" {
+                                            format!("{}/src-tauri/target/release/bundle", venture_dir)
+                                        } else {
+                                            format!("{}/dist", venture_dir)
+                                        });
+                                    }
+                                }
+                                _ => update_status(BuildStatus::Failed, Some("Process terminated with non-zero exit code.".into())),
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => update_status(BuildStatus::Failed, Some(format!("Failed to spawn build process: {}", e))),
+        }
+    });
+
+    Ok(format!("Exodus for [{}] Initiated in Background Forge.", name))
+}
+

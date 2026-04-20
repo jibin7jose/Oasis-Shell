@@ -63,6 +63,7 @@ import { RealityBridge } from "./components/shared/RealityBridge";
 import { KernelForge } from "./components/shared/KernelForge";
 import { SingularityHUD } from "./components/shared/SingularityHUD";
 import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
+import { ExodusPanel } from "./components/panels/ExodusPanel";
 
 
 // Design Utility
@@ -154,6 +155,7 @@ export default function App() {
   const [realityBridgeQuery, setRealityBridgeQuery] = useState("");
   const [sandboxOpen, setSandboxOpen] = useState(false);
   const [singularityOpen, setSingularityOpen] = useState(false);
+  const [exodusOpen, setExodusOpen] = useState(false);
   const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
   const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
 
@@ -968,16 +970,15 @@ export default function App() {
     setTimeout(() => {
       setIsThinking(false);
       const simulatedIntents = [
-        "Execute Strategic System Scan",
-        "Seal Sentinel Vault",
-        "Activate Visionary Portal",
-        "Analyze Global AI Market",
-        "Sync Foundry Workspace"
+        { id: "sync_workspace", label: "Sync Workspace", hint: "Git sync + status", permission: "system_control" },
+        { id: "forge", label: "Omni-Vent Forge", hint: "Manifest polyglot sub-ventures (Phase 35)", permission: "system_control" },
+        { id: "exodus", label: "The Exodus Protocol", hint: "Manifest native binary forge (Phase 37)", permission: "system_control" },
+        { id: "sandbox", label: "Neural Sandbox Hardening", hint: "Adversarial audit & resilience (Phase 36)", permission: "system_control" },
       ];
       const intent = simulatedIntents[Math.floor(Math.random() * simulatedIntents.length)];
 
-      setNotification(`Oasis Pulse: Voice intent CAPTURED - "${intent}"`);
-      setMessages(prev => [...prev, { role: "user", content: `(Voice) ${intent}` }]);
+      setNotification(`Oasis Pulse: Voice intent CAPTURED - "${intent.label}"`);
+      setMessages(prev => [...prev, { role: "user", content: `(Voice) ${intent.label}` }]);
 
       // Final Handshake: Injecting intent into the executive controller
       resolveNeuralIntent(intent);
@@ -2401,6 +2402,11 @@ export default function App() {
     }
     if (id === 'forge') {
         setSingularityOpen(true);
+        setCommandOpen(false);
+        return;
+    }
+    if (id === 'exodus') {
+        setExodusOpen(true);
         setCommandOpen(false);
         return;
     }
@@ -4174,6 +4180,10 @@ export default function App() {
       <SingularityHUD 
         isOpen={singularityOpen} 
         onClose={() => setSingularityOpen(false)} 
+      />
+      <ExodusPanel 
+        isOpen={exodusOpen} 
+        onClose={() => setExodusOpen(false)} 
       />
       <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>

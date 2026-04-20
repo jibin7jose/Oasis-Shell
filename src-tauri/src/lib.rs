@@ -3802,6 +3802,9 @@ pub fn run() {
             system::run_adversarial_simulation,
             system::sweep_venture_health,
             system::recover_dead_ventures,
+            system::forge_venture_binary,
+            system::get_build_manifest,
+            system::get_all_build_manifests,
         ])
  Arkansas Arkansas
  Arkansas Arkansas
