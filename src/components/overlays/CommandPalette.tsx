@@ -44,6 +44,7 @@ const BASE_COMMANDS: CommandItem[] = [
   { id: "forge", label: "Omni-Vent Forge", hint: "Manifest polyglot sub-ventures (Phase 35)", permission: "system_control" },
   { id: "exodus", label: "The Exodus Protocol", hint: "Manifest native binary forge (Phase 37)", permission: "system_control" },
   { id: "consortium", label: "The Consortium Mesh", hint: "Synchronize local strategic collective (Phase 38)", permission: "system_control" },
+  { id: "singularity", label: "The Singularity Gateway", hint: "Multi-agent neural orchestration (Phase 40)", permission: "system_control" },
   { id: "sentinel", label: "Neural Sentinel Core", hint: "Activate proactive security & intrusion detection (Phase 39)", permission: "system_control" },
   { id: "sandbox", label: "Neural Sandbox Hardening", hint: "Adversarial audit & resilience (Phase 36)", permission: "system_control" },
   { id: "index", label: "Cortex Index: Full Project", hint: "Re-index semantic store", permission: "system_control" },

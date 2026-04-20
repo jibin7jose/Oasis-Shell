@@ -22,6 +22,7 @@ pub mod vault;
 pub mod macros;
 pub mod golems;
 pub mod system;
+pub mod ai;
 use vault::vault_get_secret;
 use macros::StrategicMacro;
 use golems::{GolemTask, GOLEM_REGISTRY};
@@ -3837,6 +3838,8 @@ pub fn run() {
             system::get_global_threat_level,
             system::run_security_audit,
             system::trigger_system_lockdown,
+            ai::get_agent_collective,
+            ai::invoke_golem_debate,
         ])
  Arkansas Arkansas
  Arkansas Arkansas

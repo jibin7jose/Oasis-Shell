@@ -61,7 +61,7 @@ import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
 import { RealityBridge } from "./components/shared/RealityBridge";
 import { KernelForge } from "./components/shared/KernelForge";
-import { SingularityHUD } from "./components/shared/SingularityHUD";
+import { SingularityPanel } from "./components/shared/SingularityPanel";
 import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
 import { ExodusPanel } from "./components/panels/ExodusPanel";
 import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
@@ -4191,7 +4191,7 @@ export default function App() {
         onClose={() => setSandboxOpen(false)} 
         onInitiateMutation={handleInitiateKernelReForge}
       />
-      <SingularityHUD 
+      <SingularityPanel 
         isOpen={singularityOpen} 
         onClose={() => setSingularityOpen(false)} 
       />
