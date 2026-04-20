@@ -65,6 +65,7 @@ import { SingularityHUD } from "./components/shared/SingularityHUD";
 import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
 import { ExodusPanel } from "./components/panels/ExodusPanel";
 import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
+import { NeuralSentinelPanel } from "./components/shared/NeuralSentinelPanel";
 
 
 // Design Utility
@@ -158,6 +159,7 @@ export default function App() {
   const [singularityOpen, setSingularityOpen] = useState(false);
   const [exodusOpen, setExodusOpen] = useState(false);
   const [consortiumOpen, setConsortiumOpen] = useState(false);
+  const [sentinelOpen, setSentinelOpen] = useState(false);
   const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
   const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
 
@@ -2417,6 +2419,11 @@ export default function App() {
         setCommandOpen(false);
         return;
     }
+    if (id === 'sentinel') {
+        setSentinelOpen(true);
+        setCommandOpen(false);
+        return;
+    }
     setCommandOpen(false);
     if (['dash', 'processes', 'storage'].includes(id)) setActiveView(id as any);
     else if (id === 'vault') setShowSentinel(true);
@@ -4195,6 +4202,10 @@ export default function App() {
       <ConsortiumPanel 
         isOpen={consortiumOpen} 
         onClose={() => setConsortiumOpen(false)} 
+      />
+      <NeuralSentinelPanel 
+        isOpen={sentinelOpen} 
+        onClose={() => setSentinelOpen(false)} 
       />
       <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>

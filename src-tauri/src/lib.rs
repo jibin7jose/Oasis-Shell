@@ -3831,10 +3831,12 @@ pub fn run() {
             system::run_adversarial_simulation,
             system::sweep_venture_health,
             system::recover_dead_ventures,
-            system::forge_venture_binary,
-            system::get_build_manifest,
             system::get_all_build_manifests,
             system::get_consortium_nodes,
+            system::get_sentinel_alerts,
+            system::get_global_threat_level,
+            system::run_security_audit,
+            system::trigger_system_lockdown,
         ])
  Arkansas Arkansas
  Arkansas Arkansas
@@ -3962,6 +3964,9 @@ pub fn run() {
             
             let _ = start_telemetry_server(app_handle.clone());
             
+            // Start Sentinel Monitor
+            start_sentinel_monitor(app_handle.clone());
+            
             let resonance_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 collective_resonance_loop(resonance_handle).await;
@@ -4051,4 +4056,52 @@ pub async fn manifest_reality_bridge_thought(app: tauri::AppHandle, state: tauri
         "synthesis": parsed
     }))
 }
+
+fn start_sentinel_monitor(app: tauri::AppHandle) {
+    use notify::{Watcher, RecursiveMode, Config, EventKind};
+    use std::path::Path;
+    use tauri::Emitter;
+
+    std::thread::spawn(move || {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = notify::RecommendedWatcher::new(tx, Config::default()).expect("Failed to create Sentinel Watcher");
+
+        // Watch ventures directory
+        if let Err(e) = watcher.watch(Path::new("ventures"), RecursiveMode::Recursive) {
+            eprintln!("Sentinel Watcher Error: {:?}", e);
+            return;
+        }
+
+        loop {
+            // 1. File Integrity Monitoring (FIM)
+            if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_secs(5)) {
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
+                        let paths: Vec<String> = event.paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
+                        // Ignore common build artifacts or temp files
+                        if paths.iter().any(|p| p.contains("target") || p.contains("node_modules") || p.contains(".git")) {
+                             continue;
+                        }
+
+                        let mut alerts = system::SENTINEL_REGISTRY.lock().unwrap();
+                        alerts.push(system::SecurityAlert {
+                            id: format!("FIM-LOG-{}", chrono::Local::now().timestamp_micros()),
+                            source: "FIM Daemon".into(),
+                            message: format!("Unauthorized file mutation detected: {:?}", paths),
+                            severity: "Medium".into(),
+                            threat_level: system::ThreatLevel::Amber,
+                            timestamp: chrono::Local::now().to_rfc3339(),
+                        });
+                        let _ = app.emit("sentinel-alert", "FIM_BREACH");
+                    }
+                    _ => {}
+                }
+            }
+
+            // 2. Periodic Behavioral Scan
+            // In a real environment, we'd check GlobalThreatLevel here
+        }
+    });
+}
+
  Arkansas Arkansas

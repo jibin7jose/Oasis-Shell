@@ -143,6 +143,30 @@ pub struct MeshNode {
 pub static CONSORTIUM_REGISTRY: std::sync::LazyLock<std::sync::Mutex<HashMap<String, MeshNode>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum ThreatLevel {
+    Green,   // Nominal
+    Amber,   // Elevated Presence
+    Red,     // Active Breach
+    Lockdown // System Sealed
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SecurityAlert {
+    pub id: String,
+    pub source: String, // FIM, Behavioral, Network, Registry
+    pub message: String,
+    pub severity: String, // Low, Med, High, Critical
+    pub threat_level: ThreatLevel,
+    pub timestamp: String,
+}
+
+pub static SENTINEL_REGISTRY: std::sync::LazyLock<std::sync::Mutex<Vec<SecurityAlert>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+
+pub static GLOBAL_THREAT_LEVEL: std::sync::LazyLock<std::sync::Mutex<ThreatLevel>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(ThreatLevel::Green));
+
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
  Arkansas Arkansas
@@ -1559,5 +1583,91 @@ pub async fn register_consortium_node(node: MeshNode) -> Result<(), String> {
     registry.insert(node.id.clone(), node);
     Ok(())
 }
+
+// ============================================================
+// PHASE 39: THE NEURAL SENTINEL — Security Daemon
+// ============================================================
+
+#[tauri::command]
+pub async fn get_sentinel_alerts() -> Result<Vec<SecurityAlert>, String> {
+    let alerts = SENTINEL_REGISTRY.lock().unwrap();
+    Ok(alerts.clone())
+}
+
+#[tauri::command]
+pub async fn get_global_threat_level() -> Result<ThreatLevel, String> {
+    let level = GLOBAL_THREAT_LEVEL.lock().unwrap();
+    Ok(level.clone())
+}
+
+#[tauri::command]
+pub async fn run_security_audit() -> Result<Vec<SecurityAlert>, String> {
+    let mut new_alerts = Vec::new();
+    
+    // 1. Behavioral Scan: Process Tree
+    let s = System::new_all();
+    for (_pid, process) in s.processes() {
+        let name = process.name();
+        // Suspicious process names in a strategic environment
+        if ["powershell.exe", "cmd.exe", "reg.exe", "netstat.exe"].contains(&name) {
+            new_alerts.push(SecurityAlert {
+                id: format!("PROC-{}", chrono::Local::now().timestamp_micros()),
+                source: "Behavioral Guard".into(),
+                message: format!("Unauthorized system tool detected: [{}]", name),
+                severity: "High".into(),
+                threat_level: ThreatLevel::Amber,
+                timestamp: chrono::Local::now().to_rfc3339(),
+            });
+        }
+    }
+
+    // 2. File Integrity: Config Checks
+    if let Ok(config_meta) = std::fs::metadata("src-tauri/tauri.conf.json") {
+        if config_meta.len() == 0 {
+             new_alerts.push(SecurityAlert {
+                id: format!("FIM-{}", chrono::Local::now().timestamp_micros()),
+                source: "FIM Daemon".into(),
+                message: "CRITICAL: tauri.conf.json has been zeroed out or deleted.".into(),
+                severity: "Critical".into(),
+                threat_level: ThreatLevel::Red,
+                timestamp: chrono::Local::now().to_rfc3339(),
+            });
+        }
+    }
+
+    // Update Registry & Threat Level
+    if !new_alerts.is_empty() {
+        let mut registry = SENTINEL_REGISTRY.lock().unwrap();
+        registry.extend(new_alerts.clone());
+        
+        let mut global_level = GLOBAL_THREAT_LEVEL.lock().unwrap();
+        if new_alerts.iter().any(|a| a.severity == "Critical") {
+            *global_level = ThreatLevel::Red;
+        } else if *global_level == ThreatLevel::Green {
+            *global_level = ThreatLevel::Amber;
+        }
+    }
+
+    Ok(new_alerts)
+}
+
+#[tauri::command]
+pub async fn trigger_system_lockdown() -> Result<String, String> {
+    let mut level = GLOBAL_THREAT_LEVEL.lock().unwrap();
+    *level = ThreatLevel::Lockdown;
+    
+    let mut alerts = SENTINEL_REGISTRY.lock().unwrap();
+    alerts.push(SecurityAlert {
+        id: format!("LOCK-{}", chrono::Local::now().timestamp_micros()),
+        source: "Executive Control".into(),
+        message: "SYTEM LOCKDOWN INITIATED BY FOUNDER. SEALS ENGAGED.".into(),
+        severity: "Critical".into(),
+        threat_level: ThreatLevel::Lockdown,
+        timestamp: chrono::Local::now().to_rfc3339(),
+    });
+
+    Ok("Neural Seals Engaged. System in Total Lockdown.".into())
+}
+
 
 
