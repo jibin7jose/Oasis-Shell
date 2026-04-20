@@ -2825,7 +2825,28 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                     let _ = request.respond(response);
                     continue;
-                } else if url == "/heartbeat" || url == "/collective/pulse" {
+                } else if url == "/consortium/manifest" {
+                    let mut ventures_summary = Vec::new();
+                    {
+                        let registry = system::VENTURE_REGISTRY.lock().unwrap();
+                        for v in registry.values() {
+                            ventures_summary.push(format!("{} ({})", v.name, v.forge_mode));
+                        }
+                    }
+                    
+                    let manifest = serde_json::json!({
+                        "id": "LOCAL-NODE", // In production this would be a persistent ID
+                        "hostname": "Oasis-Strategic-Node",
+                        "active_ventures": ventures_summary,
+                        "timestamp": chrono::Local::now().to_rfc3339(),
+                    });
+                    
+                    let response = tiny_http::Response::from_string(manifest.to_string())
+                        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
+                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
+                    let _ = request.respond(response);
+                    continue;
+                } else if url == "/heartbeat" || url == "/collective/pulse" || url == "/consortium/pulse" {
                     let response = tiny_http::Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                     let _ = request.respond(response);
@@ -3559,25 +3580,33 @@ async fn collective_resonance_loop(app: tauri::AppHandle) {
     // Discovery Task
     let mut buf = [0u8; 1024];
     loop {
-        if let Ok((len, addr)) = socket.recv_from(&mut buf).await {
+        if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
             let msg = String::from_utf8_lossy(&buf[..len]);
             if msg.starts_with("OASIS_NODE_ALIVE|") {
                 let ip = msg.replace("OASIS_NODE_ALIVE|", "");
-                if ip != local_ip_address::local_ip().unwrap().to_string() {
-                    let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
+                
+                let mut local_ip = "0.0.0.0".to_string();
+                if let Ok(ip_addr) = local_ip_address::local_ip() {
+                    local_ip = ip_addr.to_string();
+                }
+
+                if ip != local_ip {
+                    let mut registry = system::CONSORTIUM_REGISTRY.lock().unwrap();
                     let id = format!("NODE-{}", ip.replace(".", "-"));
                     if !registry.contains_key(&id) {
-                        registry.insert(id.clone(), CollectiveNode {
+                        registry.insert(id.clone(), system::MeshNode {
                             id: id.clone(),
                             ip: ip.clone(),
-                            port: 4040,
-                            hostname: format!("Oasis Peer ({})", ip),
-                            status: "Active".into(),
-                            last_pulse: chrono::Local::now().to_rfc3339(),
-                            aura: "indigo".into(),
+                            hostname: format!("Oasis Mesh Peer ({})", ip),
+                            integrity: 100,
+                            active_ventures: vec![],
+                            last_seen: chrono::Local::now().to_rfc3339(),
                             latency_ms: 0,
+                            aura: "indigo".into(),
                         });
-                        let _ = app.emit("collective-discovered", id);
+                        let _ = app.emit("consortium-node-discovered", id);
+                    } else if let Some(node) = registry.get_mut(&id) {
+                        node.last_seen = chrono::Local::now().to_rfc3339();
                     }
                 }
             }
@@ -3805,6 +3834,7 @@ pub fn run() {
             system::forge_venture_binary,
             system::get_build_manifest,
             system::get_all_build_manifests,
+            system::get_consortium_nodes,
         ])
  Arkansas Arkansas
  Arkansas Arkansas

@@ -128,6 +128,21 @@ pub struct BuildManifest {
 pub static BUILD_REGISTRY: std::sync::LazyLock<std::sync::Mutex<HashMap<String, BuildManifest>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MeshNode {
+    pub id: String,
+    pub ip: String,
+    pub hostname: String,
+    pub integrity: u8,
+    pub active_ventures: Vec<String>,
+    pub last_seen: String,
+    pub latency_ms: u32,
+    pub aura: String,
+}
+
+pub static CONSORTIUM_REGISTRY: std::sync::LazyLock<std::sync::Mutex<HashMap<String, MeshNode>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
  Arkansas Arkansas
@@ -1527,4 +1542,22 @@ pub async fn forge_venture_binary(name: String) -> Result<String, String> {
 
     Ok(format!("Exodus for [{}] Initiated in Background Forge.", name))
 }
+
+// ============================================================
+// PHASE 38: THE CONSORTIUM MESH — Discovery Logic
+// ============================================================
+
+#[tauri::command]
+pub async fn get_consortium_nodes() -> Result<Vec<MeshNode>, String> {
+    let registry = CONSORTIUM_REGISTRY.lock().unwrap();
+    Ok(registry.values().cloned().collect())
+}
+
+#[tauri::command]
+pub async fn register_consortium_node(node: MeshNode) -> Result<(), String> {
+    let mut registry = CONSORTIUM_REGISTRY.lock().unwrap();
+    registry.insert(node.id.clone(), node);
+    Ok(())
+}
+
 
