@@ -49,7 +49,7 @@ export const RefractionManager: React.FC = () => {
             <div 
                 className="fixed inset-0 pointer-events-none z-[9999] opacity-30 mix-blend-overlay transition-opacity duration-1000"
                 style={{ 
-                    backgroundImage: `url("https://grainy-gradients.vercel.app/noise.svg")`,
+                    backgroundImage: 'url("/noise.svg")',
                     opacity: ventureIntegrity < 40 ? 0.2 : 0,
                     filter: `contrast(150%) brightness(1000%) invert(${ventureIntegrity < 20 ? 1 : 0})`
                 }}
@@ -57,4 +57,4 @@ export const RefractionManager: React.FC = () => {
         </>
     );
 };
- Arkansas Arkansas
+

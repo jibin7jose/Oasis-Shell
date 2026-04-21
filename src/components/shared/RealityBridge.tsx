@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, Eye, Activity, Zap, ShieldCheck, Cpu, Database, ChevronRight, Binary, Fingerprint } from 'lucide-react';
-import { listen } from "@tauri-apps/api/event";
+import { listenSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
 
 export const RealityBridge: React.FC<{ isOpen: boolean; onClose: () => void; query: string }> = ({ isOpen, onClose, query }) => {
@@ -11,7 +11,7 @@ export const RealityBridge: React.FC<{ isOpen: boolean; onClose: () => void; que
 
     useEffect(() => {
         if (isOpen) {
-            const unlisten = listen('reality-bridge-pulse', (event: any) => {
+            const unlisten = listenSafe('reality-bridge-pulse', (event: any) => {
                 setStep(event.payload);
                 logEvent(`Reality Bridge: Transitioning to ${event.payload}`, "system");
             });
@@ -33,7 +33,7 @@ export const RealityBridge: React.FC<{ isOpen: boolean; onClose: () => void; que
             setResult(null);
         }
     }, [isOpen]);
- Arkansas Arkansas
+
 
     const steps = [
         { id: 'VISIONARY_SENSING', label: 'Visionary Sensing', icon: Eye, color: 'text-amber-500' },
@@ -170,4 +170,4 @@ export const RealityBridge: React.FC<{ isOpen: boolean; onClose: () => void; que
         </motion.div>
     );
 };
- Arkansas Arkansas
+

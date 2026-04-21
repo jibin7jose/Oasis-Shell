@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Network, Wifi, Globe, Zap, Shield, Cpu, Activity, Share2, Server, Terminal } from 'lucide-react';
 import { useSystemStore } from "../../lib/systemStore";
-import { listen } from "@tauri-apps/api/event";
-import { invokeSafe } from "../../lib/tauri";
+import { invokeSafe, listenSafe } from "../../lib/tauri";
 
 interface CollectiveNode {
     id: string;
@@ -21,7 +20,7 @@ export const CollectivePanel: React.FC<{ isOpen: boolean; onClose: () => void }>
     const [isBroadcasting, setIsBroadcasting] = useState(false);
 
     useEffect(() => {
-        const unlisten = listen("collective-discovered", (event) => {
+        const unlisten = listenSafe("collective-discovered", (event) => {
             logEvent(`New Command Node Manifested: ${event.payload}`, "system");
             // Refresh collective list from kernel if needed
         });

@@ -216,7 +216,7 @@ export const HatcheryPanel: React.FC<{ isOpen: boolean; onClose: () => void }> =
                                                     </div>
                                                 </div>
                                             )}
- Arkansas Arkansas
+
                                         </motion.div>
                                     ))}
                                 </AnimatePresence>

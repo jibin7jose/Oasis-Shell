@@ -342,8 +342,13 @@ async fn invoke_neural_mirror(
         return Err("Founder Authentication Required for Mirror Handshake.".into());
     }
 
-    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-    let node = registry.get(&node_id).ok_or("Target Node not found in Collective Registry.")?;
+    let node = {
+        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
+        registry
+            .get(&node_id)
+            .cloned()
+            .ok_or("Target Node not found in Collective Registry.")?
+    };
     
     // Gather Venture Data
     let ledger = get_aegis_ledger().await?;
@@ -519,7 +524,7 @@ async fn manifest_chronos_voyage(state: tauri::State<'_, AppState>, timestamp: S
 
     Ok(snapshot)
 }
- Arkansas Arkansas
+
 
 #[tauri::command]
 async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Result<String, String> {
@@ -1056,13 +1061,6 @@ struct StrategicMemory {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GolemTask {
-    pub name: String,
-    pub language: String,
-    pub content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct CodeModule {
     pub name: String,
     pub language: String,
@@ -1336,7 +1334,7 @@ fn oas_save_resume_analysis(state: tauri::State<'_, AppState>, role: String, sco
 
 #[tauri::command]
 fn oas_get_latest_resume_analysis(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let conn = state.db.lock().unwrap();
+    let conn = state.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
     let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
     
@@ -1375,7 +1373,7 @@ async fn search_semantic_nodes(state: tauri::State<'_, AppState>, query: String)
     let embedding_val = json["embedding"].as_array().ok_or("No embedding in response")?;
     let query_vector: Vec<f32> = embedding_val.iter().map(|v| v.as_f64().unwrap() as f32).collect();
     
-    let conn = state.db.lock().unwrap();
+    let conn = state.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare("SELECT filename, filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
     
     let rows = stmt.query_map([], |row| {
@@ -1431,6 +1429,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
 }
 
+#[tauri::command]
 async fn index_strategic_asset(state: tauri::State<'_, AppState>, content: String, metadata: String) -> Result<(), String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
@@ -1547,7 +1546,7 @@ async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result
         
         if let Some(embedding) = json["embedding"].as_array() {
             let vector_str = serde_json::to_string(embedding).unwrap();
-            let conn = state.db.lock().unwrap();
+            let conn = state.pool.get().map_err(|e| e.to_string())?;
             let _ = conn.execute(
                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![name, fp, content, vector_str],
@@ -1817,13 +1816,14 @@ async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Resul
 #[tauri::command]
 async fn capture_vision_context() -> Result<String, String> {
     use screenshots::Screen;
+    use screenshots::image::ImageOutputFormat;
     use std::io::Cursor;
     
     let screens = Screen::all().map_err(|e| e.to_string())?;
     if let Some(screen) = screens.first() {
         let image = screen.capture().map_err(|e| e.to_string())?;
         let mut buffer = Vec::new();
-        image.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
+        image.write_to(&mut Cursor::new(&mut buffer), ImageOutputFormat::Png)
             .map_err(|e| e.to_string())?;
         
         use base64::prelude::*;
@@ -2484,11 +2484,11 @@ async fn semantic_search(state: tauri::State<'_, AppState>, query: String) -> Re
     let mut results = Vec::new();
     
     {
-        let conn = state.db.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").unwrap();
+        let conn = state.pool.get().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
             Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
-        }).unwrap();
+        }).map_err(|e| e.to_string())?;
         
         for row in rows {
             if let Ok((filename, filepath, vec_str)) = row {
@@ -2523,11 +2523,11 @@ async fn rag_query(state: tauri::State<'_, AppState>, query: String) -> Result<S
         let mut results: Vec<Match> = Vec::new();
         
         {
-            let conn = state.db.lock().unwrap();
-            let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").unwrap();
-            let rows = stmt.query_map([], |row| {
-                Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
-            }).unwrap();
+        let conn = state.pool.get().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
+        }).map_err(|e| e.to_string())?;
             
             for row in rows {
                 if let Ok((filepath, content, vec_str)) = row {
@@ -2695,9 +2695,9 @@ async fn get_neural_graph(state: tauri::State<'_, AppState>) -> Result<serde_jso
 
     // 2. Fetch File Embeddings
     {
-        let conn = state.db.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 40").unwrap();
-        let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).unwrap();
+        let conn = state.pool.get().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 40").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).map_err(|e| e.to_string())?;
         for row in rows.flatten() {
             if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
                 files_data.push((row.0.clone(), vec));
@@ -2736,7 +2736,7 @@ async fn get_neural_graph(state: tauri::State<'_, AppState>) -> Result<serde_jso
 
 #[tauri::command]
 async fn get_neural_brief(state: tauri::State<'_, AppState>, filename: String) -> Result<String, String> {
-    let conn = state.db.lock().unwrap();
+    let conn = state.pool.get().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare("SELECT content FROM file_embeddings WHERE filename = ? LIMIT 1").map_err(|e| e.to_string())?;
     let content: String = stmt.query_row([filename], |row| row.get(0)).map_err(|e| e.to_string())?;
     
@@ -2751,14 +2751,14 @@ async fn get_all_files(state: tauri::State<'_, AppState>) -> Result<serde_json::
     let mut entries = Vec::new();
 
     {
-        let conn = state.db.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").unwrap();
+        let conn = state.pool.get().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| Ok((
             row.get::<_, i32>(0)?,
             row.get::<_, String>(1)?,
             row.get::<_, String>(2)?,
             row.get::<_, String>(3)?
-        ))).unwrap();
+        ))).map_err(|e| e.to_string())?;
         for row in rows.flatten() {
             let snippet = if row.3.len() > 150 { row.3[..150].to_string() + "..." } else { row.3 };
             entries.push(FileEntry { id: row.0, filename: row.1, filepath: row.2, snippet });
@@ -3015,7 +3015,7 @@ fn internal_log_compute(conn: &rusqlite::Connection, tokens: i64, cost: f32) {
 
 #[tauri::command]
 fn log_compute_pulse(state: tauri::State<'_, AppState>, tokens: i64, cost: f32) -> Result<(), String> {
-    let conn = state.db.lock().unwrap();
+    let conn = state.pool.get().map_err(|e| e.to_string())?;
     internal_log_compute(&conn, tokens, cost);
     Ok(())
 }
@@ -3347,7 +3347,7 @@ async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i
     let mut results = Vec::new();
     
     // 1. Search Neural Logs
-    let mut log_stmt = conn.prepare(
+    let mut log_stmt = db.prepare(
         "SELECT id, event_type, message, timestamp FROM neural_logs 
          WHERE message LIKE ?1 OR event_type LIKE ?1 
          ORDER BY id DESC LIMIT ?2"
@@ -3366,7 +3366,7 @@ async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i
     for r in log_rows { results.push(r.unwrap()); }
 
     // 2. Search Pinned Contexts
-    let mut pin_stmt = conn.prepare(
+    let mut pin_stmt = db.prepare(
         "SELECT id, name, aura_color, timestamp FROM pinned_contexts 
          WHERE name LIKE ?1 
          ORDER BY id DESC LIMIT ?2"
@@ -3562,19 +3562,21 @@ async fn collective_pulse_loop(app: tauri::AppHandle) {
 }
 
 async fn collective_resonance_loop(app: tauri::AppHandle) {
+    use std::sync::Arc;
     use tokio::net::UdpSocket;
     use std::net::SocketAddr;
 
-    let socket = UdpSocket::bind("0.0.0.0:4040").await.expect("Failed to bind Resonance UDP Socket");
+    let socket = Arc::new(UdpSocket::bind("0.0.0.0:4040").await.expect("Failed to bind Resonance UDP Socket"));
     socket.set_broadcast(true).expect("Failed to set UDP broadcast");
 
+    let socket_broadcast = Arc::clone(&socket);
     let app_clone = app.clone();
     // Broadcast Task
     tokio::spawn(async move {
         loop {
             let broadcast_addr: SocketAddr = "255.255.255.255:4040".parse().unwrap();
             let msg = format!("OASIS_NODE_ALIVE|{}", local_ip_address::local_ip().unwrap());
-            let _ = socket.send_to(msg.as_bytes(), broadcast_addr).await;
+            let _ = socket_broadcast.send_to(msg.as_bytes(), broadcast_addr).await;
             tokio::time::sleep(Duration::from_secs(30)).await;
         }
     });
@@ -3643,6 +3645,86 @@ async fn collective_aura_sync(state: tauri::State<'_, AppState>, integrity: f32,
 async fn install_oas_binary() -> Result<String, String> {
     // Logic for binary installation/sync
     Ok("OAS Binary Synchronized and Verified.".into())
+}
+
+pub async fn cmd_set_shell_clickthrough(window: tauri::Window, ignore: bool) -> Result<(), String> {
+    window.set_ignore_cursor_events(ignore).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn cmd_get_active_host_window() -> Result<WindowInfo, String> {
+    Ok(WindowInfo {
+        title: "Host Workspace".into(),
+        pid: 0,
+        exe_path: "explorer.exe".into(),
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+        is_maximized: false,
+    })
+}
+
+pub async fn cmd_manifest_reality_bridge_thought(app: tauri::AppHandle, state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
+    use tauri::Emitter;
+    use screenshots::Screen;
+    use screenshots::image::ImageOutputFormat;
+    use std::io::Cursor;
+    use base64::Engine as _;
+    
+    // 1. VISIONARY SENSING
+    let _ = app.emit("reality-bridge-pulse", "VISIONARY_SENSING");
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    let screen = screens.first().ok_or("No strategic display detected.")?;
+    let image = screen.capture().map_err(|e| e.to_string())?;
+    let mut buffer = Vec::new();
+    image
+        .write_to(&mut Cursor::new(&mut buffer), ImageOutputFormat::Png)
+        .map_err(|e| e.to_string())?;
+    let image_b64 = base64::engine::general_purpose::STANDARD.encode(buffer);
+
+    // Invoke Multimodal Oracle
+    let vision_result = invoke_multimodal_oracle(state.clone(), image_b64, query.clone()).await?;
+
+    // 2. SYSTEMIC TELEMETRY
+    let _ = app.emit("reality-bridge-pulse", "SYSTEMIC_TELEMETRY");
+    use crate::system::run_system_diagnostic;
+    let telemetry = run_system_diagnostic().await.map_err(|e| e.to_string())?;
+
+    // 3. STRATEGIC SYNTHESIS
+    let _ = app.emit("reality-bridge-pulse", "STRATEGIC_SYNTHESIS");
+    let client = reqwest::Client::new();
+    let prompt = format!(
+        "You are the Oasis Reality Bridge. Synthesize the final strategic verdict. \n\
+        FOUNDER QUERY: {} \n\
+        VISION CONTEXT: {:?} \n\
+        TELEMETRY CONTEXT: {:?} \n\
+        Manifest a high-fidelity derivation combining physical reality (Vision) with digital health (Telemetry).",
+        query, vision_result, telemetry
+    );
+
+    let body = serde_json::json!({
+        "model": "gemma3",
+        "prompt": prompt,
+        "stream": false,
+        "format": "json"
+    });
+
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let insight = json["response"].as_str().unwrap_or("{}");
+    let parsed: serde_json::Value = serde_json::from_str(insight).unwrap_or(serde_json::json!({ "final_insight": insight }));
+
+    Ok(serde_json::json!({
+        "vision": vision_result,
+        "telemetry": telemetry,
+        "synthesis": parsed
+    }))
 }
 
 pub fn run() {
@@ -3819,9 +3901,6 @@ pub fn run() {
             golems::manifest_architectural_blueprint,
             golems::get_architectural_manifests,
             manifest_chronos_voyage,
-            set_shell_clickthrough,
-            get_active_host_window,
-            manifest_reality_bridge_thought,
             system::manifest_new_venture,
             system::launch_sub_venture,
             system::stop_sub_venture,
@@ -3846,9 +3925,9 @@ pub fn run() {
             mirror::verify_system_mutation,
             mirror::apply_neural_mutation,
         ])
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
+
+
+
         .setup(|app| {
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code};
             let app_handle = app.handle().clone();
@@ -3925,6 +4004,12 @@ pub fn run() {
                 )", []);
 
                 // Risk Oracle Forge Table
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS risk_simulations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scenario TEXT NOT NULL,
+                    probability REAL NOT NULL,
+                    impact_rating TEXT NOT NULL,
+                    defensive_strategy TEXT NOT NULL,
                     associated_venture TEXT,
                     timestamp TEXT NOT NULL
                 )", []);
@@ -3950,6 +4035,11 @@ pub fn run() {
                         status: "Awaiting Mission...".into(),
                         progress: 0.0,
                         aura: "indigo".into(),
+                        mission: None,
+                        thought_trace: None,
+                        is_autonomous: true,
+                        evolution_history: vec![],
+                        evolution_count: 0,
                     });
                     registry.insert("G-BETA".into(), GolemTask {
                         id: "G-BETA".into(),
@@ -3957,6 +4047,11 @@ pub fn run() {
                         status: "Collecting Intelligence...".into(),
                         progress: 0.0,
                         aura: "emerald".into(),
+                        mission: None,
+                        thought_trace: None,
+                        is_autonomous: true,
+                        evolution_history: vec![],
+                        evolution_count: 0,
                     });
                 }
             }
@@ -3987,84 +4082,6 @@ pub fn run() {
 
     app.run(|_app_handle, _event| {});
 }
-#[tauri::command]
-pub async fn set_shell_clickthrough(window: tauri::Window, ignore: bool) -> Result<(), String> {
-    window.set_ignore_cursor_events(ignore).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn get_active_host_window() -> Result<WindowInfo, String> {
-    Ok(WindowInfo {
-        title: "Host Workspace".into(),
-        name: "explorer.exe".into(),
-        is_visible: true,
-        is_focused: true,
-        process_id: 0,
-        hwnd: 0,
-        position: (0, 0),
-        size: (1920, 1080),
-    })
-}
- Arkansas Arkansas
-#[tauri::command]
-pub async fn manifest_reality_bridge_thought(app: tauri::AppHandle, state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
-    use tauri::Emitter;
-    use screenshots::Screen;
-    use base64::Engine as _;
-    
-    // 1. VISIONARY SENSING
-    let _ = app.emit("reality-bridge-pulse", "VISIONARY_SENSING");
-    let screens = Screen::all().map_err(|e| e.to_string())?;
-    let screen = screens.first().ok_or("No strategic display detected.")?;
-    let image = screen.capture().map_err(|e| e.to_string())?;
-    let buffer = image.to_png(None).map_err(|e| e.to_string())?;
-    let image_b64 = base64::engine::general_purpose::STANDARD.encode(buffer);
-
-    // Invoke Multimodal Oracle
-    let vision_result = invoke_multimodal_oracle(state.clone(), image_b64, query.clone()).await?;
-
-    // 2. SYSTEMIC TELEMETRY
-    let _ = app.emit("reality-bridge-pulse", "SYSTEMIC_TELEMETRY");
-    use crate::system::run_system_diagnostic;
-    let telemetry = run_system_diagnostic().await.map_err(|e| e.to_string())?;
-
-    // 3. STRATEGIC SYNTHESIS
-    let _ = app.emit("reality-bridge-pulse", "STRATEGIC_SYNTHESIS");
-    let client = reqwest::Client::new();
-    let prompt = format!(
-        "You are the Oasis Reality Bridge. Synthesize the final strategic verdict. \n\
-        FOUNDER QUERY: {} \n\
-        VISION CONTEXT: {:?} \n\
-        TELEMETRY CONTEXT: {:?} \n\
-        Manifest a high-fidelity derivation combining physical reality (Vision) with digital health (Telemetry).",
-        query, vision_result, telemetry
-    );
-
-    let body = serde_json::json!({
-        "model": "gemma3",
-        "prompt": prompt,
-        "stream": false,
-        "format": "json"
-    });
-
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let insight = json["response"].as_str().unwrap_or("{}");
-    let parsed: serde_json::Value = serde_json::from_str(insight).unwrap_or(serde_json::json!({ "final_insight": insight }));
-
-    Ok(serde_json::json!({
-        "vision": vision_result,
-        "telemetry": telemetry,
-        "synthesis": parsed
-    }))
-}
-
 fn start_sentinel_monitor(app: tauri::AppHandle) {
     use notify::{Watcher, RecursiveMode, Config, EventKind};
     use std::path::Path;
@@ -4074,7 +4091,7 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::RecommendedWatcher::new(tx, Config::default()).expect("Failed to create Sentinel Watcher");
 
-        // Watch ventures directory
+        // Watch ventures directory1234
         if let Err(e) = watcher.watch(Path::new("ventures"), RecursiveMode::Recursive) {
             eprintln!("Sentinel Watcher Error: {:?}", e);
             return;
@@ -4083,27 +4100,7 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
         loop {
             // 1. File Integrity Monitoring (FIM)
             if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_secs(5)) {
-                match event.kind {
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
-                        let paths: Vec<String> = event.paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
-                        // Ignore common build artifacts or temp files
-                        if paths.iter().any(|p| p.contains("target") || p.contains("node_modules") || p.contains(".git")) {
-                             continue;
-                        }
-
-                        let mut alerts = system::SENTINEL_REGISTRY.lock().unwrap();
-                        alerts.push(system::SecurityAlert {
-                            id: format!("FIM-LOG-{}", chrono::Local::now().timestamp_micros()),
-                            source: "FIM Daemon".into(),
-                            message: format!("Unauthorized file mutation detected: {:?}", paths),
-                            severity: "Medium".into(),
-                            threat_level: system::ThreatLevel::Amber,
-                            timestamp: chrono::Local::now().to_rfc3339(),
-                        });
-                        let _ = app.emit("sentinel-alert", "FIM_BREACH");
-                    }
-                    _ => {}
-                }
+                match event.kind {1234}
             }
 
             // 2. Periodic Behavioral Scan
@@ -4112,4 +4109,4 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
     });
 }
 
- Arkansas Arkansas
+

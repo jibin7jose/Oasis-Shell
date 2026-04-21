@@ -1,6 +1,6 @@
 import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera } from "lucide-react";
 import { OracleHub } from "../shared/OracleHub";
- Arkansas Arkansas
+
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
@@ -185,8 +185,8 @@ export default function TopBar({
             <div className={cn("ml-8 h-10 border border-white/5 rounded-2xl overflow-hidden hidden lg:flex transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}>
               <OracleHub />
             </div>
- Arkansas Arkansas
- Arkansas Arkansas
+
+
             <button
               onClick={onOpenVault}
               className={cn("ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3 duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}

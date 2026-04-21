@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   RotateCcw, Database,
@@ -8,7 +7,6 @@ import {
   Zap, Shield, X, ShieldCheck, AlertCircle, FolderOpen, Activity, ShieldAlert, Lock, Gauge, ChevronRight,
   Mic, MicOff, Skull, Pause, FlaskConical, Clock, History, Globe, Cpu, Book
 } from "lucide-react";
-import ForceGraph3D from "react-force-graph-3d";
 import ZenithHUD from "./components/dashboard/ZenithHUD";
 import SystemPanel, { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo } from "./components/panels/SystemPanel";
 import LeftRail from "./components/layout/LeftRail";
@@ -40,7 +38,7 @@ export type { FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint };
 import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
-import { PortalDashboard } from "./components/shared/PortalDashboard";
+// PortalDashboard - removed (component not found, was an unused import)
 import { NeuralMirrorPanel } from "./components/shared/NeuralMirrorPanel";
 import { GhostWindows } from "./components/visuals/GhostWindows";
 import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
@@ -55,7 +53,6 @@ import { SpectralBoundary } from "./components/shared/SpectralBoundary";
 import { GhostOverlay } from "./components/shared/GhostOverlay";
 import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
 import { GlobalTerminal } from "./components/shared/GlobalTerminal";
-import { CollectivePanel } from "./components/panels/CollectivePanel";
 import { HatcheryPanel } from "./components/panels/HatcheryPanel";
 import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 import { ChronosHUD } from "./components/shared/ChronosHUD";
@@ -65,8 +62,14 @@ import { KernelForge } from "./components/shared/KernelForge";
 import { SingularityPanel } from "./components/shared/SingularityPanel";
 import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
 import { ExodusPanel } from "./components/panels/ExodusPanel";
-import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
 import { NeuralSentinelPanel } from "./components/shared/NeuralSentinelPanel";
+import { VisionScanner } from "./components/shared/VisionScanner";
+import { LibraryPanel } from "./components/panels/LibraryPanel";
+import { DashboardPanel } from "./components/panels/DashboardPanel";
+import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
+import { SoundscapeManager } from "./components/shared/SoundscapeManager";
+
+
 
 
 // Design Utility
@@ -148,8 +151,22 @@ export default function App() {
     workforce, setWorkforce,
     showHatchery, setShowHatchery,
     showBlueprint, setShowBlueprint,
+    isVaultAuthenticated, setIsVaultAuthenticated,
+    showVault, setShowVault,
+    showSettings, setShowSettings,
+    showNexus, setShowNexus,
+    showSentinel, setShowSentinel,
+    activeView, setActiveView,
     shellMode, setShellMode,
+    showCollective, setShowCollective,
+    showLibrary: showLibraryStore, setShowLibrary: setShowLibraryStore,
+    isVisionScanning: isVisionScanningStore, setIsVisionScanning: setIsVisionScanningStore,
+    visionPreview: visionPreviewStore, setVisionPreview: setVisionPreviewStore,
+    economicNews, setEconomicNews,
   } = useSystemStore();
+
+  // Alias store vision/library state for local use (prefer store-driven)
+  const storeLog = logEvent;
 
   useHeuristicGuardian();
 
@@ -164,22 +181,67 @@ export default function App() {
   const [mirrorOpen, setMirrorOpen] = useState(false);
   const [kernelForgeOpen, setKernelForgeOpen] = useState(false);
   const [activeMutationProposal, setActiveMutationProposal] = useState<any>(null);
-
   const [activeContext, setActiveContext] = useState('dev');
   const [commandOpen, setCommandOpen] = useState(false);
   const [simMetrics, setSimMetrics] = useState({ arr: 1.24, burn: 42.5, momentum: 12.8 });
   const [simMode, setSimMode] = useState(false);
   const [isCortexSearching, setIsCortexSearching] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState(false);
+  const [autoAura, setAutoAura] = useState(false);
+  const [fpsThreshold, setFpsThreshold] = useState(22);
+  const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
+  const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
+  const [isForging, setIsForging] = useState(false);
+  const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
+  const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [zenithActive, setZenithActive] = useState(false);
+  const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
+  const [cortexMenu, setCortexMenu] = useState<{ x: number, y: number, node: any } | null>(null);
+  const [activeForge, setActiveForge] = useState<any>(null);
+
+  // Wired to global store (aliased to avoid shadowing)
+  const isVisionScanning = isVisionScanningStore;
+  const setIsVisionScanning = setIsVisionScanningStore;
+  const visionPreview = visionPreviewStore;
+  const setVisionPreview = setVisionPreviewStore;
+  const showLibrary = showLibraryStore;
+  const setShowLibrary = setShowLibraryStore;
+
+  // Legacy local state variables (still referenced throughout the kernel)
+  const [showAI, setShowAI] = useState(false);
+  const [zenMode, setZenMode] = useState(false);
+  const [visionActive, setVisionActive] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [chronosLedger, setChronosLedger] = useState<any[]>([]);
+  const [chronosIndex, setChronosIndex] = useState(-1);
+  const [crossWisdom, setCrossWisdom] = useState<any[]>([]);
+  const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
+  const [aegisLedger, setAegisLedger] = useState<any>(null);
+  const [activeOracle, setActiveOracle] = useState<any>(null);
+  const [sentinelVault, setSentinelVault] = useState<any>(null);
+  const [selectedVaultAsset, setSelectedVaultAsset] = useState<any>(null);
+  const [isVaultLocked, setIsVaultLocked] = useState(true);
+  const [founderSecret, setFounderSecret] = useState("");
+  const [showNetwork, setShowNetwork] = useState(false);
+  const [manifestHistory, setManifestHistory] = useState<string[]>([]);
+  const [hardwareStatus, setHardwareStatus] = useState<any>(null);
+  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
+  const [activeGolem, setActiveGolem] = useState<any>(null);
+
+
+
+
 
   // Neural OS: Shell Mode Lifecycle Synchronization
   useEffect(() => {
-    const unlistenShow = listen("tauri://window-shown", () => {
+    const unlistenShow = listenSafe("tauri://window-shown", () => {
         setShellMode('command');
-        invokeSafe("set_shell_clickthrough", { ignore: false });
+        void invokeSafe("cmd_set_shell_clickthrough", { ignore: false }).catch(() => {});
     });
-    const unlistenHide = listen("tauri://window-hidden", () => {
+    const unlistenHide = listenSafe("tauri://window-hidden", () => {
         setShellMode('ambient');
-        invokeSafe("set_shell_clickthrough", { ignore: true });
+        void invokeSafe("cmd_set_shell_clickthrough", { ignore: true }).catch(() => {});
     });
 
     return () => {
@@ -200,14 +262,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [shellMode]);
   useEffect(() => {
-    const unlistenAura = listen("collective-aura-sync", (event: any) => {
+    const unlistenAura = listenSafe("collective-aura-sync", (event: any) => {
       const { integrity, status, source } = event.payload;
       setNotification(`Neural Resonance Received: ${source} status is ${status}`);
       setVentureIntegrity(integrity);
       logEvent(`Collective Resonance: Synchronized with ${source}`, "neural");
     });
 
-    const unlistenHandover = listen("collective-handover-received", (event: any) => {
+    const unlistenHandover = listenSafe("collective-handover-received", (event: any) => {
       const crate = event.payload;
       setNotification(`Strategic Crate Received via Handover: ${crate.name}`);
       setCollectiveNodes(prev => prev.map(n => n.id === "HANDOVER" ? { ...n, status: "Syncing" } : n));
@@ -229,7 +291,6 @@ export default function App() {
   const [rippleColor, setRippleColor] = useState("#6366f1");
   const [showVisualForge, setShowVisualForge] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [showNexus, setShowNexus] = useState(false);
   const [auraIp, setAuraIp] = useState("192.168.1.100");
   const [commandQuery, setCommandQuery] = useState("");
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
@@ -257,9 +318,6 @@ export default function App() {
     const interval = setInterval(checkVault, 30000); // Check every 30s
     return () => clearInterval(interval);
   }, []);
-  const [fpsThreshold, setFpsThreshold] = useState(22);
-  const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
-  const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const fgRef = useRef<any>(null);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);
@@ -297,6 +355,7 @@ export default function App() {
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showBoardroom, setShowBoardroom] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
+  const [ForceGraph3DComp, setForceGraph3DComp] = useState<any>(null);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -374,26 +433,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const [zenMode, setZenMode] = useState(false);
-  const [visionActive, setVisionActive] = useState(false);
-  const [chronosLedger, setChronosLedger] = useState<any[]>([]);
-  const [chronosIndex, setChronosIndex] = useState(-1);
-  const [voiceActive, setVoiceActive] = useState(false);
-  const [crossWisdom, setCrossWisdom] = useState<any[]>([]);
-  const [neuralWisdom, setNeuralWisdom] = useState<any>(null);
-  const [aegisLedger, setAegisLedger] = useState<any>(null);
-  const [activeOracle, setActiveOracle] = useState<any>(null);
-  const [sentinelVault, setSentinelVault] = useState<any>(null);
-  const [showSentinel, setShowSentinel] = useState(false);
-  const [selectedVaultAsset, setSelectedVaultAsset] = useState<any>(null);
-  const [isVaultLocked, setIsVaultLocked] = useState(true);
-  const [founderSecret, setFounderSecret] = useState("");
-  const [showNetwork, setShowNetwork] = useState(false);
-  const [storageReport] = useState<any>(null);
-  const [manifestHistory, setManifestHistory] = useState<string[]>([]);
-  const [hardwareStatus, setHardwareStatus] = useState<any>(null);
-  const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
-  const [activeGolem, setActiveGolem] = useState<any>(null);
+  useEffect(() => {
+    if (!isTauri) return;
+    let active = true;
+    import("react-force-graph-3d")
+      .then((mod) => {
+        if (active) setForceGraph3DComp(() => mod.default);
+      })
+      .catch(() => {
+        if (active) setForceGraph3DComp(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Lifecycle Synchronizations moved to unified effect block above
 
   const handleCortexSearch = async () => {
     if (!cortexQuery.trim()) return;
@@ -479,15 +534,8 @@ export default function App() {
       setNotification(`Export Fault: ${err}`);
     }
   };
-  const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
-  const [autoAura, setAutoAura] = useState(false);
-  const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const [zenithActive, setZenithActive] = useState(false);
-  const [spectralAnomalies, setSpectralAnomalies] = useState<any[]>([]);
-  const [cortexMenu, setCortexMenu] = useState<{ x: number, y: number, node: any } | null>(null);
-  const [activeForge, setActiveForge] = useState<any>(null);
-  const [performanceMode, setPerformanceMode] = useState(false);
+  // Redundant state block removed (moved to consolidated block at head)
+
 
   // Phase 9.0: Physical Aura Bridge
   useEffect(() => {
@@ -2147,7 +2195,8 @@ export default function App() {
     }
   }
 
-  const [isForging, setIsForging] = useState(false);
+  // Redundant isForging state moved to head
+
 
   useEffect(() => {
     const syncCollective = async () => {
@@ -2374,7 +2423,7 @@ export default function App() {
     setRealityBridgeOpen(true);
     setCommandOpen(false);
     try {
-        const result = await invokeSafe("manifest_reality_bridge_thought", { query });
+        const result = await invokeSafe("invoke_deep_oracle", { task: query, context: visionaryContext });
         // The RealityBridge component listens for the completion
         // But we cast it into the UI via an event or direct state if needed
         // For simplicity, we can just emit a local complete event if we don't have a listener for result
@@ -2459,7 +2508,7 @@ export default function App() {
       await invokeSafe("index_folder", { path: "." });
       setNotification("Cortex Successfully Index.");
     }
-    else if (id === 'graph') {
+    else if (id === 'graph' || id === 'show_graph') {
       if (!performanceMode) setShowGraph(true);
     }
     else if (id === 'reset_priorities') {
@@ -2703,8 +2752,8 @@ export default function App() {
 
       {/* 3D Nebula Layer */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
-        {mounted && !performanceMode && (
-          <ForceGraph3D
+        {mounted && isTauri && !performanceMode && ForceGraph3DComp && (
+          <ForceGraph3DComp
             ref={fgRef}
             graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
             backgroundColor="#00000000"
@@ -2851,7 +2900,7 @@ export default function App() {
           {activeView === 'settings' && (
             <SpectralBoundary fallbackTitle="Settings Core Breach">
               <SettingsPanel />
-            </SettingsPanel>
+            </SpectralBoundary>
           )}
 
           {activeView === 'dash' && (
@@ -3078,8 +3127,8 @@ export default function App() {
             </div>
 
             <div className="w-full h-full pointer-events-auto">
-              {mounted && (
-                <ForceGraph3D
+              {mounted && isTauri && ForceGraph3DComp && (
+                <ForceGraph3DComp
                   graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
                   backgroundColor="#00000000"
                   nodeRelSize={performanceMode ? 3 : 5}
@@ -3101,6 +3150,13 @@ export default function App() {
                   warmupTicks={performanceMode ? 50 : 20}
                   cooldownTicks={performanceMode ? 30 : 60}
                 />
+              )}
+              {mounted && !isTauri && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="px-6 py-3 rounded-2xl border border-white/10 bg-black/40 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                    Strategic Cortex (Browser Fallback)
+                  </div>
+                </div>
               )}
             </div>
 
@@ -4221,3 +4277,4 @@ export default function App() {
       <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
     </motion.div>
   );
+}

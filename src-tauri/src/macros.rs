@@ -101,7 +101,6 @@ pub async fn sign_macro_golem(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-#[tauri::command]
 pub async fn get_macro_inventory() -> Result<Vec<StrategicMacro>, String> {
     let registry = MACRO_REGISTRY.lock().unwrap();
     Ok(registry.values().cloned().collect())
@@ -138,3 +137,5 @@ pub async fn execute_visual_macro(id: String) -> Result<String, String> {
 }
 
 pub fn run() {
+    // Module commands are registered from crate root.
+}

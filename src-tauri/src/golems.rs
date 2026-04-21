@@ -68,8 +68,8 @@ pub struct NeuralSandboxSession {
 
 pub static SANDBOX_REGISTRY: LazyLock<Mutex<HashMap<String, NeuralSandboxSession>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
- Arkansas Arkansas
- Arkansas Arkansas
+
+
 
 // Wait, I need to know what NeuralAgent is. I'll just check it after creating the file.
 // I will create the file first without register_new_golem and delete_golem, or I'll just copy them.
@@ -144,6 +144,11 @@ pub async fn release_golem_workforce(
                 status: "Analyzing Objective...".into(),
                 progress: 10.0,
                 aura: "indigo".into(),
+                mission: Some(instructions.clone()),
+                thought_trace: None,
+                is_autonomous: true,
+                evolution_history: vec![],
+                evolution_count: 0,
             });
         }
 
@@ -271,6 +276,11 @@ pub async fn register_golem_task(id: String, name: String, aura: String) -> Resu
         status: "Neural Initialization...".into(),
         progress: 0.0,
         aura,
+        mission: None,
+        thought_trace: None,
+        is_autonomous: true,
+        evolution_history: vec![],
+        evolution_count: 0,
     });
     Ok(())
 }
@@ -417,7 +427,7 @@ pub async fn hatch_autonomous_golem(state: tauri::State<'_, AppState>, name: Str
                 }
             }
         }
- Arkansas Arkansas
+
 
         // Cleanup on death
         let mut registry = GOLEM_REGISTRY.lock().unwrap();
@@ -682,4 +692,4 @@ pub async fn validate_kernel_integrity() -> Result<String, String> {
         Err(format!("Kernel Integrity Breach: Compilation failures found within the proposed mutation.\n{}", String::from_utf8_lossy(&output.stderr)))
     }
 }
- Arkansas Arkansas
+

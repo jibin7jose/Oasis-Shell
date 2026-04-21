@@ -42,8 +42,8 @@ export const NeuralBridge: React.FC<NeuralBridgeProps> = ({
   useEffect(() => {
     const fetchPredictions = async () => {
       try {
-        const res = await invokeSafe("get_predictive_intents") as PredictiveIntent[];
-        setPredictions(res);
+        const res = await invokeSafe("get_predictive_intents");
+        setPredictions(Array.isArray(res) ? (res as PredictiveIntent[]) : []);
       } catch (e) {}
     };
     fetchPredictions();
@@ -97,7 +97,7 @@ export const NeuralBridge: React.FC<NeuralBridgeProps> = ({
         <AnimatePresence>
           {predictions.map((pred, i) => (
             <motion.button
-              key={pred.label}
+              key={`${pred.label}-${i}`}
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}

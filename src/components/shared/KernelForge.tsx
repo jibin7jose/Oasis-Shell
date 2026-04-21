@@ -148,5 +148,3 @@ export const KernelForge: React.FC<{ isOpen: boolean; onClose: () => void; propo
         </motion.div>
     );
 };
- Arkansas Arkansas
- Arkansas Arkansas

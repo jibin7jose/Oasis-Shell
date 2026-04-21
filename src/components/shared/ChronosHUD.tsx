@@ -17,7 +17,8 @@ export const ChronosHUD: React.FC = () => {
 
     const fetchHistory = async () => {
         try {
-            const history = await invokeSafe("seek_chronos_history") as any[];
+            const rawHistory = await invokeSafe("seek_chronos_history");
+            const history = Array.isArray(rawHistory) ? rawHistory : [];
             setChronosHistory(history);
             if (history.length > 0 && selectedIndex === 0) {
                 setSelectedIndex(0);
@@ -133,4 +134,4 @@ export const ChronosHUD: React.FC = () => {
         </motion.div>
     );
 };
- Arkansas Arkansas
+

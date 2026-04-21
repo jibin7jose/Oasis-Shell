@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Skull, Zap, Activity, AlertTriangle, ShieldCheck, ChevronRight, Binary, Terminal, Bot, RotateCw } from 'lucide-react';
- Arkansas Arkansas
+
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
 
@@ -10,7 +10,7 @@ export const SandboxHUD: React.FC<{
     onClose: () => void;
     onInitiateMutation: (sessionId: string) => void;
 }> = ({ isOpen, onClose, onInitiateMutation }) => {
- Arkansas Arkansas
+
     const { logEvent } = useSystemStore();
     const [sessions, setSessions] = useState<any[]>([]);
     const [activeSession, setActiveSession] = useState<any>(null);
@@ -208,7 +208,7 @@ export const SandboxHUD: React.FC<{
                                                 </button>
                                             </div>
                                         </div>
- Arkansas Arkansas
+
                                     </motion.div>
                                 )}
                             </motion.div>
@@ -242,4 +242,4 @@ const Play: React.FC<{ className?: string }> = ({ className }) => (
         <polygon points="5 3 19 12 5 21 5 3" />
     </svg>
 );
- Arkansas Arkansas
+

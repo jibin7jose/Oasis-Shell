@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ChevronRight,
   Database,
+} from 'lucide-react';
 import { Fingerprint, Scan, Target, Cpu } from 'lucide-react';
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";

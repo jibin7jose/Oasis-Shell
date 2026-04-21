@@ -84,9 +84,6 @@ export const SettingsPanel: React.FC = () => {
             )}
           </div>
 
-            </div>
-          </div>
-
           <div className="glass rounded-[2rem] border border-white/5 p-8 flex flex-col gap-6">
             <div className="flex justify-between items-start">
               <div className="flex flex-col gap-1">

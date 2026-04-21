@@ -145,8 +145,14 @@ export interface SystemState {
   setShellMode: (mode: 'ambient' | 'command' | 'hidden') => void;
   focusedAppContext: any | null;
   setFocusedAppContext: (ctx: any | null) => void;
+  showSettings: boolean;
+  setShowSettings: (show: boolean) => void;
+  showNexus: boolean;
+  setShowNexus: (show: boolean) => void;
+  showSentinel: boolean;
+  setShowSentinel: (show: boolean) => void;
 }
- Arkansas Arkansas
+
 
 export const useSystemStore = create<SystemState>((set) => ({
   marketIntel: {
@@ -306,4 +312,10 @@ export const useSystemStore = create<SystemState>((set) => ({
   setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
   setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
   setEconomicNews: (news: string[]) => set({ economicNews: news }),
+  showSettings: false,
+  setShowSettings: (show: boolean) => set({ showSettings: show }),
+  showNexus: false,
+  setShowNexus: (show: boolean) => set({ showNexus: show }),
+  showSentinel: false,
+  setShowSentinel: (show: boolean) => set({ showSentinel: show }),
 }));

@@ -1,10 +1,17 @@
-use crate::seal_strategic_asset;
+use crate::{seal_strategic_asset, AppState};
+use serde::{Deserialize, Serialize};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use sysinfo::{Components, Disks, Networks, System};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+    SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE,
+};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SystemStats {
     pub oas_id: String,
     pub path_status: String,
@@ -169,13 +176,13 @@ pub static GLOBAL_THREAT_LEVEL: std::sync::LazyLock<std::sync::Mutex<ThreatLevel
 
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
- Arkansas Arkansas
+
+
+
+
+
+
+
 
 #[tauri::command]
 pub fn get_running_windows() -> Vec<WindowInfo> {
@@ -718,7 +725,8 @@ pub async fn rename_path(path: String, new_name: String) -> Result<String, Strin
     std::fs::rename(old_path, &new_path).map_err(|e| e.to_string())?;
 
     Ok(format!("Asset Re-designated: {} to {}", path, new_path.display()))
-}/// Phase 35: Omni-Vent Forge — Polyglot Scaffolding Engine
+}
+/// Phase 35: Omni-Vent Forge — Polyglot Scaffolding Engine
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum VentureForgeMode {
@@ -1076,8 +1084,6 @@ pub async fn get_oracle_pulse() -> Result<OraclePulse, String> {
 
     Ok(pulse)
 }
- Arkansas Arkansas
-}
 
 #[tauri::command]
 pub async fn launch_sub_venture(name: String) -> Result<u32, String> {
@@ -1174,7 +1180,7 @@ pub async fn purge_sub_venture(name: String) -> Result<String, String> {
 
     Ok(format!("Strategic Venture [{}] Purged from Reality.", name))
 }
- Arkansas Arkansas
+
 
 // ============================================================
 // PHASE 36: NEURAL SANDBOX HARDENING — Resilience Engine
@@ -1607,9 +1613,9 @@ pub async fn run_security_audit() -> Result<Vec<SecurityAlert>, String> {
     // 1. Behavioral Scan: Process Tree
     let s = System::new_all();
     for (_pid, process) in s.processes() {
-        let name = process.name();
+        let name = process.name().to_string_lossy().to_string();
         // Suspicious process names in a strategic environment
-        if ["powershell.exe", "cmd.exe", "reg.exe", "netstat.exe"].contains(&name) {
+        if ["powershell.exe", "cmd.exe", "reg.exe", "netstat.exe"].contains(&name.as_str()) {
             new_alerts.push(SecurityAlert {
                 id: format!("PROC-{}", chrono::Local::now().timestamp_micros()),
                 source: "Behavioral Guard".into(),
