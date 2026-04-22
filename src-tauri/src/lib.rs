@@ -4091,7 +4091,7 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::RecommendedWatcher::new(tx, Config::default()).expect("Failed to create Sentinel Watcher");
 
-        // Watch ventures directory1234
+        // Watch ventures directory
         if let Err(e) = watcher.watch(Path::new("ventures"), RecursiveMode::Recursive) {
             eprintln!("Sentinel Watcher Error: {:?}", e);
             return;
@@ -4100,7 +4100,7 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
         loop {
             // 1. File Integrity Monitoring (FIM)
             if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_secs(5)) {
-                match event.kind {1234}
+                let _ = app.emit("sentinel-event", format!("{:?}", event.kind));
             }
 
             // 2. Periodic Behavioral Scan
