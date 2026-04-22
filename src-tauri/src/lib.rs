@@ -1043,6 +1043,13 @@ pub struct OracleAlert {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EconomicPulse {
+    pub headline: String,
+    pub category: String, // TECH, MACRO, CRYPTO, etc.
+    pub timestamp: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MarketIntelligence {
     pub sentiment: String,
     pub index_change: String,
@@ -1620,15 +1627,34 @@ async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String>
 }
 
 #[tauri::command]
-async fn get_market_intelligence() -> Result<MarketIntelligence, String> {
-    // REAL MARKET REACTOR: Simulating an 18.4% Market Downturn (Oasis-X Index)
-    Ok(MarketIntelligence {
-        sentiment: "Bear Divergence".into(),
-        index_change: "-18.2% (SaaS Core)".into(),
-        sectors_active: vec!["AI Infrastructure".into(), "Neural Compute".into()],
-        market_index: 82.4, // Down from 100 base
-        sector_divergence: 12.8,
-    })
+async fn get_market_intelligence(state: tauri::State<'_, AppState>) -> Result<MarketIntelligence, String> {
+    let news = get_economic_news().await.unwrap_or_default();
+    let client = reqwest::Client::new();
+    
+    let news_context = news.iter().map(|n| n.headline.clone()).collect::<Vec<_>>().join("\n");
+    let prompt = format!(
+        "Analyze these market headlines and provide a JSON response with keys: \
+        'sentiment' (Short string, e.g. 'Bullish Convergence'), 'index_change' (Percentage string), \
+        'sectors_active' (List of strings), 'market_index' (Float), 'sector_divergence' (Float). \n\n \
+        HEADLINES:\n{}", news_context
+    );
+
+    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false, "format": "json" });
+    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(resp) = json["response"].as_str() {
+        let intel: MarketIntelligence = serde_json::from_str(resp).map_err(|e| e.to_string())?;
+        Ok(intel)
+    } else {
+        Ok(MarketIntelligence {
+            sentiment: "Stagnant".into(),
+            index_change: "0.0%".into(),
+            sectors_active: vec!["General".into()],
+            market_index: 100.0,
+            sector_divergence: 0.0,
+        })
+    }
 }
 
 
@@ -2134,7 +2160,7 @@ async fn execute_cli_directive(
 }
 
 #[tauri::command]
-async fn get_economic_news() -> Result<Vec<String>, String> {
+async fn get_economic_news() -> Result<Vec<EconomicPulse>, String> {
     let client = reqwest::Client::new();
     let res = client.get("https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty")
         .send()
@@ -2144,19 +2170,34 @@ async fn get_economic_news() -> Result<Vec<String>, String> {
     let story_ids: Vec<u64> = res.json().await.map_err(|e| e.to_string())?;
     let mut news = Vec::new();
     
-    // Fetch top 5 startup/tech headlines
     for id in story_ids.iter().take(5) {
         if let Ok(story_res) = client.get(format!("https://hacker-news.firebaseio.com/v0/item/{}.json?print=pretty", id)).send().await {
             if let Ok(story) = story_res.json::<serde_json::Value>().await {
                 if let Some(title) = story["title"].as_str() {
-                    news.push(format!("[REAL PULSE] {}", title));
+                    let category = if title.to_lowercase().contains("ai") || title.to_lowercase().contains("neural") {
+                        "TECH/AI"
+                    } else if title.to_lowercase().contains("crypto") || title.to_lowercase().contains("blockchain") {
+                        "CRYPTO"
+                    } else {
+                        "MACRO"
+                    };
+
+                    news.push(EconomicPulse {
+                        headline: title.to_string(),
+                        category: category.to_string(),
+                        timestamp: chrono::Local::now().to_rfc3339(),
+                    });
                 }
             }
         }
     }
 
     if news.is_empty() {
-        news.push("[System] Oasis Web Bridge Offline. Using Strategic Drift Buffer.".into());
+        news.push(EconomicPulse {
+            headline: "Oasis Web Bridge Offline. Using Strategic Drift Buffer.".into(),
+            category: "SYSTEM".into(),
+            timestamp: chrono::Local::now().to_rfc3339(),
+        });
     }
 
     Ok(news)
@@ -2255,7 +2296,8 @@ async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String
     // Simulate concurrent neural perspectives (Ollama sequential for now but persona-wrapped)
     for (name, role) in personas {
         let prompt = format!(
-            "ACT AS {}. Analyze the following startup task: '{}'. Context: {}. \
+            "ACT AS {}. Analyze the following startup task: '{}'. \n\
+            MARKET CONTEXT: {}. \n\
             Output ONLY valid JSON with keys: 'advice' (1 sentence), 'risk' (0-1), 'score' (0-100).",
             role, task, context
         );
@@ -2281,20 +2323,29 @@ async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String
         }
     }
 
-    let summary = if insights.is_empty() {
-        "Boardroom synthesis unavailable. Local personas did not return strategic guidance.".to_string()
+    // 3. AI-Generated Consensus Summary
+    let summary_prompt = format!(
+        "As the BOARDROOM ORACLE, synthesize the following perspectives on the task '{}':\n{}\n\
+        Provide a 2-sentence definitive strategic consensus.",
+        task, 
+        insights.iter().map(|i| format!("{}: {}", i.persona, i.advice)).collect::<Vec<_>>().join("\n")
+    );
+
+    let summary_body = serde_json::json!({ "model": "gemma3:4b", "prompt": summary_prompt, "stream": false });
+    let summary = if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&summary_body).send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            json["response"].as_str().unwrap_or("Strategic deadlock. No consensus manifested.").to_string()
+        } else {
+            "Consensus synthesis error.".to_string()
+        }
     } else {
-        insights
-            .iter()
-            .map(|insight| format!("{}: {}", insight.persona, insight.advice))
-            .collect::<Vec<_>>()
-            .join(" | ")
+        "Neural bridge offline for summary.".to_string()
     };
 
     Ok(DebateManifest {
         task_id: format!("DEBATE_{}", chrono::Local::now().format("%H%M%S")),
-        consensus_aura: if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.into(),
         insights,
+        consensus_aura: if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.into(),
         summary,
     })
 }

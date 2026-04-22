@@ -135,3 +135,9 @@ export interface FileInfo {
   size: number;
   last_modified: number;
 }
+
+export interface EconomicPulse {
+  headline: string;
+  category: string;
+  timestamp: string;
+}

@@ -21,10 +21,16 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({
     )}>
       <div className="flex gap-12 items-center animate-marquee whitespace-nowrap group-hover:pause">
         {tickerItems.map((m: any, i: number) => (
-          typeof m === 'string' ? (
+          m.headline ? (
             <div key={`economic-news-${i}`} className="flex gap-4 items-center">
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Neural Pulse</span>
-              <span className="text-sm font-bold text-white tracking-tight">{m}</span>
+              <span className={cn(
+                "text-[10px] font-black uppercase tracking-[0.3em]",
+                m.category === 'CRYPTO' ? "text-amber-500" : 
+                m.category === 'TECH/AI' ? "text-indigo-400" : "text-emerald-500"
+              )}>
+                {m.category || "Neural Pulse"}
+              </span>
+              <span className="text-sm font-bold text-white tracking-tight">{m.headline}</span>
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-2" />
             </div>
           ) : (

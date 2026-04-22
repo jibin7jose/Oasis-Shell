@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2, AlertTriangle, Activity, Shield, ShieldCheck } from 'lucide-react';
+import { X, Zap, ShieldAlert, TrendingUp, Cpu, MessageSquareQuote, Brain, ScrollText, Download, Loader2, AlertTriangle, Activity, Shield, ShieldCheck, Camera } from 'lucide-react';
 import { SpectralBoundary } from '../shared/SpectralBoundary';
 import { invokeSafe, isTauri } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
@@ -525,6 +525,21 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">Local Oracle Sync: NOMINAL</span>
                 </div>
               )}
+           </div>
+           
+           {/* Internal News Ticker */}
+           <div className="flex-1 max-w-xl mx-8 overflow-hidden relative">
+              <div className="flex gap-10 items-center animate-marquee whitespace-nowrap hover:pause">
+                 {(metrics?.market?.ai_ticker || []).map((news: any, idx: number) => (
+                   <div key={idx} className="flex items-center gap-3">
+                     <span className={`text-[8px] font-black uppercase tracking-widest ${
+                       news.category === 'CRYPTO' ? "text-amber-500" : 
+                       news.category === 'TECH/AI' ? "text-indigo-400" : "text-emerald-500"
+                     }`}>{news.category}</span>
+                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{news.headline}</span>
+                   </div>
+                 ))}
+              </div>
            </div>
 
            <div className="flex items-center gap-4">

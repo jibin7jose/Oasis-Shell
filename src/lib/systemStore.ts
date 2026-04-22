@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { 
   SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo, 
-  GolemTask, StrategicMacro, CollectiveNode, ContextCrate, FounderMetrics 
+  GolemTask, StrategicMacro, CollectiveNode, ContextCrate, FounderMetrics, EconomicPulse 
 } from "./contracts";
 
 export interface ChronosSnapshot {
@@ -68,8 +68,8 @@ export interface SystemState {
   setPendingManifests: (m: any[]) => void;
   oracleAlert: any | null;
   setOracleAlert: (a: any | null) => void;
-  economicNews: string[];
-  setEconomicNews: (news: string[]) => void;
+  economicNews: EconomicPulse[];
+  setEconomicNews: (news: EconomicPulse[]) => void;
   isMirroring: boolean;
   setIsMirroring: (is: boolean) => void;
   activeMirrorNode: string | null;
@@ -311,7 +311,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   setActiveGolems: (golems: GolemTask[]) => set({ activeGolems: golems }),
   setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
   setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
-  setEconomicNews: (news: string[]) => set({ economicNews: news }),
+  setEconomicNews: (news: EconomicPulse[]) => set({ economicNews: news }),
   showSettings: false,
   setShowSettings: (show: boolean) => set({ showSettings: show }),
   showNexus: false,

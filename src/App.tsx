@@ -629,7 +629,7 @@ export default function App() {
         await invokeSafe("start_proactive_sentience");
 
         // Phase 6: Sync Economic News
-        const news = await invokeSafe("get_economic_news") as string[];
+        const news = await invokeSafe("get_economic_news") as EconomicPulse[];
         if (news) {
           setEconomicNews(news);
           setMarketIntel({
@@ -760,7 +760,7 @@ export default function App() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const news = await invokeSafe("get_economic_news") as string[];
+        const news = await invokeSafe("get_economic_news") as EconomicPulse[];
         if (news) {
           setEconomicNews(news);
           setMarketIntel({
