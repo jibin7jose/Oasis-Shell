@@ -77,17 +77,22 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     }
     setIsExporting(true);
     try {
-      const path = await invokeSafe("generate_strategic_report", { 
+      const res = await invokeSafe("generate_strategic_report", { 
         summary: debate.summary, 
         oracleAdvice: oracleData?.advice || "No Oracle directive present." 
-      }) as string;
+      }) as { path: string, hash: string, timestamp: string };
       
-      // Index into Infinite Archive
+      const { path, hash } = res;
+      
+      // Index into Infinite Archive with SHA-256 Fingerprint
       const report_content = `BOARDROOM REPORT: ${debate.summary}\nORACLE ADVICE: ${oracleData?.advice || "N/A"}`;
-      await invokeSafe("index_strategic_asset", { content: report_content, metadata: `Report Manifest: ${path}` });
+      await invokeSafe("index_strategic_asset", { 
+        content: report_content, 
+        metadata: JSON.stringify({ path, hash, source: "Boardroom Consensus" }) 
+      });
       
-      setNotification(`Strategic Report Manifested & Indexed: ${path}`);
-      logEvent(`Strategic Memory Indexed: ${path}`, "neural");
+      setNotification(`Strategic Report Manifested: ${hash.substring(0, 8)}...`);
+      logEvent(`Strategic Asset Fingerprinted & Indexed: ${hash}`, "neural");
     } catch (e) {
       setNotification("Report Manifestation Breach.");
     } finally {
@@ -210,6 +215,14 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                      className="bg-transparent border-none text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] mt-1 w-full focus:outline-none placeholder:text-indigo-500/20"
                    />
                 </div>
+                {debate?.consensus_aura && (
+                  <div className={`ml-8 px-4 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-[0.2em] flex items-center gap-2 ${
+                    debate.consensus_aura === 'volatile' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${debate.consensus_aura === 'volatile' ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    {debate.consensus_aura === 'volatile' ? 'Strategic Conflict Detected' : 'Consensus Achieved'}
+                  </div>
+                )}
              </div>
 
              <nav className="flex items-center gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/10">

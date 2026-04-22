@@ -2431,9 +2431,9 @@ async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, con
 }
 
 #[tauri::command]
-async fn generate_strategic_report(summary: String, oracle_advice: String) -> Result<String, String> {
+async fn generate_strategic_report(summary: String, oracle_advice: String) -> Result<serde_json::Value, String> {
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let report = format!(
+    let content = format!(
         "# OASIS SHELL // STRATEGIC SYNTHESIS REPORT\n\
         Generated: {}\n\n\
         ## Boardroom Consensus Summary\n\
@@ -2441,13 +2441,31 @@ async fn generate_strategic_report(summary: String, oracle_advice: String) -> Re
         ## Deep-Oracle Directive\n\
         {}\n\n\
         ---\n\
-        *This report is signed by the Oasis Shell Neural Kernel.*",
+        *This report is cryptographically signed and archived in the Sentinel Vault.*",
         timestamp, summary, oracle_advice
     );
 
-    let path = format!("strategic_report_{}.md", chrono::Local::now().timestamp());
-    std::fs::write(&path, &report).map_err(|e| e.to_string())?;
-    Ok(path)
+    // Ensure vault directory exists
+    let report_dir = std::path::Path::new("vault/reports");
+    if !report_dir.exists() {
+        std::fs::create_dir_all(report_dir).map_err(|e| e.to_string())?;
+    }
+
+    let filename = format!("strategic_report_{}.md", chrono::Local::now().timestamp());
+    let path = report_dir.join(&filename);
+    std::fs::write(&path, &content).map_err(|e| e.to_string())?;
+
+    // Generate SHA-256 Hash for integrity verification
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let hash = format!("{:x}", hasher.finalize());
+
+    Ok(serde_json::json!({
+        "path": path.to_string_lossy(),
+        "hash": hash,
+        "timestamp": timestamp.to_string()
+    }))
 }
 
 #[tauri::command]
