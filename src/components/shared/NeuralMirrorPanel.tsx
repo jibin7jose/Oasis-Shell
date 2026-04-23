@@ -227,15 +227,39 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
 
                                 <div className="flex-1 bg-black/60 rounded-3xl border border-white/5 p-6 mb-8 overflow-hidden flex flex-col">
                                     <div className="flex items-center justify-between mb-4 px-2">
-                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Proposed Logic Flux</span>
-                                        <Code className="w-3.5 h-3.5 text-slate-700" />
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] leading-relaxed text-indigo-200/70 p-2">
-                                        <div className="opacity-30 line-through mb-4 decoration-red-500/50">{selectedMutation.original_content.substring(0, 300)}...</div>
-                                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-emerald-400/90 italic">
-                                            {selectedMutation.rationale}
+                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Neural Diff Analysis</span>
+                                        <div className="flex gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-rose-500/50" />
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
                                         </div>
-                                        <div className="mt-4 text-emerald-300 whitespace-pre-wrap">{selectedMutation.proposed_content}</div>
+                                    </div>
+                                    
+                                    <div className="flex-1 grid grid-cols-2 gap-4 overflow-hidden">
+                                        {/* Original Genome */}
+                                        <div className="flex flex-col min-h-0">
+                                            <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-2 px-1">Original Genome</span>
+                                            <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-xl p-4 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-relaxed text-slate-500 line-through decoration-rose-500/20">
+                                                {selectedMutation.original_content}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Proposed Flux */}
+                                        <div className="flex flex-col min-h-0">
+                                            <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-2 px-1">Proposed Flux</span>
+                                            <div className="flex-1 bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-4 overflow-y-auto custom-scrollbar font-mono text-[9px] leading-relaxed text-emerald-400/90">
+                                                {selectedMutation.proposed_content}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Binary className="w-3 h-3 text-indigo-400" />
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Logic Rationale</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-300 italic leading-relaxed">
+                                            "{selectedMutation.rationale}"
+                                        </p>
                                     </div>
                                 </div>
 

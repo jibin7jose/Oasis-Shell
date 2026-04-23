@@ -2250,7 +2250,7 @@ async fn generate_venture_synthesis(state: tauri::State<'_, AppState>, venture_i
     // 1. GATHER REAL DATA (Fiscal Metrics & Economic Pulse)
     let metrics = load_venture_state().await?;
     let news = get_economic_news().await?;
-    let news_context = news.join(" | ");
+    let news_context = news.iter().map(|p| p.headline.as_str()).collect::<Vec<_>>().join(" | ");
 
     // 2. SYNTHESIZE VIA GOLEM (Internal Reasoning)
     let prompt = format!(
@@ -2382,10 +2382,12 @@ async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String
         "Neural bridge offline for summary.".to_string()
     };
 
+    let consensus_aura = if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.to_string();
+    
     Ok(DebateManifest {
         task_id: format!("DEBATE_{}", chrono::Local::now().format("%H%M%S")),
         insights,
-        consensus_aura: if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.into(),
+        consensus_aura,
         summary,
     })
 }
@@ -3728,7 +3730,7 @@ async fn collective_resonance_loop(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-async fn collective_aura_sync(state: tauri::State<'_, AppState>, integrity: f32, status: String) -> Result<(), String> {
+async fn collective_aura_sync(_state: tauri::State<'_, AppState>, integrity: f32, status: String) -> Result<(), String> {
     let registry = {
         let registry = COLLECTIVE_REGISTRY.lock().unwrap();
         registry.values().cloned().collect::<Vec<CollectiveNode>>()
@@ -3773,6 +3775,8 @@ pub async fn cmd_get_active_host_window() -> Result<WindowInfo, String> {
         is_maximized: false,
     })
 }
+
+
 
 pub async fn cmd_manifest_reality_bridge_thought(app: tauri::AppHandle, state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
     use tauri::Emitter;
