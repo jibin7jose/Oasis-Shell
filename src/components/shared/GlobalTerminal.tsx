@@ -70,7 +70,7 @@ export const GlobalTerminal: React.FC = () => {
           className="fixed inset-0 z-[9999] bg-[#050505]/95 backdrop-blur-2xl flex items-center justify-center p-12 overflow-hidden"
         >
           <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <NeuralRipple />
+            <NeuralRipple active={true} />
           </div>
 
           <motion.div

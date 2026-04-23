@@ -122,7 +122,7 @@ export const SingularityPanel: React.FC<{ isOpen: boolean; onClose: () => void }
         try {
             const result = await invokeSafe('invoke_golem_debate', { task: currentTask }) as DebateState;
             setDebateResult(result);
-            logEvent("strategic_debate_complete", { task: currentTask });
+            logEvent(`Strategic Debate Complete: ${currentTask}`, "neural");
         } catch (e) {
             setNotification("Singularity Failure: Neural loop fragmented.");
             console.error(e);

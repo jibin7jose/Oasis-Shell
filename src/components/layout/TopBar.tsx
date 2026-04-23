@@ -50,7 +50,8 @@ interface TopBarProps {
   onToggleAutoAura: () => void;
   onAegisSync: () => void;
   onOpenNexus: () => void;
-  onDeepLink?: (target: string) => void;
+  onOpenSettings: () => void;
+  onDeepLink?: (target: string) => Promise<void>;
 }
 
 export default function TopBar({
@@ -80,6 +81,7 @@ export default function TopBar({
   onToggleAutoAura,
   onAegisSync,
   onOpenNexus,
+  onOpenSettings,
   onDeepLink
 }: TopBarProps) {
   return (

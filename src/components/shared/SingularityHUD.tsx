@@ -77,7 +77,7 @@ export const SingularityHUD: React.FC<{ isOpen: boolean; onClose: () => void }> 
     const handlePurge = async (name: string) => {
         try {
             await invokeSafe("purge_sub_venture", { name });
-            logEvent(`Venture Purged: ${name}`, "warning");
+            logEvent(`Venture Purged: ${name}`, "system");
             setNotification(`Venture ${name} removed from reality.`);
             fetchVentures();
         } catch (e) {

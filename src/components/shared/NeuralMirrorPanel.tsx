@@ -83,7 +83,7 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
             const msg = await invokeSafe('apply_neural_mutation', { mutationId: selectedMutation.id }) as string;
             addLog('success', msg);
             setNotification("SYSTEM EVOLUTION COMPLETE. KERNEL MUTATED.");
-            logEvent("neural_mutation_applied", { mutationId: selectedMutation.id });
+            logEvent(`Neural Mutation Manifested: ${selectedMutation.id} in ${selectedMutation.file_path}`, "neural");
             refreshMutations();
             setTimeout(onClose, 2000);
         } catch (e) {

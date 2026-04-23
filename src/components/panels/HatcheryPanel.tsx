@@ -190,7 +190,7 @@ export const HatcheryPanel: React.FC<{ isOpen: boolean; onClose: () => void }> =
                                                     <span className="text-[9px] font-black uppercase tracking-widest">Current Thought Trace</span>
                                                 </div>
                                                 <div className="text-[11px] text-slate-300 font-mono leading-relaxed bg-black/20 p-3 rounded-xl border border-white/5 relative overflow-hidden group">
-                                                    {golem.evolution_count > 0 && (
+                                                    {(golem.evolution_count ?? 0) > 0 && (
                                                         <motion.div 
                                                             animate={{ opacity: [0.1, 0.3, 0.1] }}
                                                             transition={{ duration: 2, repeat: Infinity }}

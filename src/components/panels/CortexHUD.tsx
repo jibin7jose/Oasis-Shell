@@ -23,6 +23,7 @@ const CortexHUD: React.FC = () => {
     setFounderMetrics,
     setMarketIntel,
     setVentureIntegrity,
+    logEvent,
   } = useSystemStore();
 
   const handleCortexSearch = async () => {

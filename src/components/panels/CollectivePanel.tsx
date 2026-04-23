@@ -20,7 +20,7 @@ export const CollectivePanel: React.FC<{ isOpen: boolean; onClose: () => void }>
     const [isBroadcasting, setIsBroadcasting] = useState(false);
 
     useEffect(() => {
-        const unlisten = listenSafe("collective-discovered", (event) => {
+        const unlisten = listenSafe("collective-discovered", (event: any) => {
             logEvent(`New Command Node Manifested: ${event.payload}`, "system");
             // Refresh collective list from kernel if needed
         });

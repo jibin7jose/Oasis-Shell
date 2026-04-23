@@ -906,6 +906,23 @@ async fn lock_sentinel() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn verify_strategic_asset_integrity(file_path: String, expected_hash: String) -> Result<bool, String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err("Strategic Asset Not Found for Verification.".into());
+    }
+
+    let content = std::fs::read(path).map_err(|e| e.to_string())?;
+    
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(&content);
+    let current_hash = format!("{:x}", hasher.finalize());
+
+    Ok(current_hash == expected_hash)
+}
+
+#[tauri::command]
 async fn seal_strategic_asset(file_path: String, title: String) -> Result<String, String> {
     let path = std::path::PathBuf::from(&file_path);
     if !path.exists() {
@@ -1058,8 +1075,8 @@ pub struct MarketIntelligence {
     pub sector_divergence: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct StrategicMemory {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StrategicMemory {
     id: i32,
     content: String,
     metadata: String,
@@ -1464,6 +1481,29 @@ async fn index_strategic_asset(state: tauri::State<'_, AppState>, content: Strin
     ).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+async fn get_strategic_assets(state: tauri::State<'_, AppState>) -> Result<Vec<StrategicMemory>, String> {
+    let pool = state.pool.clone();
+    let conn = pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare("SELECT id, content, metadata, score, timestamp FROM strategic_memory ORDER BY id DESC").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        Ok(StrategicMemory {
+            id: row.get(0)?,
+            content: row.get(1)?,
+            metadata: row.get(2)?,
+            score: row.get(3)?,
+            timestamp: row.get(4)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut assets = Vec::new();
+    for asset in rows {
+        assets.push(asset.map_err(|e| e.to_string())?);
+    }
+    Ok(assets)
 }
 
 #[tauri::command]
@@ -3904,6 +3944,8 @@ pub fn run() {
             generate_venture_synthesis,
             relocate_foundry_storage,
             derive_boardroom_debate,
+            get_strategic_assets,
+            verify_strategic_asset_integrity,
             sync_physical_aura,
             execute_neural_intent,
             system::get_process_list,

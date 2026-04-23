@@ -13,7 +13,8 @@ import {
   RefreshCcw,
   Terminal,
   BrainCircuit,
-  Fingerprint
+  Fingerprint,
+  Activity
 } from 'lucide-react';
 import { useSystemStore } from '../../lib/systemStore';
 import { cn } from '../../lib/utils';

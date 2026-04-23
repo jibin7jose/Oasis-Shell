@@ -13,6 +13,8 @@ interface VenturePulseCardProps {
   aura: string;
   timestamp: string;
   onLaunch: (id: number) => void;
+  onMirror?: (name: string) => void;
+  isMirroring?: boolean;
 }
 
 export const VenturePulseCard: React.FC<VenturePulseCardProps> = ({

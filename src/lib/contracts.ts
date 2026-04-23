@@ -141,3 +141,18 @@ export interface EconomicPulse {
   category: string;
   timestamp: string;
 }
+
+export interface StrategicMemory {
+  id: number;
+  content: string;
+  metadata: string;
+  score: number;
+  timestamp: string;
+}
+
+export interface NeuralLog {
+  id?: number;
+  event_type: string;
+  message: string;
+  timestamp: string;
+}

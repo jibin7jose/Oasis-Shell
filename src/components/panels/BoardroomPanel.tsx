@@ -100,6 +100,30 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
     }
   };
 
+  const deployConsensus = async () => {
+    if (!debate) return;
+    if (!isVaultAuthenticated) {
+      setNotification("Founder Signature Required to deploy strategic workforce.");
+      setShowVault(true);
+      return;
+    }
+    
+    try {
+      setNotification("Initializing Autonomous Golem for Strategic Execution...");
+      await invokeSafe("hatch_autonomous_golem", {
+        name: `Strategic Agent ${debate.task_id.split('_')[1] || ''}`,
+        mission: debate.summary,
+        aura: debate.consensus_aura === 'volatile' ? 'rose' : 'indigo'
+      });
+      
+      setNotification("Neural Directive Deployed: Golem Fleet Initialized.");
+      logEvent(`Autonomous Golem Hatched for Boardroom Directive`, "neural");
+      onClose();
+    } catch (e) {
+      setNotification("Neural Deployment Failed.");
+    }
+  };
+
   const triggerRiskSimulation = async () => {
     setIsSimulating(true);
     try {
@@ -564,6 +588,15 @@ export default function BoardroomPanel({ isOpen, onClose, metrics }: BoardroomPa
                 >
                   {isExporting ? <Loader2 className="w-3 h-3 text-emerald-400 animate-spin" /> : <Download className="w-3 h-3 text-emerald-400 group-hover:scale-110 transition-transform" />}
                   <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Manifest Strategic Report</span>
+                </button>
+              )}
+              {debate && (
+                <button 
+                  onClick={deployConsensus}
+                  className="flex items-center gap-3 px-6 py-2 bg-indigo-500 text-white rounded-full transition-all hover:scale-105 shadow-xl group"
+                >
+                  <Zap className="w-3 h-3 group-hover:animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Deploy Strategic Directive</span>
                 </button>
               )}
               <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.4em]">Strategic Directive Layer // Locked To Founder Signature</p>

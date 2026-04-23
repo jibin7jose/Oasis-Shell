@@ -29,7 +29,7 @@ import { useSystemStore } from "./lib/systemStore";
 import { ChronosSnapshot } from "./lib/systemStore";
 import { isTauri, invokeSafe, listenSafe } from "./lib/tauri";
 import { 
-  FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint, GolemTask 
+  FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint, GolemTask, EconomicPulse
 } from "./lib/contracts";
 
 export type { FounderMetrics, StrategicMacro, CollectiveNode, LatticePoint };
@@ -272,7 +272,7 @@ export default function App() {
     const unlistenHandover = listenSafe("collective-handover-received", (event: any) => {
       const crate = event.payload;
       setNotification(`Strategic Crate Received via Handover: ${crate.name}`);
-      setCollectiveNodes(prev => prev.map(n => n.id === "HANDOVER" ? { ...n, status: "Syncing" } : n));
+      setCollectiveNodes(collectiveNodes.map((n: CollectiveNode) => n.id === "HANDOVER" ? { ...n, status: "Syncing" } : n));
       logEvent(`Venture Handover manifested from remote node`, "deploy");
     });
 
@@ -1035,7 +1035,7 @@ export default function App() {
       setMessages(prev => [...prev, { role: "user", content: `(Voice) ${intent.label}` }]);
 
       // Final Handshake: Injecting intent into the executive controller
-      resolveNeuralIntent(intent);
+      resolveNeuralIntent(intent.label);
     }, 2200);
   };
 
@@ -2912,7 +2912,7 @@ export default function App() {
                 isThinking={isThinking}
                 isRecording={isRecording}
                 toggleVoiceRecording={toggleVoiceRecording}
-                handleSearchIntent={handleSearchIntent}
+                handleSearchIntent={(e: any) => handleSearchIntent(e.target.value)}
                 displayedMarket={displayedMarket}
                 marketIntel={marketIntel}
                 zenMode={zenMode}
@@ -2938,7 +2938,6 @@ export default function App() {
                 onSynthesize={handleTriggerSynthesis}
                 isSynthesizing={isSynthesizing}
                 onLaunchForge={() => setShowVisualForge(true)}
-                onLaunchVisualForge={() => setShowVisualForge(true)}
                  NeuralBridgeComponent={(props: any) => (
                   <NeuralBridge 
                     {...props}
@@ -2947,7 +2946,7 @@ export default function App() {
                     isThinking={isThinking}
                     isRecording={isRecording}
                     toggleVoiceRecording={toggleVoiceRecording}
-                    handleSearchIntent={handleSearchIntent}
+                    handleSearchIntent={(e: any) => handleSearchIntent(e.target.value)}
                   />
                 )}
                 TemporalExplorerComponent={() => (
@@ -3083,9 +3082,10 @@ export default function App() {
               </div>
 
               {/* Distributed Collective: Remote Foundry Nodes (Orchestrated by CollectivePanel) */}
-              <SpectralBoundary fallbackTitle="Collective Registry Breach">
-                <CollectivePanel />
-              </SpectralBoundary>
+              <CollectivePanel 
+                isOpen={showCollective} 
+                onClose={() => setShowCollective(false)} 
+              />
             </div>
 
             {/* Phase 14: Chronos Temporal Scrubber */}

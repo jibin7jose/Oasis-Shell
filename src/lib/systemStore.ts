@@ -1,22 +1,14 @@
 import { create } from 'zustand';
 import { 
-  SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo, 
-  GolemTask, StrategicMacro, CollectiveNode, ContextCrate, FounderMetrics, EconomicPulse 
-} from "./contracts";
-
-export interface ChronosSnapshot {
-  timestamp: string;
-  nodes: any[];
-  links: any[];
-  metrics: FounderMetrics | null;
-  market: any | null;
-  windows: any[];
-  integrity: number;
-}
+  ProcessInfo, WindowInfo, StorageInfo, DeviceInfo, 
+  FounderMetrics, SystemStats, ContextCrate, CollectiveNode, 
+  StrategicMacro, GolemTask, EconomicPulse 
+} from './contracts';
 
 export interface SystemState {
   founderMetrics: FounderMetrics;
   systemStats: SystemStats | null;
+  hardwareStatus: any | null;
   notification: string;
   timeline: { id: string; type: string; message: string; timestamp: string }[];
   activeDebate: any | null;
@@ -81,8 +73,6 @@ export interface SystemState {
   isSimulating: boolean;
   setIsSimulating: (is: boolean) => void;
 
-  
-  
   // Collective & Workforce
   collectiveNodes: CollectiveNode[];
   setCollectiveNodes: (nodes: CollectiveNode[]) => void;
@@ -153,19 +143,17 @@ export interface SystemState {
   setShowSentinel: (show: boolean) => void;
 }
 
+export type ChronosSnapshot = {
+  timestamp: string;
+  nodes: any[];
+  links: any[];
+  metrics: FounderMetrics;
+  market: any;
+  integrity: number;
+  windows?: WindowInfo[];
+};
 
 export const useSystemStore = create<SystemState>((set) => ({
-  marketIntel: {
-    market_index: 0,
-    index_change: "Awaiting kernel sync",
-    ai_ticker: []
-  },
-  fiscalBurn: { total_burn: 0.0, token_load: 0, status: 'NOMINAL' },
-  ventureIntegrity: 100,
-  strategicInventory: [],
-  sparklinesEnabled: true,
-  performanceOptimized: false,
-  systemLastSync: "",
   founderMetrics: {
     arr: "N/A",
     burn: "N/A",
@@ -174,6 +162,7 @@ export const useSystemStore = create<SystemState>((set) => ({
     stress_color: "#6366f1",
   },
   systemStats: null,
+  hardwareStatus: null,
   notification: "",
   timeline: [
     { id: "init-1", type: "system", message: "Oasis Foundry Kernel Initialized", timestamp: new Date().toISOString() },
@@ -190,15 +179,39 @@ export const useSystemStore = create<SystemState>((set) => ({
   dynamicGraph: { nodes: [], links: [] },
   cortexResults: [],
   cortexQuery: "",
+  processes: [],
+  windows: [],
+  storage: [],
+  devices: [],
+  marketIntel: {
+    market_index: 0,
+    index_change: "Awaiting kernel sync",
+    ai_ticker: []
+  },
+  fiscalBurn: { total_burn: 0.0, token_load: 0, status: 'NOMINAL' },
+  ventureIntegrity: 100,
+  strategicInventory: [],
+  sparklinesEnabled: true,
+  performanceOptimized: false,
+  systemLastSync: "",
   showCLI: false,
+  setShowCLI: (show: boolean) => set({ showCLI: show }),
   showCrates: false,
+  setShowCrates: (show: boolean) => set({ showCrates: show }),
   isSavingCrate: false,
+  setIsSavingCrate: (is: boolean) => set({ isSavingCrate: is }),
   crates: [],
+  setCrates: (crates: ContextCrate[]) => set({ crates }),
   activeVenture: "Oasis Core (Alpha)",
+  setActiveVenture: (v: string) => set({ activeVenture: v }),
   cliInput: "",
+  setCliInput: (i: string) => set({ cliInput: i }),
   cliHistory: [],
+  setCliHistory: (h: any[]) => set({ cliHistory: h }),
   searchQuery: "",
+  setSearchQuery: (q: string) => set({ searchQuery: q }),
   pendingManifests: [],
+  setPendingManifests: (m: any[]) => set({ pendingManifests: m }),
   hardwareAnchorActive: false,
   setHardwareAnchorActive: (active: boolean) => set({ hardwareAnchorActive: active }),
   isBiometricScanning: false,
@@ -206,25 +219,17 @@ export const useSystemStore = create<SystemState>((set) => ({
   resilienceData: null,
   fetchResilienceAudit: async () => {
     try {
-      const data = await invokeSafe("get_system_resilience_audit");
+      const { invoke } = await import("@tauri-apps/api/core");
+      const data = await invoke("get_system_resilience_audit");
       set({ resilienceData: data });
     } catch (e) {
       console.error("Resilience Audit Sync Failed", e);
     }
   },
-
   oracleAlert: null,
-  processes: [],
-  windows: [],
-  storage: [],
-  devices: [],
-  
-  collectiveNodes: [],
-  strategicMacros: [],
-  activeGolems: [],
-  activeProposals: [],
-  workforce: [],
+  setOracleAlert: (a: any | null) => set({ oracleAlert: a }),
   economicNews: [],
+  setEconomicNews: (news: EconomicPulse[]) => set({ economicNews: news }),
   isMirroring: false,
   setIsMirroring: (is: boolean) => set({ isMirroring: is }),
   activeMirrorNode: null,
@@ -235,29 +240,16 @@ export const useSystemStore = create<SystemState>((set) => ({
   setActiveSimulation: (s: any | null) => set({ activeSimulation: s }),
   isSimulating: false,
   setIsSimulating: (is: boolean) => set({ isSimulating: is }),
-
-  setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
-  activeView: 'dash',
-  setActiveView: (view: string) => set({ activeView: view }),
-  showVault: false,
-  setShowVault: (show: boolean) => set({ showVault: show }),
-  showLibrary: false,
-  setShowLibrary: (show: boolean) => set({ showLibrary: show }),
-  isVisionScanning: false,
-  setIsVisionScanning: (is: boolean) => set({ isVisionScanning: is }),
-  visionPreview: null,
-  setVisionPreview: (p: string | null) => set({ visionPreview: p }),
-  showCollective: false,
-  setShowCollective: (show: boolean) => set({ showCollective: show }),
-  showHatchery: false,
-  setShowHatchery: (show: boolean) => set({ showHatchery: show }),
-  showBlueprint: false,
-  setShowBlueprint: (show: boolean) => set({ showBlueprint: show }),
-  shellMode: 'ambient',
-  setShellMode: (mode) => set({ shellMode: mode }),
-  focusedAppContext: null,
-  setFocusedAppContext: (ctx) => set({ focusedAppContext: ctx }),
-
+  collectiveNodes: [],
+  setCollectiveNodes: (nodes: CollectiveNode[]) => set({ collectiveNodes: nodes }),
+  strategicMacros: [],
+  setStrategicMacros: (macros: StrategicMacro[]) => set({ strategicMacros: macros }),
+  activeGolems: [],
+  setActiveGolems: (golems: GolemTask[]) => set({ activeGolems: golems }),
+  activeProposals: [],
+  setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
+  workforce: [],
+  setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
   setMarketIntel: (market: any) => set({ marketIntel: market }),
   setFiscalBurn: (burn: any) => set({ fiscalBurn: burn }),
   setVentureIntegrity: (integrity: number) => set({ ventureIntegrity: integrity }),
@@ -296,22 +288,28 @@ export const useSystemStore = create<SystemState>((set) => ({
   setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => set({ dynamicGraph: graph }),
   setCortexResults: (results: any[]) => set({ cortexResults: results }),
   setCortexQuery: (query: string) => set({ cortexQuery: query }),
-  setShowCLI: (show: boolean) => set({ showCLI: show }),
-  setShowCrates: (show: boolean) => set({ showCrates: show }),
-  setIsSavingCrate: (is: boolean) => set({ isSavingCrate: is }),
-  setCrates: (crates: ContextCrate[]) => set({ crates }),
-  setActiveVenture: (v: string) => set({ activeVenture: v }),
-  setCliInput: (i: string) => set({ cliInput: i }),
-  setCliHistory: (h: any[]) => set({ cliHistory: h }),
-  setSearchQuery: (q: string) => set({ searchQuery: q }),
-  setPendingManifests: (m: any[]) => set({ pendingManifests: m }),
-  setOracleAlert: (a: any | null) => set({ oracleAlert: a }),
-  setCollectiveNodes: (nodes: CollectiveNode[]) => set({ collectiveNodes: nodes }),
-  setStrategicMacros: (macros: StrategicMacro[]) => set({ strategicMacros: macros }),
-  setActiveGolems: (golems: GolemTask[]) => set({ activeGolems: golems }),
-  setActiveProposals: (proposals: any[]) => set({ activeProposals: proposals }),
-  setWorkforce: (workforce: any[]) => set({ workforce: workforce }),
-  setEconomicNews: (news: EconomicPulse[]) => set({ economicNews: news }),
+  isVaultAuthenticated: false,
+  setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
+  showVault: false,
+  setShowVault: (show: boolean) => set({ showVault: show }),
+  activeView: 'dash',
+  setActiveView: (view: string) => set({ activeView: view }),
+  showLibrary: false,
+  setShowLibrary: (show: boolean) => set({ showLibrary: show }),
+  isVisionScanning: false,
+  setIsVisionScanning: (is: boolean) => set({ isVisionScanning: is }),
+  visionPreview: null,
+  setVisionPreview: (p: string | null) => set({ visionPreview: p }),
+  showCollective: false,
+  setShowCollective: (show: boolean) => set({ showCollective: show }),
+  showHatchery: false,
+  setShowHatchery: (show: boolean) => set({ showHatchery: show }),
+  showBlueprint: false,
+  setShowBlueprint: (show: boolean) => set({ showBlueprint: show }),
+  shellMode: 'ambient',
+  setShellMode: (mode: 'ambient' | 'command' | 'hidden') => set({ shellMode: mode }),
+  focusedAppContext: null,
+  setFocusedAppContext: (ctx: any | null) => set({ focusedAppContext: ctx }),
   showSettings: false,
   setShowSettings: (show: boolean) => set({ showSettings: show }),
   showNexus: false,
@@ -319,3 +317,8 @@ export const useSystemStore = create<SystemState>((set) => ({
   showSentinel: false,
   setShowSentinel: (show: boolean) => set({ showSentinel: show }),
 }));
+
+export const invokeSafe = async (cmd: string, args: any = {}) => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke(cmd, args);
+};

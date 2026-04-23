@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MousePointer2, GitBranch, Plus, Save, Play, Trash2, X } from 'lucide-react';
+import { MousePointer2, GitBranch, Plus, Save, Play, Trash2, X, Zap, Activity, Shield } from 'lucide-react';
 import { ForgeNode } from './ForgeNode';
 import { ForgeNode as IForgeNode, ForgeEdge as IForgeEdge } from '../../lib/contracts';
 import { cn } from '../../lib/utils';

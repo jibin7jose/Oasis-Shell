@@ -13,10 +13,16 @@ import {
   AlertTriangle,
   ChevronRight,
   Database,
+  FileText,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
-import { Fingerprint, Scan, Target, Cpu } from 'lucide-react';
+import { Fingerprint, Scan, Target, Cpu, Hash, Clock } from 'lucide-react';
 import { invokeSafe } from "../../lib/tauri";
 import { useSystemStore } from "../../lib/systemStore";
+import { NeuralLog } from "../../lib/contracts";
+import { cn } from "../../lib/utils";
 
 interface SentinelVaultProps {
   isOpen: boolean;
@@ -46,10 +52,14 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
   const [ledger, setLedger] = useState<SentinelLedger | null>(null);
   const [isSealing, setIsSealing] = useState(false);
   const [sealingProgress, setSealingProgress] = useState(0);
-  const [activeTab, setActiveTab] = useState<'vault' | 'logs'>('vault');
+  const [activeTab, setActiveTab] = useState<'vault' | 'reports' | 'logs'>('vault');
   const [scanQuery, setScanQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [assetTitle, setAssetTitle] = useState("");
+  const [assetPath, setAssetPath] = useState("");
+  const [reports, setReports] = useState<any[]>([]);
+  const [logs, setLogs] = useState<NeuralLog[]>([]);
+  const [verificationResult, setVerificationResult] = useState<Record<string, 'pending' | 'verified' | 'failed'>>({});
 
   const { 
     hardwareAnchorActive, isBiometricScanning, setIsBiometricScanning,
@@ -146,9 +156,56 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
     }
   };
 
+  const fetchReports = async () => {
+    try {
+      const res = await invokeSafe("get_strategic_assets") as any[];
+      setReports(res);
+    } catch (e) {
+      console.error("Reports Sync Failed", e);
+    }
+  };
+
+  const fetchLogs = async () => {
+    try {
+      const res = await invokeSafe("get_logs") as NeuralLog[];
+      setLogs(res);
+    } catch (e) {
+      console.error("Logs Sync Failed", e);
+    }
+  };
+
+  const handleVerifyReport = async (report: any) => {
+    try {
+      const meta = JSON.parse(report.metadata);
+      const { path, hash } = meta;
+      
+      setVerificationResult(prev => ({ ...prev, [report.id]: 'pending' }));
+      
+      const verified = await invokeSafe("verify_strategic_asset_integrity", { 
+        filePath: path, 
+        expectedHash: hash 
+      }) as boolean;
+      
+      setVerificationResult(prev => ({ 
+        ...prev, 
+        [report.id]: verified ? 'verified' : 'failed' 
+      }));
+      
+      if (verified) {
+        setNotification("Integrity Verified: Strategic Asset Fingerprint Matches.");
+      } else {
+        setNotification("INTEGRITY BREACH: Asset Hash Mismatch!");
+      }
+    } catch (e) {
+      setNotification("Verification Failed: Metadata Corruption.");
+    }
+  };
+
   useEffect(() => {
     if (isOpen && isAuthenticated) {
       fetchLedger();
+      fetchReports();
+      fetchLogs();
     }
   }, [isOpen, isAuthenticated]);
 
@@ -305,6 +362,13 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                    <span className="text-xs font-black uppercase tracking-widest">Asset Ledger</span>
                  </button>
                  <button 
+                   onClick={() => setActiveTab('reports')}
+                   className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-indigo-500/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                 >
+                   <FileText className="w-5 h-5" />
+                   <span className="text-xs font-black uppercase tracking-widest">Strategic Reports</span>
+                 </button>
+                 <button 
                    onClick={() => setActiveTab('logs')}
                    className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${activeTab === 'logs' ? 'bg-indigo-500/10 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                  >
@@ -400,7 +464,58 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                  )}
                </AnimatePresence>
 
-               {/* Asset List */}
+                {activeTab === 'reports' && (
+                  <div className="space-y-6">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4">Manifested Strategic Reports</h4>
+                    {reports.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-4">
+                        {reports.map((report) => {
+                          let meta = { path: "", hash: "" };
+                          try { meta = JSON.parse(report.metadata); } catch(e) {}
+                          const status = verificationResult[report.id];
+                          
+                          return (
+                            <div key={report.id} className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between group">
+                              <div className="flex items-center gap-6">
+                                <div className="w-12 h-12 rounded-xl bg-indigo-500/5 flex items-center justify-center border border-indigo-500/10">
+                                  <FileText className="w-6 h-6 text-indigo-400" />
+                                </div>
+                                <div>
+                                  <h5 className="text-sm font-black text-white uppercase tracking-tighter">Strategic Directive {report.id}</h5>
+                                  <p className="text-[10px] text-slate-500 font-mono mt-1">{meta.hash?.substring(0, 32)}...</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Status</p>
+                                  <p className={`text-[10px] font-black uppercase tracking-widest ${
+                                    status === 'verified' ? 'text-emerald-500' : status === 'failed' ? 'text-rose-500' : 'text-slate-400'
+                                  }`}>
+                                    {status === 'verified' ? 'Fingerprint Matches' : status === 'failed' ? 'Integrity Breach' : 'Awaiting Verify'}
+                                  </p>
+                                </div>
+                                <button 
+                                  onClick={() => handleVerifyReport(report)}
+                                  className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all border border-white/5"
+                                >
+                                  {status === 'verified' ? <CheckCircle className="w-5 h-5 text-emerald-500" /> : status === 'failed' ? <XCircle className="w-5 h-5 text-rose-500" /> : <Shield className="w-5 h-5 text-indigo-400" />}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="h-64 border-2 border-dashed border-white/5 rounded-[3rem] flex flex-col items-center justify-center gap-4">
+                         <FileText className="w-8 h-8 text-slate-700" />
+                         <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No Strategic Assets Manifested</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'vault' && (
                <div className="space-y-6">
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4">Sealed Strategic Assets</h4>
                   
@@ -444,7 +559,67 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                     </div>
                   )}
                </div>
-            </main>
+               )}
+
+                {activeTab === 'logs' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Forensic Audit Trail</h4>
+                      <button 
+                        onClick={fetchLogs}
+                        className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:text-indigo-300 transition-colors flex items-center gap-2"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Sync Timeline
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-4 custom-scrollbar">
+                      {logs.length > 0 ? (
+                        logs.map((log, i) => (
+                          <motion.div 
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.03 }}
+                            key={log.id || i} 
+                            className="relative pl-8 border-l border-white/5 pb-6 last:pb-0"
+                          >
+                            <div className={cn(
+                              "absolute left-0 -translate-x-1/2 w-6 h-6 rounded-full border flex items-center justify-center shadow-lg bg-black",
+                              log.event_type === 'Security' ? 'border-rose-500/50 text-rose-500' : 
+                              log.event_type === 'Neural' ? 'border-indigo-500/50 text-indigo-500' : 'border-slate-500/50 text-slate-500'
+                            )}>
+                              {log.event_type === 'Security' ? <Shield className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+                            </div>
+                            
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-3">
+                                <span className={cn(
+                                  "text-[9px] font-black uppercase tracking-widest",
+                                  log.event_type === 'Security' ? 'text-rose-500' : 
+                                  log.event_type === 'Neural' ? 'text-indigo-500' : 'text-slate-500'
+                                )}>{log.event_type}</span>
+                                <span className="text-[8px] font-mono text-slate-600">OFFSET://{log.id?.toString().padStart(4, '0')}</span>
+                              </div>
+                              <p className="text-xs font-bold text-white/80 leading-relaxed">{log.message}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Clock className="w-3 h-3 text-slate-700" />
+                                <span className="text-[8px] font-mono text-slate-600">
+                                  {new Date(log.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="h-64 border-2 border-dashed border-white/5 rounded-[3rem] flex flex-col items-center justify-center gap-4">
+                           <Fingerprint className="w-8 h-8 text-slate-700" />
+                           <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No Forensic Records Found</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+             </main>
           </div>
         )}
       </div>
