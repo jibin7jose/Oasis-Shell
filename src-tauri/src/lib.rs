@@ -439,10 +439,9 @@ async fn receive_neural_mirror(
 #[allow(dead_code)]
 static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
 
-#[tauri::command]
-async fn capture_chronos_snapshot(
-  state: tauri::State<'_, AppState>,
-  nodes: Vec<serde_json::Value>, 
+pub fn capture_chronos_snapshot_with_pool(
+  pool: &Pool<SqliteConnectionManager>,
+  nodes: Vec<serde_json::Value>,
   links: Vec<serde_json::Value>,
   metrics: Option<VentureMetrics>,
   market: Option<MarketIntelligence>,
@@ -458,29 +457,29 @@ async fn capture_chronos_snapshot(
         "windows": windows,
         "integrity": integrity,
     });
-    
+
     let json_str = serde_json::to_string(&snapshot_data).map_err(|e| e.to_string())?;
-    
-    let db = state.pool.get().map_err(|e| e.to_string())?;
+
+    let db = pool.get().map_err(|e| e.to_string())?;
     db.execute(
         "INSERT INTO chronos_history (timestamp, data, integrity) VALUES (?1, ?2, ?3)",
         rusqlite::params![timestamp, json_str, integrity],
     ).map_err(|e| e.to_string())?;
-    
-    // Prune history to keep last 100 for performance
+
     let _ = db.execute(
         "DELETE FROM chronos_history WHERE id NOT IN (SELECT id FROM chronos_history ORDER BY id DESC LIMIT 100)",
-        []
+        [],
     );
 
     Ok("Chronos State Archival Complete (Native).".into())
 }
 
-#[tauri::command]
-async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<ChronosSnapshot>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
+pub fn seek_chronos_history_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+) -> Result<Vec<ChronosSnapshot>, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
     let mut stmt = db.prepare("SELECT timestamp, data, integrity FROM chronos_history ORDER BY id DESC").map_err(|e| e.to_string())?;
-    
+
     let rows = stmt.query_map([], |row| {
         let timestamp: String = row.get(0)?;
         let data_str: String = row.get(1)?;
@@ -495,8 +494,26 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
             history.push(snap);
         }
     }
-    
+
     Ok(history)
+}
+
+#[tauri::command]
+async fn capture_chronos_snapshot(
+  state: tauri::State<'_, AppState>,
+  nodes: Vec<serde_json::Value>, 
+  links: Vec<serde_json::Value>,
+  metrics: Option<VentureMetrics>,
+  market: Option<MarketIntelligence>,
+  windows: Vec<serde_json::Value>,
+  integrity: f32
+) -> Result<String, String> {
+    capture_chronos_snapshot_with_pool(&state.pool, nodes, links, metrics, market, windows, integrity)
+}
+
+#[tauri::command]
+async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<ChronosSnapshot>, String> {
+    seek_chronos_history_with_pool(&state.pool)
 }
 
 #[tauri::command]

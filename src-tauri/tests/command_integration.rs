@@ -1,5 +1,7 @@
 use oasis_shell_lib::{
+    capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
+    seek_chronos_history_with_pool,
     system::normalize_process_priority,
     vault::{
         vault_get_secret_with_pool,
@@ -25,6 +27,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)",
+            [],
+        )
+        .expect("chronos schema");
     }
 
     AppState {
@@ -84,4 +91,28 @@ fn chronos_snapshot_parser_preserves_core_payload_fields() {
     assert_eq!(snapshot.links.len(), 1);
     assert_eq!(snapshot.windows.len(), 1);
     assert_eq!(snapshot.integrity, 87.5);
+}
+
+#[test]
+fn chronos_capture_and_seek_round_trip_through_sqlite() {
+    let state = make_state();
+
+    let status = capture_chronos_snapshot_with_pool(
+        &state.pool,
+        vec![serde_json::json!({ "id": "n1", "label": "Node 1" })],
+        vec![serde_json::json!({ "id": "l1", "source": "n1", "target": "n2" })],
+        None,
+        None,
+        vec![serde_json::json!({ "title": "Main" })],
+        91.25,
+    )
+    .expect("capture");
+    assert_eq!(status, "Chronos State Archival Complete (Native).");
+
+    let history = seek_chronos_history_with_pool(&state.pool).expect("seek");
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].nodes.len(), 1);
+    assert_eq!(history[0].links.len(), 1);
+    assert_eq!(history[0].windows.len(), 1);
+    assert_eq!(history[0].integrity, 91.25);
 }
