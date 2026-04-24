@@ -419,11 +419,18 @@ async fn receive_neural_mirror(
     state: tauri::State<'_, AppState>,
     payload: MirrorPayload
 ) -> Result<String, String> {
+    receive_neural_mirror_with_pool(&state.pool, payload)
+}
+
+pub fn receive_neural_mirror_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    payload: MirrorPayload
+) -> Result<String, String> {
     if payload.signature != "OASIS_FOUNDER_SIG_V1" {
         return Err("Neural Signature Mismatch: Mirror handshake rejected.".into());
     }
 
-    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let db = pool.get().map_err(|e| e.to_string())?;
     
     // Persist received crates
     for c in payload.crates {
