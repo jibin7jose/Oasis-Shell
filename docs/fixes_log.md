@@ -24,3 +24,4 @@
 - Moved the search/log helper cluster into `src-tauri/src/search.rs` and added integration coverage for neural log listing, pinned-context deletion, and mixed log/context search.
 - Moved the multimodal vision/oracle helper cluster into `src-tauri/src/vision.rs` and kept the public command surface stable through re-exports from `src-tauri/src/lib.rs`.
 - Moved the file-backed venture-state and Chronos helpers into `src-tauri/src/state.rs` and added temp-path round-trip coverage for both files.
+- Moved the biometric and collective-registry helpers into `src-tauri/src/access.rs` and added unit coverage for the biometric session window and node-id builder.

@@ -4,7 +4,7 @@ use windows::Win32::Foundation::HWND;
 use rusqlite::params;
 use r2d2_sqlite::SqliteConnectionManager;
 use r2d2::Pool;
-use std::sync::{LazyLock, Mutex};
+use std::sync::Mutex;
 use notify::Watcher;
 use std::time::Duration;
 use tauri::Emitter;
@@ -29,6 +29,7 @@ pub mod oracle;
 pub mod search;
 pub mod vision;
 pub mod state;
+pub mod access;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -56,12 +57,23 @@ pub use state::{
     load_venture_state_from_path,
     save_venture_state_to_path,
 };
+pub use access::{
+    biometric_session_is_valid_at,
+    build_collective_node,
+    broadcast_distributed_aura,
+    check_biometric_status,
+    get_collective_nodes,
+    is_biometric_session_valid,
+    register_remote_node,
+    trigger_biometric_scan,
+};
 pub use vision::{
     create_restore_point,
     invoke_multimodal_oracle,
     trigger_hardware_symbiosis,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
+use access::COLLECTIVE_REGISTRY;
 use vault::vault_get_secret;
 use golems::{GolemTask, GOLEM_REGISTRY};
 use system::WindowInfo;
@@ -564,61 +576,6 @@ async fn derive_mitigation_macro(
     Ok(manifest)
 }
 
-static BIOMETRIC_SESSION: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
-
-#[tauri::command]
-async fn check_biometric_status() -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let cmd = "Add-Type -AssemblyName System.Runtime.WindowsRuntime; [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials, ContentType=WindowsRuntime]::CheckAvailabilityAsync().GetAwaiter().GetResult() -eq 'Available'";
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", cmd])
-            .output()
-            .map_err(|e| e.to_string())?;
-        
-        Ok(String::from_utf8_lossy(&output.stdout).trim() == "True")
-    }
-    #[cfg(not(target_os = "windows"))]
-    { Ok(false) }
-}
-
-#[tauri::command]
-async fn trigger_biometric_scan(reason: String) -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        // Biometric Gate Triggered
-        let cmd = format!(
-            "Add-Type -AssemblyName System.Runtime.WindowsRuntime; $res = [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials, ContentType=WindowsRuntime]::RequestVerificationAsync('{}').GetAwaiter().GetResult(); $res -eq 'Verified'",
-            reason
-        );
-        
-        let output = std::process::Command::new("powershell")
-            .args(["-Command", &cmd])
-            .output()
-            .map_err(|e| e.to_string())?;
-        
-        let verified = String::from_utf8_lossy(&output.stdout).trim() == "True";
-        if verified {
-            let mut session = BIOMETRIC_SESSION.lock().unwrap();
-            *session = Some(chrono::Local::now());
-        }
-        Ok(verified)
-    }
-    #[cfg(not(target_os = "windows"))]
-    { Ok(true) } // Simulation fallback for non-windows
-}
-
-#[tauri::command]
-async fn is_biometric_session_valid() -> bool {
-    let session = BIOMETRIC_SESSION.lock().unwrap();
-    if let Some(timestamp) = *session {
-        let now = chrono::Local::now();
-        let diff = now.signed_duration_since(timestamp);
-        return diff.num_minutes() < 5;
-    }
-    false
-}
-
 #[tauri::command]
 async fn synthesize_founder_directive(
     query: String
@@ -659,55 +616,6 @@ async fn synthesize_founder_directive(
     let actions: Vec<ShellAction> = serde_json::from_str(response_content).map_err(|e| format!("Parsing Directive Failed: {}", e))?;
 
     Ok(actions)
-}
-
-static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-#[tauri::command]
-async fn register_remote_node(_state: tauri::State<'_, AppState>, ip: String, port: u16, hostname: String) -> Result<String, String> {
-    let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
-    let node_id = format!("NODE_{}", hostname.to_uppercase());
-    
-    let peer = CollectiveNode {
-        id: node_id.clone(),
-        ip,
-        port,
-        hostname: hostname.clone(),
-        status: "Active".into(),
-        last_pulse: chrono::Local::now().to_rfc3339(),
-        aura: "amber".into(),
-        latency_ms: 0,
-    };
-
-    registry.insert(node_id.clone(), peer);
-    Ok(format!("Distributed Node {} Manifested.", node_id))
-}
-
-#[tauri::command]
-async fn get_collective_nodes() -> Result<Vec<CollectiveNode>, String> {
-    let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-    Ok(registry.values().cloned().collect())
-}
-
-#[tauri::command]
-async fn broadcast_distributed_aura(message: String) -> Result<usize, String> {
-    let registry = {
-        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-        registry.values().cloned().collect::<Vec<CollectiveNode>>()
-    };
-    let client = reqwest::Client::new();
-    let mut success_count = 0;
-
-    for node in registry.iter() {
-        if node.status == "Active" {
-            let url = format!("http://{}:{}/neural-broadcast", node.ip, node.port);
-            let _ = client.post(url).body(message.clone()).send().await;
-            success_count += 1;
-        }
-    }
-    
-    Ok(success_count)
 }
 
 #[tauri::command]
