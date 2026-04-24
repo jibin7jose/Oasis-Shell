@@ -30,6 +30,7 @@ pub mod search;
 pub mod vision;
 pub mod state;
 pub mod access;
+pub mod strategy;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -71,6 +72,12 @@ pub use vision::{
     create_restore_point,
     invoke_multimodal_oracle,
     trigger_hardware_symbiosis,
+};
+pub use strategy::{
+    market_bias_label,
+    neural_wisdom_for_color,
+    neural_workforce_for_market_index,
+    pending_manifests_for_color,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use access::COLLECTIVE_REGISTRY;
@@ -1536,19 +1543,7 @@ async fn authorize_branch(agent_id: String, branch_tag: String) -> Result<String
 
 #[tauri::command]
 async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String> {
-    if stress_color == "#ef4444" || stress_color == "#f59e0b" {
-        Ok(NeuralWisdom {
-            recommendation: "Re-activate 'Series A Outreach' module immediately.".into(),
-            insight: "Last successful pivot (2026-03-12) resulted in +14.2% ARR growth within 7 days.".into(),
-            confidence: 0.94,
-        })
-    } else {
-        Ok(NeuralWisdom {
-            recommendation: "System Stable. Focus on 'Strategic Innovation' nodes.".into(),
-            insight: "Venture Equilibrium maintained for 18.5 consecutive cycles.".into(),
-            confidence: 0.98,
-        })
-    }
+    Ok(neural_wisdom_for_color(&stress_color))
 }
 
 #[tauri::command]
@@ -1632,60 +1627,12 @@ async fn mirror_venture_intelligence(source_id: String) -> Result<Vec<String>, S
 
 #[tauri::command]
 async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, String> {
-    let market_bias = if market_index < 90.0 { "EMERALD_BIAS (Safe)" } else { "RUBY_BIAS (Aggressive)" };
-    let mut workforce = vec![
-        NeuralAgent {
-            id: "auditor".into(),
-            name: "Neural Auditor".into(),
-            role: "Financial Sentinel".into(),
-            status: format!("Market Aware: {}", market_bias),
-            recommendation: "Sector divergence detected. Pivot emerald for capital preservation.".into(),
-            branches: vec![
-                AgentBranch { tag: "emerald".into(), title: "Emerald Path".into(), description: "Conservative Burn Reduction.".into(), risk_level: "Minimal".into() },
-                AgentBranch { tag: "ruby".into(), title: "Ruby Path".into(), description: "Aggressive ARR Expansion.".into(), risk_level: "High Risk (Market Divergence)".into() },
-            ],
-        },
-        NeuralAgent {
-            id: "growth".into(),
-            name: "The Expansion Golem".into(),
-            role: "Viral Architect".into(),
-            status: "Monitoring Market Momentum".into(),
-            recommendation: "Internal momentum is diverging from SaaS core trends by 12.8%.".into(),
-            branches: vec![
-                AgentBranch { tag: "organic".into(), title: "Organic Link".into(), description: "Community-led retention focus.".into(), risk_level: "Market Verified".into() },
-                AgentBranch { tag: "paid".into(), title: "Capital Injection".into(), description: "Paid acquisition sprint.".into(), risk_level: "High Burn (Market Conflict)".into() },
-            ],
-        },
-    ];
-
-    // Load dynamic golems
-    let path = ".golem_registry.json";
-    if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let mut registered: Vec<NeuralAgent> = serde_json::from_str(&data).unwrap_or_default();
-        workforce.append(&mut registered);
-    }
-
-    Ok(workforce)
+    Ok(neural_workforce_for_market_index(market_index))
 }
 
 #[tauri::command]
 async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManifest>, String> {
-    if stress_color == "#ef4444" {
-        Ok(vec![PendingManifest {
-            id: "pivot_01".into(),
-            title: "Emergency Pivot Audit".into(),
-            rationale: "Venture stress is critical. Auditor suggests immediate runway-burn decoupling.".into(),
-            code_draft: "export const PivotAudit = () => { console.log('Critical Pivot Node Active'); }".into(),
-        }])
-    } else {
-        Ok(vec![PendingManifest {
-            id: "growth_01".into(),
-            title: "Scaling Momentum Node".into(),
-            rationale: "Internal momentum is high. Growth Op suggests architecting a referral engine.".into(),
-            code_draft: "export const GrowthEngine = () => { console.log('Scaling Momentum Engine Active'); }".into(),
-        }])
-    }
+    Ok(pending_manifests_for_color(&stress_color))
 }
 
 
