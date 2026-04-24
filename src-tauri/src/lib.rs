@@ -27,6 +27,7 @@ pub mod chronos;
 pub mod ledger;
 pub mod oracle;
 pub mod search;
+pub mod vision;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -47,6 +48,11 @@ pub use search::{
     delete_pinned_context_with_pool,
     get_neural_logs_with_pool,
     seek_chronos_with_pool,
+};
+pub use vision::{
+    create_restore_point,
+    invoke_multimodal_oracle,
+    trigger_hardware_symbiosis,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use vault::vault_get_secret;
@@ -1799,42 +1805,6 @@ async fn capture_vision_context() -> Result<String, String> {
     }
 }
 
-#[tauri::command]
-async fn invoke_multimodal_oracle(state: tauri::State<'_, AppState>, image_b64: String, task: String) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-    
-    let prompt = format!(
-        "You are the Oasis Omniscient Eye. Analyze this visual workspace context. \
-        The Founder is focused on: {}. Identify any anomalies, strategic charts, or layout misalignments. \
-        Provide a terse, executive-level strategic verdict based on what you see.",
-        task
-    );
-
-    let body = serde_json::json!({
-        "model": "gemma3",
-        "prompt": prompt,
-        "images": [image_b64],
-        "stream": false,
-        "format": "json"
-    });
-
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        // Handle potential double JSON encoding from some Ollama versions
-        let parsed: serde_json::Value = serde_json::from_str(resp).unwrap_or(serde_json::json!({ "advice": resp, "thought_trace": "Visual reasoning manifested." }));
-        Ok(parsed)
-    } else {
-        Err("Oracle Vision Resonance Failure: Final diagnostic withheld.".into())
-    }
-}
-
 #[allow(dead_code)]
 #[tauri::command]
 async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<String, String> {
@@ -1853,46 +1823,6 @@ async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<St
     } else {
         Err("Oracle Resonance Failure: Final blessing withheld.".into())
     }
-}
-
-#[allow(dead_code)]
-#[tauri::command]
-async fn speak_directive(text: String) -> Result<(), String> {
-    std::thread::spawn(move || {
-        let ps_script = format!(
-            "Add-Type -AssemblyName System.Speech; \
-             $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; \
-             $synth.Rate = -1; \
-             $synth.Speak('{}')",
-            text.replace("'", "''")
-        );
-        let _ = std::process::Command::new("powershell")
-            .arg("-Command")
-            .arg(&ps_script)
-            .spawn();
-    });
-    Ok(())
-}
-
-#[tauri::command]
-async fn trigger_hardware_symbiosis(stress_color: String) -> Result<HardwareStatus, String> {
-    if stress_color == "#ef4444" {
-        Ok(HardwareStatus {
-            focus_mode: "Survival Mode (Grayscale Lockdown)".into(),
-            aura_intensity: 1.0,
-        })
-    } else {
-        Ok(HardwareStatus {
-            focus_mode: "Strategic Harmony (Full Spectrum)".into(),
-            aura_intensity: 0.2,
-        })
-    }
-}
-
-#[tauri::command]
-async fn create_restore_point(_metrics: VentureMetrics, _files: Vec<String>) -> Result<String, String> {
-    let id = format!("SNAP_{}", chrono::Utc::now().timestamp());
-    Ok(format!("Restore Point {} Created. Venture State Synchronized.", id))
 }
 
 #[tauri::command]

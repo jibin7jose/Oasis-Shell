@@ -1,0 +1,2 @@
+cargo test runtime: 26.46s compile time in the final run.
+Integration test runtime: 1.65s for the command_integration suite.
