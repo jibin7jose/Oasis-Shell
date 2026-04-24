@@ -181,3 +181,57 @@ fn neural_mirror_persists_context_crates_through_sqlite() {
 
     assert_eq!(stored_status, "Mirrored");
 }
+
+#[test]
+fn neural_mirror_rejects_invalid_signature_without_persisting_rows() {
+    let state = make_state();
+    let payload = MirrorPayload {
+        venture: VentureSnapshot {
+            id: "venture-8".into(),
+            name: "Orion".into(),
+            timestamp: "2026-04-24T22:00:00Z".into(),
+            metrics: VentureMetrics {
+                arr: "90k".into(),
+                burn: "14k".into(),
+                runway: "5m".into(),
+                momentum: "steady".into(),
+                stress_color: "#ffaa00".into(),
+            },
+            market: MarketIntelligence {
+                sentiment: "neutral".into(),
+                index_change: "0.0%".into(),
+                sectors_active: vec!["ops".into()],
+                market_index: 1.2,
+                sector_divergence: 0.3,
+            },
+            dominance_index: 64.0,
+        },
+        crates: vec![ContextCrate {
+            id: None,
+            name: "Rejected Crate".into(),
+            description: "Should not be mirrored".into(),
+            aura_color: "#445566".into(),
+            apps: "[\"console\"]".into(),
+            timestamp: "2026-04-24T22:00:00Z".into(),
+            integrity: 71,
+            arr: 8.0,
+            burn: 3.0,
+            status: "Queued".into(),
+        }],
+        signature: "INVALID_SIGNATURE".into(),
+    };
+
+    let err = receive_neural_mirror_with_pool(&state.pool, payload).expect_err("mirror should fail");
+    assert_eq!(err, "Neural Signature Mismatch: Mirror handshake rejected.");
+
+    let db = state.pool.get().expect("conn");
+    let count: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM context_crates WHERE name = ?1",
+            ["Rejected Crate"],
+            |row| row.get(0),
+        )
+        .expect("count");
+
+    assert_eq!(count, 0);
+}

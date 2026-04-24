@@ -14,3 +14,4 @@
 - Added a SQLite-backed Chronos capture/seek round-trip helper and integration test so the temporal ledger path is covered end to end.
 - Added a SQLite-backed neural mirror persistence helper and integration test so `context_crates` writes now have direct coverage through the public helper path.
 - Split the chronos and neural-mirror helper code out of `src-tauri/src/lib.rs` into `src-tauri/src/chronos.rs` and `src-tauri/src/mirror.rs`, keeping the public API stable with re-exports.
+- Added a negative integration test that verifies invalid neural mirror signatures are rejected without persisting any `context_crates` rows.
