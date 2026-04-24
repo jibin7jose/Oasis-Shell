@@ -20,3 +20,4 @@
 - Added an Oracle alert persistence helper and integration test so `oracle_predictions` inserts now have direct SQLite coverage without needing the live oracle path.
 - Added a risk-simulation persistence helper and integration test so `risk_simulations` inserts are directly covered through a local SQLite seam.
 - Moved the persistence helper cluster into `src-tauri/src/ledger.rs` and kept the public helper names re-exported from `src-tauri/src/lib.rs`.
+- Moved the Oracle audit logic into `src-tauri/src/oracle.rs` and added coverage for the generated alert path and the resilience-audit readout path.

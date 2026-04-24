@@ -3,7 +3,9 @@ use oasis_shell_lib::{
     chronos_snapshot_from_row,
     index_strategic_asset_with_pool,
     persist_oracle_alert_with_pool,
+    get_system_resilience_audit_with_pool,
     persist_risk_scenario_with_pool,
+    trigger_oracle_audit_with_pool,
     receive_neural_mirror_with_pool,
     ContextCrate,
     MirrorPayload,
@@ -359,4 +361,46 @@ fn risk_scenario_persists_directly_into_sqlite() {
     assert_eq!(row.0, "Supply chain collapse triggers a vendor outage");
     assert_eq!(row.1, 0.74);
     assert_eq!(row.2, "SEVERE");
+}
+
+#[test]
+fn trigger_oracle_audit_persists_generated_alert() {
+    let state = make_state();
+    let alert = trigger_oracle_audit_with_pool(&state.pool, 1200.0, 10.0).expect("audit");
+    assert_eq!(alert.title, "STRATEGIC EQUILIBRIUM");
+
+    let db = state.pool.get().expect("conn");
+    let row: (String, String) = db
+        .query_row(
+            "SELECT title, divergence_level FROM oracle_predictions WHERE title = ?1",
+            ["STRATEGIC EQUILIBRIUM"],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("row");
+
+    assert_eq!(row.0, "STRATEGIC EQUILIBRIUM");
+    assert_eq!(row.1, "Minimal");
+}
+
+#[test]
+fn system_resilience_audit_scores_oracle_and_chronos_history() {
+    let state = make_state();
+    {
+        let db = state.pool.get().expect("conn");
+        db.execute(
+            "INSERT INTO oracle_predictions (title, divergence_level, timestamp) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["High Risk Event", "High Risk", "2026-04-24T22:00:00Z"],
+        )
+        .expect("oracle insert");
+        db.execute(
+            "INSERT INTO chronos_history (timestamp, data, integrity) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["2026-04-24T22:30:00Z", "{}", 94.0_f32],
+        )
+        .expect("chronos insert");
+    }
+
+    let audit = get_system_resilience_audit_with_pool(&state.pool).expect("audit");
+    assert_eq!(audit["predictions_count"], 1);
+    assert_eq!(audit["mitigated_count"], 1);
+    assert_eq!(audit["score"], serde_json::json!(100.0));
 }
