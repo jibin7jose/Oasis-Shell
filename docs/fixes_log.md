@@ -13,3 +13,4 @@
 - Added integration tests in `src-tauri/tests/command_integration.rs` that exercise the public AppState-backed vault flow, process-priority normalization, and Chronos parsing from the outside.
 - Added a SQLite-backed Chronos capture/seek round-trip helper and integration test so the temporal ledger path is covered end to end.
 - Added a SQLite-backed neural mirror persistence helper and integration test so `context_crates` writes now have direct coverage through the public helper path.
+- Split the chronos and neural-mirror helper code out of `src-tauri/src/lib.rs` into `src-tauri/src/chronos.rs` and `src-tauri/src/mirror.rs`, keeping the public API stable with re-exports.

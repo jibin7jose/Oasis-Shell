@@ -1,9 +1,11 @@
-use crate::AppState;
+use crate::{AppState, MirrorPayload};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use std::fs;
 use std::process::Command;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NeuralMutation {
@@ -149,4 +151,32 @@ pub async fn apply_neural_mutation(mutation_id: String) -> Result<String, String
     registry.insert(mutation_id, mutation);
     
     Ok("NEURAL MUTATION MANIFESTED. System Evolution Complete.".into())
+}
+
+#[tauri::command]
+pub async fn receive_neural_mirror(
+    state: tauri::State<'_, AppState>,
+    payload: MirrorPayload,
+) -> Result<String, String> {
+    receive_neural_mirror_with_pool(&state.pool, payload)
+}
+
+pub fn receive_neural_mirror_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    payload: MirrorPayload,
+) -> Result<String, String> {
+    if payload.signature != "OASIS_FOUNDER_SIG_V1" {
+        return Err("Neural Signature Mismatch: Mirror handshake rejected.".into());
+    }
+
+    let db = pool.get().map_err(|e| e.to_string())?;
+
+    for c in payload.crates {
+        let _ = db.execute(
+            "INSERT OR REPLACE INTO context_crates (name, description, aura_color, apps, timestamp, integrity, arr, burn, status) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![c.name, c.description, c.aura_color, c.apps, c.timestamp, c.integrity, c.arr, c.burn, "Mirrored"],
+        );
+    }
+
+    Ok(format!("Neural Mirror Received. Strategy for {} manifested in local ledger.", payload.venture.name))
 }
