@@ -19,3 +19,4 @@
 - Added a strategic-memory SQLite helper seam and integration test so persistence of indexed strategic assets now has direct coverage without needing Ollama during the test run.
 - Added an Oracle alert persistence helper and integration test so `oracle_predictions` inserts now have direct SQLite coverage without needing the live oracle path.
 - Added a risk-simulation persistence helper and integration test so `risk_simulations` inserts are directly covered through a local SQLite seam.
+- Moved the persistence helper cluster into `src-tauri/src/ledger.rs` and kept the public helper names re-exported from `src-tauri/src/lib.rs`.
