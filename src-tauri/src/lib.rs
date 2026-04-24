@@ -1425,7 +1425,15 @@ async fn index_strategic_asset(state: tauri::State<'_, AppState>, content: Strin
     let embedding = json["embedding"].as_array().ok_or("Failed to manifest embedding vector")?;
     let vector_json = serde_json::to_string(&embedding).map_err(|e| e.to_string())?;
 
-    let pool = state.pool.clone();
+    index_strategic_asset_with_pool(&state.pool, content, metadata, vector_json)
+}
+
+pub fn index_strategic_asset_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    content: String,
+    metadata: String,
+    vector_json: String,
+) -> Result<(), String> {
     let conn = pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
 

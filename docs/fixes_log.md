@@ -16,3 +16,4 @@
 - Split the chronos and neural-mirror helper code out of `src-tauri/src/lib.rs` into `src-tauri/src/chronos.rs` and `src-tauri/src/mirror.rs`, keeping the public API stable with re-exports.
 - Added a negative integration test that verifies invalid neural mirror signatures are rejected without persisting any `context_crates` rows.
 - Added a pinned-context SQLite helper seam and integration test so `pinned_contexts` round-trips are covered through the same public pattern as vault, chronos, and mirror flows.
+- Added a strategic-memory SQLite helper seam and integration test so persistence of indexed strategic assets now has direct coverage without needing Ollama during the test run.

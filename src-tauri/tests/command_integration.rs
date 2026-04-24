@@ -1,6 +1,7 @@
 use oasis_shell_lib::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
+    index_strategic_asset_with_pool,
     receive_neural_mirror_with_pool,
     ContextCrate,
     MirrorPayload,
@@ -50,6 +51,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("pinned contexts schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS strategic_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, metadata TEXT NOT NULL, vector TEXT NOT NULL, timestamp TEXT NOT NULL)",
+            [],
+        )
+        .expect("strategic memory schema");
     }
 
     AppState {
@@ -260,4 +266,29 @@ fn pinned_context_round_trip_through_sqlite() {
     assert_eq!(entries[0].name, "Command Palette");
     assert_eq!(entries[0].state_blob, r#"{"tab":"search"}"#);
     assert_eq!(entries[0].aura_color, "#abcdef");
+}
+
+#[test]
+fn strategic_memory_indexes_directly_into_sqlite() {
+    let state = make_state();
+    index_strategic_asset_with_pool(
+        &state.pool,
+        "Airtight plan".into(),
+        r#"{"source":"integration"}"#.into(),
+        serde_json::json!([0.2, 0.4, 0.6]).to_string(),
+    )
+    .expect("index");
+
+    let db = state.pool.get().expect("conn");
+    let row: (String, String, String) = db
+        .query_row(
+            "SELECT content, metadata, vector FROM strategic_memory WHERE content = ?1",
+            ["Airtight plan"],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("row");
+
+    assert_eq!(row.0, "Airtight plan");
+    assert_eq!(row.1, r#"{"source":"integration"}"#);
+    assert_eq!(row.2, serde_json::json!([0.2, 0.4, 0.6]).to_string());
 }
