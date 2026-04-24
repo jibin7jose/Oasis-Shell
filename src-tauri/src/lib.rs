@@ -26,6 +26,7 @@ pub mod mirror;
 pub mod chronos;
 pub mod ledger;
 pub mod oracle;
+pub mod search;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -41,6 +42,11 @@ pub use ledger::{
 pub use oracle::{
     get_system_resilience_audit_with_pool,
     trigger_oracle_audit_with_pool,
+};
+pub use search::{
+    delete_pinned_context_with_pool,
+    get_neural_logs_with_pool,
+    seek_chronos_with_pool,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use vault::vault_get_secret;
@@ -3299,76 +3305,19 @@ async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<Pi
 
 #[tauri::command]
 async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT ?1").map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([limit], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, i64>(0)?,
-            "type": row.get::<_, String>(1)?,
-            "message": row.get::<_, String>(2)?,
-            "timestamp": row.get::<_, String>(3)?
-        }))
-    }).map_err(|e| e.to_string())?;
-    
-    let mut entries = Vec::new();
-    for r in rows { entries.push(r.unwrap()); }
-    Ok(entries)
+    get_neural_logs_with_pool(&state.pool, limit)
 }
 
 
 #[tauri::command]
 async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    db.execute("DELETE FROM pinned_contexts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
-    Ok(())
+    delete_pinned_context_with_pool(&state.pool, id)
 }
 
 
 #[tauri::command]
 async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    // High-Fidelity Neural Search across logs and contexts
-    let mut results = Vec::new();
-    
-    // 1. Search Neural Logs
-    let mut log_stmt = db.prepare(
-        "SELECT id, event_type, message, timestamp FROM neural_logs 
-         WHERE message LIKE ?1 OR event_type LIKE ?1 
-         ORDER BY id DESC LIMIT ?2"
-    ).map_err(|e| e.to_string())?;
-    
-    let log_rows = log_stmt.query_map([format!("%{}%", query), limit.to_string()], |row| {
-        Ok(serde_json::json!({
-            "source": "NEURAL_LOG",
-            "id": row.get::<_, i64>(0)?,
-            "type": row.get::<_, String>(1)?,
-            "message": row.get::<_, String>(2)?,
-            "timestamp": row.get::<_, String>(3)?
-        }))
-    }).map_err(|e| e.to_string())?;
-
-    for r in log_rows { results.push(r.unwrap()); }
-
-    // 2. Search Pinned Contexts
-    let mut pin_stmt = db.prepare(
-        "SELECT id, name, aura_color, timestamp FROM pinned_contexts 
-         WHERE name LIKE ?1 
-         ORDER BY id DESC LIMIT ?2"
-    ).map_err(|e| e.to_string())?;
-    
-    let pin_rows = pin_stmt.query_map([format!("%{}%", query), limit.to_string()], |row| {
-        Ok(serde_json::json!({
-            "source": "PINNED_CONTEXT",
-            "id": row.get::<_, i64>(0)?,
-            "title": row.get::<_, String>(1)?,
-            "aura": row.get::<_, String>(2)?,
-            "timestamp": row.get::<_, String>(3)?
-        }))
-    }).map_err(|e| e.to_string())?;
-
-    for r in pin_rows { results.push(r.unwrap()); }
-
-    Ok(results)
+    seek_chronos_with_pool(&state.pool, query, limit)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

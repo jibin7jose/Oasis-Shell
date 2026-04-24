@@ -10,8 +10,11 @@ use oasis_shell_lib::{
     ContextCrate,
     MirrorPayload,
     get_pinned_contexts_with_pool,
+    get_neural_logs_with_pool,
+    delete_pinned_context_with_pool,
     pin_context_with_pool,
     seek_chronos_history_with_pool,
+    seek_chronos_with_pool,
     system::normalize_process_priority,
     VentureMetrics,
     VentureSnapshot,
@@ -55,6 +58,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("pinned contexts schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)",
+            [],
+        )
+        .expect("neural logs schema");
         db.execute(
             "CREATE TABLE IF NOT EXISTS strategic_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, metadata TEXT NOT NULL, vector TEXT NOT NULL, timestamp TEXT NOT NULL)",
             [],
@@ -331,6 +339,53 @@ fn oracle_alert_persists_directly_into_sqlite() {
 
     assert_eq!(row.0, "CRITICAL RUNWAY DEPLETION");
     assert_eq!(row.1, "High Risk");
+}
+
+#[test]
+fn neural_log_search_and_pinned_context_search_share_the_same_store() {
+    let state = make_state();
+    {
+        let db = state.pool.get().expect("conn");
+        db.execute(
+            "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
+            rusqlite::params!["Network", "Apollo handshake established", "2026-04-24T22:00:00Z"],
+        )
+        .expect("log insert");
+        db.execute(
+            "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params!["Apollo Pin", "{}", "#123456", "2026-04-24T22:00:00Z"],
+        )
+        .expect("pin insert");
+    }
+
+    let logs = get_neural_logs_with_pool(&state.pool, 10).expect("logs");
+    assert_eq!(logs.len(), 1);
+    assert_eq!(logs[0]["type"], "Network");
+
+    let results = seek_chronos_with_pool(&state.pool, "Apollo".into(), 10).expect("seek");
+    let sources: Vec<String> = results
+        .iter()
+        .map(|row| row["source"].as_str().unwrap_or("").to_string())
+        .collect();
+
+    assert!(sources.contains(&"NEURAL_LOG".to_string()));
+    assert!(sources.contains(&"PINNED_CONTEXT".to_string()));
+}
+
+#[test]
+fn delete_pinned_context_removes_the_row() {
+    let state = make_state();
+    let id = pin_context_with_pool(
+        &state.pool,
+        "Temp Pin".into(),
+        "{}".into(),
+        "#00aaff".into(),
+    )
+    .expect("pin");
+
+    delete_pinned_context_with_pool(&state.pool, id).expect("delete");
+    let entries = get_pinned_contexts_with_pool(&state.pool).expect("get");
+    assert!(entries.is_empty());
 }
 
 #[test]
