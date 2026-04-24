@@ -3,6 +3,7 @@ use oasis_shell_lib::{
     chronos_snapshot_from_row,
     index_strategic_asset_with_pool,
     persist_oracle_alert_with_pool,
+    persist_risk_scenario_with_pool,
     receive_neural_mirror_with_pool,
     ContextCrate,
     MirrorPayload,
@@ -62,6 +63,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("oracle predictions schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS risk_simulations (id INTEGER PRIMARY KEY AUTOINCREMENT, scenario TEXT NOT NULL, probability REAL NOT NULL, impact_rating TEXT NOT NULL, defensive_strategy TEXT NOT NULL, associated_venture TEXT NOT NULL, timestamp TEXT NOT NULL)",
+            [],
+        )
+        .expect("risk simulations schema");
     }
 
     AppState {
@@ -323,4 +329,34 @@ fn oracle_alert_persists_directly_into_sqlite() {
 
     assert_eq!(row.0, "CRITICAL RUNWAY DEPLETION");
     assert_eq!(row.1, "High Risk");
+}
+
+#[test]
+fn risk_scenario_persists_directly_into_sqlite() {
+    let state = make_state();
+    let scenario = oasis_shell_lib::RiskScenario {
+        id: None,
+        scenario: "Supply chain collapse triggers a vendor outage".into(),
+        probability: 0.74,
+        impact_rating: "SEVERE".into(),
+        defensive_strategy: "Diversify suppliers and pre-stage fallbacks".into(),
+        associated_venture: "Atlas".into(),
+        timestamp: "2026-04-24T22:00:00Z".into(),
+    };
+
+    let persisted = persist_risk_scenario_with_pool(&state.pool, scenario).expect("persist");
+    assert!(persisted.id.is_some());
+
+    let db = state.pool.get().expect("conn");
+    let row: (String, f32, String) = db
+        .query_row(
+            "SELECT scenario, probability, impact_rating FROM risk_simulations WHERE associated_venture = ?1",
+            ["Atlas"],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("row");
+
+    assert_eq!(row.0, "Supply chain collapse triggers a vendor outage");
+    assert_eq!(row.1, 0.74);
+    assert_eq!(row.2, "SEVERE");
 }

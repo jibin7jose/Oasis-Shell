@@ -18,3 +18,4 @@
 - Added a pinned-context SQLite helper seam and integration test so `pinned_contexts` round-trips are covered through the same public pattern as vault, chronos, and mirror flows.
 - Added a strategic-memory SQLite helper seam and integration test so persistence of indexed strategic assets now has direct coverage without needing Ollama during the test run.
 - Added an Oracle alert persistence helper and integration test so `oracle_predictions` inserts now have direct SQLite coverage without needing the live oracle path.
+- Added a risk-simulation persistence helper and integration test so `risk_simulations` inserts are directly covered through a local SQLite seam.

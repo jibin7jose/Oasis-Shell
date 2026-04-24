@@ -1805,6 +1805,22 @@ pub fn persist_oracle_alert_with_pool(
     Ok(alert)
 }
 
+pub fn persist_risk_scenario_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    mut sim: RiskScenario,
+) -> Result<RiskScenario, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
+    db.execute(
+        "INSERT INTO risk_simulations (scenario, probability, impact_rating, defensive_strategy, associated_venture, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![sim.scenario, sim.probability, sim.impact_rating, sim.defensive_strategy, sim.associated_venture, sim.timestamp],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let last_id: i32 = db.query_row("SELECT last_insert_rowid()", [], |r| r.get(0)).unwrap_or(0);
+    sim.id = Some(last_id);
+    Ok(sim)
+}
+
 #[tauri::command]
 async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     let db = state.pool.get().map_err(|e| e.to_string())?;
