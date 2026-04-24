@@ -35,3 +35,7 @@ yarn-error.log*
 # SQLite Databases
 *.db
 *.db-journal
+
+# Local safety backups
+scratch/backup_docs/
+scratch/backup_root/
