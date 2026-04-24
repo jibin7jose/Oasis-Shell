@@ -2,6 +2,7 @@ use oasis_shell_lib::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
     index_strategic_asset_with_pool,
+    persist_oracle_alert_with_pool,
     receive_neural_mirror_with_pool,
     ContextCrate,
     MirrorPayload,
@@ -56,6 +57,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("strategic memory schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS oracle_predictions (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, divergence_level TEXT NOT NULL, timestamp TEXT NOT NULL)",
+            [],
+        )
+        .expect("oracle predictions schema");
     }
 
     AppState {
@@ -291,4 +297,30 @@ fn strategic_memory_indexes_directly_into_sqlite() {
     assert_eq!(row.0, "Airtight plan");
     assert_eq!(row.1, r#"{"source":"integration"}"#);
     assert_eq!(row.2, serde_json::json!([0.2, 0.4, 0.6]).to_string());
+}
+
+#[test]
+fn oracle_alert_persists_directly_into_sqlite() {
+    let state = make_state();
+    let alert = oasis_shell_lib::OracleAlert {
+        title: "CRITICAL RUNWAY DEPLETION".into(),
+        body: "Direct helper coverage".into(),
+        divergence_level: "High Risk".into(),
+        economic_signal: "Market Beta Sector: RECOVERY FOCUS".into(),
+    };
+
+    let returned = persist_oracle_alert_with_pool(&state.pool, alert).expect("persist");
+    assert_eq!(returned.title, "CRITICAL RUNWAY DEPLETION");
+
+    let db = state.pool.get().expect("conn");
+    let row: (String, String) = db
+        .query_row(
+            "SELECT title, divergence_level FROM oracle_predictions WHERE title = ?1",
+            ["CRITICAL RUNWAY DEPLETION"],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("row");
+
+    assert_eq!(row.0, "CRITICAL RUNWAY DEPLETION");
+    assert_eq!(row.1, "High Risk");
 }

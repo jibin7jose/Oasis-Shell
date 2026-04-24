@@ -1788,8 +1788,14 @@ async fn trigger_oracle_audit(state: tauri::State<'_, AppState>, arr: f32, burn:
         }
     };
 
-    // PERSIST PREDICTION
-    let db = state.pool.get().map_err(|e| e.to_string())?;
+    persist_oracle_alert_with_pool(&state.pool, alert)
+}
+
+pub fn persist_oracle_alert_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    alert: OracleAlert,
+) -> Result<OracleAlert, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
     let _ = db.execute(
         "INSERT INTO oracle_predictions (title, divergence_level, timestamp) VALUES (?1, ?2, ?3)",
