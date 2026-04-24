@@ -1,0 +1,5 @@
+Phase 1 timing notes:
+
+- `cargo check`: about 36.8s on the first run, then about 0.6s on the cached rerun.
+- Frontend build failure surfaced in under 2s once the Vite config loader started.
+

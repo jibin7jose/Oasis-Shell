@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE};
-use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
-use rusqlite::{params, Connection};
+use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_SHOWWINDOW};
+use windows::Win32::Foundation::HWND;
+use rusqlite::params;
 use r2d2_sqlite::SqliteConnectionManager;
 use r2d2::Pool;
 use std::sync::{LazyLock, Mutex};
@@ -9,14 +9,13 @@ use notify::Watcher;
 use std::time::Duration;
 use tauri::Emitter;
 use tauri::Manager;
-use sysinfo::{Disks, System, Components, Networks};
+use sysinfo::Disks;
 use base64::Engine as _;
 use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use std::collections::HashMap;
 use chrono::Timelike;
-use std::path::{Path, PathBuf};
 use std::fs;
 pub mod vault;
 pub mod macros;
@@ -25,9 +24,8 @@ pub mod system;
 pub mod ai;
 pub mod mirror;
 use vault::vault_get_secret;
-use macros::StrategicMacro;
 use golems::{GolemTask, GOLEM_REGISTRY};
-use system::{SystemStats, BatteryHealthInfo, ProcessInfo, StorageInfo, DeviceInfo, WindowInfo, WindowSnapshot};
+use system::WindowInfo;
 
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
@@ -325,6 +323,21 @@ pub struct ChronosSnapshot {
     pub entropy_index: f32,
 }
 
+fn chronos_snapshot_from_row(timestamp: String, data_str: String, integrity: f32) -> ChronosSnapshot {
+    let data: serde_json::Value = serde_json::from_str(&data_str).unwrap_or_default();
+
+    ChronosSnapshot {
+        timestamp,
+        nodes: data["nodes"].as_array().cloned().unwrap_or_default(),
+        links: data["links"].as_array().cloned().unwrap_or_default(),
+        metrics: serde_json::from_value(data["metrics"].clone()).ok(),
+        market: serde_json::from_value(data["market"].clone()).ok(),
+        windows: data["windows"].as_array().cloned().unwrap_or_default(),
+        integrity,
+        entropy_index: 0.0,
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MirrorPayload {
     pub venture: VentureSnapshot,
@@ -379,15 +392,15 @@ async fn invoke_neural_mirror(
         }
     }
 
-    let payload = MirrorPayload {
+    let _payload = MirrorPayload {
         venture,
         crates,
         signature: "OASIS_FOUNDER_SIG_V1".into(),
     };
 
     // SIMULATED P2P TRANSMISSION (In a real setup, we'd POST to node.ip)
-    let client = reqwest::Client::new();
-    let target_url = format!("http://{}:{}/neural-mirror", node.ip, node.port);
+    let _client = reqwest::Client::new();
+    let _target_url = format!("http://{}:{}/neural-mirror", node.ip, node.port);
     
     // For this simulation, we log the intent and return success
     // Neural Mirror Synchronized
@@ -423,6 +436,7 @@ async fn receive_neural_mirror(
     Ok(format!("Neural Mirror Received. Strategy for {} manifested in local ledger.", payload.venture.name))
 }
 
+#[allow(dead_code)]
 static CHRONOS_BUFFER: Mutex<Vec<ChronosSnapshot>> = Mutex::new(Vec::new());
 
 #[tauri::command]
@@ -471,19 +485,8 @@ async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<C
         let timestamp: String = row.get(0)?;
         let data_str: String = row.get(1)?;
         let integrity: f32 = row.get(2)?;
-        
-        let data: serde_json::Value = serde_json::from_str(&data_str).unwrap_or_default();
-        
-        Ok(ChronosSnapshot {
-            timestamp,
-            nodes: data["nodes"].as_array().cloned().unwrap_or_default(),
-            links: data["links"].as_array().cloned().unwrap_or_default(),
-            metrics: serde_json::from_value(data["metrics"].clone()).ok(),
-            market: serde_json::from_value(data["market"].clone()).ok(),
-            windows: data["windows"].as_array().cloned().unwrap_or_default(),
-            integrity,
-            entropy_index: 0.0,
-        })
+
+        Ok(chronos_snapshot_from_row(timestamp, data_str, integrity))
     }).map_err(|e| e.to_string())?;
 
     let mut history = Vec::new();
@@ -525,6 +528,32 @@ async fn manifest_chronos_voyage(state: tauri::State<'_, AppState>, timestamp: S
     Ok(snapshot)
 }
 
+#[cfg(test)]
+mod chronos_tests {
+    use super::chronos_snapshot_from_row;
+
+    #[test]
+    fn chronos_row_parser_round_trips_core_fields() {
+        let snapshot = chronos_snapshot_from_row(
+            "2026-04-24T22:00:00Z".into(),
+            serde_json::json!({
+                "nodes": [{"id": "n1"}],
+                "links": [{"id": "l1"}],
+                "metrics": {"arr": "1", "burn": "2", "runway": "3", "momentum": "4", "stress_color": "#fff"},
+                "market": {"market_index": 1.0, "index_change": "+1%", "ai_ticker": []},
+                "windows": [{"title": "Main"}]
+            }).to_string(),
+            87.5,
+        );
+
+        assert_eq!(snapshot.timestamp, "2026-04-24T22:00:00Z");
+        assert_eq!(snapshot.nodes.len(), 1);
+        assert_eq!(snapshot.links.len(), 1);
+        assert_eq!(snapshot.windows.len(), 1);
+        assert_eq!(snapshot.integrity, 87.5);
+    }
+}
+
 
 #[tauri::command]
 async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Result<String, String> {
@@ -535,7 +564,7 @@ async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Res
 #[tauri::command]
 async fn derive_mitigation_macro(
     anomaly_category: String,
-    current_metrics: serde_json::Value
+    _current_metrics: serde_json::Value
 ) -> Result<serde_json::Value, String> {
     if !is_vault_session_valid() {
         return Err("Founder Authentication required for Neural Mitigation.".into());
@@ -679,7 +708,7 @@ static COLLECTIVE_REGISTRY: LazyLock<Mutex<HashMap<String, CollectiveNode>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[tauri::command]
-async fn register_remote_node(state: tauri::State<'_, AppState>, ip: String, port: u16, hostname: String) -> Result<String, String> {
+async fn register_remote_node(_state: tauri::State<'_, AppState>, ip: String, port: u16, hostname: String) -> Result<String, String> {
     let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
     let node_id = format!("NODE_{}", hostname.to_uppercase());
     
@@ -1879,6 +1908,7 @@ async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Resul
     }))
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 async fn capture_vision_context() -> Result<String, String> {
     use screenshots::Screen;
@@ -1935,6 +1965,7 @@ async fn invoke_multimodal_oracle(state: tauri::State<'_, AppState>, image_b64: 
     }
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<String, String> {
     let client = reqwest::Client::new();
@@ -1954,6 +1985,7 @@ async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<St
     }
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 async fn speak_directive(text: String) -> Result<(), String> {
     std::thread::spawn(move || {
@@ -3665,7 +3697,8 @@ async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde
     }
 }
 
-async fn collective_pulse_loop(app: tauri::AppHandle) {
+#[allow(dead_code)]
+async fn collective_pulse_loop(_app: tauri::AppHandle) {
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
         // Pulse logic as before...
@@ -3681,7 +3714,7 @@ async fn collective_resonance_loop(app: tauri::AppHandle) {
     socket.set_broadcast(true).expect("Failed to set UDP broadcast");
 
     let socket_broadcast = Arc::clone(&socket);
-    let app_clone = app.clone();
+    let _app_clone = app.clone();
     // Broadcast Task
     tokio::spawn(async move {
         loop {
@@ -4198,7 +4231,7 @@ pub fn run() {
     app.run(|_app_handle, _event| {});
 }
 fn start_sentinel_monitor(app: tauri::AppHandle) {
-    use notify::{Watcher, RecursiveMode, Config, EventKind};
+    use notify::{Watcher, RecursiveMode, Config};
     use std::path::Path;
     use tauri::Emitter;
 

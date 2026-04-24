@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "tauri dev",
     "dev:clean": "powershell -ExecutionPolicy Bypass -Command \"if (Test-Path ./tauri-dev.log) { Remove-Item ./tauri-dev.log -Force }; tauri dev *> tauri-dev.log\"",
-    "frontend": "vite --port 1420",
-    "build": "vite build",
+    "frontend": "vite --config vite.config.mjs --port 1420",
+    "build": "vite build --config vite.config.mjs",
     "build:desktop": "tauri build",
-    "preview": "vite preview",
+    "preview": "vite preview --config vite.config.mjs",
     "tauri": "tauri",
     "sync": "powershell -ExecutionPolicy Bypass -File ./scripts/sync.ps1",
     "smoke": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-check.ps1",

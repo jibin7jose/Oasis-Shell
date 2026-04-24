@@ -1,0 +1,3 @@
+Phase 5 timing notes:
+
+- `cargo test`: about 53.2s wall time overall, with the test binaries finishing in about 10.3s once compiled.

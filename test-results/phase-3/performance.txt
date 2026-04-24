@@ -1,0 +1,5 @@
+Phase 3 timing notes:
+
+- `npm.cmd run build`: about 10.6s.
+- `scripts\smoke-check.ps1`: about 6.9s.
+- `npm.cmd run smoke:web`: about 41.1s.

@@ -2,7 +2,6 @@ use crate::{seal_strategic_asset, AppState};
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use sysinfo::{Components, Disks, Networks, System};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
@@ -176,6 +175,17 @@ pub static GLOBAL_THREAT_LEVEL: std::sync::LazyLock<std::sync::Mutex<ThreatLevel
 
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
+
+pub(crate) fn normalize_process_priority(priority: &str) -> &'static str {
+    match priority.to_lowercase().as_str() {
+        "idle" | "low" => "Idle",
+        "below_normal" | "below" => "BelowNormal",
+        "above_normal" | "above" => "AboveNormal",
+        "high" => "High",
+        "realtime" => "RealTime",
+        _ => "Normal",
+    }
+}
 
 
 
@@ -507,14 +517,7 @@ pub async fn resume_process(pid: u32) -> Result<String, String> {
 pub async fn set_process_priority(pid: u32, priority: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        let class = match priority.to_lowercase().as_str() {
-            "idle" | "low" => "Idle",
-            "below_normal" | "below" => "BelowNormal",
-            "above_normal" | "above" => "AboveNormal",
-            "high" => "High",
-            "realtime" => "RealTime",
-            _ => "Normal",
-        };
+        let class = normalize_process_priority(&priority);
 
         let cmd = format!("$p = Get-Process -Id {}; $p.PriorityClass = '{}'", pid, class);
         let output = std::process::Command::new("powershell")
@@ -1673,6 +1676,24 @@ pub async fn trigger_system_lockdown() -> Result<String, String> {
     });
 
     Ok("Neural Seals Engaged. System in Total Lockdown.".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_process_priority;
+
+    #[test]
+    fn process_priority_mapping_covers_known_aliases() {
+        assert_eq!(normalize_process_priority("idle"), "Idle");
+        assert_eq!(normalize_process_priority("low"), "Idle");
+        assert_eq!(normalize_process_priority("below_normal"), "BelowNormal");
+        assert_eq!(normalize_process_priority("below"), "BelowNormal");
+        assert_eq!(normalize_process_priority("above_normal"), "AboveNormal");
+        assert_eq!(normalize_process_priority("above"), "AboveNormal");
+        assert_eq!(normalize_process_priority("high"), "High");
+        assert_eq!(normalize_process_priority("realtime"), "RealTime");
+        assert_eq!(normalize_process_priority("anything-else"), "Normal");
+    }
 }
 
 

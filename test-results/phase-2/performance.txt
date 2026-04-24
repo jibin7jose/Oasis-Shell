@@ -1,0 +1,5 @@
+Phase 2 timing notes:
+
+- Vite build reached the transform stage in tens of milliseconds before failing on the esbuild spawn path.
+- `cargo check` remained fast on rerun at roughly 0.6s due to cache reuse.
+- `scripts\\smoke-check.ps1` completed in about 15.3s and failed only on frontend/process availability.

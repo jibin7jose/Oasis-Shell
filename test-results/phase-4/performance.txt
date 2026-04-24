@@ -1,0 +1,4 @@
+Phase 4 timing notes:
+
+- `cargo check`: about 8.3s.
+- `npm.cmd run build`: about 11.0s.

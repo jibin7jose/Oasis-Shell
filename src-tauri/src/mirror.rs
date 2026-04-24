@@ -2,10 +2,8 @@ use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
-use std::path::Path;
 use std::fs;
 use std::process::Command;
-use crate::ai;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NeuralMutation {
@@ -29,7 +27,7 @@ pub async fn get_neural_mutations() -> Result<Vec<NeuralMutation>, String> {
 }
 
 #[tauri::command]
-pub async fn analyze_system_genome(app: tauri::AppHandle, state: tauri::State<'_, AppState>, target_file: String) -> Result<NeuralMutation, String> {
+pub async fn analyze_system_genome(_app: tauri::AppHandle, state: tauri::State<'_, AppState>, target_file: String) -> Result<NeuralMutation, String> {
     // 1. READ GENOME (Self-Reading)
     let content = fs::read_to_string(&target_file).map_err(|e| format!("Failed to read genome at {}: {}", target_file, e))?;
     
