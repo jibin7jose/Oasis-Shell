@@ -1,10 +1,14 @@
 use oasis_shell_lib::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
+    create_chronos_snapshot_to_path,
     index_strategic_asset_with_pool,
     persist_oracle_alert_with_pool,
     get_system_resilience_audit_with_pool,
     persist_risk_scenario_with_pool,
+    get_chronos_ledger_from_path,
+    load_venture_state_from_path,
+    save_venture_state_to_path,
     trigger_oracle_audit_with_pool,
     receive_neural_mirror_with_pool,
     ContextCrate,
@@ -458,4 +462,42 @@ fn system_resilience_audit_scores_oracle_and_chronos_history() {
     assert_eq!(audit["predictions_count"], 1);
     assert_eq!(audit["mitigated_count"], 1);
     assert_eq!(audit["score"], serde_json::json!(100.0));
+}
+
+#[test]
+fn venture_state_and_chronos_files_round_trip_through_temp_paths() {
+    let temp_dir = std::env::temp_dir().join(format!("oasis-shell-state-{}", Uuid::new_v4()));
+    std::fs::create_dir_all(&temp_dir).expect("temp dir");
+    let state_path = temp_dir.join("foundry_state.json");
+    let ledger_path = temp_dir.join("chronos_ledger.json");
+
+    let metrics = VentureMetrics {
+        arr: "100k".into(),
+        burn: "12k".into(),
+        runway: "8m".into(),
+        momentum: "steady".into(),
+        stress_color: "#22c55e".into(),
+    };
+    let market = MarketIntelligence {
+        sentiment: "positive".into(),
+        index_change: "+2.1%".into(),
+        sectors_active: vec!["core".into(), "growth".into()],
+        market_index: 2.8,
+        sector_divergence: 0.5,
+    };
+
+    let persisted = save_venture_state_to_path(&metrics, &state_path).expect("save");
+    assert!(persisted.contains("Persisted"));
+
+    let loaded = load_venture_state_from_path(&state_path).expect("load");
+    assert_eq!(loaded.arr, "100k");
+    assert_eq!(loaded.momentum, "steady");
+
+    let snapshot_msg = create_chronos_snapshot_to_path(metrics.clone(), market.clone(), &ledger_path).expect("snapshot");
+    assert!(snapshot_msg.contains("Chronos Snapshot"));
+
+    let ledger = get_chronos_ledger_from_path(&ledger_path).expect("ledger");
+    assert_eq!(ledger.len(), 1);
+    assert_eq!(ledger[0].metrics.arr, "100k");
+    assert_eq!(ledger[0].market.sentiment, "positive");
 }

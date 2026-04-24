@@ -28,6 +28,7 @@ pub mod ledger;
 pub mod oracle;
 pub mod search;
 pub mod vision;
+pub mod state;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -48,6 +49,12 @@ pub use search::{
     delete_pinned_context_with_pool,
     get_neural_logs_with_pool,
     seek_chronos_with_pool,
+};
+pub use state::{
+    create_chronos_snapshot_to_path,
+    get_chronos_ledger_from_path,
+    load_venture_state_from_path,
+    save_venture_state_to_path,
 };
 pub use vision::{
     create_restore_point,
@@ -1890,64 +1897,28 @@ async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
 
 #[tauri::command]
 async fn save_venture_state(metrics: VentureMetrics) -> Result<String, String> {
-    let data = serde_json::to_string(&metrics).map_err(|e| e.to_string())?;
-    std::fs::write(".foundry_state.json", data).map_err(|e| e.to_string())?;
-    Ok("Venture State Persisted to Neural Ledger.".into())
+    save_venture_state_to_path(&metrics, std::path::Path::new(".foundry_state.json"))
 }
 
 #[tauri::command]
 async fn load_venture_state() -> Result<VentureMetrics, String> {
-    let path = ".foundry_state.json";
-    if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let metrics: VentureMetrics = serde_json::from_str(&data).map_err(|e| e.to_string())?;
-        Ok(metrics)
-    } else {
-        Ok(VentureMetrics {
-            arr: "N/A".into(),
-            burn: "N/A".into(),
-            runway: "N/A".into(),
-            momentum: "Awaiting Sync".into(),
-            stress_color: "#94a3b8".into(),
-        })
-    }
+    load_venture_state_from_path(std::path::Path::new(".foundry_state.json"))
 }
 
 #[tauri::command]
 async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
-    let path = ".chronos_ledger.json";
-    let mut snapshots = if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Vec<VentureSnapshot>>(&data).unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-
-    snapshots.push(VentureSnapshot {
-        id: format!("S_{}", snapshots.len()),
-        name: "Chronos Snapshot".to_string(),
-        timestamp: chrono::Local::now().to_rfc3339(),
+    create_chronos_snapshot_to_path(
         metrics,
         market,
-        dominance_index: 85.0, // Seed value
-    });
-
-    let data = serde_json::to_string(&snapshots).map_err(|e| e.to_string())?;
-    std::fs::write(path, data).map_err(|e| e.to_string())?;
-    Ok("Chronos Snapshot Etched to Neural Ledger.".into())
+        std::path::Path::new(".chronos_ledger.json"),
+    )
 }
 
 
 
 #[tauri::command]
 async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
-    let path = ".chronos_ledger.json";
-    if std::path::Path::new(path).exists() {
-        let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        Ok(serde_json::from_str(&data).unwrap_or_default())
-    } else {
-        Ok(Vec::new())
-    }
+    get_chronos_ledger_from_path(std::path::Path::new(".chronos_ledger.json"))
 }
 
 

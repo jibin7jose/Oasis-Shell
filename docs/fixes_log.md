@@ -23,3 +23,4 @@
 - Moved the Oracle audit logic into `src-tauri/src/oracle.rs` and added coverage for the generated alert path and the resilience-audit readout path.
 - Moved the search/log helper cluster into `src-tauri/src/search.rs` and added integration coverage for neural log listing, pinned-context deletion, and mixed log/context search.
 - Moved the multimodal vision/oracle helper cluster into `src-tauri/src/vision.rs` and kept the public command surface stable through re-exports from `src-tauri/src/lib.rs`.
+- Moved the file-backed venture-state and Chronos helpers into `src-tauri/src/state.rs` and added temp-path round-trip coverage for both files.
