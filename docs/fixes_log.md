@@ -10,3 +10,4 @@
 - Cleaned up Rust warnings by removing unused imports and marking intentionally dormant helper functions as dead code.
 - Reduced `cargo check` warnings from 25 to 0.
 - Added unit tests for vault key derivation and secret round-trips, process-priority mapping, and Chronos snapshot parsing.
+- Added integration tests in `src-tauri/tests/command_integration.rs` that exercise the public AppState-backed vault flow, process-priority normalization, and Chronos parsing from the outside.

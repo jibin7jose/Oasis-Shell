@@ -323,7 +323,7 @@ pub struct ChronosSnapshot {
     pub entropy_index: f32,
 }
 
-fn chronos_snapshot_from_row(timestamp: String, data_str: String, integrity: f32) -> ChronosSnapshot {
+pub fn chronos_snapshot_from_row(timestamp: String, data_str: String, integrity: f32) -> ChronosSnapshot {
     let data: serde_json::Value = serde_json::from_str(&data_str).unwrap_or_default();
 
     ChronosSnapshot {

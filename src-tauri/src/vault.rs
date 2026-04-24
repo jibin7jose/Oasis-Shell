@@ -12,7 +12,7 @@ pub fn vault_derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
     key
 }
 
-fn vault_store_secret_with_pool(
+pub fn vault_store_secret_with_pool(
     pool: &Pool<SqliteConnectionManager>,
     name: String,
     value: String,
@@ -44,7 +44,7 @@ fn vault_store_secret_with_pool(
     Ok(())
 }
 
-fn vault_get_secret_with_pool(
+pub fn vault_get_secret_with_pool(
     pool: &Pool<SqliteConnectionManager>,
     name: String,
     master_key: String,
@@ -69,7 +69,7 @@ fn vault_get_secret_with_pool(
     String::from_utf8(plaintext).map_err(|e| e.to_string())
 }
 
-fn vault_list_secrets_with_pool(pool: &Pool<SqliteConnectionManager>) -> Result<Vec<String>, String> {
+pub fn vault_list_secrets_with_pool(pool: &Pool<SqliteConnectionManager>) -> Result<Vec<String>, String> {
     let db = pool.get().map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare("SELECT name FROM system_secrets")

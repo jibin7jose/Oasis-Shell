@@ -1,0 +1,3 @@
+Phase 6 timing notes:
+
+- `cargo test`: about 29.5s total wall time, with the integration binary completing in about 2.6s after compile.

@@ -176,7 +176,7 @@ pub static GLOBAL_THREAT_LEVEL: std::sync::LazyLock<std::sync::Mutex<ThreatLevel
 static ORACLE_CACHE: std::sync::Mutex<Option<OraclePulse>> = std::sync::Mutex::new(None);
 static LAST_ORACLE_UPDATE: std::sync::Mutex<Option<chrono::DateTime<chrono::Local>>> = std::sync::Mutex::new(None);
 
-pub(crate) fn normalize_process_priority(priority: &str) -> &'static str {
+pub fn normalize_process_priority(priority: &str) -> &'static str {
     match priority.to_lowercase().as_str() {
         "idle" | "low" => "Idle",
         "below_normal" | "below" => "BelowNormal",
