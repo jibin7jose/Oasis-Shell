@@ -1,1 +1,1 @@
-No new UI screenshot was captured for this native-state integration pass.
+No UI screenshot was captured for this native-state integration pass.
