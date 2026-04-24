@@ -15,3 +15,4 @@
 - Added a SQLite-backed neural mirror persistence helper and integration test so `context_crates` writes now have direct coverage through the public helper path.
 - Split the chronos and neural-mirror helper code out of `src-tauri/src/lib.rs` into `src-tauri/src/chronos.rs` and `src-tauri/src/mirror.rs`, keeping the public API stable with re-exports.
 - Added a negative integration test that verifies invalid neural mirror signatures are rejected without persisting any `context_crates` rows.
+- Added a pinned-context SQLite helper seam and integration test so `pinned_contexts` round-trips are covered through the same public pattern as vault, chronos, and mirror flows.

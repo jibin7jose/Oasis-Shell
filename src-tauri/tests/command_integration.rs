@@ -4,6 +4,8 @@ use oasis_shell_lib::{
     receive_neural_mirror_with_pool,
     ContextCrate,
     MirrorPayload,
+    get_pinned_contexts_with_pool,
+    pin_context_with_pool,
     seek_chronos_history_with_pool,
     system::normalize_process_priority,
     VentureMetrics,
@@ -43,6 +45,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("context crates schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)",
+            [],
+        )
+        .expect("pinned contexts schema");
     }
 
     AppState {
@@ -234,4 +241,23 @@ fn neural_mirror_rejects_invalid_signature_without_persisting_rows() {
         .expect("count");
 
     assert_eq!(count, 0);
+}
+
+#[test]
+fn pinned_context_round_trip_through_sqlite() {
+    let state = make_state();
+    let id = pin_context_with_pool(
+        &state.pool,
+        "Command Palette".into(),
+        r#"{"tab":"search"}"#.into(),
+        "#abcdef".into(),
+    )
+    .expect("pin");
+    assert!(id > 0);
+
+    let entries = get_pinned_contexts_with_pool(&state.pool).expect("get");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].name, "Command Palette");
+    assert_eq!(entries[0].state_blob, r#"{"tab":"search"}"#);
+    assert_eq!(entries[0].aura_color, "#abcdef");
 }

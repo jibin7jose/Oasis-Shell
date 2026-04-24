@@ -3350,22 +3350,39 @@ async fn analyze_work_context(state: tauri::State<'_, AppState>) -> Result<Strin
 
 #[tauri::command]
 async fn pin_context(state: tauri::State<'_, AppState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let timestamp = chrono::Local::now().to_rfc3339();
-    db.execute(
-        "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![name, state_blob, aura, timestamp],
-    ).map_err(|e| e.to_string())?;
-    
-    // We can't use conn.last_insert_rowid() directly if we don't hold the connection
-    let id: i64 = db.query_row("SELECT last_insert_rowid()", [], |row| row.get(0)).unwrap_or(0);
-    Ok(id)
+    pin_context_with_pool(&state.pool, name, state_blob, aura)
 }
 
 #[tauri::command]
 async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<PinnedContext>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC").map_err(|e| e.to_string())?;
+    get_pinned_contexts_with_pool(&state.pool)
+}
+
+pub fn pin_context_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    name: String,
+    state_blob: String,
+    aura: String,
+) -> Result<i64, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
+    let timestamp = chrono::Local::now().to_rfc3339();
+    db.execute(
+        "INSERT INTO pinned_contexts (name, state_blob, aura_color, timestamp) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![name, state_blob, aura, timestamp],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let id: i64 = db.query_row("SELECT last_insert_rowid()", [], |row| row.get(0)).unwrap_or(0);
+    Ok(id)
+}
+
+pub fn get_pinned_contexts_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+) -> Result<Vec<PinnedContext>, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db
+        .prepare("SELECT id, name, state_blob, aura_color, timestamp FROM pinned_contexts ORDER BY id DESC")
+        .map_err(|e| e.to_string())?;
     let rows = stmt.query_map([], |row| {
         Ok(PinnedContext {
             id: row.get(0)?,
@@ -3375,9 +3392,11 @@ async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<Pi
             timestamp: row.get(4)?,
         })
     }).map_err(|e| e.to_string())?;
-    
+
     let mut entries = Vec::new();
-    for r in rows { entries.push(r.unwrap()); }
+    for r in rows {
+        entries.push(r.unwrap());
+    }
     Ok(entries)
 }
 
