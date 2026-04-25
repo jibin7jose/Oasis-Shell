@@ -32,6 +32,7 @@ pub mod state;
 pub mod access;
 pub mod strategy;
 pub mod graph;
+pub mod health;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -84,6 +85,13 @@ pub use graph::{
     build_neural_graph_with_pool,
     get_all_files_from_pool,
     get_neural_brief_from_pool,
+};
+pub use health::{
+    fiscal_report_from_pool,
+    logic_path_for_aura,
+    log_compute_to_pool,
+    predictive_intents_for_conditions,
+    venture_integrity_from_pool,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use access::COLLECTIVE_REGISTRY;
@@ -2621,112 +2629,31 @@ fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, statu
 
 #[tauri::command]
 async fn get_predictive_intents(state: tauri::State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let mut intents = Vec::new();
-
-    // 1. Check Venture Integrity
-    let integrity = get_venture_integrity(state.clone())?;
-    if integrity < 70.0 {
-        intents.push(serde_json::json!({
-            "label": "Neural Venture Stabilization",
-            "intent": "stabilize venture integrity",
-            "type": "warning"
-        }));
-    }
-
-    // 2. Check CPU Load
+    let integrity = venture_integrity_from_pool(&state.pool)?;
     let mut sys = sysinfo::System::new_all();
     sys.refresh_cpu_usage();
     let cpu_load = sys.global_cpu_usage();
-    if cpu_load > 60.0 {
-        intents.push(serde_json::json!({
-            "label": "Strategic Process Culling",
-            "intent": "optimize high cpu processes",
-            "type": "performance"
-        }));
-    }
-
-    // 3. Vault Status
-    if !is_vault_session_valid() {
-        intents.push(serde_json::json!({
-            "label": "Unseal Strategic Vault",
-            "intent": "open vault",
-            "type": "security"
-        }));
-    }
-
-    // 4. Default Strategic Options
-    intents.push(serde_json::json!({
-        "label": "Context Crate Synthesis",
-        "intent": "create context crate",
-        "type": "default"
-    }));
-    intents.push(serde_json::json!({
-        "label": "Market Intelligence Sync",
-        "intent": "sync market news",
-        "type": "growth"
-    }));
-
-    Ok(intents.into_iter().take(3).collect())
+    Ok(predictive_intents_for_conditions(integrity, cpu_load, !is_vault_session_valid()))
 }
 
 #[tauri::command]
 fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = match db.prepare("SELECT status FROM strategic_pulses ORDER BY id DESC LIMIT 20") {
-        Ok(s) => s,
-        Err(_) => return Ok(100.0),
-    };
-    let statuses: Vec<String> = stmt.query_map([], |row| row.get(0)).unwrap().flatten().collect();
-    
-    if statuses.is_empty() { return Ok(100.0); }
-    
-    let healthy = statuses.iter().filter(|s| s.as_str() == "emerald").count() as f32;
-    Ok((healthy / statuses.len() as f32) * 100.0)
+    venture_integrity_from_pool(&state.pool)
 }
 
 #[tauri::command]
 fn get_fiscal_report(state: tauri::State<'_, AppState>) -> Result<FiscalReport, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = match db.prepare("SELECT SUM(cost), SUM(tokens) FROM compute_ledger") {
-        Ok(s) => s,
-        Err(_) => return Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() }),
-    };
-    
-    let mut rows = stmt.query([]).unwrap();
-    if let Some(row) = rows.next().unwrap() {
-        let burn: f32 = row.get(0).unwrap_or(0.0);
-        let load: i64 = row.get(1).unwrap_or(0);
-        let status = if burn > 10.0 { "CRITICAL" } else if burn > 5.0 { "HIGH" } else { "OPTIMAL" };
-        Ok(FiscalReport { total_burn: burn, token_load: load, status: status.into() })
-    } else {
-        Ok(FiscalReport { total_burn: 0.0, token_load: 0, status: "NOMINAL".into() })
-    }
-}
-
-fn internal_log_compute(conn: &rusqlite::Connection, tokens: i64, cost: f32) {
-    let ts = chrono::Local::now().to_rfc3339();
-    let _ = conn.execute(
-        "INSERT INTO compute_ledger (tokens, cost, timestamp) VALUES (?1, ?2, ?3)",
-        rusqlite::params![tokens, cost, ts],
-    );
+    fiscal_report_from_pool(&state.pool)
 }
 
 #[tauri::command]
 fn log_compute_pulse(state: tauri::State<'_, AppState>, tokens: i64, cost: f32) -> Result<(), String> {
-    let conn = state.pool.get().map_err(|e| e.to_string())?;
-    internal_log_compute(&conn, tokens, cost);
-    Ok(())
+    log_compute_to_pool(&state.pool, tokens, cost)
 }
 
 #[tauri::command]
 fn get_logic_path(aura: String) -> String {
-    match aura.as_str() {
-        "dev" => "Native Logic > Cargo Link > Build Cycle > Pulse".into(),
-        "design" => "Mesh Logic > Texture Link > GLTF Build > Sync".into(),
-        "gaming" => "Stream Logic > Frame Pulse > Latency Sync > Record".into(),
-        "research" => "Query Logic > Semantic Link > Vector Search > Archive".into(),
-        _ => "Idle Logic > Waiting for Neural Intent".into()
-    }
+    logic_path_for_aura(&aura)
 }
 
 #[tauri::command]

@@ -27,3 +27,4 @@
 - Moved the biometric and collective-registry helpers into `src-tauri/src/access.rs` and added unit coverage for the biometric session window and node-id builder.
 - Moved the pure strategy helpers into `src-tauri/src/strategy.rs` and added unit coverage for wisdom selection, manifest selection, and market-bias labeling.
 - Moved the neural graph/file index helpers into `src-tauri/src/graph.rs` and added temp-SQLite integration coverage for graph, file brief, and file listing reads.
+- Moved the predictive-intent, venture-integrity, fiscal-report, compute-log, and logic-path helpers into `src-tauri/src/health.rs` and added unit coverage for the intent and logic-path rules.
