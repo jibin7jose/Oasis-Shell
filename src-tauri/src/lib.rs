@@ -784,8 +784,7 @@ pub struct SentinelVault {
     pub security_resonance: f32,
 }
 
-#[tauri::command]
-async fn authenticate_founder(secret: String) -> Result<String, String> {
+fn seal_founder_session(secret: &str) -> Result<String, String> {
     let expected_secret = std::env::var("OASIS_FOUNDER_SECRET")
         .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
         .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
@@ -810,6 +809,23 @@ async fn authenticate_founder(secret: String) -> Result<String, String> {
     *auth_time = Some(chrono::Local::now());
     
     Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
+}
+
+#[tauri::command]
+async fn authenticate_founder(secret: String) -> Result<String, String> {
+    seal_founder_session(&secret)
+}
+
+#[tauri::command]
+async fn bootstrap_founder_access() -> Result<bool, String> {
+    let secret = std::env::var("OASIS_FOUNDER_SECRET")
+        .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
+        .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
+
+    match seal_founder_session(&secret) {
+        Ok(_) => Ok(true),
+        Err(_) => Ok(false),
+    }
 }
 
 #[tauri::command]
@@ -3285,6 +3301,7 @@ pub fn run() {
             mirror_venture_intelligence,
             invoke_oracle_prediction,
             authenticate_founder,
+            bootstrap_founder_access,
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,

@@ -38,6 +38,7 @@ Use this when you want to verify the app after a fresh restart or after changing
 2. Run `npm run smoke:collect` and confirm the report shows `Frontend OK` and `Tauri Process OK`.
 3. Run `npm run smoke:web` and confirm it saves `smoke-assets/ui-smoke.png`.
 4. If the frontend is already running, the guarded launcher reuses it instead of starting a second Vite server on port `1420`.
+5. If `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY` is set, the app now bootstraps the founder session automatically during startup, so the manual key prompt is usually skipped.
 
 ### Expected green signals
 - Frontend responds on `http://localhost:1420`

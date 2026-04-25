@@ -25,6 +25,7 @@ export const TAURI_DEFAULTS: Record<string, any> = {
     if (args.secret === "12345") return true;
     throw new Error("Neural Handshake Refused: Invalid Founder Key");
   },
+  bootstrap_founder_access: true,
   seal_strategic_asset: (args: any) => {
     const id = `B${Math.floor(Math.random() * 1000)}`;
     (MOCK_STATE.ledger.blobs as any)[id] = {

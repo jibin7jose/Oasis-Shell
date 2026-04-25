@@ -318,6 +318,29 @@ export default function App() {
     const interval = setInterval(checkVault, 30000); // Check every 30s
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapFounderSession = async () => {
+      try {
+        const booted = await invokeSafe("bootstrap_founder_access") as boolean;
+        if (!cancelled && booted) {
+          setIsVaultAuthenticated(true);
+          setIsHandshakeSuccessful(true);
+        }
+      } catch (e) {
+        // Leave the manual boot flow in place if automatic auth is not configured.
+      }
+    };
+
+    bootstrapFounderSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const [fpsHistory, setFpsHistory] = useState<number[]>([]);
   const fgRef = useRef<any>(null);
   const [fpsHover, setFpsHover] = useState<{ index: number; value: number; xPct: number } | null>(null);

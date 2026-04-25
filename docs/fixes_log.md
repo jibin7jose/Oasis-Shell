@@ -9,3 +9,5 @@
 - Re-ran the full restart-style smoke cycle after a fresh launch and confirmed the guarded frontend bootstrap and browser smoke remain green on repeat.
 - Added a one-command full-health runner at `scripts/full-health.ps1` and exposed it as `npm run health:full`.
 - Verified the full health loop runs build, Rust tests, smoke diagnostics, and UI smoke successfully in one pass.
+- Added an automatic founder bootstrap command so the app can unlock the founder session on startup when `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY` is configured.
+- Updated the main app to call the bootstrap path automatically, removing the need to type the founder key manually in the common configured case.
