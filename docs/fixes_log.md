@@ -28,3 +28,5 @@
 - Moved the pure strategy helpers into `src-tauri/src/strategy.rs` and added unit coverage for wisdom selection, manifest selection, and market-bias labeling.
 - Moved the neural graph/file index helpers into `src-tauri/src/graph.rs` and added temp-SQLite integration coverage for graph, file brief, and file listing reads.
 - Moved the predictive-intent, venture-integrity, fiscal-report, compute-log, and logic-path helpers into `src-tauri/src/health.rs` and added unit coverage for the intent and logic-path rules.
+- Moved the strategic report, storage relocation, and venture audit file helpers into `src-tauri/src/reports.rs` and added temp-directory unit coverage for all three file workflows.
+- Added ignore rules for the generated relocation config artifact so report/storage tests stay workspace-clean after runs.

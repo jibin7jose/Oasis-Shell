@@ -33,6 +33,7 @@ pub mod access;
 pub mod strategy;
 pub mod graph;
 pub mod health;
+pub mod reports;
 pub use chronos::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
@@ -92,6 +93,11 @@ pub use health::{
     log_compute_to_pool,
     predictive_intents_for_conditions,
     venture_integrity_from_pool,
+};
+pub use reports::{
+    generate_strategic_report_to_dir,
+    generate_venture_audit_to_dir,
+    relocate_foundry_storage_to_dir,
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use access::COLLECTIVE_REGISTRY;
@@ -2146,105 +2152,17 @@ async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, con
 
 #[tauri::command]
 async fn generate_strategic_report(summary: String, oracle_advice: String) -> Result<serde_json::Value, String> {
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    let content = format!(
-        "# OASIS SHELL // STRATEGIC SYNTHESIS REPORT\n\
-        Generated: {}\n\n\
-        ## Boardroom Consensus Summary\n\
-        {}\n\n\
-        ## Deep-Oracle Directive\n\
-        {}\n\n\
-        ---\n\
-        *This report is cryptographically signed and archived in the Sentinel Vault.*",
-        timestamp, summary, oracle_advice
-    );
-
-    // Ensure vault directory exists
-    let report_dir = std::path::Path::new("vault/reports");
-    if !report_dir.exists() {
-        std::fs::create_dir_all(report_dir).map_err(|e| e.to_string())?;
-    }
-
-    let filename = format!("strategic_report_{}.md", chrono::Local::now().timestamp());
-    let path = report_dir.join(&filename);
-    std::fs::write(&path, &content).map_err(|e| e.to_string())?;
-
-    // Generate SHA-256 Hash for integrity verification
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    let hash = format!("{:x}", hasher.finalize());
-
-    Ok(serde_json::json!({
-        "path": path.to_string_lossy(),
-        "hash": hash,
-        "timestamp": timestamp.to_string()
-    }))
+    generate_strategic_report_to_dir(&summary, &oracle_advice, std::path::Path::new("vault/reports"))
 }
 
 #[tauri::command]
 async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, String> {
-    let base_folders = vec!["vault", "manifested"];
-    let db_file = "src-tauri/oasis_shell.db";
-    let target_dir = std::path::Path::new(&target_path);
-
-    if !target_dir.exists() {
-        std::fs::create_dir_all(target_dir).map_err(|e| e.to_string())?;
-    }
-
-    let mut total_bytes = 0;
-
-    // 1. MIGRATE CRATES DB (Critical)
-    if std::path::Path::new(db_file).exists() {
-        let db_target = target_dir.join("oasis_shell.db");
-        std::fs::copy(db_file, &db_target).map_err(|e| e.to_string())?;
-        total_bytes += std::fs::metadata(db_file).unwrap().len();
-    }
-
-    // 2. MIGRATE STRATEGIC FOLDERS
-    for folder in base_folders {
-        let source_folder = std::path::Path::new(folder);
-        if source_folder.exists() {
-            let target_folder = target_dir.join(folder);
-            if !target_folder.exists() {
-                std::fs::create_dir_all(&target_folder).map_err(|e| e.to_string())?;
-            }
-            
-            for entry in std::fs::read_dir(source_folder).map_err(|e| e.to_string())? {
-                let entry = entry.map_err(|e| e.to_string())?;
-                let file_name = entry.file_name();
-                let dest_path = target_folder.join(file_name);
-                std::fs::copy(entry.path(), dest_path).map_err(|e| e.to_string())?;
-                total_bytes += entry.metadata().unwrap().len();
-            }
-        }
-    }
-
-    // 3. PERSIST RELOCATION CONFIG (Atomic Layer)
-    let config_path = "oas_relocation_map.json";
-    let config = serde_json::json!({ "active_root": target_path, "timestamp": chrono::Local::now().to_rfc3339() });
-    std::fs::write(config_path, config.to_string()).map_err(|e| e.to_string())?;
-
-    Ok(StorageReport {
-        current_path: "D:/myproject/new/oasis-shell".into(),
-        target_path,
-        transferred_bytes: total_bytes,
-        status: "Strategic Foundations Relocated & Synced.".into()
-    })
+    relocate_foundry_storage_to_dir(std::path::Path::new(&target_path))
 }
 
 #[tauri::command]
 async fn generate_venture_audit() -> Result<String, String> {
-    let path = "manifested/venture_audit_report.md";
-    let dir = std::path::Path::new("manifested");
-    if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
-    
-    let audit_data = format!(
-        "# 🏙️ OASIS FOUNDRY: EXECUTIVE VENTURE AUDIT\n\n## 📊 CORE METRICS\n- **ARR**: $1.24M\n- **Burn Rate**: $42.5K/mo\n- **Projected Runway**: 18.4 Months\n- **Stress Level**: EQUILIBRIUM (Stable)\n\n## 🏗️ STRATEGIC ARCHITECTURE\n- **Pillar 15**: Autonomous Architect (Active)\n- **Pillar 16**: One-Click Auditor Engine (Synchronized)\n\n## 🕰️ RECENT MILESTONES\n- 09:42:15: Venture Metrics Bridge Synced\n- 10:32:32: Pillar 14 & 15 Global Push Complete\n\n## 🛡️ AUDIT VERDICT\n**Venture is highly viable. Scalability parameters are within healthy thresholds.**\n\n--- \n*Oasis Foundry OS Sentience Level: 7*",
-    );
-    
-    std::fs::write(&path, audit_data).map_err(|e| e.to_string())?;
-    Ok(format!("Executive Venture Audit Manifested in {}", path))
+    generate_venture_audit_to_dir(std::path::Path::new("manifested"))
 }
 
 #[tauri::command]
@@ -3658,5 +3576,6 @@ fn start_sentinel_monitor(app: tauri::AppHandle) {
         }
     });
 }
+
 
 

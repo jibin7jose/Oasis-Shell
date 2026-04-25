@@ -39,3 +39,5 @@ yarn-error.log*
 # Local safety backups
 scratch/backup_docs/
 scratch/backup_root/
+oas_relocation_map.json
+src-tauri/oas_relocation_map.json
