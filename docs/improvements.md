@@ -9,6 +9,7 @@
 - Keep the explicit ESM Vite config so Windows shells do not depend on TypeScript config bundling.
 - Add a dedicated CI job for `cargo check` plus the frontend build path that works in this repo.
 - Capture build and smoke output automatically into `test-results/phase-*`.
+- Keep the one-command health runner (`npm run health:full`) as the canonical local verification flow.
 
 ## Reliability
 - Add focused tests around the most important Tauri commands and state transitions.

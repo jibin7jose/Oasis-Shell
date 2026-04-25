@@ -30,6 +30,7 @@
 - Smoke prep: `npm run smoke:prepare`
 - Smoke diagnostics: `npm run smoke:collect`
 - Web smoke: `npm run smoke:web`
+- Full health run: `npm run health:full`
 
 ### Restart-safe smoke flow
 Use this when you want to verify the app after a fresh restart or after changing dev startup scripts:
@@ -43,6 +44,7 @@ Use this when you want to verify the app after a fresh restart or after changing
 - `oasis-shell` appears in the process list during smoke collection
 - Browser smoke opens the main dashboard and the key panels without runtime errors
 - `smoke-assets/smoke-diagnostics.txt` and `smoke-assets/ui-smoke.png` refresh successfully
+- `npm run health:full` completes all build, test, and smoke steps without manual intervention
 
 ## Notes
 - The app is designed around Tauri IPC, so frontend behavior depends on the Rust backend being available.
