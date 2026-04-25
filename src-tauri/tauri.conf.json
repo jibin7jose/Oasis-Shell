@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "identifier": "com.jibin-jose.oasis-shell",
   "build": {
-    "beforeDevCommand": "npm run frontend",
+    "beforeDevCommand": "npm run frontend:guarded",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"

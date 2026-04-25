@@ -14,9 +14,10 @@
 - Add focused tests around the most important Tauri commands and state transitions.
 - Add a lightweight frontend smoke contract for the major panels and the command palette.
 - Narrow the number of always-on background loops in the Rust backend to reduce startup noise.
+- Add guarded launcher scripts for the frontend and browser smoke so repeated verification runs can reuse live processes without racing the same port.
+- Prefer direct local browser and PowerShell wrappers for smoke steps instead of `npx`-spawned tooling when the environment is sensitive to user-profile paths.
 
 ## Security
 - Audit commands that can launch, delete, or suspend OS processes.
 - Revisit secret-handling and auth gating to make sure all sensitive commands use the same guard path.
 - Keep the SQLite database in the app data directory and avoid writing sensitive artifacts outside that scope.
-

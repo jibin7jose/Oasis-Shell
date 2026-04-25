@@ -30,6 +30,23 @@ $tauriLogPath = Join-Path $root "tauri-dev.log"
 
 $checks = @()
 
+function Get-TauriProcess {
+    Get-Process | Where-Object { $_.ProcessName -eq "oasis-shell" } | Select-Object -First 1
+}
+
+function Wait-ForTauriProcess {
+    param([int]$TimeoutSeconds = 45)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $proc = Get-TauriProcess
+        if ($proc) { return $proc }
+        Start-Sleep -Seconds 2
+    }
+
+    return $null
+}
+
 $checks += Test-Endpoint "Frontend" {
     (Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:1420").StatusCode
 }
@@ -75,9 +92,9 @@ $checks += Test-Endpoint "Founder Secret" {
 }
 
 $checks += Test-Endpoint "Tauri Process" {
-    $proc = Get-Process | Where-Object { $_.ProcessName -eq "oasis-shell" } | Select-Object -First 1
+    $proc = Wait-ForTauriProcess
     if (-not $proc) {
-        throw "oasis-shell process not running"
+        throw "oasis-shell process not running after wait"
     }
 
     "PID $($proc.Id)"

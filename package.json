@@ -7,6 +7,7 @@
     "dev": "tauri dev",
     "dev:clean": "powershell -ExecutionPolicy Bypass -Command \"if (Test-Path ./tauri-dev.log) { Remove-Item ./tauri-dev.log -Force }; tauri dev *> tauri-dev.log\"",
     "frontend": "vite --config vite.config.mjs --port 1420",
+    "frontend:guarded": "powershell -ExecutionPolicy Bypass -File ./scripts/start-frontend-if-needed.ps1",
     "build": "vite build --config vite.config.mjs",
     "build:desktop": "tauri build",
     "preview": "vite preview --config vite.config.mjs",
@@ -15,7 +16,7 @@
     "smoke": "powershell -ExecutionPolicy Bypass -File ./scripts/smoke-check.ps1",
     "smoke:prepare": "powershell -ExecutionPolicy Bypass -File ./scripts/prepare-manual-smoke.ps1",
     "smoke:collect": "powershell -ExecutionPolicy Bypass -File ./scripts/collect-smoke-diagnostics.ps1",
-    "smoke:web": "npx -y -p playwright node ./scripts/ui-smoke.cjs"
+    "smoke:web": "powershell -ExecutionPolicy Bypass -File ./scripts/run-ui-smoke.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

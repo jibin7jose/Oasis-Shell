@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { chromium } = require("playwright");
 
 const baseUrl = "http://localhost:1420";
@@ -70,7 +71,18 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const candidateBrowsers = [
+    process.env.PLAYWRIGHT_EXECUTABLE_PATH,
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  ].filter(Boolean);
+
+  const executablePath = candidateBrowsers.find((candidate) => fs.existsSync(candidate));
+  const browser = executablePath
+    ? await chromium.launch({ headless: true, executablePath })
+    : await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 
   page.on("pageerror", (err) => runtimeErrors.push(`pageerror: ${err.message}`));
