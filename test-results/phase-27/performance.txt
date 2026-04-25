@@ -1,0 +1,5 @@
+# Performance
+
+- Tauri dev startup to ready: ~2-3s in the final successful run
+- Browser smoke runtime: ~5s
+- Diagnostic collection runtime: ~33s

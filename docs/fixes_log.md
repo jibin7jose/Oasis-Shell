@@ -6,3 +6,4 @@
 - Updated the Playwright smoke to prefer a local system browser when available, which avoids spawning the bundled browser from the restricted user-profile path.
 - Updated the smoke collector so it can clean up stale port-1420 listeners before relaunching dev and then re-check the app state.
 - Re-ran the smoke loop and confirmed the frontend, Tauri process, Ollama checks, and UI browser flow all pass together.
+- Re-ran the full restart-style smoke cycle after a fresh launch and confirmed the guarded frontend bootstrap and browser smoke remain green on repeat.
