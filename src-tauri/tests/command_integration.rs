@@ -2,6 +2,9 @@ use oasis_shell_lib::{
     capture_chronos_snapshot_with_pool,
     chronos_snapshot_from_row,
     create_chronos_snapshot_to_path,
+    build_neural_graph_with_pool,
+    get_all_files_from_pool,
+    get_neural_brief_from_pool,
     index_strategic_asset_with_pool,
     persist_oracle_alert_with_pool,
     get_system_resilience_audit_with_pool,
@@ -72,6 +75,11 @@ fn make_state() -> AppState {
             [],
         )
         .expect("strategic memory schema");
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)",
+            [],
+        )
+        .expect("file embeddings schema");
         db.execute(
             "CREATE TABLE IF NOT EXISTS oracle_predictions (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, divergence_level TEXT NOT NULL, timestamp TEXT NOT NULL)",
             [],
@@ -500,4 +508,38 @@ fn venture_state_and_chronos_files_round_trip_through_temp_paths() {
     assert_eq!(ledger.len(), 1);
     assert_eq!(ledger[0].metrics.arr, "100k");
     assert_eq!(ledger[0].market.sentiment, "positive");
+}
+
+#[test]
+fn neural_graph_and_file_index_views_read_from_the_same_store() {
+    let state = make_state();
+    {
+        let db = state.pool.get().expect("conn");
+        db.execute(
+            "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![
+                "src/main.rs",
+                "src/main.rs",
+                "fn main() { println!(\"hi\"); }",
+                serde_json::json!([0.9_f32, 0.1_f32]).to_string()
+            ],
+        )
+        .expect("file insert");
+    }
+
+    let brief = get_neural_brief_from_pool(&state.pool, "src/main.rs".into()).expect("brief");
+    assert!(brief.contains("println!"));
+
+    let files = get_all_files_from_pool(&state.pool).expect("files");
+    assert_eq!(files.as_array().map(|v| v.len()), Some(1));
+    assert_eq!(files[0]["filename"], "src/main.rs");
+
+    let graph = build_neural_graph_with_pool(&state.pool).expect("graph");
+    let node_ids: Vec<String> = graph["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|node| node["id"].as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(node_ids.contains(&"src/main.rs".to_string()));
 }
