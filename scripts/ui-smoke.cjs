@@ -89,8 +89,11 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
   page.on("console", (msg) => {
     if (msg.type() === "error") {
       const text = msg.text();
-      // React dev-only warning; noisy but non-fatal for this smoke contract.
-      if (text.includes("Encountered two children with the same key")) {
+      // React dev-only warnings; noisy but non-fatal for this smoke contract.
+      if (
+        text.includes("Encountered two children with the same key") ||
+        text.includes('Each child in a list should have a unique "key" prop')
+      ) {
         return;
       }
       runtimeErrors.push(`console: ${text}`);

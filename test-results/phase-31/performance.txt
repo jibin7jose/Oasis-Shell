@@ -1,0 +1,7 @@
+# Performance
+
+- Frontend build: ~18s
+- Rust tests: ~105s
+- Smoke diagnostics: ~14s
+- UI smoke: ~33s
+- Total full-health runtime: ~3m 7s

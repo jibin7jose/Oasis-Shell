@@ -191,6 +191,7 @@ export default function App() {
   const [fpsThreshold, setFpsThreshold] = useState(22);
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
+  const [founderBootstrapMode, setFounderBootstrapMode] = useState<'auto' | 'manual' | null>(null);
   const [isForging, setIsForging] = useState(false);
   const [pinnedContexts, setPinnedContexts] = useState<any[]>([]);
   const [neuralLogs, setNeuralLogs] = useState<any[]>([]);
@@ -326,8 +327,11 @@ export default function App() {
       try {
         const booted = await invokeSafe("bootstrap_founder_access") as boolean;
         if (!cancelled && booted) {
+          setFounderBootstrapMode('auto');
           setIsVaultAuthenticated(true);
           setIsHandshakeSuccessful(true);
+          setShowVault(true);
+          setNotification("Founder session auto-unlocked from environment secret.");
         }
       } catch (e) {
         // Leave the manual boot flow in place if automatic auth is not configured.
@@ -2556,6 +2560,7 @@ export default function App() {
 
   if (!isHandshakeSuccessful) {
     return <BootSequence onSuccess={() => {
+      setFounderBootstrapMode('manual');
       setIsHandshakeSuccessful(true);
       startEngine();
     }} />;
@@ -2579,6 +2584,11 @@ export default function App() {
       )}
     >
       <RefractionManager />
+      {founderBootstrapMode === 'auto' && (
+        <div className="fixed top-6 right-6 z-[2600] px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+          Founder session auto-unlocked from env
+        </div>
+      )}
       {!isTauri && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[2600] px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-black uppercase tracking-widest text-amber-300">
           Browser Dev Mode: Tauri Disabled

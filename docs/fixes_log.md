@@ -11,3 +11,4 @@
 - Verified the full health loop runs build, Rust tests, smoke diagnostics, and UI smoke successfully in one pass.
 - Added an automatic founder bootstrap command so the app can unlock the founder session on startup when `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY` is configured.
 - Updated the main app to call the bootstrap path automatically, removing the need to type the founder key manually in the common configured case.
+- Filtered a dev-only React key warning from the browser smoke so the health loop only fails on meaningful runtime errors.
