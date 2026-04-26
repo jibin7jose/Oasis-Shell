@@ -12,3 +12,8 @@
 - Added an automatic founder bootstrap command so the app can unlock the founder session on startup when `OASIS_FOUNDER_SECRET` or `OASIS_MASTER_KEY` is configured.
 - Updated the main app to call the bootstrap path automatically, removing the need to type the founder key manually in the common configured case.
 - Filtered a dev-only React key warning from the browser smoke so the health loop only fails on meaningful runtime errors.
+
+## 2026-04-26
+- Normalized the browser-mode strategic inventory mock so it returns real `file_path` values instead of placeholder-only records.
+- Hardened the Sentient Vault strategic inventory renderer to derive safe display names and skip sealing actions when a path is missing, preventing the visible `blob` / `Neural Identifier Missing` cards from surfacing in browser mode.
+- Re-ran the full health loop and confirmed the frontend build, Rust tests, smoke diagnostics, and UI smoke all pass after the inventory rendering fix.

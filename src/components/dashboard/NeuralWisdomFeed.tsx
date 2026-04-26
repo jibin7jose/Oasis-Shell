@@ -59,7 +59,7 @@ export const NeuralWisdomFeed: React.FC<NeuralWisdomFeedProps> = ({
           </motion.div>
         ) : (
           <motion.div
-            key={report.id}
+            key={`wisdom-${report.id || report.strategic_narrative?.slice(0, 24) || "report"}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -83,7 +83,7 @@ export const NeuralWisdomFeed: React.FC<NeuralWisdomFeedProps> = ({
               <div className="space-y-2">
                 {report.actionable_outreach.map((step, i) => (
                   <motion.div 
-                    key={i}
+                    key={`wisdom-step-${i}-${step}`}
                     initial={{ x: -10, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: i * 0.1 }}

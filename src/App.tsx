@@ -3440,8 +3440,24 @@ export default function App() {
 
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
               {strategicInventory.map((asset: any, i: number) => (
+                (() => {
+                  const resolvedPath = typeof asset.file_path === "string" ? asset.file_path.trim() : "";
+                  const resolvedName = (
+                    typeof asset.name === "string" && asset.name.trim()
+                      ? asset.name.trim()
+                      : typeof asset.title === "string" && asset.title.trim()
+                        ? asset.title.trim()
+                        : resolvedPath
+                          ? resolvedPath.split(/[\\/]/).pop()
+                          : `Strategic Asset ${i + 1}`
+                  );
+                  const fileName = resolvedPath
+                    ? resolvedPath.split(/[\\/]/).pop() || resolvedName
+                    : resolvedName;
+
+                  return (
                 <motion.div
-                  key={asset.file_path}
+                  key={resolvedPath || asset.id || resolvedName || i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
@@ -3459,8 +3475,8 @@ export default function App() {
                       {asset.risk}
                     </div>
                   </div>
-                  <h3 className="text-sm font-black text-white truncate mb-1">{String(asset.file_path || "blob").split('/').pop()}</h3>
-                  <p className="text-[10px] text-slate-500 font-mono truncate mb-4">{asset.file_path || "Neural Identifier Missing"}</p>
+                  <h3 className="text-sm font-black text-white truncate mb-1">{fileName}</h3>
+                  <p className="text-[10px] text-slate-500 font-mono truncate mb-4">{resolvedPath || "Neural Identifier Missing"}</p>
 
                   <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                     <div>
@@ -3472,10 +3488,21 @@ export default function App() {
                       <span className="text-[10px] font-bold text-indigo-400">{asset.authorizer}</span>
                     </div>
                   </div>
-                  <button onClick={() => handleSealAsset(asset.file_path, asset.file_path.split("/").pop() || "Strategic Asset")} className="w-full mt-6 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (!resolvedPath) {
+                        setNotification("Strategic Asset Path Missing: Unable to seal placeholder inventory.");
+                        return;
+                      }
+                      handleSealAsset(resolvedPath, fileName || "Strategic Asset");
+                    }}
+                    className="w-full mt-6 py-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded-2xl transition-all border border-amber-500/20 flex items-center justify-center gap-2"
+                  >
                     <Lock className="w-3 h-3" /> Seal within Sentinel
                   </button>
                 </motion.div>
+                  );
+                })()
               ))}
             </div>
           </motion.div>
@@ -3493,8 +3520,8 @@ export default function App() {
             <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
               <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
               <div className="space-y-12">
-                {timeline.map((event: any) => (
-                  <div key={event.id} className="relative pl-12">
+                {timeline.map((event: any, i: number) => (
+                  <div key={`timeline-${event.id || event.timestamp || i}`} className="relative pl-12">
                     <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center z-10", event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600")}>
                       <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                     </div>
@@ -3776,7 +3803,7 @@ export default function App() {
             <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 px-12 overflow-y-auto custom-scrollbar">
               {Object.values(aegisLedger?.ventures || {}).map((ven: any, i: number) => (
                 <motion.div
-                  key={ven.id}
+                  key={`aegis-venture-${ven.id || ven.name || i}`}
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
@@ -4038,8 +4065,8 @@ export default function App() {
                 <button onClick={() => setPendingManifests([])} className="text-slate-500 hover:text-white"><Plus className="w-5 h-5 rotate-45" /></button>
               </div>
               <div className="space-y-6">
-                {pendingManifests.map((m: any) => (
-                  <div key={m.id} className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                {pendingManifests.map((m: any, i: number) => (
+                  <div key={`manifest-${m.id || m.title || i}`} className="p-5 rounded-2xl bg-white/5 border border-white/10">
                     <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">{m.title}</h4>
                     <p className="text-[9px] text-slate-400 font-medium leading-relaxed mb-6 line-clamp-3">
                       {m.rationale}
@@ -4076,9 +4103,9 @@ export default function App() {
 
                           {/* STRATEGIC BRANCHES */}
                           <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
-                            {neuralWisdom.agent?.branches?.map((branch: any) => (
+                          {neuralWisdom.agent?.branches?.map((branch: any, branchIndex: number) => (
                               <button
-                                key={branch.tag}
+                                key={`branch-${branch.tag || branch.title || "branch"}-${branchIndex}`}
                                 onClick={() => handleAuthorizeBranch(neuralWisdom.agent.id, branch.tag)}
                                 className={cn(
                                   "p-3 rounded-xl border flex flex-col gap-1 transition-all text-left group",

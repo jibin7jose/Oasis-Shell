@@ -469,13 +469,13 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4">Manifested Strategic Reports</h4>
                     {reports.length > 0 ? (
                       <div className="grid grid-cols-1 gap-4">
-                        {reports.map((report) => {
+                        {reports.map((report, index) => {
                           let meta = { path: "", hash: "" };
                           try { meta = JSON.parse(report.metadata); } catch(e) {}
                           const status = verificationResult[report.id];
                           
                           return (
-                            <div key={report.id} className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between group">
+                            <div key={`report-${report.id || report.metadata?.slice?.(0, 24) || index}`} className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between group">
                               <div className="flex items-center gap-6">
                                 <div className="w-12 h-12 rounded-xl bg-indigo-500/5 flex items-center justify-center border border-indigo-500/10">
                                   <FileText className="w-6 h-6 text-indigo-400" />

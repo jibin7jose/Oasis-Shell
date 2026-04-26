@@ -66,9 +66,9 @@ export const ForgePanel: React.FC<ForgePanelProps> = ({ macros, onExecute, onSig
           </div>
         ) : (
           <AnimatePresence>
-            {macros.map((macro) => (
+            {macros.map((macro, index) => (
               <motion.div
-                key={macro.id}
+                key={`macro-${macro.id || macro.name || index}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}

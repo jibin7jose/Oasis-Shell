@@ -112,8 +112,20 @@ export const TAURI_DEFAULTS: Record<string, any> = {
   get_economic_news: [],
   get_pending_manifests: [],
   get_strategic_inventory: [
-    { id: 1, name: "Core Neural Weights", status: "secured", type: "asset" },
-    { id: 2, name: "Market Liquidity Bridge", status: "active", type: "financial" }
+    {
+      id: 1,
+      name: "Core Neural Weights",
+      file_path: "manifested/core_neural_weights.dat",
+      status: "secured",
+      type: "asset"
+    },
+    {
+      id: 2,
+      name: "Market Liquidity Bridge",
+      file_path: "manifested/market_liquidity_bridge.dat",
+      status: "active",
+      type: "financial"
+    }
   ],
   get_available_ventures: [],
   get_storage_map: [

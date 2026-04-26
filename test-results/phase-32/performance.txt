@@ -1,0 +1,5 @@
+﻿Health run duration: 101.6s
+Frontend build: 14.85s
+Rust tests: 22.8s total wrapper time, 15 unit tests + 16 integration tests
+Smoke diagnostics: 16.5s
+UI smoke: 29.9s
