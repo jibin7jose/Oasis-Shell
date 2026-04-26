@@ -1,5 +1,5 @@
 Oasis Shell Smoke Diagnostics
-Generated: 2026-04-26 08:24:26
+Generated: 2026-04-26 08:27:45
 
 == Smoke Check ==
 
@@ -14,7 +14,7 @@ Ollama API      OK                                                     gemma3:4b
 Ollama Generate OK                                                          Smoke checks clear, local oracle confirmed.
 Founder Secret  OK                                                                                           Configured
 Tauri Process   OK                                                                                            PID 19008
-Tauri Log       OK      ...m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+Tauri Log       OK      ...)[22m[39m [32mhmr update [39m[2m/src/components/layout/LeftRail.tsx, /src/index.css[22m
 
 
 
@@ -29,12 +29,12 @@ ProcessName    Id
 -----------    --
 cargo       21592
 cargo       28036
-node         1324
 node         6152
 node        12688
+node        16240
 node        16268
 node        16396
-node        20976
+node        27664
 node        28112
 oasis-shell 19008
 
@@ -76,3 +76,4 @@ Starting frontend on http://localhost:1420...
 [2m8:16:56 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/TopBar.tsx, /src/index.css[22m
 [2m8:21:57 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/TopBar.tsx, /src/index.css[22m
 [2m8:22:00 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+[2m8:26:50 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/LeftRail.tsx, /src/index.css[22m

@@ -22,3 +22,5 @@
 - Added accessible top-bar launchers for the CLI and command palette, then updated the browser smoke to fall back to those launchers when keyboard accelerators are intercepted by the browser.
 - Closed the terminal overlay before opening the command palette in smoke so the launcher steps run in the correct order.
 - Re-ran the full health loop and confirmed the terminal shortcut and command palette now surface reliably in browser automation.
+- Renamed the left-rail strategic consensus launcher to `Boardroom Debate` and added a visible `Documentation Manual` launcher so the smoke harness can open both panels directly.
+- Re-ran the full health loop and confirmed the boardroom and documentation launchers now pass in browser automation.
