@@ -1,5 +1,5 @@
 Oasis Shell Smoke Diagnostics
-Generated: 2026-04-26 08:10:24
+Generated: 2026-04-26 08:24:26
 
 == Smoke Check ==
 
@@ -11,10 +11,10 @@ Name            Status                                                          
 ----            ------                                                                                           ------
 Frontend        OK                                                                                                  200
 Ollama API      OK                                                     gemma3:4b, nomic-embed-text:latest, llava:latest
-Ollama Generate OK                                              Smoke checks initiated, confirming local oracle status.
+Ollama Generate OK                                                          Smoke checks clear, local oracle confirmed.
 Founder Secret  OK                                                                                           Configured
 Tauri Process   OK                                                                                            PID 19008
-Tauri Log       OK      ...d + debuginfo] target(s) in 55.81s | [1m[92m     Running[0m `target\debug\oasis-shell.exe`
+Tauri Log       OK      ...m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
 
 
 
@@ -29,12 +29,12 @@ ProcessName    Id
 -----------    --
 cargo       21592
 cargo       28036
+node         1324
 node         6152
-node         9024
 node        12688
 node        16268
 node        16396
-node        21928
+node        20976
 node        28112
 oasis-shell 19008
 
@@ -72,3 +72,7 @@ Starting frontend on http://localhost:1420...
                                                             
 [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 55.81s
 [1m[92m     Running[0m `target\debug\oasis-shell.exe`
+[2m8:15:15 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/shared/GlobalTerminal.tsx, /src/index.css[22m
+[2m8:16:56 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/TopBar.tsx, /src/index.css[22m
+[2m8:21:57 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/TopBar.tsx, /src/index.css[22m
+[2m8:22:00 am[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m

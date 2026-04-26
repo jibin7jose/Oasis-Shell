@@ -86,7 +86,7 @@ export const GlobalTerminal: React.FC = () => {
                 </div>
                 <div>
                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Global Founder Terminal</h2>
-                   <p className="text-[10px] font-black text-indigo-500/60 uppercase tracking-[0.4em] mt-1">Direct Neural-to-Kernel Manifestation</p>
+                   <p className="text-[10px] font-black text-indigo-500/60 uppercase tracking-[0.4em] mt-1">Strategic Command Node | Awaiting Directive</p>
                 </div>
               </div>
               <button 

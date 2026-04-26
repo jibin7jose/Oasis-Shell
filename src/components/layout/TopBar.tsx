@@ -1,4 +1,4 @@
-import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera } from "lucide-react";
+import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera, Search } from "lucide-react";
 import { OracleHub } from "../shared/OracleHub";
 
 import { motion } from "framer-motion";
@@ -45,6 +45,7 @@ interface TopBarProps {
   onToggleVision: () => void;
   onToggleZen: () => void;
   onToggleCLI: () => void;
+  onToggleCommandPalette: () => void;
   onTogglePresentation: () => void;
   onToggleNetwork: () => void;
   onToggleAutoAura: () => void;
@@ -76,6 +77,7 @@ export default function TopBar({
   onToggleVision,
   onToggleZen,
   onToggleCLI,
+  onToggleCommandPalette,
   onTogglePresentation,
   onToggleNetwork,
   onToggleAutoAura,
@@ -228,11 +230,24 @@ export default function TopBar({
             </button>
             <button
               onClick={onToggleCLI}
+              aria-label="Open Oasis CLI"
+              title="Open Oasis CLI"
               className={cn("ml-4 p-2 glass rounded-lg text-emerald-400 group relative", zenMode && "opacity-0 scale-90")}
             >
               <Terminal className="w-3.5 h-3.5" />
               <span className="absolute left-full ml-3 px-3 py-1.5 bg-emerald-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                 Oasis Shell (CLI)
+              </span>
+            </button>
+            <button
+              onClick={onToggleCommandPalette}
+              aria-label="Open Command Palette"
+              title="Open Command Palette"
+              className={cn("ml-4 p-2 glass rounded-lg text-cyan-400 group relative", zenMode && "opacity-0 scale-90")}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="absolute left-full ml-3 px-3 py-1.5 bg-cyan-600 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                Neural Command Palette
               </span>
             </button>
             <button

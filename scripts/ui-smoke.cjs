@@ -48,11 +48,20 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
 
   const paletteInput = page.getByPlaceholder(/command the system/i);
   if (!(await paletteInput.count())) {
+    const paletteButton = page.locator('button[aria-label="Open Command Palette"]');
+    if (await paletteButton.count()) {
+      await paletteButton.first().click({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(700);
+    }
+  }
+
+  const retryInput = page.getByPlaceholder(/command the system/i);
+  if (!(await retryInput.count())) {
     note(resultName, "SKIP", "command palette did not open");
     return false;
   }
 
-  await paletteInput.fill(commandLabel);
+  await retryInput.fill(commandLabel);
   await page.waitForTimeout(500);
   await page.keyboard.press("Enter").catch(() => {});
   await page.waitForTimeout(1200);
@@ -128,8 +137,33 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
     const terminalText = await page.locator("body").innerText();
     if (/Strategic Command Node|Awaiting Directive|OASIS KERNEL/i.test(terminalText)) {
       note("Terminal Shortcut", "OK", "terminal surfaced");
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(500);
     } else {
-      note("Terminal Shortcut", "SKIP", "terminal shortcut did not surface visible panel");
+      await page.keyboard.press("Control+Shift+K").catch(() => {});
+      await page.waitForTimeout(1000);
+      const shortcutText = await page.locator("body").innerText();
+      if (/Strategic Command Node|Awaiting Directive|OASIS KERNEL/i.test(shortcutText)) {
+        note("Terminal Shortcut", "OK", "terminal surfaced via ctrl+shift+k");
+        await page.keyboard.press("Escape").catch(() => {});
+        await page.waitForTimeout(500);
+      } else {
+        const terminalButton = page.locator('button[aria-label="Open Oasis CLI"]');
+        if (await terminalButton.count()) {
+          await terminalButton.first().click({ timeout: 3000 }).catch(() => {});
+          await page.waitForTimeout(1000);
+          const fallbackText = await page.locator("body").innerText();
+          if (/Strategic Command Node|Awaiting Directive|OASIS KERNEL/i.test(fallbackText)) {
+            note("Terminal Shortcut", "OK", "terminal surfaced via visible launcher");
+            await page.keyboard.press("Escape").catch(() => {});
+            await page.waitForTimeout(500);
+          } else {
+            note("Terminal Shortcut", "SKIP", "terminal shortcut did not surface visible panel");
+          }
+        } else {
+          note("Terminal Shortcut", "SKIP", "terminal shortcut did not surface visible panel");
+        }
+      }
     }
 
     await openFromPalette(page, "Open Sentinel Vault", /Sentinel Vault|Authentication Required|Asset Ledger/i, "Palette: Open Sentinel Vault");

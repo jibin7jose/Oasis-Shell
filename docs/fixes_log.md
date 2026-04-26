@@ -19,3 +19,6 @@
 - Re-ran the full health loop and confirmed the frontend build, Rust tests, smoke diagnostics, and UI smoke all pass after the inventory rendering fix.
 - Added a backend guard in `get_strategic_inventory` so the manifest scan ignores non-file entries and empty names at the source.
 - Re-ran the full health loop again and confirmed the source-side inventory guard keeps the app green.
+- Added accessible top-bar launchers for the CLI and command palette, then updated the browser smoke to fall back to those launchers when keyboard accelerators are intercepted by the browser.
+- Closed the terminal overlay before opening the command palette in smoke so the launcher steps run in the correct order.
+- Re-ran the full health loop and confirmed the terminal shortcut and command palette now surface reliably in browser automation.

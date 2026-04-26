@@ -2869,6 +2869,7 @@ export default function App() {
           onToggleVision={() => setVisionActive(!visionActive)}
           onToggleZen={() => setZenMode(!zenMode)}
           onToggleCLI={() => setShowCLI(!showCLI)}
+          onToggleCommandPalette={() => setCommandOpen(!commandOpen)}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onToggleNetwork={() => setShowNetwork(!showNetwork)}
           onToggleAutoAura={() => setAutoAura(!autoAura)}

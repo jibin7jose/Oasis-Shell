@@ -1,0 +1,5 @@
+﻿Full health run completed successfully.
+Frontend build: 17.1s
+Rust tests: 10.9s wrapper time
+Smoke diagnostics: 6.3s
+UI smoke: 27.4s
