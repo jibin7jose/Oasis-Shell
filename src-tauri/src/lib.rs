@@ -1770,6 +1770,9 @@ async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
         let entry = entry.map_err(|e| e.to_string())?;
         let metadata = entry.metadata().map_err(|e| e.to_string())?;
         let file_name = entry.file_name().into_string().unwrap_or_default();
+        if file_name.trim().is_empty() || !metadata.is_file() {
+            continue;
+        }
         
         // Calculate Pseudo-Debt based on actual file size (e.g., larger = more complex/debt)
         let debt = (metadata.len() as f32 / 100.0).min(100.0);

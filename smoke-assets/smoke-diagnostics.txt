@@ -1,5 +1,5 @@
 Oasis Shell Smoke Diagnostics
-Generated: 2026-04-26 08:04:58
+Generated: 2026-04-26 08:10:24
 
 == Smoke Check ==
 
@@ -11,10 +11,10 @@ Name            Status                                                          
 ----            ------                                                                                           ------
 Frontend        OK                                                                                                  200
 Ollama API      OK                                                     gemma3:4b, nomic-embed-text:latest, llava:latest
-Ollama Generate OK                                                Smoke checks initiated, local oracle status: nominal.
+Ollama Generate OK                                              Smoke checks initiated, confirming local oracle status.
 Founder Secret  OK                                                                                           Configured
-Tauri Process   OK                                                                                            PID 23780
-Tauri Log       OK      ...ed + debuginfo] target(s) in 1.03s | [1m[92m     Running[0m `target\debug\oasis-shell.exe`
+Tauri Process   OK                                                                                            PID 19008
+Tauri Log       OK      ...d + debuginfo] target(s) in 55.81s | [1m[92m     Running[0m `target\debug\oasis-shell.exe`
 
 
 
@@ -27,16 +27,16 @@ OASIS_FOUNDER_SECRET=[configured]
 
 ProcessName    Id
 -----------    --
-cargo        9356
-cargo       29328
+cargo       21592
+cargo       28036
 node         6152
-node         7208
+node         9024
 node        12688
-node        15752
 node        16268
 node        16396
+node        21928
 node        28112
-oasis-shell 23780
+oasis-shell 19008
 
 == Recent Tauri Log ==
 node.exe :      Running BeforeDevCommand (`npm run frontend:guarded`)
@@ -63,4 +63,12 @@ Starting frontend on http://localhost:1420...
      Running DevCommand (`cargo  run --no-default-features --color always --`)
         Info Watching D:\myproject\new\oasis-shell\src-tauri for changes...
 [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.03s
+[1m[92m     Running[0m `target\debug\oasis-shell.exe`
+        Info File src-tauri\src\lib.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+[1m[92m   Compiling[0m oasis-shell v1.0.0 (D:\myproject\new\oasis-shell\src-tauri)
+[1m[96m    Building[0m [=======================> ] 603/605: oasis-sGǪ
+[1m[96m    Building[0m [=======================> ] 604/605: oasis-sGǪ
+                                                            
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 55.81s
 [1m[92m     Running[0m `target\debug\oasis-shell.exe`

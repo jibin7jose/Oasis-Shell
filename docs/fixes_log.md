@@ -17,3 +17,5 @@
 - Normalized the browser-mode strategic inventory mock so it returns real `file_path` values instead of placeholder-only records.
 - Hardened the Sentient Vault strategic inventory renderer to derive safe display names and skip sealing actions when a path is missing, preventing the visible `blob` / `Neural Identifier Missing` cards from surfacing in browser mode.
 - Re-ran the full health loop and confirmed the frontend build, Rust tests, smoke diagnostics, and UI smoke all pass after the inventory rendering fix.
+- Added a backend guard in `get_strategic_inventory` so the manifest scan ignores non-file entries and empty names at the source.
+- Re-ran the full health loop again and confirmed the source-side inventory guard keeps the app green.
