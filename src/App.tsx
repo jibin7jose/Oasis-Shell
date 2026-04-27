@@ -461,7 +461,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isTauri) return;
+    if (!isTauri || !showGraph || performanceMode) return;
     let active = true;
     import("react-force-graph-3d")
       .then((mod) => {
@@ -473,7 +473,13 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [showGraph, performanceMode]);
+
+  useEffect(() => {
+    if (!showGraph || performanceMode) {
+      setForceGraph3DComp(null);
+    }
+  }, [showGraph, performanceMode]);
 
   // Lifecycle Synchronizations moved to unified effect block above
 
@@ -2785,7 +2791,7 @@ export default function App() {
 
       {/* 3D Nebula Layer */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
-        {mounted && isTauri && !performanceMode && ForceGraph3DComp && (
+        {mounted && isTauri && !performanceMode && !showGraph && ForceGraph3DComp ? (
           <ForceGraph3DComp
             ref={fgRef}
             graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
@@ -2810,6 +2816,8 @@ export default function App() {
             linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.15)"}
             showNavInfo={false}
           />
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.92),rgba(2,6,23,0.65))]" />
         )}
       </div>
 

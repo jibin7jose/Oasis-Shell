@@ -4,6 +4,7 @@ import {
   FounderMetrics, SystemStats, ContextCrate, CollectiveNode, 
   StrategicMacro, GolemTask, EconomicPulse 
 } from './contracts';
+import { invokeSafe } from "./tauri";
 
 export interface SystemState {
   founderMetrics: FounderMetrics;
@@ -219,8 +220,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   resilienceData: null,
   fetchResilienceAudit: async () => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const data = await invoke("get_system_resilience_audit");
+      const data = await invokeSafe("get_system_resilience_audit");
       set({ resilienceData: data });
     } catch (e) {
       console.error("Resilience Audit Sync Failed", e);
@@ -317,8 +317,3 @@ export const useSystemStore = create<SystemState>((set) => ({
   showSentinel: false,
   setShowSentinel: (show: boolean) => set({ showSentinel: show }),
 }));
-
-export const invokeSafe = async (cmd: string, args: any = {}) => {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke(cmd, args);
-};

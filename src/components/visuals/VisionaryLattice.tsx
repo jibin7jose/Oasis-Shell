@@ -14,15 +14,22 @@ interface VisionaryLatticeProps {
   show: boolean;
 }
 
+const CATEGORY_RGB: Record<LatticePoint["category"] | "DEFAULT", [number, number, number]> = {
+  ERROR: [244, 63, 94],
+  MARKET: [16, 185, 129],
+  CODE: [99, 102, 241],
+  SYSTEM: [168, 85, 247],
+  DEFAULT: [148, 163, 184],
+};
+
 const VisionaryLattice: React.FC<VisionaryLatticeProps> = ({ points, show }) => {
   const getCategoryColor = (cat: string) => {
-    switch (cat) {
-      case "ERROR": return "rgba(244, 63, 94,";
-      case "MARKET": return "rgba(16, 185, 129,";
-      case "CODE": return "rgba(99, 102, 241,";
-      case "SYSTEM": return "rgba(168, 85, 247,";
-      default: return "rgba(148, 163, 184,";
-    }
+    return CATEGORY_RGB[cat as keyof typeof CATEGORY_RGB] ?? CATEGORY_RGB.DEFAULT;
+  };
+
+  const rgba = (cat: string, alpha: number) => {
+    const [r, g, b] = getCategoryColor(cat);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
   return (
@@ -46,7 +53,7 @@ const VisionaryLattice: React.FC<VisionaryLatticeProps> = ({ points, show }) => 
             {/* Heatmap Core */}
             <div 
               className="w-40 h-40 rounded-full blur-3xl opacity-20"
-              style={{ background: `radial-gradient(circle, ${getCategoryColor(point.category)}1) 0%, transparent 70%)` }}
+              style={{ background: `radial-gradient(circle, ${rgba(point.category, 0.28)} 0%, transparent 70%)` }}
             />
             
             {/* Focus Ring */}
@@ -57,7 +64,7 @@ const VisionaryLattice: React.FC<VisionaryLatticeProps> = ({ points, show }) => 
             >
               <div 
                 className="w-8 h-8 rounded-full border-2 border-dashed"
-                style={{ borderColor: `${getCategoryColor(point.category)}0.5)` }}
+                style={{ borderColor: rgba(point.category, 0.5) }}
               />
             </motion.div>
 
@@ -66,8 +73,8 @@ const VisionaryLattice: React.FC<VisionaryLatticeProps> = ({ points, show }) => 
               <span 
                 className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border backdrop-blur-md"
                 style={{ 
-                  backgroundColor: `${getCategoryColor(point.category)}0.2)`,
-                  borderColor: `${getCategoryColor(point.category)}0.4)`,
+                  backgroundColor: rgba(point.category, 0.2),
+                  borderColor: rgba(point.category, 0.4),
                   color: "white" 
                 }}
               >
