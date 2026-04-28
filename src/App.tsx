@@ -68,11 +68,8 @@ import { LibraryPanel } from "./components/panels/LibraryPanel";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
 import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
 import { SoundscapeManager } from "./components/shared/SoundscapeManager";
-
-
-
-
-// Design Utility
+import { AutomationPanel } from "./components/panels/AutomationPanel";
+import { AuditLog } from "./components/panels/AuditLog";// Design Utility
 
 // Design Utility moved to lib/tauri
 
@@ -382,7 +379,9 @@ export default function App() {
   const [selectedGolem, setSelectedGolem] = useState<any | null>(null);
   const [showBoardroom, setShowBoardroom] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
-  const [ForceGraph3DComp, setForceGraph3DComp] = useState<any>(null);
+  const [showAutomation, setShowAutomation] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [ForceGraph2DComp, setForceGraph2DComp] = useState<any>(null);
   const [resetProgress, setResetProgress] = useState<{ active: boolean; total: number; done: number; mode: "reset" | "reset_clear" } | null>(null);
   const [permissions, setPermissions] = useState<Record<CommandPermission, boolean>>({
     process_control: false,
@@ -463,12 +462,12 @@ export default function App() {
   useEffect(() => {
     if (!isTauri || !showGraph || performanceMode) return;
     let active = true;
-    import("react-force-graph-3d")
+    import("react-force-graph-2d")
       .then((mod) => {
-        if (active) setForceGraph3DComp(() => mod.default);
+        if (active) setForceGraph2DComp(() => mod.default);
       })
       .catch(() => {
-        if (active) setForceGraph3DComp(null);
+        if (active) setForceGraph2DComp(null);
       });
     return () => {
       active = false;
@@ -477,7 +476,7 @@ export default function App() {
 
   useEffect(() => {
     if (!showGraph || performanceMode) {
-      setForceGraph3DComp(null);
+      setForceGraph2DComp(null);
     }
   }, [showGraph, performanceMode]);
 
@@ -2791,8 +2790,8 @@ export default function App() {
 
       {/* 3D Nebula Layer */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
-        {mounted && isTauri && !performanceMode && !showGraph && ForceGraph3DComp ? (
-          <ForceGraph3DComp
+        {mounted && isTauri && !performanceMode && !showGraph && ForceGraph2DComp ? (
+          <ForceGraph2DComp
             ref={fgRef}
             graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
             backgroundColor="#00000000"
@@ -2814,7 +2813,6 @@ export default function App() {
             nodeLabel="id"
             onNodeClick={handleNodeClick}
             linkColor={() => simMode ? "rgba(245, 158, 11, 0.2)" : "rgba(99, 102, 241, 0.15)"}
-            showNavInfo={false}
           />
         ) : (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%),linear-gradient(to_bottom,rgba(2,6,23,0.92),rgba(2,6,23,0.65))]" />
@@ -2833,7 +2831,7 @@ export default function App() {
         onOpenVault={() => setShowVault(true)}
         onOpenBoardroom={() => setShowBoardroom(true)}
         onOpenWorkforce={() => setShowWorkforce(true)}
-        onOpenLogs={() => setShowLogs(true)}
+        onOpenLogs={() => setShowAuditLog(true)}
         onOpenNexus={() => setShowNexus(true)}
         onActivateSim={() => setSimMode(true)}
         onToggleSim={() => setSimMode(!simMode)}
@@ -3169,8 +3167,8 @@ export default function App() {
             </div>
 
             <div className="w-full h-full pointer-events-auto">
-              {mounted && isTauri && ForceGraph3DComp && (
-                <ForceGraph3DComp
+              {mounted && isTauri && ForceGraph2DComp && (
+                <ForceGraph2DComp
                   graphData={dynamicGraph.nodes.length > 0 ? dynamicGraph : graphData}
                   backgroundColor="#00000000"
                   nodeRelSize={performanceMode ? 3 : 5}
@@ -3185,7 +3183,6 @@ export default function App() {
                   linkColor={() => "rgba(255, 255, 255, 0.05)"}
                   linkWidth={performanceMode ? 0.5 : 1}
                   enableNodeDrag={!performanceMode}
-                  showNavInfo={false}
                   onNodeRightClick={(node: any, event: any) => {
                     setCortexMenu({ x: event.clientX, y: event.clientY, node });
                   }}
@@ -4308,6 +4305,8 @@ export default function App() {
       <CollectivePanel isOpen={showCollective} onClose={() => setShowCollective(false)} />
       <HatcheryPanel isOpen={showHatchery} onClose={() => setShowHatchery(false)} />
       <BlueprintPanel isOpen={showBlueprint} onClose={() => setShowBlueprint(false)} />
+      <AutomationPanel isOpen={showAutomation} onClose={() => setShowAutomation(false)} />
+      <AuditLog isOpen={showAuditLog} onClose={() => setShowAuditLog(false)} />
       <ChronosHUD />
       <AnimatePresence>
         {realityBridgeOpen && (
