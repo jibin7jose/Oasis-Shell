@@ -316,4 +316,9 @@ export const useSystemStore = create<SystemState>((set) => ({
   setShowNexus: (show: boolean) => set({ showNexus: show }),
   showSentinel: false,
   setShowSentinel: (show: boolean) => set({ showSentinel: show }),
+  auraIp: '192.168.1.100',
+  setAuraIp: (ip: string) => set({ auraIp: ip }),
+  sensoryFeedbackEnabled: true,
+  setSensoryFeedbackEnabled: (enabled: boolean) => set({ sensoryFeedbackEnabled: enabled }),
 }));
+

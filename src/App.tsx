@@ -154,6 +154,8 @@ export default function App() {
     showSettings, setShowSettings,
     showNexus, setShowNexus,
     showSentinel, setShowSentinel,
+      auraIp, setAuraIp,
+      sensoryFeedbackEnabled, setSensoryFeedbackEnabled,
     activeView, setActiveView,
     shellMode, setShellMode,
     showCollective, setShowCollective,
@@ -185,7 +187,7 @@ export default function App() {
   const [simMode, setSimMode] = useState(false);
   const [isCortexSearching, setIsCortexSearching] = useState(false);
   const [performanceMode, setPerformanceMode] = useState(false);
-  const [autoAura, setAutoAura] = useState(false);
+  
   const [fpsThreshold, setFpsThreshold] = useState(22);
   const [sparklinesAutoDisabled, setSparklinesAutoDisabled] = useState(false);
   const [isHandshakeSuccessful, setIsHandshakeSuccessful] = useState(false);
@@ -290,7 +292,7 @@ export default function App() {
   const [rippleColor, setRippleColor] = useState("#6366f1");
   const [showVisualForge, setShowVisualForge] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
-  const [auraIp, setAuraIp] = useState("192.168.1.100");
+  
   const [commandQuery, setCommandQuery] = useState("");
   const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
   const [batteryHealth, setBatteryHealth] = useState<{ health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null>(null);
@@ -572,14 +574,14 @@ export default function App() {
 
   // Phase 9.0: Physical Aura Bridge
   useEffect(() => {
-    if (!autoAura) return;
+    if (!sensoryFeedbackEnabled) return;
     const sync = async () => {
       try {
         await invokeSafe("sync_hardware_aura", { targetIp: auraIp, hexColor: founderMetrics.stress_color });
       } catch (e) { }
     };
     sync();
-  }, [founderMetrics.stress_color, auraIp, autoAura]);
+  }, [founderMetrics.stress_color, auraIp, sensoryFeedbackEnabled]);
 
   // Phase 8.2: Neural Cortex Sync
   useEffect(() => {
@@ -1074,7 +1076,7 @@ export default function App() {
 
   // EFFECT: Physical Aura Sync (Pillar 25)
   useEffect(() => {
-    if (autoAura) {
+    if (sensoryFeedbackEnabled) {
       let activeAura = "indigo"; // Default Focus
       if (activeDebate?.consensus_aura === 'volatile') activeAura = "rose";
       else if (ventureIntegrity < 50) activeAura = "amber";
@@ -1082,7 +1084,7 @@ export default function App() {
 
       invokeSafe("sync_physical_aura", { integrity: ventureIntegrity, ip: auraIp, color: activeAura }).catch(() => { });
     }
-  }, [autoAura, activeDebate, ventureIntegrity]);
+  }, [sensoryFeedbackEnabled, activeDebate, ventureIntegrity]);
 
   useEffect(() => {
     if (!isTauri) {
@@ -2864,7 +2866,7 @@ export default function App() {
           zenMode={zenMode}
           voiceActive={voiceActive}
           visionActive={visionActive}
-          autoAura={autoAura}
+          sensoryFeedbackEnabled={sensoryFeedbackEnabled}
           ventureIntegrity={ventureIntegrity}
           fiscalBurn={fiscalBurn}
           hardwareStatus={hardwareStatus}
@@ -2880,7 +2882,7 @@ export default function App() {
           onToggleCommandPalette={() => setCommandOpen(!commandOpen)}
           onTogglePresentation={() => setPresentationMode(!presentationMode)}
           onToggleNetwork={() => setShowNetwork(!showNetwork)}
-          onToggleAutoAura={() => setAutoAura(!autoAura)}
+          onToggleSensoryFeedback={() => setSensoryFeedbackEnabled(!sensoryFeedbackEnabled)}
           onAegisSync={handleAegisSync}
           onOpenNexus={() => setShowNexus(true)}
           onOpenSettings={() => setActiveView('settings')}
@@ -3575,7 +3577,7 @@ export default function App() {
                   <div className="flex items-center glass rounded-2xl px-6 py-4 border-white/10">
                     <span className="text-[10px] font-black text-slate-500 mr-4 font-mono">TARGET_IP:</span>
                     <input value={auraIp} onChange={(e) => setAuraIp(e.target.value)} placeholder="192.168.1.XXX" className="bg-transparent border-none outline-none text-lg w-full text-white font-black tracking-tighter" />
-                    <div className={cn("w-3 h-3 rounded-full animate-pulse shadow-sm", autoAura ? "bg-indigo-500 shadow-indigo-500/40" : "bg-white/10")} />
+                    <div className={cn("w-3 h-3 rounded-full animate-pulse shadow-sm", sensoryFeedbackEnabled ? "bg-indigo-500 shadow-indigo-500/40" : "bg-white/10")} />
                   </div>
                   <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Configure your workspace luminosity bridge. The shell targets the raw UDP/JSON API of your WLED device to reflect venture integrity in physical space.</p>
                 </div>
@@ -4349,4 +4351,7 @@ export default function App() {
     </motion.div>
   );
 }
+
+
+
 

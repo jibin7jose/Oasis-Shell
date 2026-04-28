@@ -172,6 +172,54 @@ export const SettingsPanel: React.FC = () => {
         </div>
       </section>
 
+      {/* Sensory Bridge Section */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Activity className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Sensory Feedback Bridge</h3>
+        </div>
+
+        <div className="glass rounded-[2.5rem] border border-white/5 p-8 space-y-8">
+           <div className="flex items-center justify-between">
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-white">Active Sensory Feedback</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Enable hardware RGB sync and dynamic audio engine</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSensoryFeedbackEnabled(!sensoryFeedbackEnabled)}
+                className={cn(
+                  "w-12 h-6 rounded-full relative transition-all duration-500 p-1",
+                  sensoryFeedbackEnabled ? "bg-indigo-500" : "bg-white/10"
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full transition-all duration-500",
+                  sensoryFeedbackEnabled ? "translate-x-6" : "translate-x-0"
+                )} />
+              </button>
+           </div>
+
+           <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hardware Aura IP (WLED/Philips Hue)</label>
+              <div className="relative group">
+                <Terminal className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-indigo-400" />
+                <input 
+                  type="text" 
+                  value={auraIp}
+                  onChange={(e) => setAuraIp(e.target.value)}
+                  placeholder="192.168.1.100"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-14 pr-6 text-xs text-white font-mono outline-none focus:border-indigo-500/40 transition-all font-bold"
+                />
+              </div>
+           </div>
+        </div>
+      </section>
+
       {/* Neural Config Section */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
@@ -249,3 +297,4 @@ export const SettingsPanel: React.FC = () => {
     </div>
   );
 };
+

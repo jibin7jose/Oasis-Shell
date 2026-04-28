@@ -58,18 +58,20 @@ export function useSoundscape() {
     const ctx = audioCtx.current;
     const normalizedLoad = Math.min(100, Math.max(0, load)) / 100;
 
-    // Frequency shift (40Hz to 60Hz)
-    const baseFreq = 40 + (normalizedLoad * 20);
-    engineBase.current.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.8);
-    if (engineTexture.current) engineTexture.current.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.8);
+    // Phase 9.2: Sensory Feedback Bridge (Dynamic Hum)
+    // Subsonic scaling (40Hz to 80Hz)
+    const baseFreq = 40 + (normalizedLoad * 40);
+    engineBase.current.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.5);
 
-    // Filter opening (200Hz to 1200Hz) - the "Whirl"
-    const filterFreq = 180 + (normalizedLoad * 1000);
-    engineFilter.current.frequency.setTargetAtTime(filterFreq, ctx.currentTime, 0.5);
+    // Filter resonance scaling (200Hz to 2500Hz)
+    const filterFreq = 200 + (Math.pow(normalizedLoad, 2) * 2300);
+    engineFilter.current.frequency.setTargetAtTime(filterFreq, ctx.currentTime, 0.3);
+    engineFilter.current.Q.setTargetAtTime(2 + (normalizedLoad * 8), ctx.currentTime, 0.3);
 
-    // Volume modulation (subtle increase with load)
-    const targetGain = 0.02 + (normalizedLoad * 0.04);
-    engineGain.current.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.6);
+    // Texture harmonics scaling
+    if (engineTexture.current) {
+      engineTexture.current.frequency.setTargetAtTime(baseFreq * 2.01, ctx.currentTime, 0.5);
+    }
   }, []);
 
   const playClick = useCallback(() => {
@@ -181,7 +183,11 @@ export function useSoundscape() {
     playPulse, 
     playHandshake, 
     playNotification,
+    playMutationSuccess,
+    playAuraHandshake,
     startEngine,
     updateEngine
   };
 }
+
+
