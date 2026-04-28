@@ -54,6 +54,7 @@ pub use search::{
     delete_pinned_context_with_pool,
     get_neural_logs_with_pool,
     seek_chronos_with_pool,
+    get_audit_logs,
 };
 pub use state::{
     create_chronos_snapshot_to_path,
@@ -3368,6 +3369,9 @@ pub fn run() {
             macros::execute_visual_macro,
             macros::sign_macro_golem,
             macros::get_macro_inventory,
+            macros::get_automation_tasks,
+            macros::execute_automation_task,
+            get_audit_logs,
             get_nexus_pulse,
             derive_predictive_simulation,
             get_risk_simulations,
@@ -3489,6 +3493,23 @@ pub fn run() {
                     aura TEXT NOT NULL,
                     status TEXT NOT NULL,
                     progress REAL DEFAULT 0.0
+                )", []);
+
+                // Automation & Audit Tables
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS automation_tasks (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    schedule TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    last_run INTEGER
+                )", []);
+                
+                let _ = conn.execute("CREATE TABLE IF NOT EXISTS audit_logs (
+                    id TEXT PRIMARY KEY,
+                    timestamp INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    details TEXT NOT NULL
                 )", []);
 
                 // Risk Oracle Forge Table

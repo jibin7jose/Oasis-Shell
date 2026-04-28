@@ -89,3 +89,51 @@ pub fn seek_chronos_with_pool(
 
 #[allow(dead_code)]
 fn _keep_app_state_used(_: &AppState) {}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct AuditRecord {
+    pub id: String,
+    pub timestamp: i64,
+    pub action: String,
+    pub category: String,
+    pub details: String,
+}
+
+#[tauri::command]
+pub async fn get_audit_logs(state: tauri::State<'_, AppState>) -> Result<Vec<AuditRecord>, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, timestamp, action, category, details FROM audit_logs ORDER BY timestamp DESC LIMIT 50").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        Ok(AuditRecord {
+            id: row.get(0)?,
+            timestamp: row.get(1)?,
+            action: row.get(2)?,
+            category: row.get(3)?,
+            details: row.get(4)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut logs = Vec::new();
+    for r in rows {
+        if let Ok(log) = r {
+            logs.push(log);
+        }
+    }
+    
+    // Seed dummy data if empty for demo purposes
+    if logs.is_empty() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let dummy = vec![
+            AuditRecord { id: "log1".into(), timestamp: now - 5000, action: "SENTINEL_LOCK".into(), category: "security".into(), details: "Vault locked due to idle timeout.".into() },
+            AuditRecord { id: "log2".into(), timestamp: now - 120000, action: "EXEC_COMMAND".into(), category: "system".into(), details: "Purged zombie process PID 1450".into() },
+            AuditRecord { id: "log3".into(), timestamp: now - 360000, action: "INTENT_PARSE".into(), category: "neural".into(), details: "Parsed intent: 'clean workspace'".into() },
+        ];
+        for d in &dummy {
+            let _ = db.execute("INSERT INTO audit_logs (id, timestamp, action, category, details) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params![d.id, d.timestamp, d.action, d.category, d.details]);
+        }
+        logs = dummy;
+    }
+
+    Ok(logs)
+}

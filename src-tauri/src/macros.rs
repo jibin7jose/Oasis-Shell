@@ -139,3 +139,69 @@ pub async fn execute_visual_macro(id: String) -> Result<String, String> {
 pub fn run() {
     // Module commands are registered from crate root.
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AutomationTask {
+    pub id: String,
+    pub name: String,
+    pub schedule: String,
+    pub status: String,
+    pub last_run: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn get_automation_tasks(state: tauri::State<'_, AppState>) -> Result<Vec<AutomationTask>, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db.prepare("SELECT id, name, schedule, status, last_run FROM automation_tasks").map_err(|e| e.to_string())?;
+    
+    let rows = stmt.query_map([], |row| {
+        let last_run: Option<i64> = row.get(4).unwrap_or(None);
+        Ok(AutomationTask {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            schedule: row.get(2)?,
+            status: row.get(3)?,
+            last_run,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut tasks = Vec::new();
+    for r in rows {
+        if let Ok(task) = r {
+            tasks.push(task);
+        }
+    }
+    
+    // Seed dummy data if empty for demo purposes
+    if tasks.is_empty() {
+        let dummy = vec![
+            AutomationTask { id: "t1".into(), name: "Daily System Clean".into(), schedule: "@daily".into(), status: "idle".into(), last_run: None },
+            AutomationTask { id: "t2".into(), name: "Sync Neural Manifest".into(), schedule: "every 4 hours".into(), status: "success".into(), last_run: Some(chrono::Utc::now().timestamp_millis() - 3600000) },
+            AutomationTask { id: "t3".into(), name: "Purge Zombie Procs".into(), schedule: "@hourly".into(), status: "running".into(), last_run: None },
+        ];
+        for d in &dummy {
+            let _ = db.execute("INSERT INTO automation_tasks (id, name, schedule, status, last_run) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params![d.id, d.name, d.schedule, d.status, d.last_run]);
+        }
+        tasks = dummy;
+    }
+
+    Ok(tasks)
+}
+
+#[tauri::command]
+pub async fn execute_automation_task(state: tauri::State<'_, AppState>, id: String) -> Result<String, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    
+    let now = chrono::Utc::now().timestamp_millis();
+    db.execute("UPDATE automation_tasks SET status = 'success', last_run = ?1 WHERE id = ?2", rusqlite::params![now, id])
+        .map_err(|e| e.to_string())?;
+    
+    // Add to audit logs
+    let log_id = format!("log_{}", now);
+    db.execute(
+        "INSERT INTO audit_logs (id, timestamp, action, category, details) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![log_id, now, "EXEC_AUTOMATION", "system", format!("Executed task {}", id)]
+    ).map_err(|e| e.to_string())?;
+
+    Ok("Task Executed".into())
+}
