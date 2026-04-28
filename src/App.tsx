@@ -2832,6 +2832,7 @@ export default function App() {
         onOpenVault={() => setShowVault(true)}
         onOpenBoardroom={() => setShowBoardroom(true)}
         onOpenWorkforce={() => setShowWorkforce(true)}
+        onOpenMirror={() => setMirrorOpen(true)}
         onOpenLogs={() => setShowAuditLog(true)}
         onOpenNexus={() => setShowNexus(true)}
         onActivateSim={() => setSimMode(true)}
@@ -4348,3 +4349,4 @@ export default function App() {
     </motion.div>
   );
 }
+

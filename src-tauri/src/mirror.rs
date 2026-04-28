@@ -137,7 +137,19 @@ pub async fn verify_system_mutation(mutation_id: String) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub async fn apply_neural_mutation(mutation_id: String) -> Result<String, String> {
+pub async fn apply_neural_mutation(mutation_id: String, founder_secret: String) -> Result<String, String> {
+    let expected_secret = std::env::var("OASIS_FOUNDER_SECRET")
+        .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
+        .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
+
+    if founder_secret.trim().is_empty() {
+        return Err("Founder secret is required.".into());
+    }
+
+    if founder_secret != expected_secret {
+        return Err("Founder authentication failed. Unauthorized mutation attempt.".into());
+    }
+
     let mut mutation = {
         let mut registry = MUTATION_REGISTRY.lock().unwrap();
         registry.get_mut(&mutation_id).map(|m| m.clone()).ok_or("Mutation not found.")?

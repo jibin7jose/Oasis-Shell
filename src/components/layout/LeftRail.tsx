@@ -19,6 +19,7 @@ interface LeftRailProps {
   onOpenDocs: () => void;
   onOpenBoardroom: () => void;
   onOpenWorkforce: () => void;
+  onOpenMirror: () => void;
   onSnapshot: () => void;
   proposalCount: number;
   chronosIndex: number;
@@ -50,6 +51,7 @@ export default function LeftRail({
   onOpenDocs,
   onOpenBoardroom,
   onOpenWorkforce,
+  onOpenMirror,
   onSnapshot,
   chronosIndex,
   chronosCount,
@@ -93,6 +95,7 @@ export default function LeftRail({
           { id: 'boardroom', icon: MessageSquareQuote, label: 'Boardroom Debate', action: onOpenBoardroom },
           { id: 'docs', icon: Book, label: 'Documentation Manual', action: onOpenDocs },
           { id: 'workforce', icon: Users, label: 'Neural Workforce', action: onOpenWorkforce },
+          { id: 'mirror', icon: Zap, label: 'Neural Mirror', action: onOpenMirror },
           { id: 'logs', icon: Activity, label: 'Temporal Logs', action: onOpenLogs },
           { id: 'nexus', icon: ShieldCheck, label: 'Aegis Nexus', action: onOpenNexus },
           { id: "zenith", icon: ShieldCheck, label: "Focus Layer", action: onActivateZenith },
@@ -212,3 +215,4 @@ export default function LeftRail({
     </motion.aside>
   );
 }
+

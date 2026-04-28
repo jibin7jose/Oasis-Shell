@@ -26,6 +26,7 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
     const [isValidating, setIsValidating] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
     const [auditLog, setAuditLog] = useState<{ type: 'info' | 'success' | 'warn' | 'error', msg: string }[]>([]);
+    const [founderSecret, setFounderSecret] = useState("");
 
     const refreshMutations = useCallback(async () => {
         try {
@@ -80,7 +81,7 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
         setIsApplying(true);
         addLog('info', "Manifesting Neural Mutation...");
         try {
-            const msg = await invokeSafe('apply_neural_mutation', { mutationId: selectedMutation.id }) as string;
+            const msg = await invokeSafe('apply_neural_mutation', { mutationId: selectedMutation.id, founderSecret }) as string;
             addLog('success', msg);
             setNotification("SYSTEM EVOLUTION COMPLETE. KERNEL MUTATED.");
             logEvent(`Neural Mutation Manifested: ${selectedMutation.id} in ${selectedMutation.file_path}`, "neural");
@@ -278,6 +279,13 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
                                         {isValidating && <RotateCw className="w-4 h-4 animate-spin" />}
                                     </button>
 
+                                    <input
+                                        type="password"
+                                        placeholder="Enter Founder Signature..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white text-xs font-black tracking-widest outline-none focus:border-indigo-500/50 transition-all mb-2"
+                                        value={founderSecret}
+                                        onChange={(e) => setFounderSecret(e.target.value)}
+                                    />
                                     <button 
                                         onClick={applyMutation}
                                         disabled={isApplying || selectedMutation.status === 'Applied'}
@@ -301,3 +309,5 @@ export const NeuralMirrorPanel: React.FC<{ isOpen: boolean; onClose: () => void 
         </motion.div>
     );
 };
+
+
