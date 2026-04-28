@@ -69,7 +69,8 @@ import { DashboardPanel } from "./components/panels/DashboardPanel";
 import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
 import { SoundscapeManager } from "./components/shared/SoundscapeManager";
 import { AutomationPanel } from "./components/panels/AutomationPanel";
-import { AuditLog } from "./components/panels/AuditLog";// Design Utility
+import { AuditLog } from "./components/panels/AuditLog";
+import BoardroomPanel from "./components/panels/BoardroomPanel"; // Design Utility
 
 // Design Utility moved to lib/tauri
 
@@ -4307,6 +4308,7 @@ export default function App() {
       <BlueprintPanel isOpen={showBlueprint} onClose={() => setShowBlueprint(false)} />
       <AutomationPanel isOpen={showAutomation} onClose={() => setShowAutomation(false)} />
       <AuditLog isOpen={showAuditLog} onClose={() => setShowAuditLog(false)} />
+      <BoardroomPanel isOpen={showBoardroom} onClose={() => setShowBoardroom(false)} metrics={founderMetrics} />
       <ChronosHUD />
       <AnimatePresence>
         {realityBridgeOpen && (
