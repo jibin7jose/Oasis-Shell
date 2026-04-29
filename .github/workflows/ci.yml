@@ -44,3 +44,8 @@ jobs:
         run: npm run health:full
         env:
           CI: true
+
+      - name: UI Smoke Contract
+        run: npm run smoke:web
+        env:
+          CI: true

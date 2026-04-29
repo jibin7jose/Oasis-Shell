@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { lazy, Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -39,11 +39,8 @@ import AdvisoryDebate from "./components/panels/AdvisoryDebate";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import CortexHUD from "./components/panels/CortexHUD";
 // PortalDashboard - removed (component not found, was an unused import)
-import { NeuralMirrorPanel } from "./components/shared/NeuralMirrorPanel";
 import { GhostWindows } from "./components/visuals/GhostWindows";
 import { TemporalExplorer } from "./components/dashboard/TemporalExplorer";
-import { VisualForge } from "./components/panels/VisualForge";
-import { AegisNexus } from "./components/panels/AegisNexus";
 import { NeuralRipple } from "./components/ui/NeuralRipple";
 import { NeuralBridge } from "./components/dashboard/NeuralBridge";
 import { FileExplorerPanel } from "./components/panels/FileExplorerPanel";
@@ -57,16 +54,12 @@ import { HatcheryPanel } from "./components/panels/HatcheryPanel";
 import { BlueprintPanel } from "./components/panels/BlueprintPanel";
 import { ChronosHUD } from "./components/shared/ChronosHUD";
 import { RefractionManager } from "./components/shared/RefractionManager";
-import { RealityBridge } from "./components/shared/RealityBridge";
-import { KernelForge } from "./components/shared/KernelForge";
 import { SingularityPanel } from "./components/shared/SingularityPanel";
-import { NeuralSandboxPanel } from "./components/shared/NeuralSandboxPanel";
 import { ExodusPanel } from "./components/panels/ExodusPanel";
 import { NeuralSentinelPanel } from "./components/shared/NeuralSentinelPanel";
 import { VisionScanner } from "./components/shared/VisionScanner";
 import { LibraryPanel } from "./components/panels/LibraryPanel";
 import { DashboardPanel } from "./components/panels/DashboardPanel";
-import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
 import { SoundscapeManager } from "./components/shared/SoundscapeManager";
 import { AutomationPanel } from "./components/panels/AutomationPanel";
 import { AuditLog } from "./components/panels/AuditLog";
@@ -100,6 +93,13 @@ const buildFpsPath = (values: number[], width = 120, height = 40) => {
 };
 
 // Interface definitions moved to contracts.ts
+const VisualForge = lazy(() => import("./components/panels/VisualForge").then((m) => ({ default: m.VisualForge })));
+const AegisNexus = lazy(() => import("./components/panels/AegisNexus").then((m) => ({ default: m.AegisNexus })));
+const RealityBridge = lazy(() => import("./components/shared/RealityBridge").then((m) => ({ default: m.RealityBridge })));
+const NeuralSandboxPanel = lazy(() => import("./components/shared/NeuralSandboxPanel").then((m) => ({ default: m.NeuralSandboxPanel })));
+const ConsortiumPanel = lazy(() => import("./components/shared/ConsortiumPanel").then((m) => ({ default: m.ConsortiumPanel })));
+const NeuralMirrorPanel = lazy(() => import("./components/shared/NeuralMirrorPanel").then((m) => ({ default: m.NeuralMirrorPanel })));
+const KernelForge = lazy(() => import("./components/shared/KernelForge").then((m) => ({ default: m.KernelForge })));
 
 export default function App() {
   const { playClick, playPulse, playHandshake, playNotification, startEngine, updateEngine } = useSoundscape();
@@ -2760,10 +2760,12 @@ export default function App() {
       <AnimatePresence>
         {showVisualForge && (
           <SpectralBoundary fallbackTitle="Visual Forge Breach">
-            <VisualForge 
-                onSave={handleSaveVisualMacro}
-                onClose={() => setShowVisualForge(false)}
-            />
+            <Suspense fallback={null}>
+              <VisualForge 
+                  onSave={handleSaveVisualMacro}
+                  onClose={() => setShowVisualForge(false)}
+              />
+            </Suspense>
           </SpectralBoundary>
         )}
       </AnimatePresence>
@@ -2771,10 +2773,12 @@ export default function App() {
       <AnimatePresence>
         {showNexus && (
           <SpectralBoundary fallbackTitle="Aegis Nexus Breach">
-            <AegisNexus 
-                onLaunch={handleLaunchCrate}
-                onClose={() => setShowNexus(false)}
-            />
+            <Suspense fallback={null}>
+              <AegisNexus 
+                  onLaunch={handleLaunchCrate}
+                  onClose={() => setShowNexus(false)}
+              />
+            </Suspense>
           </SpectralBoundary>
         )}
       </AnimatePresence>
@@ -4316,18 +4320,22 @@ export default function App() {
       <ChronosHUD />
       <AnimatePresence>
         {realityBridgeOpen && (
-          <RealityBridge 
-            isOpen={realityBridgeOpen} 
-            onClose={() => setRealityBridgeOpen(false)} 
-            query={realityBridgeQuery}
-          />
+          <Suspense fallback={null}>
+            <RealityBridge 
+              isOpen={realityBridgeOpen} 
+              onClose={() => setRealityBridgeOpen(false)} 
+              query={realityBridgeQuery}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
-      <NeuralSandboxPanel 
-        isOpen={sandboxOpen} 
-        onClose={() => setSandboxOpen(false)} 
-        onInitiateMutation={handleInitiateKernelReForge}
-      />
+      <Suspense fallback={null}>
+        <NeuralSandboxPanel 
+          isOpen={sandboxOpen} 
+          onClose={() => setSandboxOpen(false)} 
+          onInitiateMutation={handleInitiateKernelReForge}
+        />
+      </Suspense>
       <SingularityPanel 
         isOpen={singularityOpen} 
         onClose={() => setSingularityOpen(false)} 
@@ -4336,19 +4344,25 @@ export default function App() {
         isOpen={exodusOpen} 
         onClose={() => setExodusOpen(false)} 
       />
-      <ConsortiumPanel 
-        isOpen={consortiumOpen} 
-        onClose={() => setConsortiumOpen(false)} 
-      />
+      <Suspense fallback={null}>
+        <ConsortiumPanel 
+          isOpen={consortiumOpen} 
+          onClose={() => setConsortiumOpen(false)} 
+        />
+      </Suspense>
       <NeuralSentinelPanel 
         isOpen={sentinelOpen} 
         onClose={() => setSentinelOpen(false)} 
       />
-      <NeuralMirrorPanel 
-        isOpen={mirrorOpen} 
-        onClose={() => setMirrorOpen(false)} 
-      />
-      <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
+      <Suspense fallback={null}>
+        <NeuralMirrorPanel 
+          isOpen={mirrorOpen} 
+          onClose={() => setMirrorOpen(false)} 
+        />
+      </Suspense>
+      <Suspense fallback={null}>
+        <KernelForge isOpen={kernelForgeOpen} onClose={() => setKernelForgeOpen(false)} proposal={activeMutationProposal} />
+      </Suspense>
     </motion.div>
   );
 }
