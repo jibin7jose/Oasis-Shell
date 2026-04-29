@@ -3,174 +3,33 @@ import { listen } from "@tauri-apps/api/event";
 
 export const isTauri = typeof (window as any).__TAURI__ !== "undefined";
 
-export const TAURI_DEFAULTS: Record<string, any> = {
-  get_venture_metrics: { arr: "$1.24M", burn: "$42.5K/mo", runway: "29 Months", momentum: "STRONG (Browser Mode)", stress_color: "#6366f1" },
-  run_system_diagnostic: { cpu_load: 34.2, mem_used: 10737418240, battery_level: 88, is_charging: true, battery_health: 98, time_remaining_min: 420 },
-  get_venture_integrity: 94,
-  get_fiscal_report: { total_burn: 42500, token_load: 120500, status: 'STABLE (MOCK)' },
-  load_venture_state: { arr: "$1.24M", burn: "$42.5K/mo", runway: "29 Months", momentum: "STRONG (Browser Mode)", stress_color: "#6366f1" },
-  get_market_intelligence: {
-    market_index: 12450.8,
-    index_change: "+1.2% (Resonant)",
-    ai_ticker: [
-      { id: "OASIS", price: 42.5, change: "+2.1%", color: "emerald" },
-      { id: "CORTEX", price: 12.8, change: "-0.4%", color: "rose" },
-      { id: "FOUNDRY", price: 88.2, change: "+5.7%", color: "emerald" },
-      { id: "NEURAL", price: 31.4, change: "+1.1%", color: "emerald" },
-    ]
-  },
-  get_neural_wisdom: { recommendation: "Optimization recommended for neural nodes.", insight: "Browser mode detected. Displaying high-fidelity simulations.", confidence: 85 },
-  get_sentinel_ledger: () => (MOCK_STATE.ledger),
-  authenticate_founder: (args: any) => {
-    if (args.secret === "12345") return true;
-    throw new Error("Neural Handshake Refused: Invalid Founder Key");
-  },
-  bootstrap_founder_access: true,
-  seal_strategic_asset: (args: any) => {
-    const id = `B${Math.floor(Math.random() * 1000)}`;
-    (MOCK_STATE.ledger.blobs as any)[id] = {
-      id,
-      title: args.title || "Untitled Asset",
-      original_path: args.filePath || "Unknown",
-      encrypted_path: `C:/Oasis/Vault/${id}.enc`,
-      timestamp: new Date().toISOString(),
-      aura_intensity: 0.9
-    };
-    return id;
-  },
-  unseal_strategic_asset: (args: any) => {
-    delete (MOCK_STATE.ledger.blobs as any)[args.blobId];
-    return true;
-  },
-  get_aegis_ledger: [],
-  seek_chronos: [],
-  search_semantic_nodes: [],
-  manifest_temporal_log: "Browser preview active.",
-  get_documentation_index: ["overview", "architecture", "security", "roadmap"],
-  get_documentation_chapter: `
-    <div class="p-8 space-y-8 font-sans text-slate-300">
-      <h1 class="text-5xl font-black text-white uppercase tracking-tighter mb-12">Oasis Kernel <span class="text-indigo-500">v1.1</span></h1>
-      
-      <section class="space-y-4">
-        <h2 class="text-xl font-bold text-indigo-400 uppercase tracking-widest">01 / Sentinel Vault</h2>
-        <p class="leading-relaxed opacity-80">The system utilizes a zero-knowledge Sentinel Vault for strategic asset archival. All secrets are hardened using PBKDF2-HMAC-SHA256 key derivation and native AES-256-GCM encryption within the Rust kernel.</p>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-bold text-emerald-400 uppercase tracking-widest">02 / Neural Forge</h2>
-        <p class="leading-relaxed opacity-80">Autonomous workforce simulation is processed in a background native thread. Golems manifest neural proposals by correlating local context embeddings with the Gemma3 LLM edge-bridge.</p>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-bold text-amber-400 uppercase tracking-widest">03 / Chronos Ledger</h2>
-        <p class="leading-relaxed opacity-80">System-wide state snapshots are persisted to a forensic SQLite ledger. Temporal scrubbing allows the Founder to navigate historical system integrity metrics with micro-second precision.</p>
-      </section>
-
-      <div class="pt-12 border-t border-white/5">
-        <p class="text-[10px] font-mono uppercase tracking-[0.5em] text-slate-500">Kernel Status: HARDENED | Resonance: OPTIMAL</p>
-      </div>
-    </div>
-  `,
-  get_process_list: [
-    { pid: 1024, name: "oasis_kernel.exe", cpu_usage: 12.4, mem_usage: 512000000, status: "stable", priority: "high" },
-    { pid: 2048, name: "neural_cortex.sys", cpu_usage: 8.2, mem_usage: 1024000000, status: "active", priority: "critical" },
-    { pid: 4096, name: "sentinel_pulse.exe", cpu_usage: 1.5, mem_usage: 128000000, status: "idle", priority: "normal" }
-  ],
-  get_running_windows: [
-    { title: "Oasis Dev Tools", name: "code.exe" },
-    { title: "Chrome - Oasis Shell", name: "chrome.exe" }
-  ],
-  save_venture_state: null,
-  execute_neural_intent: { content: "Neural Intent Handled (Simulated).", tool: "NONE" },
-  get_chronos_ledger: [],
-  get_neural_logs: [],
-  get_neural_workforce: [],
-  get_active_golems: () => {
-    MOCK_STATE.golems.forEach(g => {
-      if (g.progress < 100) {
-        g.progress += Math.floor(Math.random() * 2) + 1;
-        if (g.progress >= 100) {
-          g.progress = 100;
-          g.status = "MANIFESTING_PR";
-        }
-      }
-    });
-    return MOCK_STATE.golems;
-  },
-  get_golem_proposals: () => MOCK_STATE.proposals,
-  resolve_golem_proposal: (args: any) => {
-    const { proposalId, action } = args;
-    const proposal = MOCK_STATE.proposals.find(p => p.id === proposalId);
-    if (proposal) {
-        MOCK_STATE.proposals = MOCK_STATE.proposals.filter(p => p.id !== proposalId);
-        const golem = MOCK_STATE.golems.find(g => g.name === proposal.agent_name);
-        if (golem) { golem.progress = 0; golem.status = "IDLE"; }
-    }
-    return { status: "SUCCESS" };
-  },
-  get_pinned_contexts: [],
-  get_economic_news: [],
-  get_pending_manifests: [],
-  get_strategic_inventory: [
-    {
-      id: 1,
-      name: "Core Neural Weights",
-      file_path: "manifested/core_neural_weights.dat",
-      status: "secured",
-      type: "asset"
-    },
-    {
-      id: 2,
-      name: "Market Liquidity Bridge",
-      file_path: "manifested/market_liquidity_bridge.dat",
-      status: "active",
-      type: "financial"
-    }
-  ],
-  get_available_ventures: [],
-  get_storage_map: [
-    { name: "Main Vault", mount: "C:/", total: "1TB", free: "450GB", type: "SSD" },
-    { name: "Neural Archive", mount: "D:/", total: "4TB", free: "1.2TB", type: "HDD" }
-  ],
-  get_system_devices: [
-    { name: "Neural Cortex GPU", type: "GPU", status: "Online" },
-    { name: "Quantum Aura Mic", type: "Audio", status: "Ready" }
-  ],
-  "derive_boardroom_debate": {
-    summary: "Strategic v1.1 Roadmap: The consensus suggests prioritizing Spectral Sound integration while hardening Remote Context Crates. Risk impact is moderate but scalability is high.",
-    insights: [
-      { persona: "ARCHITECT-01", score: 94, advice: "Core kernel stability must be maintained. Implementing the Crate Registry as a distributed ledger is the most robust path forward.", risk: 0.12 },
-      { persona: "GROWTH-X", score: 82, advice: "Market resonance requires immediate 'Spectral Sound' deployment. Users are pivoting toward immersive sensory dashboards. Speed is the only metric.", risk: 0.45 },
-      { persona: "SENTINEL-ROOT", score: 88, advice: "Security audit of the 'Shadow Vault' is pending. We cannot allow unauthorized telemetry leaks during the soundscape initialization.", risk: 0.08 }
-    ]
-  },
-  "invoke_deep_oracle": {
-    thought_trace: "Initializing Deep Synthesis... Analyzing venture metrics (ARR: $1.24M)... Correlating with market sentiment... Detecting spectral anomalies... Conclusion prioritized: Total Consensus requires Founder Signature.",
-    advice: "Strategic Directive: Integrate the Neural Key with the Spectral Sound layer. This will create a 'Founder-Only' sensory firewall, ensuring absolute command over the Oasis Shell evolution."
-  },
-  "generate_strategic_report": "C:/Oasis/Reports/Strategic_v1.1_Consensus_Report.pdf",
-};
-
-// STATEFUL BROWSER MOCKS (MINIMAL FOR PREVIEW)
-const MOCK_STATE = {
-  ledger: {
-    blobs: {
-      "B1": { id: "B1", title: "Founder Directive v0.1", original_path: "C:/Secret/Directive.pdf", encrypted_path: "C:/Oasis/Vault/B1.enc", timestamp: new Date().toISOString(), aura_intensity: 0.8 }
-    },
-    security_resonance: 98.4
-  },
-  golems: [
-    { id: "G-ALPHA", name: "Golem Alpha", mission: "Neural Refactor", progress: 45, aura: "indigo", status: "PROCESSING" },
-    { id: "G-BETA", name: "Golem Beta", mission: "Market Scraping", progress: 12, aura: "emerald", status: "COLLECTING" }
-  ],
-  proposals: [] as any[]
-};
-
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {
   if (!isTauri) {
-    const mockValue = TAURI_DEFAULTS[cmd];
-    if (typeof mockValue === "function") return mockValue(payload) as T;
-    return (mockValue ?? null) as T;
+    const browserFallbacks: Record<string, unknown> = {
+      load_venture_state: { arr: "N/A", burn: "N/A", runway: "N/A", momentum: "Offline", stress_color: "#6366f1" },
+      get_venture_metrics: { arr: "N/A", burn: "N/A", runway: "N/A", momentum: "Offline", stress_color: "#6366f1" },
+      run_system_diagnostic: { cpu_load: 0, mem_used: 0, battery_level: 0, is_charging: false, battery_health: 0, time_remaining_min: 0 },
+      get_fiscal_report: { total_burn: 0, token_load: 0, status: "OFFLINE" },
+      get_market_intelligence: { market_index: 0, index_change: "OFFLINE", ai_ticker: [] },
+      get_oracle_pulse: { sentiment: "OFFLINE", btc_usd: 0, eth_usd: 0, tech_momentum: 0, timestamp: new Date().toISOString() },
+      get_venture_integrity: 0,
+      get_logic_path: "",
+      get_chronos_ledger: [],
+      get_pinned_contexts: [],
+      get_neural_logs: [],
+      get_pending_manifests: [],
+      get_active_golems: [],
+      get_strategic_inventory: [],
+      get_economic_news: [],
+      get_available_ventures: [],
+    };
+    if (Object.prototype.hasOwnProperty.call(browserFallbacks, cmd)) {
+      return browserFallbacks[cmd] as T;
+    }
+    if (cmd.startsWith("get_") || cmd.startsWith("seek_")) {
+      return [] as T;
+    }
+    return null as T;
   }
   return invoke(cmd, payload as any) as Promise<T>;
 };

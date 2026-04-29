@@ -172,19 +172,6 @@ pub async fn get_automation_tasks(state: tauri::State<'_, AppState>) -> Result<V
         }
     }
     
-    // Seed dummy data if empty for demo purposes
-    if tasks.is_empty() {
-        let dummy = vec![
-            AutomationTask { id: "t1".into(), name: "Daily System Clean".into(), schedule: "@daily".into(), status: "idle".into(), last_run: None },
-            AutomationTask { id: "t2".into(), name: "Sync Neural Manifest".into(), schedule: "every 4 hours".into(), status: "success".into(), last_run: Some(chrono::Utc::now().timestamp_millis() - 3600000) },
-            AutomationTask { id: "t3".into(), name: "Purge Zombie Procs".into(), schedule: "@hourly".into(), status: "running".into(), last_run: None },
-        ];
-        for d in &dummy {
-            let _ = db.execute("INSERT INTO automation_tasks (id, name, schedule, status, last_run) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params![d.id, d.name, d.schedule, d.status, d.last_run]);
-        }
-        tasks = dummy;
-    }
-
     Ok(tasks)
 }
 

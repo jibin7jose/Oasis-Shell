@@ -121,19 +121,5 @@ pub async fn get_audit_logs(state: tauri::State<'_, AppState>) -> Result<Vec<Aud
         }
     }
     
-    // Seed dummy data if empty for demo purposes
-    if logs.is_empty() {
-        let now = chrono::Utc::now().timestamp_millis();
-        let dummy = vec![
-            AuditRecord { id: "log1".into(), timestamp: now - 5000, action: "SENTINEL_LOCK".into(), category: "security".into(), details: "Vault locked due to idle timeout.".into() },
-            AuditRecord { id: "log2".into(), timestamp: now - 120000, action: "EXEC_COMMAND".into(), category: "system".into(), details: "Purged zombie process PID 1450".into() },
-            AuditRecord { id: "log3".into(), timestamp: now - 360000, action: "INTENT_PARSE".into(), category: "neural".into(), details: "Parsed intent: 'clean workspace'".into() },
-        ];
-        for d in &dummy {
-            let _ = db.execute("INSERT INTO audit_logs (id, timestamp, action, category, details) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params![d.id, d.timestamp, d.action, d.category, d.details]);
-        }
-        logs = dummy;
-    }
-
     Ok(logs)
 }

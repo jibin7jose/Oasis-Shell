@@ -70,7 +70,6 @@ import { ConsortiumPanel } from "./components/shared/ConsortiumPanel";
 import { SoundscapeManager } from "./components/shared/SoundscapeManager";
 import { AutomationPanel } from "./components/panels/AutomationPanel";
 import { AuditLog } from "./components/panels/AuditLog";
-import BoardroomPanel from "./components/panels/BoardroomPanel"; // Design Utility
 
 // Design Utility moved to lib/tauri
 
@@ -632,9 +631,9 @@ export default function App() {
     const syncCoreData = async () => {
       try {
         const pins = await invokeSafe("get_pinned_contexts") as any[];
-        setPinnedContexts(pins);
+        setPinnedContexts(pins ?? []);
         const logs = await invokeSafe("get_neural_logs", { limit: 50 }) as any[];
-        setNeuralLogs(logs);
+        setNeuralLogs(logs ?? []);
       } catch (err) { }
     };
     const itv = setInterval(syncCoreData, 5000);
@@ -650,8 +649,9 @@ export default function App() {
         if (metrics) setFounderMetrics(metrics);
 
         const ledger = await invokeSafe("get_chronos_ledger") as any[];
-        setChronosLedger(ledger);
-        setChronosIndex(ledger.length > 0 ? ledger.length - 1 : 0);
+        const safeLedger = ledger ?? [];
+        setChronosLedger(safeLedger);
+        setChronosIndex(safeLedger.length > 0 ? safeLedger.length - 1 : 0);
 
         const initialFiscal = await invokeSafe("get_fiscal_report") as any;
         setFiscalBurn(initialFiscal);
@@ -1309,7 +1309,7 @@ export default function App() {
     const syncGolems = async () => {
       try {
         const pmd = await invokeSafe("get_pending_manifests", { stressColor: founderMetrics.stress_color }) as any[];
-        setPendingManifests(pmd);
+        setPendingManifests(pmd ?? []);
       } catch (e) { }
     };
     syncGolems();
@@ -1356,6 +1356,7 @@ export default function App() {
     const restoreState = async () => {
       try {
         const met = await invokeSafe("load_venture_state") as any;
+        if (!met) return;
         setFounderMetrics(met);
         // Normalize simulation inputs to persisted state
         const arrVal = parseFloat(met.arr.replace('$', '').replace('M', ''));
@@ -2249,7 +2250,7 @@ export default function App() {
     const pulse = async () => {
       try {
         const metrics = await invokeSafe("get_venture_metrics", { founderArr: simMetrics.arr, founderBurn: simMetrics.burn }) as any;
-        setFounderMetrics(metrics);
+        if (metrics) setFounderMetrics(metrics);
 
         const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
         setSystemStats(stats);

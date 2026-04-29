@@ -25,13 +25,10 @@ export const AutomationPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose:
   const loadTasks = async () => {
     setLoading(true);
     try {
-      // Mocking the call since backend implementation is coming later or might return empty
-      const data = await invokeSafe("get_automation_tasks").catch(() => [
-        { id: "t1", name: "Daily System Clean", schedule: "@daily", status: "idle" },
-        { id: "t2", name: "Sync Neural Manifest", schedule: "every 4 hours", status: "success", lastRun: Date.now() - 3600000 },
-        { id: "t3", name: "Purge Zombie Procs", schedule: "@hourly", status: "running" }
-      ]);
+      const data = await invokeSafe("get_automation_tasks");
       setTasks(data as AutomationTask[]);
+    } catch {
+      setTasks([]);
     } finally {
       setLoading(false);
     }
