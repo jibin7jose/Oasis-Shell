@@ -49,3 +49,13 @@ jobs:
         run: npm run smoke:web
         env:
           CI: true
+
+      - name: Upload Smoke Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-artifacts
+          path: |
+            smoke-assets/ui-smoke.png
+            smoke-assets/smoke-diagnostics.txt
+          if-no-files-found: warn

@@ -70,7 +70,11 @@ import { AuditLog } from "./components/panels/AuditLog";
 const contexts = [
   { id: 'dev', name: 'Strategic Core', icon: Terminal, aura: 'rgba(99, 102, 241, 0.4)' },
   { id: 'design', name: 'Creative Forge', icon: Shield, aura: 'rgba(168, 85, 247, 0.4)' },
-  { id: 'growth', name: 'Capital Matrix', icon: Activity, aura: 'rgba(16, 185, 129, 0.4)' }
+  { id: 'growth', name: 'Capital Matrix', icon: 1234
+    
+    
+    
+    , aura: 'rgba(16, 185, 129, 0.4)' }
 ];
 
 const buildFpsPath = (values: number[], width = 120, height = 40) => {

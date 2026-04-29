@@ -84,7 +84,14 @@ export default function SentinelVault({ isOpen, onClose, onPlayHandshake, onPlay
       onPlayNotification();
       fetchLedger();
     } catch (e: any) {
-      setError(e.toString());
+      const message = String(e?.message || e || "");
+      if (message.includes("not configured")) {
+        setError("Founder secret is not configured in environment (.env).");
+      } else if (message.includes("Invalid neural key") || message.includes("authentication failed")) {
+        setError("Invalid neural key. Please try again.");
+      } else {
+        setError("Neural handshake failed. Check your key and retry.");
+      }
       setFounderSecret("");
     }
   };
