@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Lock } from 'lucide-react';
 import { useSoundscape } from '../../hooks/useSoundscape';
+import { invokeSafe } from '../../lib/tauri';
 
 interface BootSequenceProps {
   onSuccess: () => void;
@@ -12,6 +13,7 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [key, setKey] = useState('');
   const [isError, setIsError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { playHandshake, playPulse } = useSoundscape();
 
   const rawLogs = [
@@ -41,13 +43,23 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
     }
   }, [stage]);
 
-  const handleHandshake = () => {
-    // For now, simulate successful handshake if key is not empty
-    if (key.length > 3) {
+  const handleHandshake = async () => {
+    try {
+      if (key.trim().length === 0) throw new Error("Founder key required");
+      await invokeSafe("authenticate_founder", { secret: key.trim() });
+      setErrorMessage('');
       playHandshake();
       setStage('breach');
       setTimeout(onSuccess, 1500);
-    } else {
+    } catch (err: any) {
+      const message = String(err?.message || err || "");
+      if (message.includes("not configured")) {
+        setErrorMessage("Founder secret is not configured in environment (.env).");
+      } else if (message.includes("Invalid neural key") || message.includes("authentication failed")) {
+        setErrorMessage("Invalid neural key. Please try again.");
+      } else {
+        setErrorMessage("Neural handshake failed. Check your key and retry.");
+      }
       setIsError(true);
       setTimeout(() => setIsError(false), 2000);
     }
@@ -113,6 +125,11 @@ export default function BootSequence({ onSuccess }: BootSequenceProps) {
                 className="absolute bottom-0 left-0 h-1 bg-rose-500 rounded-full"
               />
             </div>
+            {errorMessage && (
+              <p className="text-[10px] text-rose-400 font-bold uppercase tracking-[0.2em]">
+                {errorMessage}
+              </p>
+            )}
 
             <button 
               onClick={handleHandshake}

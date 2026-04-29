@@ -27,8 +27,9 @@ export const OracleHub: React.FC = () => {
 
     if (!pulse) return null;
 
-    const isBull = pulse.sentiment.includes("BULL");
-    const isBreach = pulse.sentiment.includes("BREACH");
+    const sentiment = typeof pulse?.sentiment === "string" ? pulse.sentiment : "OFFLINE";
+    const isBull = sentiment.includes("BULL");
+    const isBreach = sentiment.includes("BREACH");
 
     return (
         <div className="flex items-center gap-6 px-8 py-3 bg-black/40 backdrop-blur-2xl border-x border-white/5 h-full group">
@@ -39,7 +40,7 @@ export const OracleHub: React.FC = () => {
                 <div className="flex flex-col">
                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Oracle Sentiment</span>
                     <span className={`text-[10px] font-black uppercase tracking-tighter ${isBull ? 'text-emerald-400' : isBreach ? 'text-red-400' : 'text-amber-400'}`}>
-                        {pulse.sentiment}
+                        {sentiment}
                     </span>
                 </div>
             </div>
@@ -50,7 +51,7 @@ export const OracleHub: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <span className="text-[9px] font-bold text-slate-400">BTC</span>
                     <span className="text-[10px] font-black text-white px-2 py-0.5 bg-white/5 rounded-md font-mono">
-                        ${pulse.btc_usd.toLocaleString()}
+                        ${Number(pulse?.btc_usd ?? 0).toLocaleString()}
                     </span>
                     {isBull ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
                 </div>
@@ -58,7 +59,7 @@ export const OracleHub: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <span className="text-[9px] font-bold text-slate-400">ETH</span>
                     <span className="text-[10px] font-black text-white px-2 py-0.5 bg-white/5 rounded-md font-mono">
-                        ${pulse.eth_usd.toLocaleString()}
+                        ${Number(pulse?.eth_usd ?? 0).toLocaleString()}
                     </span>
                     <TrendingUp className="w-3 h-3 text-emerald-500 opacity-50" />
                 </div>
@@ -68,7 +69,7 @@ export const OracleHub: React.FC = () => {
                     <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
                         <motion.div 
                             initial={{ width: 0 }}
-                            animate={{ width: `${pulse.tech_momentum * 100}%` }}
+                            animate={{ width: `${Number(pulse?.tech_momentum ?? 0) * 100}%` }}
                             className="h-full bg-emerald-500"
                         />
                     </div>
@@ -77,7 +78,7 @@ export const OracleHub: React.FC = () => {
 
             <div className="ml-auto flex items-center gap-4 opacity-50 group-hover:opacity-100 transition-opacity">
                 <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                    Last Sync: {new Date(pulse.timestamp).toLocaleTimeString()}
+                    Last Sync: {new Date(pulse?.timestamp ?? Date.now()).toLocaleTimeString()}
                 </span>
                 <Globe className="w-3 h-3 text-slate-600" />
             </div>

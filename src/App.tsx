@@ -654,7 +654,7 @@ export default function App() {
         setChronosIndex(safeLedger.length > 0 ? safeLedger.length - 1 : 0);
 
         const initialFiscal = await invokeSafe("get_fiscal_report") as any;
-        setFiscalBurn(initialFiscal);
+        if (initialFiscal) setFiscalBurn(initialFiscal);
 
         setNotification("Oasis Neural Layer: Real-Time Venture Ledger Synchronized.");
 
@@ -665,7 +665,7 @@ export default function App() {
 
         // Phase 6: Sync Economic News
         const news = await invokeSafe("get_economic_news") as EconomicPulse[];
-        if (news) {
+        if (Array.isArray(news)) {
           setEconomicNews(news);
           setMarketIntel({
             market_index: 15420,
@@ -675,7 +675,7 @@ export default function App() {
         }
 
         const integrity = await invokeSafe("get_venture_integrity") as number;
-        setVentureIntegrity(integrity);
+        if (typeof integrity === "number") setVentureIntegrity(integrity);
 
       } catch (e) {
         console.error("Neural Sync Failure:", e);
@@ -687,7 +687,7 @@ export default function App() {
     const integrityItv = setInterval(async () => {
        try {
          const integrity = await invokeSafe("get_venture_integrity") as number;
-         setVentureIntegrity(integrity);
+         if (typeof integrity === "number") setVentureIntegrity(integrity);
        } catch (e) {}
     }, 15000);
 
@@ -704,13 +704,13 @@ export default function App() {
         if (procs && Array.isArray(procs)) setProcesses(procs);
         
         const wins = await invokeSafe("get_running_windows");
-        if (wins) setWindows(wins);
+        if (Array.isArray(wins)) setWindows(wins);
         
         const stor = await invokeSafe("get_storage_map");
-        if (stor) setStorage(stor);
+        if (Array.isArray(stor)) setStorage(stor);
         
         const dev = await invokeSafe("get_system_devices");
-        if (dev) setDevices(dev);
+        if (Array.isArray(dev)) setDevices(dev);
 
         if (stats && stats.cpu_load !== undefined) {
           updateEngine(stats.cpu_load);
