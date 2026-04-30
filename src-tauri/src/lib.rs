@@ -102,7 +102,10 @@ pub use reports::{
 };
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use access::COLLECTIVE_REGISTRY;
-use vault::vault_get_secret;
+use vault::{
+    vault_get_secret_with_session_key_with_pool,
+    vault_store_secret_with_session_key_with_pool,
+};
 use golems::{GolemTask, GOLEM_REGISTRY};
 use system::WindowInfo;
 
@@ -812,6 +815,24 @@ fn seal_founder_session(secret: &str) -> Result<String, String> {
     Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
 }
 
+fn active_founder_session_key() -> Result<[u8; 32], String> {
+    let state = FOUNDER_KEY_STATE.lock().unwrap();
+    state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())
+}
+
+fn resolve_secret_for_runtime(pool: &Pool<SqliteConnectionManager>, name: &str) -> Result<String, String> {
+    if let Ok(session_key) = active_founder_session_key() {
+        if let Ok(secret) = vault_get_secret_with_session_key_with_pool(pool, name.to_string(), session_key) {
+            return Ok(secret);
+        }
+    }
+
+    let master_key = std::env::var("OASIS_MASTER_KEY")
+        .or_else(|_| std::env::var("OASIS_FOUNDER_SECRET"))
+        .map_err(|_| "No founder master key available for secret migration fallback.".to_string())?;
+    vault::vault_get_secret_with_pool(pool, name.to_string(), master_key)
+}
+
 #[tauri::command]
 async fn authenticate_founder(secret: String) -> Result<String, String> {
     seal_founder_session(&secret)
@@ -841,6 +862,18 @@ async fn lock_sentinel() -> Result<(), String> {
     let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
     *auth_time = None;
     Ok(())
+}
+
+#[tauri::command]
+async fn provision_secret(state: tauri::State<'_, AppState>, name: String, value: String) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("Secret name is required.".to_string());
+    }
+    if value.trim().is_empty() {
+        return Err("Secret value is required.".to_string());
+    }
+    let session_key = active_founder_session_key()?;
+    vault_store_secret_with_session_key_with_pool(&state.pool, name.trim().to_string(), value, session_key)
 }
 
 #[tauri::command]
@@ -2093,14 +2126,9 @@ async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String
 #[tauri::command]
 async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, context: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    
-    // 1. Attempt to pull from Sentinel Vault first
-    let vault_key = match vault_get_secret(state.clone(), "DEEPSEEK_API_KEY".into(), "OASIS_MASTER_KEY".into()).await {
-        Ok(k) => k,
-        Err(_) => std::env::var("DEEPSEEK_API_KEY").unwrap_or_else(|_| "MOCK_KEY".into())
-    };
-    
-    let api_key = vault_key;
+
+    let api_key = resolve_secret_for_runtime(&state.pool, "DEEPSEEK_API_KEY")
+        .unwrap_or_else(|_| "MOCK_KEY".into());
 
     if api_key == "MOCK_KEY" {
         let prompt = format!(
@@ -2932,7 +2960,7 @@ async fn query_lattice_points(state: tauri::State<'_, AppState>, image_base64: S
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[tauri::command]
-async fn transcribe_audio(audio_data: Vec<u8>) -> Result<String, String> {
+async fn transcribe_audio(state: tauri::State<'_, AppState>, audio_data: Vec<u8>) -> Result<String, String> {
     let client = reqwest::Client::new();
     
     let part = reqwest::multipart::Part::bytes(audio_data)
@@ -2943,7 +2971,7 @@ async fn transcribe_audio(audio_data: Vec<u8>) -> Result<String, String> {
         .text("model", "whisper-1")
         .part("file", part);
 
-    let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
+    let api_key = resolve_secret_for_runtime(&state.pool, "OPENAI_API_KEY").unwrap_or_default();
     if api_key.is_empty() {
         return Ok("System: Whisper logic mapped. Provide OPENAI_API_KEY for live streaming.".into())
     }
@@ -3306,6 +3334,7 @@ pub fn run() {
             invoke_oracle_prediction,
             authenticate_founder,
             bootstrap_founder_access,
+            provision_secret,
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,

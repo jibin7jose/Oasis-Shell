@@ -1,5 +1,13 @@
 # Fixes Log
 
+## 2026-04-30
+- Implemented a founder-only `provision_secret` Tauri command to ingest sensitive keys into encrypted vault storage without exposing a hardcoded master key in frontend calls.
+- Added session-key vault helpers in `src-tauri/src/vault.rs` for encrypted secret storage and retrieval bound to an active founder session.
+- Refactored `invoke_deep_oracle` to resolve `DEEPSEEK_API_KEY` from encrypted vault state first, with migration fallback through founder env keys instead of direct plaintext provider env usage.
+- Refactored `transcribe_audio` to resolve `OPENAI_API_KEY` from encrypted vault state first, preserving mock/offline behavior when no key is provisioned.
+- Added an Encrypted Secret Provisioning block to `SettingsPanel` so founders can store and audit key names directly from the UI.
+- Ran `cargo check` successfully for backend verification; frontend `npm run build` is currently blocked in this environment by local Node/PowerShell path permissions.
+
 ## 2026-04-25
 - Added a guarded frontend launcher at `scripts/start-frontend-if-needed.ps1` and switched Tauri `beforeDevCommand` to `npm run frontend:guarded` so a live frontend server can be reused instead of racing a second Vite process on port 1420.
 - Added a PowerShell wrapper for the browser smoke at `scripts/run-ui-smoke.ps1` so the UI smoke runs from a stable working directory.

@@ -1,9 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
 import { 
-  Settings, 
   Cpu, 
-  Eye, 
   Zap, 
   Shield, 
   Lock, 
@@ -14,7 +11,8 @@ import {
   Terminal,
   BrainCircuit,
   Fingerprint,
-  Activity
+  Activity,
+  KeyRound
 } from 'lucide-react';
 import { useSystemStore } from '../../lib/systemStore';
 import { cn } from '../../lib/utils';
@@ -28,6 +26,22 @@ export const SettingsPanel: React.FC = () => {
     hardwareAnchorActive, setHardwareAnchorActive,
     logEvent
   } = useSystemStore();
+  const [secretName, setSecretName] = useState("DEEPSEEK_API_KEY");
+  const [secretValue, setSecretValue] = useState("");
+  const [secretFeedback, setSecretFeedback] = useState("");
+  const [storedSecrets, setStoredSecrets] = useState<string[]>([]);
+
+  useEffect(() => {
+    const syncSecrets = async () => {
+      try {
+        const names = await invokeSafe<string[]>("vault_list_secrets");
+        setStoredSecrets(Array.isArray(names) ? names : []);
+      } catch {
+        setStoredSecrets([]);
+      }
+    };
+    syncSecrets();
+  }, []);
 
   const handleClearCache = () => {
     localStorage.clear();
@@ -41,6 +55,27 @@ export const SettingsPanel: React.FC = () => {
       window.location.reload(); // Force lock state UI refresh
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleProvisionSecret = async () => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before provisioning secrets.");
+      return;
+    }
+    if (!secretName.trim() || !secretValue.trim()) {
+      setSecretFeedback("Secret name and value are required.");
+      return;
+    }
+    try {
+      await invokeSafe("provision_secret", { name: secretName.trim(), value: secretValue.trim() });
+      const names = await invokeSafe<string[]>("vault_list_secrets");
+      setStoredSecrets(Array.isArray(names) ? names : []);
+      setSecretValue("");
+      setSecretFeedback("Encrypted secret provisioned.");
+      logEvent(`Secret provisioned: ${secretName.trim()}`, "system");
+    } catch (e) {
+      setSecretFeedback(`Provision failed: ${String(e)}`);
     }
   };
 
@@ -109,6 +144,44 @@ export const SettingsPanel: React.FC = () => {
             </div>
             <p className="text-[10px] text-slate-500 leading-relaxed uppercase font-bold tracking-tight">
               Bind high-signature strategic manifestations to physical biometric presence check.
+            </p>
+          </div>
+
+          <div className="glass rounded-[2rem] border border-white/5 p-8 flex flex-col gap-5 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <KeyRound className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <p className="text-sm font-black text-white uppercase tracking-tight">Encrypted Secret Provisioning</p>
+                  <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Founder-only key ingestion</p>
+                </div>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">Stored: {storedSecrets.length}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                value={secretName}
+                onChange={(e) => setSecretName(e.target.value)}
+                placeholder="DEEPSEEK_API_KEY"
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-white font-mono outline-none focus:border-indigo-500/40 transition-all font-bold"
+              />
+              <input
+                type="password"
+                value={secretValue}
+                onChange={(e) => setSecretValue(e.target.value)}
+                placeholder="Paste secret value"
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-white font-mono outline-none focus:border-indigo-500/40 transition-all font-bold"
+              />
+            </div>
+            <button
+              onClick={handleProvisionSecret}
+              className="w-full py-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-indigo-500/20"
+            >
+              Encrypt and Store Secret
+            </button>
+            {secretFeedback && <p className="text-[10px] text-slate-400">{secretFeedback}</p>}
+            <p className="text-[10px] text-slate-500">
+              Active keys: {storedSecrets.length ? storedSecrets.join(", ") : "None provisioned"}
             </p>
           </div>
         </div>

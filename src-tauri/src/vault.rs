@@ -44,6 +44,35 @@ pub fn vault_store_secret_with_pool(
     Ok(())
 }
 
+pub fn vault_store_secret_with_session_key_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    name: String,
+    value: String,
+    session_key: [u8; 32],
+) -> Result<(), String> {
+    let mut nonce_bytes = [0u8; 12];
+    OsRng.fill_bytes(&mut nonce_bytes);
+
+    let key = Key::<Aes256Gcm>::from_slice(&session_key);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(nonce, value.as_bytes())
+        .map_err(|e| format!("Encryption failure: {}", e))?;
+
+    let db = pool.get().map_err(|e| e.to_string())?;
+    let timestamp = chrono::Local::now().to_rfc3339();
+
+    db.execute(
+        "INSERT OR REPLACE INTO system_secrets (name, secret_blob, nonce, salt, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![name, ciphertext, nonce_bytes.to_vec(), Vec::<u8>::new(), timestamp],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 pub fn vault_get_secret_with_pool(
     pool: &Pool<SqliteConnectionManager>,
     name: String,
@@ -60,6 +89,30 @@ pub fn vault_get_secret_with_pool(
 
     let encryption_key_bytes = vault_derive_key(&master_key, &salt);
     let key = Key::<Aes256Gcm>::from_slice(&encryption_key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let plaintext = cipher
+        .decrypt(nonce, ciphertext.as_slice())
+        .map_err(|e| format!("Decryption failure: {}", e))?;
+    String::from_utf8(plaintext).map_err(|e| e.to_string())
+}
+
+pub fn vault_get_secret_with_session_key_with_pool(
+    pool: &Pool<SqliteConnectionManager>,
+    name: String,
+    session_key: [u8; 32],
+) -> Result<String, String> {
+    let db = pool.get().map_err(|e| e.to_string())?;
+    let mut stmt = db
+        .prepare("SELECT secret_blob, nonce FROM system_secrets WHERE name = ?1")
+        .map_err(|e| e.to_string())?;
+
+    let (ciphertext, nonce_bytes): (Vec<u8>, Vec<u8>) = stmt
+        .query_row([name], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("Secret not found or access denied: {}", e))?;
+
+    let key = Key::<Aes256Gcm>::from_slice(&session_key);
     let cipher = Aes256Gcm::new(key);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
