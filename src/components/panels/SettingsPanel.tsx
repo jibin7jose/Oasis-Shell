@@ -19,6 +19,9 @@ import { cn } from '../../lib/utils';
 import { invokeSafe } from '../../lib/tauri';
 
 export const SettingsPanel: React.FC = () => {
+  type SecretMetadata = { name: string; updated_at: string; status: string };
+  type SecretHealth = { name: string; required: boolean; present: boolean; stale: boolean; updated_at?: string; status: string };
+  type SecretEvent = { timestamp: string; message: string };
   const { 
     sparklinesEnabled, setSparklinesEnabled,
     performanceOptimized, setPerformanceOptimized,
@@ -29,15 +32,29 @@ export const SettingsPanel: React.FC = () => {
   const [secretName, setSecretName] = useState("DEEPSEEK_API_KEY");
   const [secretValue, setSecretValue] = useState("");
   const [secretFeedback, setSecretFeedback] = useState("");
-  const [storedSecrets, setStoredSecrets] = useState<string[]>([]);
+  const [storedSecrets, setStoredSecrets] = useState<SecretMetadata[]>([]);
+  const [secretHealth, setSecretHealth] = useState<SecretHealth[]>([]);
+  const [secretEvents, setSecretEvents] = useState<SecretEvent[]>([]);
+  const [backupPath, setBackupPath] = useState("./vault/secrets-backup.oasisbak");
+  const [restorePath, setRestorePath] = useState("./vault/secrets-backup.oasisbak");
+  const [replaceOnRestore, setReplaceOnRestore] = useState(true);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [revokeConfirmArmed, setRevokeConfirmArmed] = useState(false);
+  const [revokeConfirmText, setRevokeConfirmText] = useState("");
 
   useEffect(() => {
     const syncSecrets = async () => {
       try {
-        const names = await invokeSafe<string[]>("vault_list_secrets");
-        setStoredSecrets(Array.isArray(names) ? names : []);
+        const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+        setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+        const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+        setSecretHealth(Array.isArray(health) ? health : []);
+        const events = await invokeSafe<SecretEvent[]>("get_secret_security_events", { limit: 8 });
+        setSecretEvents(Array.isArray(events) ? events : []);
       } catch {
         setStoredSecrets([]);
+        setSecretHealth([]);
+        setSecretEvents([]);
       }
     };
     syncSecrets();
@@ -69,13 +86,128 @@ export const SettingsPanel: React.FC = () => {
     }
     try {
       await invokeSafe("provision_secret", { name: secretName.trim(), value: secretValue.trim() });
-      const names = await invokeSafe<string[]>("vault_list_secrets");
-      setStoredSecrets(Array.isArray(names) ? names : []);
+      const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+      setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+      const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+      setSecretHealth(Array.isArray(health) ? health : []);
       setSecretValue("");
       setSecretFeedback("Encrypted secret provisioned.");
       logEvent(`Secret provisioned: ${secretName.trim()}`, "system");
     } catch (e) {
       setSecretFeedback(`Provision failed: ${String(e)}`);
+    }
+  };
+
+  const handleRotateSecret = async () => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before rotating secrets.");
+      return;
+    }
+    if (!secretName.trim() || !secretValue.trim()) {
+      setSecretFeedback("Secret name and new value are required.");
+      return;
+    }
+    try {
+      await invokeSafe("rotate_secret", { name: secretName.trim(), value: secretValue.trim() });
+      const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+      setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+      const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+      setSecretHealth(Array.isArray(health) ? health : []);
+      setSecretValue("");
+      setSecretFeedback("Encrypted secret rotated.");
+      logEvent(`Secret rotated: ${secretName.trim()}`, "system");
+    } catch (e) {
+      setSecretFeedback(`Rotate failed: ${String(e)}`);
+    }
+  };
+
+  const handleDeleteSecret = async (name: string) => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before deleting secrets.");
+      return;
+    }
+    try {
+      const removed = await invokeSafe<boolean>("delete_secret", { name });
+      const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+      setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+      const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+      setSecretHealth(Array.isArray(health) ? health : []);
+      setSecretFeedback(removed ? `Secret deleted: ${name}` : `Secret not found: ${name}`);
+      if (removed) {
+        logEvent(`Secret deleted: ${name}`, "system");
+      }
+    } catch (e) {
+      setSecretFeedback(`Delete failed: ${String(e)}`);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before exporting backup.");
+      return;
+    }
+    try {
+      const out = await invokeSafe<string>("export_secrets_backup", { target_path: backupPath });
+      setSecretFeedback(`Backup exported: ${out}`);
+    } catch (e) {
+      setSecretFeedback(`Backup failed: ${String(e)}`);
+    }
+  };
+
+  const handleRestoreBackup = async () => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before restoring backup.");
+      return;
+    }
+    if (restoreConfirmText.trim().toUpperCase() !== "RESTORE") {
+      setSecretFeedback("Type RESTORE to confirm backup recovery.");
+      return;
+    }
+    if (!restorePath.endsWith(".oasisbak")) {
+      setSecretFeedback("Restore aborted: backup file must use .oasisbak extension.");
+      return;
+    }
+    try {
+      const restored = await invokeSafe<number>("restore_secrets_backup", {
+        source_path: restorePath,
+        replace_existing: replaceOnRestore,
+      });
+      const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+      setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+      const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+      setSecretHealth(Array.isArray(health) ? health : []);
+      setSecretFeedback(`Backup restored: ${restored} secrets`);
+      setRestoreConfirmText("");
+    } catch (e) {
+      setSecretFeedback(`Restore failed: ${String(e)}`);
+    }
+  };
+
+  const handleRevokeAllSecrets = async () => {
+    if (!isVaultAuthenticated) {
+      setSecretFeedback("Unlock Sentinel Vault before revoking all secrets.");
+      return;
+    }
+    if (!revokeConfirmArmed) {
+      setRevokeConfirmArmed(true);
+      setSecretFeedback("Confirmation step armed. Type REVOKE ALL and confirm.");
+      return;
+    }
+    if (revokeConfirmText.trim().toUpperCase() !== "REVOKE ALL") {
+      setSecretFeedback("Confirmation phrase mismatch. Type REVOKE ALL.");
+      return;
+    }
+    try {
+      const removed = await invokeSafe<number>("revoke_all_secrets");
+      const metadata = await invokeSafe<SecretMetadata[]>("vault_list_secrets_metadata");
+      setStoredSecrets(Array.isArray(metadata) ? metadata : []);
+      const health = await invokeSafe<SecretHealth[]>("get_secret_health");
+      setSecretHealth(Array.isArray(health) ? health : []);
+      setSecretFeedback(`All secrets revoked: ${removed}`);
+      setRevokeConfirmArmed(false);
+      setRevokeConfirmText("");
+    } catch (e) {
+      setSecretFeedback(`Revoke-all failed: ${String(e)}`);
     }
   };
 
@@ -173,16 +305,119 @@ export const SettingsPanel: React.FC = () => {
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-white font-mono outline-none focus:border-indigo-500/40 transition-all font-bold"
               />
             </div>
-            <button
-              onClick={handleProvisionSecret}
-              className="w-full py-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-indigo-500/20"
-            >
-              Encrypt and Store Secret
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button
+                onClick={handleProvisionSecret}
+                className="w-full py-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-indigo-500/20"
+              >
+                Encrypt and Store Secret
+              </button>
+              <button
+                onClick={handleRotateSecret}
+                className="w-full py-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-amber-500/20"
+              >
+                Rotate Selected Secret
+              </button>
+            </div>
             {secretFeedback && <p className="text-[10px] text-slate-400">{secretFeedback}</p>}
             <p className="text-[10px] text-slate-500">
-              Active keys: {storedSecrets.length ? storedSecrets.join(", ") : "None provisioned"}
+              Active keys: {storedSecrets.length ? storedSecrets.map((s) => s.name).join(", ") : "None provisioned"}
             </p>
+            {storedSecrets.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {storedSecrets.map((secret) => (
+                  <div key={secret.name} className="flex items-center justify-between bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2">
+                    <button
+                      onClick={() => setSecretName(secret.name)}
+                      className="text-[10px] text-slate-300 font-mono hover:text-white transition-colors"
+                    >
+                      {secret.name}
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] text-slate-500">
+                        {new Date(secret.updated_at).toLocaleString()} · {secret.status}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteSecret(secret.name)}
+                        className="text-[9px] uppercase tracking-widest font-black text-rose-400 hover:text-rose-300"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                value={backupPath}
+                onChange={(e) => setBackupPath(e.target.value)}
+                placeholder="./vault/secrets-backup.json"
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-[10px] text-white font-mono outline-none"
+              />
+              <button onClick={handleExportBackup} className="py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-[10px] font-black uppercase tracking-widest rounded-xl border border-emerald-500/20">
+                Export Backup
+              </button>
+            </div>
+            {!backupPath.endsWith(".oasisbak") && (
+              <p className="text-[10px] text-amber-400">Warning: use `.oasisbak` extension for encrypted backup manifests.</p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input
+                value={restorePath}
+                onChange={(e) => setRestorePath(e.target.value)}
+                placeholder="./vault/secrets-backup.json"
+                className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-[10px] text-white font-mono outline-none"
+              />
+              <button onClick={handleRestoreBackup} className="py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-[10px] font-black uppercase tracking-widest rounded-xl border border-cyan-500/20">
+                Restore Backup
+              </button>
+            </div>
+            {!restorePath.endsWith(".oasisbak") && (
+              <p className="text-[10px] text-rose-400">Restore blocked risk: selected file does not use `.oasisbak` extension.</p>
+            )}
+            <label className="flex items-center gap-2 text-[10px] text-slate-400">
+              <input type="checkbox" checked={replaceOnRestore} onChange={(e) => setReplaceOnRestore(e.target.checked)} />
+              Replace existing secrets during restore
+            </label>
+            <input
+              value={restoreConfirmText}
+              onChange={(e) => setRestoreConfirmText(e.target.value)}
+              placeholder="Type RESTORE to confirm"
+              className="w-full bg-white/5 border border-cyan-500/20 rounded-xl py-2 px-3 text-[10px] text-white font-mono outline-none"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input
+                value={revokeConfirmText}
+                onChange={(e) => setRevokeConfirmText(e.target.value)}
+                placeholder="Type REVOKE ALL"
+                className="md:col-span-2 w-full bg-white/5 border border-rose-500/20 rounded-xl py-2 px-3 text-[10px] text-white font-mono outline-none"
+              />
+              <button onClick={handleRevokeAllSecrets} className="py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-[10px] font-black uppercase tracking-widest rounded-xl border border-rose-500/20">
+                {revokeConfirmArmed ? "Confirm Revoke All" : "Arm Revoke All"}
+              </button>
+            </div>
+            {secretHealth.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Secret Health</p>
+                {secretHealth.map((h) => (
+                  <div key={h.name} className="text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>{h.name}</span>
+                    <span>{h.status}{h.updated_at ? ` · ${new Date(h.updated_at).toLocaleDateString()}` : ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {secretEvents.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Recent Secret Events</p>
+                {secretEvents.map((ev, i) => (
+                  <div key={`${ev.timestamp}-${i}`} className="text-[10px] text-slate-400">
+                    {new Date(ev.timestamp).toLocaleString()} · {ev.message}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

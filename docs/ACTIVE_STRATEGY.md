@@ -16,6 +16,10 @@ Current objectives in development.
 - [x] **Phase 21: Neural Workforce Manifestation** (COMPLETED)
 - [x] **Phase 22: Context Crate Optimization** (COMPLETED)
 - [x] **Phase 23: Production Hardening & Encrypted Secrets** (COMPLETED)
+- [x] **Phase 24: Secret Lifecycle Rotation & Revocation** (COMPLETED)
+- [x] **Phase 25: Secret Policy Guardrails & Metadata Visibility** (COMPLETED)
+- [x] **Phase 26: Secret Recovery & Operational Safety** (COMPLETED)
+- [x] **Phase 27: Cryptographic Backup Integrity & Restore Safety** (COMPLETED)
 
 ---
 > [!TIP]

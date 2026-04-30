@@ -15,6 +15,7 @@ use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha256;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use chrono::Timelike;
 use std::fs;
 pub mod vault;
@@ -103,7 +104,12 @@ pub use reports::{
 pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
 use access::COLLECTIVE_REGISTRY;
 use vault::{
+    vault_delete_secret_with_pool,
+    vault_delete_all_secrets_with_pool,
+    vault_export_secrets_backup_with_pool,
     vault_get_secret_with_session_key_with_pool,
+    vault_list_secret_metadata_with_pool,
+    vault_restore_secrets_backup_with_pool,
     vault_store_secret_with_session_key_with_pool,
 };
 use golems::{GolemTask, GOLEM_REGISTRY};
@@ -112,6 +118,16 @@ use system::WindowInfo;
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
 static LAST_AUTH_TIME: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
+static SECRET_MUTATION_COOLDOWNS: std::sync::LazyLock<Mutex<HashMap<String, chrono::DateTime<chrono::Local>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+static ALLOWED_SECRET_NAMES: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
+    HashSet::from([
+        "OPENAI_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OASIS_MASTER_KEY",
+        "OASIS_FOUNDER_SECRET",
+    ])
+});
 
 pub fn is_vault_session_valid() -> bool {
     let state = FOUNDER_KEY_STATE.lock().unwrap();
@@ -833,6 +849,69 @@ fn resolve_secret_for_runtime(pool: &Pool<SqliteConnectionManager>, name: &str) 
     vault::vault_get_secret_with_pool(pool, name.to_string(), master_key)
 }
 
+fn validate_secret_name(name: &str) -> Result<String, String> {
+    let normalized = name.trim().to_uppercase();
+    if normalized.is_empty() {
+        return Err("Secret name is required.".to_string());
+    }
+    if !ALLOWED_SECRET_NAMES.contains(normalized.as_str()) {
+        return Err(format!("Secret '{}' is not allowed by policy.", normalized));
+    }
+    Ok(normalized)
+}
+
+fn enforce_secret_mutation_cooldown(name: &str) -> Result<(), String> {
+    let now = chrono::Local::now();
+    let mut state = SECRET_MUTATION_COOLDOWNS.lock().unwrap();
+    if let Some(last) = state.get(name) {
+        let elapsed = now.signed_duration_since(*last).num_seconds();
+        if elapsed < 5 {
+            return Err(format!("Secret mutation cooldown active for '{}'. Retry in {}s.", name, 5 - elapsed));
+        }
+    }
+    state.insert(name.to_string(), now);
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct SecretHealthEntry {
+    name: String,
+    required: bool,
+    present: bool,
+    stale: bool,
+    updated_at: Option<String>,
+    status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct SecretAuditEntry {
+    timestamp: String,
+    message: String,
+}
+
+#[cfg(test)]
+mod secret_policy_tests {
+    use super::{enforce_secret_mutation_cooldown, validate_secret_name, SECRET_MUTATION_COOLDOWNS};
+
+    #[test]
+    fn validate_secret_name_enforces_allowlist() {
+        let ok = validate_secret_name("openai_api_key").expect("allowlisted");
+        assert_eq!(ok, "OPENAI_API_KEY");
+        assert!(validate_secret_name("CUSTOM_TOKEN").is_err());
+    }
+
+    #[test]
+    fn cooldown_blocks_immediate_repeat_mutations() {
+        let secret = "OPENAI_API_KEY";
+        {
+            let mut map = SECRET_MUTATION_COOLDOWNS.lock().unwrap();
+            map.remove(secret);
+        }
+        assert!(enforce_secret_mutation_cooldown(secret).is_ok());
+        assert!(enforce_secret_mutation_cooldown(secret).is_err());
+    }
+}
+
 #[tauri::command]
 async fn authenticate_founder(secret: String) -> Result<String, String> {
     seal_founder_session(&secret)
@@ -866,14 +945,149 @@ async fn lock_sentinel() -> Result<(), String> {
 
 #[tauri::command]
 async fn provision_secret(state: tauri::State<'_, AppState>, name: String, value: String) -> Result<(), String> {
-    if name.trim().is_empty() {
-        return Err("Secret name is required.".to_string());
-    }
+    let normalized_name = validate_secret_name(&name)?;
     if value.trim().is_empty() {
         return Err("Secret value is required.".to_string());
     }
+    enforce_secret_mutation_cooldown(&normalized_name)?;
     let session_key = active_founder_session_key()?;
-    vault_store_secret_with_session_key_with_pool(&state.pool, name.trim().to_string(), value, session_key)
+    vault_store_secret_with_session_key_with_pool(&state.pool, normalized_name.clone(), value, session_key)?;
+    let _ = log_event(
+        state.clone(),
+        "security".into(),
+        format!("Secret provisioned: {}", normalized_name),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+async fn rotate_secret(state: tauri::State<'_, AppState>, name: String, value: String) -> Result<(), String> {
+    let normalized_name = validate_secret_name(&name)?;
+    if value.trim().is_empty() {
+        return Err("Secret value is required.".to_string());
+    }
+    enforce_secret_mutation_cooldown(&normalized_name)?;
+    let session_key = active_founder_session_key()?;
+    vault_store_secret_with_session_key_with_pool(&state.pool, normalized_name.clone(), value, session_key)?;
+    let _ = log_event(
+        state.clone(),
+        "security".into(),
+        format!("Secret rotated: {}", normalized_name),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_secret(state: tauri::State<'_, AppState>, name: String) -> Result<bool, String> {
+    let normalized_name = validate_secret_name(&name)?;
+    enforce_secret_mutation_cooldown(&normalized_name)?;
+    let _ = active_founder_session_key()?;
+    let deleted = vault_delete_secret_with_pool(&state.pool, normalized_name.clone())?;
+    if deleted {
+        let _ = log_event(
+            state.clone(),
+            "security".into(),
+            format!("Secret deleted: {}", normalized_name),
+        );
+    }
+    Ok(deleted)
+}
+
+#[tauri::command]
+async fn export_secrets_backup(state: tauri::State<'_, AppState>, target_path: String) -> Result<String, String> {
+    let session_key = active_founder_session_key()?;
+    let out = vault_export_secrets_backup_with_pool(&state.pool, target_path, session_key)?;
+    let _ = log_event(state.clone(), "security".into(), "Secret backup exported".into());
+    Ok(out)
+}
+
+#[tauri::command]
+async fn restore_secrets_backup(
+    state: tauri::State<'_, AppState>,
+    source_path: String,
+    replace_existing: bool,
+) -> Result<usize, String> {
+    let session_key = active_founder_session_key()?;
+    let restored = vault_restore_secrets_backup_with_pool(&state.pool, source_path, replace_existing, session_key)?;
+    let _ = log_event(
+        state.clone(),
+        "security".into(),
+        format!("Secret backup restored ({} entries)", restored),
+    );
+    Ok(restored)
+}
+
+#[tauri::command]
+async fn revoke_all_secrets(state: tauri::State<'_, AppState>) -> Result<usize, String> {
+    let _ = active_founder_session_key()?;
+    let removed = vault_delete_all_secrets_with_pool(&state.pool)?;
+    let _ = log_event(
+        state.clone(),
+        "security".into(),
+        format!("All secrets revoked ({} entries)", removed),
+    );
+    Ok(removed)
+}
+
+#[tauri::command]
+async fn get_secret_health(state: tauri::State<'_, AppState>) -> Result<Vec<SecretHealthEntry>, String> {
+    let meta = vault_list_secret_metadata_with_pool(&state.pool)?;
+    let mut by_name: HashMap<String, String> = HashMap::new();
+    for m in meta {
+        by_name.insert(m.name, m.updated_at);
+    }
+
+    let required_keys = vec!["OPENAI_API_KEY", "DEEPSEEK_API_KEY"];
+    let mut out = Vec::new();
+    for key in required_keys {
+        let updated = by_name.get(key).cloned();
+        let stale = if let Some(ts) = &updated {
+            chrono::DateTime::parse_from_rfc3339(ts)
+                .map(|dt| chrono::Local::now().signed_duration_since(dt.with_timezone(&chrono::Local)).num_days() > 30)
+                .unwrap_or(false)
+        } else {
+            false
+        };
+        let present = updated.is_some();
+        let status = if !present {
+            "missing"
+        } else if stale {
+            "stale"
+        } else {
+            "healthy"
+        };
+        out.push(SecretHealthEntry {
+            name: key.to_string(),
+            required: true,
+            present,
+            stale,
+            updated_at: updated,
+            status: status.to_string(),
+        });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+async fn get_secret_security_events(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<SecretAuditEntry>, String> {
+    let db = state.pool.get().map_err(|e| e.to_string())?;
+    let lim = if limit <= 0 { 20 } else { limit.min(200) };
+    let mut stmt = db
+        .prepare("SELECT timestamp, message FROM neural_logs WHERE event_type = 'security' AND message LIKE 'Secret%' ORDER BY id DESC LIMIT ?1")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([lim], |row| {
+            Ok(SecretAuditEntry {
+                timestamp: row.get(0)?,
+                message: row.get(1)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut events = Vec::new();
+    for r in rows {
+        events.push(r.map_err(|e| e.to_string())?);
+    }
+    Ok(events)
 }
 
 #[tauri::command]
@@ -3335,6 +3549,13 @@ pub fn run() {
             authenticate_founder,
             bootstrap_founder_access,
             provision_secret,
+            rotate_secret,
+            delete_secret,
+            export_secrets_backup,
+            restore_secrets_backup,
+            revoke_all_secrets,
+            get_secret_health,
+            get_secret_security_events,
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,
@@ -3393,6 +3614,8 @@ pub fn run() {
             vault::vault_store_secret,
             vault::vault_get_secret,
             vault::vault_list_secrets,
+            vault::vault_list_secrets_metadata,
+            vault::vault_delete_secret,
             macros::forge_macro_intent,
             macros::execute_macro_golem,
             macros::execute_visual_macro,

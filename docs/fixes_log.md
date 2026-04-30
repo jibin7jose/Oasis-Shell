@@ -7,6 +7,23 @@
 - Refactored `transcribe_audio` to resolve `OPENAI_API_KEY` from encrypted vault state first, preserving mock/offline behavior when no key is provisioned.
 - Added an Encrypted Secret Provisioning block to `SettingsPanel` so founders can store and audit key names directly from the UI.
 - Ran `cargo check` successfully for backend verification; frontend `npm run build` is currently blocked in this environment by local Node/PowerShell path permissions.
+- Added founder-gated secret lifecycle commands `rotate_secret` and `delete_secret` to support credential rotation and revocation without leaving encrypted vault workflows.
+- Added vault-level delete primitive and regression coverage (`delete_secret_removes_entry`) to validate secret deletion behavior.
+- Expanded Settings secret management UI with rotate and revoke actions, including selectable key targets and post-action vault refresh.
+- Added secret-name allowlist enforcement for provision/rotate/delete operations to block non-approved key identifiers.
+- Added per-secret mutation cooldown protection to throttle rapid repeated secret updates/deletions during unlocked sessions.
+- Added `vault_list_secrets_metadata` for secure status/timestamp visibility and wired Settings to render last-updated metadata for each secret key.
+- Added and passed focused tests for allowlist validation, cooldown rejection, and metadata listing.
+- Added founder-gated encrypted secret backup export/restore commands and vault helpers for operational recovery.
+- Added dual-confirmation revoke-all secret flow in Settings (`arm` + `REVOKE ALL` phrase) to reduce accidental destructive actions.
+- Added backend secret health status endpoint and surfaced required-key health states in Settings.
+- Added secret-focused security event feed from kernel security logs for quick audit visibility in Settings.
+- Added and passed backup/restore recovery round-trip tests.
+- Migrated secret backup export format to encrypted `.oasisbak` envelopes with version metadata.
+- Hardened restore with envelope preflight checks and decryption-based tamper/wrong-key rejection.
+- Wrapped secret restore in a transaction so invalid entries trigger rollback instead of partial destructive state.
+- Added explicit restore confirmation phrase and extension guard checks in Settings for operational safety.
+- Added and passed tests for tamper rejection and restore rollback preservation behavior.
 
 ## 2026-04-25
 - Added a guarded frontend launcher at `scripts/start-frontend-if-needed.ps1` and switched Tauri `beforeDevCommand` to `npm run frontend:guarded` so a live frontend server can be reused instead of racing a second Vite process on port 1420.
