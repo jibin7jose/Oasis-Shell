@@ -65,6 +65,19 @@
 5.  **Integrity Test Coverage:**
     -   Added tests for tamper rejection and rollback preservation under invalid backup entries.
 
+## 2026-04-30 - Phase 28 Hardware-Backed Key Custody & Reauth
+### Core Features Implemented:
+1.  **Windows Hardware-Backed Session Custody:**
+    -   Added DPAPI-protected founder session key custody on Windows instead of plaintext in-process key retention.
+2.  **High-Risk Biometric Reauth Gate:**
+    -   Added fresh-biometric requirement for secret backup export, backup restore, and revoke-all operations.
+3.  **Stricter Session Timeout and Lock Clearing:**
+    -   Reduced vault auth window and centralized lock cleanup to aggressively clear session key material.
+4.  **Custody Status Visibility:**
+    -   Added backend key custody status API and surfaced hardware-backed/biometric freshness in Settings.
+5.  **Lock-State Regression Coverage:**
+    -   Added backend test validating post-lock session clearance and key access rejection.
+
 ## Alpha 1.0 - The Glassmorphic Foundation
 ### Core Features Implemented:
 1.  **Context-Aware UI Overlay:**

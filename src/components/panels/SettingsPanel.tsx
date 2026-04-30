@@ -22,6 +22,7 @@ export const SettingsPanel: React.FC = () => {
   type SecretMetadata = { name: string; updated_at: string; status: string };
   type SecretHealth = { name: string; required: boolean; present: boolean; stale: boolean; updated_at?: string; status: string };
   type SecretEvent = { timestamp: string; message: string };
+  type KeyCustodyStatus = { hardware_backed: boolean; vault_unlocked: boolean; auth_fresh_seconds: number; biometric_fresh: boolean };
   const { 
     sparklinesEnabled, setSparklinesEnabled,
     performanceOptimized, setPerformanceOptimized,
@@ -41,6 +42,7 @@ export const SettingsPanel: React.FC = () => {
   const [restoreConfirmText, setRestoreConfirmText] = useState("");
   const [revokeConfirmArmed, setRevokeConfirmArmed] = useState(false);
   const [revokeConfirmText, setRevokeConfirmText] = useState("");
+  const [custodyStatus, setCustodyStatus] = useState<KeyCustodyStatus | null>(null);
 
   useEffect(() => {
     const syncSecrets = async () => {
@@ -51,10 +53,13 @@ export const SettingsPanel: React.FC = () => {
         setSecretHealth(Array.isArray(health) ? health : []);
         const events = await invokeSafe<SecretEvent[]>("get_secret_security_events", { limit: 8 });
         setSecretEvents(Array.isArray(events) ? events : []);
+        const custody = await invokeSafe<KeyCustodyStatus>("get_key_custody_status");
+        setCustodyStatus(custody ?? null);
       } catch {
         setStoredSecrets([]);
         setSecretHealth([]);
         setSecretEvents([]);
+        setCustodyStatus(null);
       }
     };
     syncSecrets();
@@ -416,6 +421,15 @@ export const SettingsPanel: React.FC = () => {
                     {new Date(ev.timestamp).toLocaleString()} · {ev.message}
                   </div>
                 ))}
+              </div>
+            )}
+            {custodyStatus && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Key Custody</p>
+                <div className="text-[10px] text-slate-400">Storage: {custodyStatus.hardware_backed ? "Hardware-backed (DPAPI)" : "In-memory fallback"}</div>
+                <div className="text-[10px] text-slate-400">Vault Session: {custodyStatus.vault_unlocked ? "Unlocked" : "Locked"}</div>
+                <div className="text-[10px] text-slate-400">Auth Freshness: {custodyStatus.auth_fresh_seconds < 0 ? "N/A" : `${custodyStatus.auth_fresh_seconds}s ago`}</div>
+                <div className="text-[10px] text-slate-400">Biometric Fresh: {custodyStatus.biometric_fresh ? "Yes" : "No (re-auth required for backup/restore/revoke-all)"}</div>
               </div>
             )}
           </div>

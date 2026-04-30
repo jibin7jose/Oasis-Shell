@@ -20,6 +20,7 @@ Current objectives in development.
 - [x] **Phase 25: Secret Policy Guardrails & Metadata Visibility** (COMPLETED)
 - [x] **Phase 26: Secret Recovery & Operational Safety** (COMPLETED)
 - [x] **Phase 27: Cryptographic Backup Integrity & Restore Safety** (COMPLETED)
+- [x] **Phase 28: Hardware-Backed Key Custody & Reauth Enforcement** (COMPLETED)
 
 ---
 > [!TIP]

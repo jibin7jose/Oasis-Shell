@@ -117,6 +117,7 @@ use system::WindowInfo;
 
 
 static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
+static FOUNDER_KEY_DPAPI_BLOB: Mutex<Option<Vec<u8>>> = Mutex::new(None);
 static LAST_AUTH_TIME: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
 static SECRET_MUTATION_COOLDOWNS: std::sync::LazyLock<Mutex<HashMap<String, chrono::DateTime<chrono::Local>>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -130,14 +131,26 @@ static ALLOWED_SECRET_NAMES: std::sync::LazyLock<HashSet<&'static str>> = std::s
 });
 
 pub fn is_vault_session_valid() -> bool {
-    let state = FOUNDER_KEY_STATE.lock().unwrap();
-    if state.is_none() { return false; }
+    #[cfg(target_os = "windows")]
+    {
+        let state = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+        if state.is_none() {
+            return false;
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let state = FOUNDER_KEY_STATE.lock().unwrap();
+        if state.is_none() {
+            return false;
+        }
+    }
     
     let last_auth = LAST_AUTH_TIME.lock().unwrap();
     if let Some(time) = *last_auth {
         let now = chrono::Local::now();
         let diff = now.signed_duration_since(time);
-        if diff.num_minutes() < 15 {
+        if diff.num_minutes() < 10 {
             return true;
         }
     }
@@ -821,9 +834,20 @@ fn seal_founder_session(secret: &str) -> Result<String, String> {
     let salt = b"OASIS_NEURAL_SALT_45_LEX_FOUNDRY"; // Consistent salt for the primary cipher
     
     pbkdf2_hmac::<Sha256>(secret.as_bytes(), salt, 100_000, &mut password_key);
-    
-    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-    *state = Some(password_key);
+
+    #[cfg(target_os = "windows")]
+    {
+        let protected = dpapi_protect_key_material(password_key)?;
+        let mut blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+        *blob = Some(protected);
+        let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+        *state = None;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+        *state = Some(password_key);
+    }
     
     let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
     *auth_time = Some(chrono::Local::now());
@@ -831,9 +855,91 @@ fn seal_founder_session(secret: &str) -> Result<String, String> {
     Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
 }
 
+#[cfg(target_os = "windows")]
+fn dpapi_protect_key_material(key: [u8; 32]) -> Result<Vec<u8>, String> {
+    let key_b64 = base64::engine::general_purpose::STANDARD.encode(key);
+    let script = format!(
+        "$p='{0}';$b=[Convert]::FromBase64String($p);$enc=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Convert]::ToBase64String($enc)",
+        key_b64
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    base64::engine::general_purpose::STANDARD
+        .decode(out.as_bytes())
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn dpapi_unprotect_key_material(blob: &[u8]) -> Result<[u8; 32], String> {
+    let blob_b64 = base64::engine::general_purpose::STANDARD.encode(blob);
+    let script = format!(
+        "$p='{0}';$b=[Convert]::FromBase64String($p);$dec=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Convert]::ToBase64String($dec)",
+        blob_b64
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+    let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(out.as_bytes())
+        .map_err(|e| e.to_string())?;
+    if bytes.len() != 32 {
+        return Err("Invalid unprotected key length.".to_string());
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
 fn active_founder_session_key() -> Result<[u8; 32], String> {
-    let state = FOUNDER_KEY_STATE.lock().unwrap();
-    state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())
+    #[cfg(target_os = "windows")]
+    {
+        let blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+        let encrypted = blob
+            .as_ref()
+            .ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?;
+        return dpapi_unprotect_key_material(encrypted);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let state = FOUNDER_KEY_STATE.lock().unwrap();
+        state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())
+    }
+}
+
+fn require_fresh_biometric_for_high_risk() -> Result<(), String> {
+    let session = access::BIOMETRIC_SESSION.lock().unwrap();
+    if biometric_session_is_valid_at(*session, chrono::Local::now()) {
+        return Ok(());
+    }
+    Err("Biometric revalidation required for this high-risk action.".to_string())
+}
+
+fn clear_founder_session() {
+    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+    if let Some(mut key) = *state {
+        key.fill(0);
+    }
+    *state = None;
+
+    let mut blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+    if let Some(bytes) = blob.as_mut() {
+        bytes.fill(0);
+    }
+    *blob = None;
+
+    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
+    *auth_time = None;
 }
 
 fn resolve_secret_for_runtime(pool: &Pool<SqliteConnectionManager>, name: &str) -> Result<String, String> {
@@ -889,9 +995,22 @@ struct SecretAuditEntry {
     message: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct KeyCustodyStatus {
+    hardware_backed: bool,
+    vault_unlocked: bool,
+    auth_fresh_seconds: i64,
+    biometric_fresh: bool,
+}
+
 #[cfg(test)]
 mod secret_policy_tests {
-    use super::{enforce_secret_mutation_cooldown, validate_secret_name, SECRET_MUTATION_COOLDOWNS};
+    use super::{
+        active_founder_session_key, clear_founder_session, enforce_secret_mutation_cooldown, is_vault_session_valid,
+        validate_secret_name, LAST_AUTH_TIME, SECRET_MUTATION_COOLDOWNS,
+    };
+    #[cfg(not(target_os = "windows"))]
+    use super::FOUNDER_KEY_STATE;
 
     #[test]
     fn validate_secret_name_enforces_allowlist() {
@@ -909,6 +1028,27 @@ mod secret_policy_tests {
         }
         assert!(enforce_secret_mutation_cooldown(secret).is_ok());
         assert!(enforce_secret_mutation_cooldown(secret).is_err());
+    }
+
+    #[test]
+    fn lock_clears_session_and_blocks_access() {
+        #[cfg(target_os = "windows")]
+        {
+            let mut blob = super::FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+            *blob = Some(vec![1, 2, 3, 4]);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let mut state = FOUNDER_KEY_STATE.lock().unwrap();
+            *state = Some([9u8; 32]);
+        }
+        {
+            let mut auth = LAST_AUTH_TIME.lock().unwrap();
+            *auth = Some(chrono::Local::now());
+        }
+        clear_founder_session();
+        assert!(!is_vault_session_valid());
+        assert!(active_founder_session_key().is_err());
     }
 }
 
@@ -936,10 +1076,7 @@ async fn is_vault_unlocked() -> Result<bool, String> {
 
 #[tauri::command]
 async fn lock_sentinel() -> Result<(), String> {
-    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-    *state = None;
-    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
-    *auth_time = None;
+    clear_founder_session();
     Ok(())
 }
 
@@ -995,6 +1132,7 @@ async fn delete_secret(state: tauri::State<'_, AppState>, name: String) -> Resul
 
 #[tauri::command]
 async fn export_secrets_backup(state: tauri::State<'_, AppState>, target_path: String) -> Result<String, String> {
+    require_fresh_biometric_for_high_risk()?;
     let session_key = active_founder_session_key()?;
     let out = vault_export_secrets_backup_with_pool(&state.pool, target_path, session_key)?;
     let _ = log_event(state.clone(), "security".into(), "Secret backup exported".into());
@@ -1007,6 +1145,7 @@ async fn restore_secrets_backup(
     source_path: String,
     replace_existing: bool,
 ) -> Result<usize, String> {
+    require_fresh_biometric_for_high_risk()?;
     let session_key = active_founder_session_key()?;
     let restored = vault_restore_secrets_backup_with_pool(&state.pool, source_path, replace_existing, session_key)?;
     let _ = log_event(
@@ -1019,6 +1158,7 @@ async fn restore_secrets_backup(
 
 #[tauri::command]
 async fn revoke_all_secrets(state: tauri::State<'_, AppState>) -> Result<usize, String> {
+    require_fresh_biometric_for_high_risk()?;
     let _ = active_founder_session_key()?;
     let removed = vault_delete_all_secrets_with_pool(&state.pool)?;
     let _ = log_event(
@@ -1091,6 +1231,39 @@ async fn get_secret_security_events(state: tauri::State<'_, AppState>, limit: i3
 }
 
 #[tauri::command]
+async fn get_key_custody_status() -> Result<KeyCustodyStatus, String> {
+    let now = chrono::Local::now();
+    let auth_fresh_seconds = {
+        let last_auth = LAST_AUTH_TIME.lock().unwrap();
+        last_auth
+            .map(|t| now.signed_duration_since(t).num_seconds())
+            .unwrap_or(-1)
+    };
+    let biometric_fresh = {
+        let bio = access::BIOMETRIC_SESSION.lock().unwrap();
+        biometric_session_is_valid_at(*bio, now)
+    };
+    let hardware_backed = {
+        #[cfg(target_os = "windows")]
+        {
+            let blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
+            blob.is_some()
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            false
+        }
+    };
+
+    Ok(KeyCustodyStatus {
+        hardware_backed,
+        vault_unlocked: is_vault_session_valid(),
+        auth_fresh_seconds,
+        biometric_fresh,
+    })
+}
+
+#[tauri::command]
 async fn verify_strategic_asset_integrity(file_path: String, expected_hash: String) -> Result<bool, String> {
     let path = std::path::Path::new(&file_path);
     if !path.exists() {
@@ -1117,10 +1290,7 @@ async fn seal_strategic_asset(file_path: String, title: String) -> Result<String
     let data = std::fs::read(&path).map_err(|e| e.to_string())?;
     
     // Neural Key Derivation: In V4.5.1 we pull the session key from memory
-    let session_key = {
-        let state = FOUNDER_KEY_STATE.lock().unwrap();
-        state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?
-    };
+    let session_key = active_founder_session_key()?;
     
     let key = Key::<Aes256Gcm>::from_slice(&session_key); 
     let cipher = Aes256Gcm::new(key);
@@ -1177,10 +1347,7 @@ async fn unseal_strategic_asset(blob_id: String) -> Result<String, String> {
         let ciphertext = std::fs::read(&blob.encrypted_path).map_err(|e| e.to_string())?;
         
         // Session Key Derivation (V4.5.1)
-        let session_key = {
-            let state = FOUNDER_KEY_STATE.lock().unwrap();
-            state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?
-        };
+        let session_key = active_founder_session_key()?;
         
         let key = Key::<Aes256Gcm>::from_slice(&session_key);
         let cipher = Aes256Gcm::new(key);
@@ -3556,6 +3723,7 @@ pub fn run() {
             revoke_all_secrets,
             get_secret_health,
             get_secret_security_events,
+            get_key_custody_status,
             seal_strategic_asset,
             unseal_strategic_asset,
             get_sentinel_ledger,

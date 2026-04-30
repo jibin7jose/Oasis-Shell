@@ -24,6 +24,11 @@
 - Wrapped secret restore in a transaction so invalid entries trigger rollback instead of partial destructive state.
 - Added explicit restore confirmation phrase and extension guard checks in Settings for operational safety.
 - Added and passed tests for tamper rejection and restore rollback preservation behavior.
+- Added Windows DPAPI-based session key custody path so founder key material is hardware/user protected at rest in memory.
+- Added biometric freshness gating for high-risk secret operations (backup export/restore and revoke-all).
+- Reduced vault session validity window and centralized lock cleanup to clear custody state deterministically.
+- Added key custody visibility in Settings (hardware-backed status, auth freshness, biometric freshness).
+- Added and passed lock-state regression coverage for session clearing and post-lock key access rejection.
 
 ## 2026-04-25
 - Added a guarded frontend launcher at `scripts/start-frontend-if-needed.ps1` and switched Tauri `beforeDevCommand` to `npm run frontend:guarded` so a live frontend server can be reused instead of racing a second Vite process on port 1420.
