@@ -1,5 +1,5 @@
 Oasis Shell Smoke Diagnostics
-Generated: 2026-05-01 22:54:01
+Generated: 2026-05-01 23:01:29
 
 == Smoke Check ==
 
@@ -11,9 +11,9 @@ Name            Status                                                          
 ----            ------                                                                                           ------
 Frontend        OK                                                                                                  200
 Ollama API      OK                                                     gemma3:4b, nomic-embed-text:latest, llava:latest
-Ollama Generate OK                                                        Smoke check complete, local oracle confirmed.
+Ollama Generate OK                                              Smoke checks initiated, confirming local oracle status.
 Founder Secret  OK                                                                                           Configured
-Tauri Process   OK                                                                                            PID 12100
+Tauri Process   OK                                                                                            PID 18992
 Tauri Log       OK      ...:8) |     at process.processTicksAndRejections (node:internal/process/task_queues:82:21)[39m
 
 
@@ -27,16 +27,16 @@ OASIS_FOUNDER_SECRET=[configured]
 
 ProcessName    Id
 -----------    --
-cargo        9700
-cargo       23448
-node         1704
+cargo       22184
+cargo       22288
 node         6708
+node        14620
+node        15072
 node        15408
-node        17164
-node        25096
-node        28028
+node        27732
 node        29056
-oasis-shell 12100
+node        29288
+oasis-shell 18992
 
 == Recent Tauri Log ==
 node.exe :      Running BeforeDevCommand (`npm run frontend:guarded`)
@@ -52,7 +52,7 @@ At D:\myproject\new\oasis-shell\node_modules\.bin\tauri.ps1:24 char:5
 > oasis-shell@1.0.0 frontend:guarded
 > powershell -ExecutionPolicy Bypass -File ./scripts/start-frontend-if-needed.ps1
 
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.16s
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.29s
 [1m[92m     Running[0m `target\debug\oasis-shell.exe`
 Starting frontend on http://localhost:1420...
 

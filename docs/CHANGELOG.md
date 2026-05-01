@@ -28,6 +28,17 @@
     -   Added backend unit test for window normalization behavior.
     -   Extended UI smoke test to assert the running-windows surface section is present.
 
+## 2026-05-01 - Phase 29 Final Closeout
+### Core Features Implemented:
+1.  **Window Surface Sync Consolidation:**
+    -   Refactored frontend window polling to use a shared refresh path for stable update cadence and reduced duplicate polling.
+2.  **Operator Telemetry Visibility:**
+    -   Added `Window Sync` timestamp rendering in the System panel Running Windows section.
+3.  **Smoke Reliability Hardening:**
+    -   Updated smoke navigation to explicitly enter the Core Nodes process HUD before asserting window-surface visibility.
+4.  **Health Pipeline Validation:**
+    -   Re-ran full health pipeline to confirm backend tests, frontend build, diagnostics, and UI smoke execution.
+
 ## 2026-04-30 - Phase 23 Hardening & Encrypted Secrets
 ### Core Features Implemented:
 1.  **Founder-Only Secret Provisioning Path:**

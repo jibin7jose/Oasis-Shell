@@ -10,6 +10,31 @@ function note(name, status, detail = "") {
   findings.push({ name, status, detail });
 }
 
+async function ensureProcessesView(page) {
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.waitForTimeout(250);
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.waitForTimeout(250);
+
+  const railButton = page.locator('button[aria-label="Core Nodes"]').first();
+  if (!(await railButton.count())) {
+    note("Window Surface Panel", "FAIL", "core nodes rail button not found");
+    return false;
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    await railButton.click({ timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(700);
+    const hudVisible = (await page.getByText(/Strategic Process HUD/i).count()) > 0;
+    if (hudVisible) {
+      return true;
+    }
+  }
+
+  note("Window Surface Panel", "FAIL", "could not switch to process HUD");
+  return false;
+}
+
 async function maybeClick(page, label, modalPattern) {
   const button = page.getByRole("button", { name: label }).first();
   if (await button.count()) {
@@ -174,18 +199,20 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
     await maybeClick(page, /sentinel|vault/i, /Sentinel Vault|Authentication Required|Asset Ledger/i);
     await maybeClick(page, /workforce/i, /Neural Workforce|Manifested Proposals|Active Neural Pulses/i);
     await maybeClick(page, /documentation|manual/i, /Documentation|System Documentation|Manual/i);
-    await maybeClick(page, /core nodes/i, /Strategic Process HUD|System Core|Running Windows|Live Process Surface/i);
-    await page.mouse.wheel(0, 2000);
-    await page.waitForTimeout(600);
-    await page.mouse.wheel(0, 2000);
-    await page.waitForTimeout(600);
+    const processHudReady = await ensureProcessesView(page);
+    if (processHudReady) {
+      await page.mouse.wheel(0, 2000);
+      await page.waitForTimeout(600);
+      await page.mouse.wheel(0, 2000);
+      await page.waitForTimeout(600);
 
-    const runningWindowsCount = await page.getByText(/Running Windows/i).count();
-    const windowSyncCount = await page.getByText(/Window Sync:/i).count();
-    if (runningWindowsCount > 0 || windowSyncCount > 0) {
-      note("Window Surface Panel", "OK", "running windows section detected");
-    } else {
-      note("Window Surface Panel", "FAIL", "running windows section missing");
+      const runningWindowsCount = await page.getByText(/Running Windows/i).count();
+      const windowSyncCount = await page.getByText(/Window Sync:/i).count();
+      if (runningWindowsCount > 0 || windowSyncCount > 0) {
+        note("Window Surface Panel", "OK", "running windows section detected");
+      } else {
+        note("Window Surface Panel", "FAIL", "running windows section missing");
+      }
     }
 
     if (badResponses.length > 0) {
