@@ -67,7 +67,14 @@ import { AuditLog } from "./components/panels/AuditLog";
 // Design Utility moved to lib/tauri
 
 // Context Library
-const contexts = [
+type ContextDockEntry = {
+  id: string;
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  aura: string;
+};
+
+const contexts: ContextDockEntry[] = [
   { id: 'dev', name: 'Strategic Core', icon: Terminal, aura: 'rgba(99, 102, 241, 0.4)' },
   { id: 'design', name: 'Creative Forge', icon: Shield, aura: 'rgba(168, 85, 247, 0.4)' },
   { id: 'growth', name: 'Capital Matrix', icon: Globe, aura: 'rgba(16, 185, 129, 0.4)' }

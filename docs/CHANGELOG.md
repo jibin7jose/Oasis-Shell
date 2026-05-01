@@ -1,6 +1,18 @@
 # PROJECT LOG: OASIS SHELL
 # Project Start & Initialization
 
+## 2026-05-01 - Phase 29 Runtime Stability & Daily Startup Automation
+### Core Features Implemented:
+1.  **Daily Startup Orchestration:**
+    -   Added `daily:start` workflow to boot desktop dev mode and immediately run full health checks in one command.
+    -   Added `scripts/daily-start.ps1` to launch `dev:clean`, wait for startup, and execute `health:full`.
+2.  **Runtime Crash Fix (App Render Path):**
+    -   Resolved React runtime failure (`Element type is invalid ... got: number`) by fixing an invalid context icon entry in `App`.
+3.  **Type-Safety Guardrail for Context Icons:**
+    -   Added explicit `ContextDockEntry` typing so non-component icon values are rejected at compile time.
+4.  **Smoke Validation After Fix:**
+    -   Re-ran UI smoke checks and confirmed runtime errors are no longer observed.
+
 ## 2026-04-30 - Phase 23 Hardening & Encrypted Secrets
 ### Core Features Implemented:
 1.  **Founder-Only Secret Provisioning Path:**
