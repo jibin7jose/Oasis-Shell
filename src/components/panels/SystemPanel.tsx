@@ -26,6 +26,7 @@ interface SystemPanelProps {
   externalConfirmAction?: "reset" | "reset_clear" | null;
   onClearExternalConfirm?: () => void;
   lastSync: string;
+  windowSync?: string;
   onRefresh: () => void;
   onKillProcess: (pid: number) => void;
   onSuspendProcess: (pid: number) => void;
@@ -105,6 +106,7 @@ export default function SystemPanel({
   externalConfirmAction,
   onClearExternalConfirm,
   lastSync,
+  windowSync,
   onRefresh,
   onKillProcess,
   onSuspendProcess,
@@ -895,12 +897,15 @@ export default function SystemPanel({
               {(windows ?? []).length}
             </span>
           </div>
-          <span className={cn(
-            "text-[9px] font-mono",
-            (windows ?? []).length > 0 ? "text-emerald-400" : "text-slate-500"
-          )}>
-            {(windows ?? []).length > 0 ? "Live Process Surface: Active" : "Live Process Surface: Idle"}
-          </span>
+          <div className="flex flex-col items-end">
+            <span className={cn(
+              "text-[9px] font-mono",
+              (windows ?? []).length > 0 ? "text-emerald-400" : "text-slate-500"
+            )}>
+              {(windows ?? []).length > 0 ? "Live Process Surface: Active" : "Live Process Surface: Idle"}
+            </span>
+            <span className="text-[8px] font-mono text-slate-500">Window Sync: {windowSync || "N/A"}</span>
+          </div>
         </div>
 
         <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-3">

@@ -174,13 +174,18 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
     await maybeClick(page, /sentinel|vault/i, /Sentinel Vault|Authentication Required|Asset Ledger/i);
     await maybeClick(page, /workforce/i, /Neural Workforce|Manifested Proposals|Active Neural Pulses/i);
     await maybeClick(page, /documentation|manual/i, /Documentation|System Documentation|Manual/i);
-    await maybeClick(page, /parameters|disk atlas|system/i, /System Core|Running Windows|Live Process Surface/i);
+    await maybeClick(page, /core nodes/i, /Strategic Process HUD|System Core|Running Windows|Live Process Surface/i);
+    await page.mouse.wheel(0, 2000);
+    await page.waitForTimeout(600);
+    await page.mouse.wheel(0, 2000);
+    await page.waitForTimeout(600);
 
-    const latestBodyText = await page.locator("body").innerText();
-    if (/Running Windows|Live Process Surface/i.test(latestBodyText)) {
+    const runningWindowsCount = await page.getByText(/Running Windows/i).count();
+    const windowSyncCount = await page.getByText(/Window Sync:/i).count();
+    if (runningWindowsCount > 0 || windowSyncCount > 0) {
       note("Window Surface Panel", "OK", "running windows section detected");
     } else {
-      note("Window Surface Panel", "SKIP", "running windows section not visible in current viewport");
+      note("Window Surface Panel", "FAIL", "running windows section missing");
     }
 
     if (badResponses.length > 0) {

@@ -1,5 +1,5 @@
 Oasis Shell Smoke Diagnostics
-Generated: 2026-05-01 19:18:05
+Generated: 2026-05-01 22:54:01
 
 == Smoke Check ==
 
@@ -11,10 +11,10 @@ Name            Status                                                          
 ----            ------                                                                                           ------
 Frontend        OK                                                                                                  200
 Ollama API      OK                                                     gemma3:4b, nomic-embed-text:latest, llava:latest
-Ollama Generate OK                                                Smoke checks initiated, local oracle status: nominal.
+Ollama Generate OK                                                        Smoke check complete, local oracle confirmed.
 Founder Secret  OK                                                                                           Configured
-Tauri Process   OK                                                                                            PID 26400
-Tauri Log       OK      ...ed + debuginfo] target(s) in 0.79s | [1m[92m     Running[0m `target\debug\oasis-shell.exe`
+Tauri Process   OK                                                                                            PID 12100
+Tauri Log       OK      ...:8) |     at process.processTicksAndRejections (node:internal/process/task_queues:82:21)[39m
 
 
 
@@ -27,17 +27,16 @@ OASIS_FOUNDER_SECRET=[configured]
 
 ProcessName    Id
 -----------    --
-cargo       11796
-cargo       15468
-node         2656
-node         7436
-node         9420
-node        11000
-node        12092
-node        13464
-node        27192
-node        27608
-oasis-shell 26400
+cargo        9700
+cargo       23448
+node         1704
+node         6708
+node        15408
+node        17164
+node        25096
+node        28028
+node        29056
+oasis-shell 12100
 
 == Recent Tauri Log ==
 node.exe :      Running BeforeDevCommand (`npm run frontend:guarded`)
@@ -47,20 +46,22 @@ At D:\myproject\new\oasis-shell\node_modules\.bin\tauri.ps1:24 char:5
     + CategoryInfo          : NotSpecified: (     Running Be...ntend:guarded`):String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info Watching D:\myproject\new\oasis-shell\src-tauri for changes...
 
 > oasis-shell@1.0.0 frontend:guarded
 > powershell -ExecutionPolicy Bypass -File ./scripts/start-frontend-if-needed.ps1
 
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.16s
+[1m[92m     Running[0m `target\debug\oasis-shell.exe`
 Starting frontend on http://localhost:1420...
 
 > oasis-shell@1.0.0 frontend
 > vite --config vite.config.mjs --port 1420
 
-
-  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m500[22m[2m[0m ms[22m
-
-  [32mGP£[39m  [1mLocal[22m:   [36mhttp://localhost:[1m1420[22m/[39m
-     Running DevCommand (`cargo  run --no-default-features --color always --`)
-        Info Watching D:\myproject\new\oasis-shell\src-tauri for changes...
-[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.79s
-[1m[92m     Running[0m `target\debug\oasis-shell.exe`
+[31merror when starting dev server:
+Error: Port 1420 is already in use
+    at Server.onError$1 (file:///D:/myproject/new/oasis-shell/node_modules/vite/dist/node/chunks/config.js:14933:28)
+    at Server.emit (node:events:524:28)
+    at emitErrorNT (node:net:1944:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)[39m

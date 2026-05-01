@@ -271,6 +271,7 @@ export default function App() {
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
   const lastWindowCountRef = useRef(0);
+  const [windowSurfaceLastSync, setWindowSurfaceLastSync] = useState("N/A");
 
 
 
@@ -441,6 +442,19 @@ export default function App() {
   const [visionaryContext, setVisionaryContext] = useState<string>("Initializing...");
   const [latticePoints, setLatticePoints] = useState<LatticePoint[]>([]);
   const [isLatticeActive, setIsLatticeActive] = useState(true);
+
+  const refreshWindowSurface = async (announceOnWake = false) => {
+    try {
+      const windows = await invokeSafe("get_running_windows");
+      const normalizedWindows = normalizeWindowSurface(windows);
+      setWindows(normalizedWindows);
+      if (announceOnWake && lastWindowCountRef.current === 0 && normalizedWindows.length > 0) {
+        setNotification(`Window Surface Synced: ${normalizedWindows.length} active window(s) detected.`);
+      }
+      lastWindowCountRef.current = normalizedWindows.length;
+      setWindowSurfaceLastSync(new Date().toLocaleTimeString());
+    } catch (e) { }
+  };
 
   useEffect(() => {
     if (!isHandshakeSuccessful) return;
@@ -746,10 +760,7 @@ export default function App() {
         const procs = await invokeSafe("get_process_list") as any[];
         if (procs && Array.isArray(procs)) setProcesses(procs);
         
-        const wins = await invokeSafe("get_running_windows");
-        const normalizedWins = normalizeWindowSurface(wins);
-        setWindows(normalizedWins);
-        lastWindowCountRef.current = normalizedWins.length;
+        await refreshWindowSurface(false);
         
         const stor = await invokeSafe("get_storage_map");
         if (Array.isArray(stor)) setStorage(stor);
@@ -1442,13 +1453,7 @@ export default function App() {
     try {
       const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
       setSystemStats(stats);
-      const windows = await invokeSafe("get_running_windows");
-      const normalizedWindows = normalizeWindowSurface(windows);
-      setWindows(normalizedWindows);
-      if (lastWindowCountRef.current === 0 && normalizedWindows.length > 0) {
-        setNotification(`Window Surface Synced: ${normalizedWindows.length} active window(s) detected.`);
-      }
-      lastWindowCountRef.current = normalizedWindows.length;
+      await refreshWindowSurface(true);
       const procList = await invokeSafe("get_process_list") as ProcessInfo[];
       setProcesses(procList);
       const priorities = await Promise.all(
@@ -1476,20 +1481,6 @@ export default function App() {
       setSystemLastSync(new Date().toLocaleTimeString());
     } catch (e) { }
   };
-
-  useEffect(() => {
-    const syncWindows = async () => {
-      try {
-        const windows = await invokeSafe("get_running_windows");
-        const normalizedWindows = normalizeWindowSurface(windows);
-        setWindows(normalizedWindows);
-        lastWindowCountRef.current = normalizedWindows.length;
-      } catch (e) { }
-    };
-    syncWindows();
-    const interval = setInterval(syncWindows, 15000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Phase 1: Automated Priority Enforcement
   useEffect(() => {
@@ -2963,6 +2954,7 @@ export default function App() {
                   storage={storage}
                   devices={devices}
                   lastSync={systemLastSync}
+                  windowSync={windowSurfaceLastSync}
                   processPriorities={processPriorities}
                   priorityAudit={priorityAudit}
                   priorityCache={priorityCache}
