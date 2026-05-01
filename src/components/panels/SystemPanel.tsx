@@ -895,7 +895,12 @@ export default function SystemPanel({
               {(windows ?? []).length}
             </span>
           </div>
-          <span className="text-[9px] font-mono text-slate-500">Live Process Surface</span>
+          <span className={cn(
+            "text-[9px] font-mono",
+            (windows ?? []).length > 0 ? "text-emerald-400" : "text-slate-500"
+          )}>
+            {(windows ?? []).length > 0 ? "Live Process Surface: Active" : "Live Process Surface: Idle"}
+          </span>
         </div>
 
         <div className="max-h-72 overflow-y-auto custom-scrollbar space-y-3">

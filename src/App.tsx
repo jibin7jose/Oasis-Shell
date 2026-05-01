@@ -74,6 +74,41 @@ type ContextDockEntry = {
   aura: string;
 };
 
+const normalizeWindowSurface = (raw: unknown): WindowInfo[] => {
+  if (!Array.isArray(raw)) return [];
+
+  const normalized = raw
+    .map((entry: any) => ({
+      title: String(entry?.title ?? "").trim(),
+      pid: Number(entry?.pid ?? 0),
+      exe_path: String(entry?.exe_path ?? "").trim() || "[unresolved]",
+      x: Number(entry?.x ?? 0),
+      y: Number(entry?.y ?? 0),
+      width: Number(entry?.width ?? 0),
+      height: Number(entry?.height ?? 0),
+      is_maximized: Boolean(entry?.is_maximized),
+    }))
+    .filter((win) =>
+      win.title.length > 0 &&
+      win.title !== "Program Manager" &&
+      win.title !== "Settings" &&
+      win.pid > 0 &&
+      win.width > 0 &&
+      win.height > 0
+    )
+    .sort((a, b) => a.title.localeCompare(b.title) || a.pid - b.pid);
+
+  const deduped: WindowInfo[] = [];
+  const seen = new Set<string>();
+  for (const win of normalized) {
+    const key = `${win.pid}|${win.title.toLowerCase()}|${win.exe_path.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(win);
+  }
+  return deduped;
+};
+
 const contexts: ContextDockEntry[] = [
   { id: 'dev', name: 'Strategic Core', icon: Terminal, aura: 'rgba(99, 102, 241, 0.4)' },
   { id: 'design', name: 'Creative Forge', icon: Shield, aura: 'rgba(168, 85, 247, 0.4)' },
@@ -235,6 +270,7 @@ export default function App() {
   const [hardwareStatus, setHardwareStatus] = useState<any>(null);
   const [ventureNetwork, setVentureNetwork] = useState<any[]>([]);
   const [activeGolem, setActiveGolem] = useState<any>(null);
+  const lastWindowCountRef = useRef(0);
 
 
 
@@ -711,7 +747,9 @@ export default function App() {
         if (procs && Array.isArray(procs)) setProcesses(procs);
         
         const wins = await invokeSafe("get_running_windows");
-        if (Array.isArray(wins)) setWindows(wins);
+        const normalizedWins = normalizeWindowSurface(wins);
+        setWindows(normalizedWins);
+        lastWindowCountRef.current = normalizedWins.length;
         
         const stor = await invokeSafe("get_storage_map");
         if (Array.isArray(stor)) setStorage(stor);
@@ -1404,8 +1442,13 @@ export default function App() {
     try {
       const stats = await invokeSafe("run_system_diagnostic") as SystemStats;
       setSystemStats(stats);
-      const windows = await invokeSafe("get_running_windows") as WindowInfo[];
-      setWindows(windows);
+      const windows = await invokeSafe("get_running_windows");
+      const normalizedWindows = normalizeWindowSurface(windows);
+      setWindows(normalizedWindows);
+      if (lastWindowCountRef.current === 0 && normalizedWindows.length > 0) {
+        setNotification(`Window Surface Synced: ${normalizedWindows.length} active window(s) detected.`);
+      }
+      lastWindowCountRef.current = normalizedWindows.length;
       const procList = await invokeSafe("get_process_list") as ProcessInfo[];
       setProcesses(procList);
       const priorities = await Promise.all(
@@ -1437,8 +1480,10 @@ export default function App() {
   useEffect(() => {
     const syncWindows = async () => {
       try {
-        const windows = await invokeSafe("get_running_windows") as WindowInfo[];
-        setWindows(windows);
+        const windows = await invokeSafe("get_running_windows");
+        const normalizedWindows = normalizeWindowSurface(windows);
+        setWindows(normalizedWindows);
+        lastWindowCountRef.current = normalizedWindows.length;
       } catch (e) { }
     };
     syncWindows();

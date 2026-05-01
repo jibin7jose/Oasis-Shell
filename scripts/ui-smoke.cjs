@@ -174,6 +174,14 @@ async function openFromPalette(page, commandLabel, modalPattern, resultName) {
     await maybeClick(page, /sentinel|vault/i, /Sentinel Vault|Authentication Required|Asset Ledger/i);
     await maybeClick(page, /workforce/i, /Neural Workforce|Manifested Proposals|Active Neural Pulses/i);
     await maybeClick(page, /documentation|manual/i, /Documentation|System Documentation|Manual/i);
+    await maybeClick(page, /parameters|disk atlas|system/i, /System Core|Running Windows|Live Process Surface/i);
+
+    const latestBodyText = await page.locator("body").innerText();
+    if (/Running Windows|Live Process Surface/i.test(latestBodyText)) {
+      note("Window Surface Panel", "OK", "running windows section detected");
+    } else {
+      note("Window Surface Panel", "SKIP", "running windows section not visible in current viewport");
+    }
 
     if (badResponses.length > 0) {
       note("HTTP Errors", "FAIL", badResponses.join(" | ").slice(0, 1000));

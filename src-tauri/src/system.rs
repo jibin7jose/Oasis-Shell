@@ -7,7 +7,7 @@ use sysinfo::{Components, Disks, Networks, System};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-    SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE,
+    IsZoomed, SetWindowPos, ShowWindow, SWP_NOZORDER, SWP_SHOWWINDOW, SW_RESTORE,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -202,7 +202,7 @@ pub fn get_running_windows() -> Vec<WindowInfo> {
         let _ = EnumWindows(Some(enum_window_callback), LPARAM(&mut windows as *mut Vec<WindowInfo> as isize));
     }
 
-    windows
+    normalize_window_entries(windows)
 }
 
 unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -235,17 +235,43 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                 windows.push(WindowInfo {
                     title,
                     pid,
-                    exe_path,
+                    exe_path: if exe_path.trim().is_empty() { "[unresolved]".into() } else { exe_path },
                     x: rect.left,
                     y: rect.top,
                     width: rect.right - rect.left,
                     height: rect.bottom - rect.top,
-                    is_maximized: false, // Calculate if needed via GetWindowPlacement
+                    is_maximized: IsZoomed(hwnd).as_bool(),
                 });
             }
         }
     }
     BOOL::from(true)
+}
+
+fn normalize_window_entries(mut windows: Vec<WindowInfo>) -> Vec<WindowInfo> {
+    windows.retain(|win| {
+        let title = win.title.trim();
+        title != "Program Manager"
+            && title != "Settings"
+            && !title.is_empty()
+            && win.pid > 0
+            && win.width > 0
+            && win.height > 0
+    });
+
+    windows.sort_by(|a, b| {
+        let a_title = a.title.to_lowercase();
+        let b_title = b.title.to_lowercase();
+        a_title.cmp(&b_title).then(a.pid.cmp(&b.pid))
+    });
+
+    windows.dedup_by(|a, b| {
+        a.pid == b.pid
+            && a.title.eq_ignore_ascii_case(&b.title)
+            && a.exe_path.eq_ignore_ascii_case(&b.exe_path)
+    });
+
+    windows
 }
 
 #[tauri::command]
@@ -1680,7 +1706,7 @@ pub async fn trigger_system_lockdown() -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_process_priority;
+    use super::{normalize_process_priority, normalize_window_entries, WindowInfo};
 
     #[test]
     fn process_priority_mapping_covers_known_aliases() {
@@ -1693,6 +1719,52 @@ mod tests {
         assert_eq!(normalize_process_priority("high"), "High");
         assert_eq!(normalize_process_priority("realtime"), "RealTime");
         assert_eq!(normalize_process_priority("anything-else"), "Normal");
+    }
+
+    #[test]
+    fn window_surface_normalization_filters_sorts_and_deduplicates() {
+        let windows = vec![
+            WindowInfo {
+                title: "Program Manager".into(),
+                pid: 1,
+                exe_path: "a.exe".into(),
+                x: 0, y: 0, width: 50, height: 50,
+                is_maximized: false,
+            },
+            WindowInfo {
+                title: "Zeta".into(),
+                pid: 300,
+                exe_path: "z.exe".into(),
+                x: 0, y: 0, width: 100, height: 100,
+                is_maximized: false,
+            },
+            WindowInfo {
+                title: "alpha".into(),
+                pid: 100,
+                exe_path: "a.exe".into(),
+                x: 0, y: 0, width: 100, height: 100,
+                is_maximized: false,
+            },
+            WindowInfo {
+                title: "Alpha".into(),
+                pid: 100,
+                exe_path: "A.EXE".into(),
+                x: 0, y: 0, width: 100, height: 100,
+                is_maximized: false,
+            },
+            WindowInfo {
+                title: "NoSize".into(),
+                pid: 200,
+                exe_path: "n.exe".into(),
+                x: 0, y: 0, width: 0, height: 100,
+                is_maximized: false,
+            },
+        ];
+
+        let normalized = normalize_window_entries(windows);
+        assert_eq!(normalized.len(), 2);
+        assert_eq!(normalized[0].title, "alpha");
+        assert_eq!(normalized[1].title, "Zeta");
     }
 }
 

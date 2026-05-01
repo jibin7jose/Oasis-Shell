@@ -13,6 +13,21 @@
 4.  **Smoke Validation After Fix:**
     -   Re-ran UI smoke checks and confirmed runtime errors are no longer observed.
 
+## 2026-05-01 - Phase 29 Window Surface Completion
+### Core Features Implemented:
+1.  **Backend Window Surface Hardening:**
+    -   Normalized `get_running_windows` output with filtering for invalid entries and deterministic sorting.
+    -   Added maximized-state detection and fallback executable path labeling when path resolution is unavailable.
+2.  **Deduplication Guardrail:**
+    -   Added PID/title/executable deduplication to reduce duplicate window rows across polling cycles.
+3.  **Frontend Window Sync Normalization:**
+    -   Added a normalized window-surface mapper in `App` and applied it to all `get_running_windows` sync paths.
+4.  **Visible Surface-State UX:**
+    -   Updated System panel to show `Live Process Surface: Active/Idle` for immediate operator visibility.
+5.  **Regression Coverage:**
+    -   Added backend unit test for window normalization behavior.
+    -   Extended UI smoke test to assert the running-windows surface section is present.
+
 ## 2026-04-30 - Phase 23 Hardening & Encrypted Secrets
 ### Core Features Implemented:
 1.  **Founder-Only Secret Provisioning Path:**
