@@ -1078,6 +1078,33 @@ async fn query_photographic_memory(query: String) -> Result<String, String> {
     }
 }
 
+#[derive(serde::Serialize)]
+struct MemoryEntry {
+    id: i32,
+    timestamp: String,
+    description: String,
+}
+
+#[tauri::command]
+async fn get_all_photographic_memories() -> Result<Vec<MemoryEntry>, String> {
+    let mut memories = Vec::new();
+    if let Ok(conn) = Connection::open("oasis_crates.db") {
+        if let Ok(mut stmt) = conn.prepare("SELECT id, timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 50") {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok(MemoryEntry {
+                    id: row.get(0)?,
+                    timestamp: row.get(1)?,
+                    description: row.get(2)?,
+                })
+            }) {
+                for row in rows.flatten() {
+                    memories.push(row);
+                }
+            }
+        }
+    }
+    Ok(memories)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -1209,6 +1236,7 @@ pub fn run() {
             start_proactive_sentience,
             start_photographic_memory,
             query_photographic_memory,
+            get_all_photographic_memories,
             sync_hardware_aura,
             capture_screenshot,
             query_vision,
