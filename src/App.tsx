@@ -136,6 +136,11 @@ export default function App() {
       try {
         setAutostart(await isEnabled());
       } catch (e) {}
+      try {
+        await invoke("start_photographic_memory");
+      } catch (e) {
+        console.error("Failed to start memory agent:", e);
+      }
     })();
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -241,6 +246,35 @@ export default function App() {
         invoke('trigger_deploy', { env: 'Global' }).catch(() => { });
         logEvent("Deployment Sequence Alpha Initiated", "deploy");
       } 
+      else if (q.includes("git") || q.includes("commit") || q.includes("push") || q.includes("review code")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status..." }]);
+        logEvent("Git Automation Triggered", "deploy");
+        (async () => {
+          try {
+            const gitStatus = await invoke("execute_neural_command", { command: "git status -s" }) as string;
+            if (!gitStatus.trim()) {
+              setMessages(prev => [...prev, { role: "assistant", content: "Git status is clean. No code to review." }]);
+              return;
+            }
+            setMessages(prev => [...prev, { role: "assistant", content: `Uncommitted Changes Detected:\n${gitStatus}\n\nGenerating autonomous commit message...` }]);
+            
+            // Ask LLM to generate a commit message based on the diff
+            const gitDiff = await invoke("execute_neural_command", { command: "git --no-pager diff" }) as string;
+            const commitMessage = await invoke("generate_commit_message", { diff: gitDiff }) as string;
+            
+            setMessages(prev => [...prev, { role: "assistant", content: `Generated Commit: ${commitMessage.trim()}` }]);
+            
+            if (q.includes("push") || q.includes("commit")) {
+               setMessages(prev => [...prev, { role: "assistant", content: "Pushing to remote origin..." }]);
+               await invoke("execute_neural_command", { command: `git add . ; git commit -m "${commitMessage.trim().replace(/"/g, '')}" ; git push` });
+               setMessages(prev => [...prev, { role: "assistant", content: "Codebase securely pushed to GitHub." }]);
+               logEvent("Autonomous Git Push Complete", "system");
+            }
+          } catch(e) {
+            setMessages(prev => [...prev, { role: "assistant", content: `Git execution failed: ${e}` }]);
+          }
+        })();
+      }
       else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
         const title = query.replace(/create|architect|build module/gi, "").trim() || "New Dynamic Module";
         setDynamicModules(prev => [
@@ -292,7 +326,18 @@ export default function App() {
           setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Scanning active workspace for Context Crate..." }]);
           logEvent("Context Crate scan initiated", "system");
         }
-      } else if (q.includes("graph") || q.includes("cortex") || q.includes("3d")) {
+      } else if (q.includes("photographic memory") || q.includes("recall") || q.includes("remember")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Querying Photographic Memory Engine..." }]);
+        logEvent("Photographic Memory Engine Queried", "neural");
+        (async () => {
+          try {
+            const memoryResponse = await invoke("query_photographic_memory", { query: q }) as string;
+            setMessages(prev => [...prev, { role: "assistant", content: memoryResponse }]);
+          } catch(e) {
+            setMessages(prev => [...prev, { role: "assistant", content: `Memory query failed: ${e}` }]);
+          }
+        })();
+      } else if ((q.includes("graph") || q.includes("cortex") || q.includes("3d")) && !q.includes("photograph")) {
         setShowGraph(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating 3D Strategic Cortex..." }]);
         logEvent("Strategic Cortex Visualization Launched", "system");

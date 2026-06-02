@@ -952,6 +952,114 @@ async fn query_vision(image_base64: String, prompt: String) -> Result<String, St
     Ok(res["response"].as_str().unwrap_or("Vision Failure").to_string())
 }
 
+#[tauri::command]
+fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<(), String> {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(30)); // 30 seconds
+            
+            // Capture Screen
+            if let Ok(screens) = Screen::all() {
+                if let Some(screen) = screens.first() {
+                    if let Ok(image) = screen.capture() {
+                        let mut buffer = Cursor::new(Vec::new());
+                        if image.write_to(&mut buffer, ImageFormat::Png).is_ok() {
+                            let b64 = general_purpose::STANDARD.encode(buffer.get_ref());
+                            
+                            // Query Vision (Blocking)
+                            let client = reqwest::blocking::Client::new();
+                            // Check if llava is available first
+                            let tags_res = client.get("http://localhost:11434/api/tags").send();
+                            let llava_ready = tags_res.ok()
+                                .and_then(|r| r.json::<serde_json::Value>().ok())
+                                .and_then(|j| j["models"].as_array().map(|models| 
+                                    models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("llava"))
+                                ))
+                                .unwrap_or(false);
+
+                            if !llava_ready {
+                                println!("Photographic Memory: Waiting for llava model to download...");
+                                continue;
+                            }
+
+                            let body = serde_json::json!({
+                                "model": "llava",
+                                "prompt": "Describe precisely what is visible on this desktop screen. Include visible text, open applications, and context.",
+                                "images": [b64],
+                                "stream": false
+                            });
+
+                            if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send() {
+                                if let Ok(json) = res.json::<serde_json::Value>() {
+                                    if let Some(desc) = json["response"].as_str() {
+                                        println!("Photographic Memory Captured: {}", desc);
+                                        if let Ok(conn) = Connection::open("oasis_crates.db") {
+                                            let r = conn.execute(
+                                                "INSERT INTO photographic_memory (description) VALUES (?1)",
+                                                params![desc],
+                                            );
+                                            println!("DB Insert Result: {:?}", r);
+                                        } else {
+                                            println!("Failed to open DB for memory");
+                                        }
+                                    } else {
+                                        println!("LLM response missing 'response' field: {:?}", json);
+                                    }
+                                } else {
+                                    println!("Failed to parse LLM JSON");
+                                }
+                            } else {
+                                println!("Failed to send request to Ollama LLM");
+                            }
+                        } else {
+                            println!("Failed to write screenshot to PNG");
+                        }
+                    } else {
+                        println!("Failed to capture screen");
+                    }
+                } else {
+                    println!("No screens found");
+                }
+            } else {
+                println!("Failed to get screens");
+            }
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
+async fn query_photographic_memory(query: String) -> Result<String, String> {
+    let mut context_block = String::new();
+    if let Ok(conn) = Connection::open("oasis_crates.db") {
+        if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20") {
+            if let Ok(rows) = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))) {
+                for row in rows.flatten() {
+                    context_block.push_str(&format!("Time: {}\nDescription: {}\n\n", row.0, row.1));
+                }
+            }
+        }
+    }
+
+    if context_block.is_empty() {
+        return Ok("I have no photographic memories saved yet.".to_string());
+    }
+
+    let client = reqwest::Client::new();
+    let prompt = format!("You are an AI with a photographic memory of the user's desktop. Using the chronological desktop screenshots descriptions below, answer the user's question.\n\nMemories:\n{}\n\nQuestion: {}", context_block, query);
+    
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(response) = json["response"].as_str() {
+        Ok(response.to_string())
+    } else {
+        Err("Failed to parse LLM response for memory query".into())
+    }
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let conn = Connection::open("oasis_crates.db").expect("failed to open database");
@@ -997,7 +1105,14 @@ pub fn run() {
         [],
     ).expect("failed to create vector table");
 
-
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS photographic_memory (
+            id INTEGER PRIMARY KEY,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            description TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create photographic memory table");
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
         .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
@@ -1073,6 +1188,8 @@ pub fn run() {
             generate_commit_message,
             check_ai_status,
             start_proactive_sentience,
+            start_photographic_memory,
+            query_photographic_memory,
             sync_hardware_aura,
             capture_screenshot,
             query_vision,
