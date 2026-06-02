@@ -962,12 +962,29 @@ fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<(), St
             if let Ok(screens) = Screen::all() {
                 if let Some(screen) = screens.first() {
                     if let Ok(image) = screen.capture() {
-                        let mut buffer = Cursor::new(Vec::new());
-                        if image.write_to(&mut buffer, ImageFormat::Png).is_ok() {
-                            let b64 = general_purpose::STANDARD.encode(buffer.get_ref());
+                        // Extract raw RGBA bytes to bridge screenshots crate (image v0.24)
+                        // with our image crate (v0.25) for resize/encode
+                        let width = image.width();
+                        let height = image.height();
+                        let raw_bytes = image.into_raw();
+                        let encode_ok = image::RgbaImage::from_raw(width, height, raw_bytes)
+                            .map(image::DynamicImage::ImageRgba8)
+                            .map(|dyn_img| {
+                                // Downsample to 640x360 JPEG for fast llava inference
+                                dyn_img.resize(640, 360, image::imageops::FilterType::Triangle)
+                            })
+                            .and_then(|small| {
+                                let mut small_buffer = Cursor::new(Vec::new());
+                                small.write_to(&mut small_buffer, image::ImageFormat::Jpeg).ok()?;
+                                Some(general_purpose::STANDARD.encode(small_buffer.into_inner()))
+                            });
+                        if let Some(b64) = encode_ok {
                             
-                            // Query Vision (Blocking)
-                            let client = reqwest::blocking::Client::new();
+                            // Query Vision (Blocking) - llava can take 2-3 min on CPU
+                            let client = reqwest::blocking::Client::builder()
+                                .timeout(std::time::Duration::from_secs(300)) // 5 min timeout
+                                .build()
+                                .unwrap_or_default();
                             // Check if llava is available first
                             let tags_res = client.get("http://localhost:11434/api/tags").send();
                             let llava_ready = tags_res.ok()
