@@ -229,7 +229,7 @@ fn get_hardware_telemetry(state: tauri::State<TelemetryState>) -> Result<Hardwar
     sys.refresh_cpu_usage();
     sys.refresh_memory();
     
-    let cpu_usage = sys.global_cpu_info().cpu_usage();
+    let cpu_usage = sys.global_cpu_usage();
     let ram_usage = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
     
     Ok(HardwareTelemetry {
@@ -984,17 +984,45 @@ pub fn run() {
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
         .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
+        .setup(|app| {
+            tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Oasis Sentient OS")
+                .on_tray_icon_event(|tray, event| match event {
+                    tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } => {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show().and_then(|_| window.set_focus());
+                        }
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
-            .with_handler(|app, _shortcut, event| {
+            .with_shortcut("CommandOrControl+`").expect("failed to register terminal shortcut")
+            .with_handler(|app, shortcut, event| {
                 if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                     if let Some(window) = app.get_webview_window("main") {
-                        let _ = if window.is_visible().unwrap_or(false) {
-                            window.hide()
+                        if shortcut.matches(tauri_plugin_global_shortcut::Modifiers::CONTROL | tauri_plugin_global_shortcut::Modifiers::META | tauri_plugin_global_shortcut::Modifiers::SHIFT, tauri_plugin_global_shortcut::Code::Space) {
+                            let _ = if window.is_visible().unwrap_or(false) {
+                                window.hide()
+                            } else {
+                                window.show().and_then(|_| window.set_focus())
+                            };
                         } else {
-                            window.show().and_then(|_| window.set_focus())
-                        };
+                            // It's the terminal shortcut!
+                            let _ = window.show().and_then(|_| window.set_focus());
+                            let _ = window.emit("toggle-sentient-terminal", ());
+                        }
                     }
                 }
             })

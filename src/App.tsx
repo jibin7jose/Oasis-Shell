@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot, Search, LayoutDashboard, FolderOpen, Activity,
   Settings, Zap, BrainCircuit, Shield, Terminal,
-  Plus, Activity as PulseIcon, UploadCloud
+  Plus, Activity as PulseIcon, UploadCloud, Eye
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -118,6 +119,7 @@ export default function App() {
   const [showLogs, setShowLogs] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [autostart, setAutostart] = useState(false);
   const [simMode, setSimMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isIndexing, setIsIndexing] = useState(false);
@@ -128,8 +130,14 @@ export default function App() {
   const [ragAnswer, setRagAnswer] = useState("");
   const [isRagging, setIsRagging] = useState(false);
 
-  // Global Keybindings
+  // Global Keybindings & Init
   useEffect(() => {
+    (async () => {
+      try {
+        setAutostart(await isEnabled());
+      } catch (e) {}
+    })();
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -144,7 +152,16 @@ export default function App() {
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    
+    // Listen for global shortcut from Rust backend
+    const unlisten = listen('toggle-sentient-terminal', () => {
+      setShowTerminal(prev => !prev);
+    });
+
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      unlisten.then(f => f());
+    };
   }, []);
 
   const [founderMetrics, setFounderMetrics] = useState({
@@ -317,6 +334,25 @@ export default function App() {
       }
     }, 800);
     setSearchQuery("");
+  };
+
+  const analyzeScreen = async () => {
+    setMessages(prev => [...prev, { role: "user", content: "Analyze my screen and tell me what I am looking at." }]);
+    setIsThinking(true);
+    try {
+      const base64Image = await invoke("capture_screenshot") as string;
+      const visionResult = await invoke("query_vision", { 
+        imageBase64: base64Image, 
+        prompt: "You are the Oasis Kernel. Describe precisely what the user is working on right now based on this screenshot of their desktop. Keep it concise." 
+      }) as string;
+      
+      setMessages(prev => [...prev, { role: "system", content: visionResult }]);
+      logEvent("Omniscient Vision analysis complete", 'neural');
+    } catch(err) {
+      setMessages(prev => [...prev, { role: "system", content: "Vision capabilities offline or Ollama 'llava' model not running." }]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const handleSearchIntent = (e: React.KeyboardEvent) => {
@@ -1154,15 +1190,20 @@ export default function App() {
                   <Terminal className="w-5 h-5 text-indigo-400" />
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Oasis Sentient Terminal</span>
                 </div>
-                <button onClick={() => setShowTerminal(false)} className="text-slate-500 hover:text-white transition-colors">
-                  <Plus className="w-5 h-5 rotate-45" />
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={analyzeScreen} disabled={isThinking} className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 rounded-xl border border-indigo-500/20 disabled:opacity-40 transition-colors text-[10px] font-bold uppercase tracking-widest">
+                    <Eye className="w-3.5 h-3.5" /> Analyze Screen
+                  </button>
+                  <button onClick={() => setShowTerminal(false)} className="text-slate-500 hover:text-white transition-colors">
+                    <Plus className="w-5 h-5 rotate-45" />
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-4">
                 {messages.map((msg, i) => (
                   <div key={i} className={cn("flex flex-col max-w-4xl", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{msg.role === 'user' ? 'Operator' : 'Oasis Kernel'}</span>
-                    <div className={cn("p-4 rounded-2xl text-sm font-mono whitespace-pre-wrap", msg.role === 'user' ? "bg-indigo-600 text-white" : "bg-white/5 text-indigo-100 border border-white/5")}>
+                    <div className={cn("p-4 rounded-2xl text-sm font-mono whitespace-pre-wrap", msg.role === 'user' ? "bg-indigo-600 text-white" : "bg-white/5 text-indigo-100 border border-white/5", msg.content.includes("Analyze my screen") && "border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]")}>
                       {msg.content}
                     </div>
                   </div>
@@ -1283,6 +1324,26 @@ export default function App() {
                   </div>
                 </div>
               </div>
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">System Boot Sequence</h3>
+                <div className="p-4 glass rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-white">Initialize Oasis on Windows Startup</span>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          if (autostart) { await disable(); setAutostart(false); }
+                          else { await enable(); setAutostart(true); }
+                        } catch(e) { console.error("Autostart Error:", e); }
+                      }}
+                      className={cn("w-12 h-6 rounded-full relative transition-colors", autostart ? "bg-indigo-500" : "bg-white/10")}
+                    >
+                      <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow", autostart ? "left-7" : "left-1")} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </motion.div>
         )}
