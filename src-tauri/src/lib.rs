@@ -19,6 +19,7 @@ use sysinfo::Disks;
 
 
 struct DbState(Mutex<Connection>);
+struct TelemetryState(Mutex<sysinfo::System>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContextCrate {
@@ -45,6 +46,13 @@ pub struct WindowInfo {
     pub width: i32,
     pub height: i32,
     pub is_maximized: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HardwareTelemetry {
+    pub cpu_usage: f32,
+    pub ram_usage: f32,
+    pub disk_usage: f32,
 }
 
 #[tauri::command]
@@ -84,20 +92,28 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
             }
 
             if !exe_path.is_empty() && !exe_path.contains("oasis-shell") {
+                // Better deduplication: Allow multiple windows of same app ONLY if they have different titles
+                let is_duplicate = windows.iter().any(|w| w.exe_path == exe_path && w.title == title);
                 let mut rect = RECT::default();
                 let _ = GetWindowRect(hwnd, &mut rect);
-                let is_maximized = IsZoomed(hwnd).as_bool();
-
-                windows.push(WindowInfo {
-                    title,
-                    pid,
-                    exe_path,
-                    x: rect.left,
-                    y: rect.top,
-                    width: rect.right - rect.left,
-                    height: rect.bottom - rect.top,
-                    is_maximized,
-                });
+                
+                // Ignore tiny invisible background windows
+                let w = rect.right - rect.left;
+                let h = rect.bottom - rect.top;
+                
+                if !is_duplicate && w > 50 && h > 50 {
+                    let is_maximized = IsZoomed(hwnd).as_bool();
+                    windows.push(WindowInfo {
+                        title,
+                        pid,
+                        exe_path,
+                        x: rect.left,
+                        y: rect.top,
+                        width: w,
+                        height: h,
+                        is_maximized,
+                    });
+                }
             }
         }
     }
@@ -195,6 +211,35 @@ fn save_crate(state: tauri::State<DbState>, name: String, apps: Vec<WindowInfo>)
 }
 
 #[tauri::command]
+fn update_crate(state: tauri::State<DbState>, id: i32, name: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
+    
+    conn.execute(
+        "UPDATE context_crates SET name = ?1, apps = ?2 WHERE id = ?3",
+        params![name, apps_json, id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn get_hardware_telemetry(state: tauri::State<TelemetryState>) -> Result<HardwareTelemetry, String> {
+    let mut sys = state.0.lock().unwrap();
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    
+    let cpu_usage = sys.global_cpu_info().cpu_usage();
+    let ram_usage = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
+    
+    Ok(HardwareTelemetry {
+        cpu_usage,
+        ram_usage,
+        disk_usage: 45.0, // Placeholder
+    })
+}
+
+#[tauri::command]
 fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String> {
     let conn = state.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT id, name, apps, timestamp FROM context_crates").map_err(|e| e.to_string())?;
@@ -214,6 +259,13 @@ fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String>
     }
     
     Ok(crates)
+}
+
+#[tauri::command]
+fn delete_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -242,11 +294,47 @@ fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
     let apps_json: String = stmt.query_row(params![id], |row| row.get(0)).map_err(|e| e.to_string())?;
     let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
 
-    for app in apps {
+    for app in &apps {
         if !app.exe_path.is_empty() {
-            let _ = std::process::Command::new(app.exe_path).spawn();
+            let _ = std::process::Command::new(&app.exe_path).spawn();
         }
     }
+    
+    // Spawn background thread to restore window placement after they open
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        
+        unsafe extern "system" fn position_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let apps = &mut *(lparam.0 as *mut Vec<WindowInfo>);
+            if IsWindowVisible(hwnd).as_bool() {
+                let mut pid = 0u32;
+                GetWindowThreadProcessId(hwnd, Some(&mut pid));
+                
+                use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+                use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
+                
+                let mut exe_path = String::new();
+                if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                    let mut path_buffer = [0u16; 1024];
+                    let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
+                    if path_len > 0 { exe_path = String::from_utf16_lossy(&path_buffer[..path_len as usize]); }
+                    let _ = windows::Win32::Foundation::CloseHandle(handle);
+                }
+
+                if let Some(pos) = apps.iter().position(|a| a.exe_path == exe_path) {
+                    let app = apps.remove(pos);
+                    use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, HWND_TOP};
+                    let _ = SetWindowPos(hwnd, HWND_TOP, app.x, app.y, app.width, app.height, SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+            }
+            BOOL(1)
+        }
+
+        let mut apps_clone = apps.clone();
+        unsafe {
+            let _ = EnumWindows(Some(position_callback), LPARAM(&mut apps_clone as *mut Vec<WindowInfo> as isize));
+        }
+    });
     
     Ok(())
 }
@@ -895,6 +983,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(DbState(Mutex::new(conn)))
+        .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
@@ -915,7 +1004,10 @@ pub fn run() {
             get_running_windows, 
             sync_project, 
             save_crate, 
+            update_crate,
             get_crates,
+            get_hardware_telemetry,
+            delete_crate,
             start_watcher,
             launch_crate,
             log_event,
