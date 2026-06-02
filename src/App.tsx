@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot, Search, LayoutDashboard, FolderOpen, Activity,
   Settings, Zap, BrainCircuit, Shield, Terminal,
-  Plus, Activity as PulseIcon, UploadCloud, Eye
+  Plus, Activity as PulseIcon, UploadCloud, Eye, Mic, MicOff, Clock, Image as ImageIcon
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 
@@ -119,6 +119,7 @@ export default function App() {
   const [showLogs, setShowLogs] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTimeMachine, setShowTimeMachine] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [simMode, setSimMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -129,6 +130,20 @@ export default function App() {
   const [ragQuery, setRagQuery] = useState("");
   const [ragAnswer, setRagAnswer] = useState("");
   const [isRagging, setIsRagging] = useState(false);
+
+  // Voice Engine State
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+
+  // Memory State
+  const [photographicMemories, setPhotographicMemories] = useState<any[]>([]);
+
+  const loadMemories = async () => {
+    try {
+      const mems = await invoke("get_all_photographic_memories") as any[];
+      setPhotographicMemories(mems);
+    } catch(e) { console.error(e); }
+  };
 
   // Global Keybindings & Init
   useEffect(() => {
@@ -246,7 +261,7 @@ export default function App() {
         invoke('trigger_deploy', { env: 'Global' }).catch(() => { });
         logEvent("Deployment Sequence Alpha Initiated", "deploy");
       } 
-      else if (q.includes("git") || q.includes("commit") || q.includes("push") || q.includes("review code")) {
+      else if (q.includes("git") || q.includes("commit") || q.includes("push") || q.includes("review code") || (q.includes("review") && q.includes("push")) || q.includes("review and push") || q.includes("code and push")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status..." }]);
         logEvent("Git Automation Triggered", "deploy");
         (async () => {
@@ -404,6 +419,56 @@ export default function App() {
     if (e.key === "Enter" && searchQuery.trim()) {
       resolveNeuralIntent(searchQuery);
     }
+  };
+
+  const startVoiceCapture = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setMessages(prev => [...prev, { role: "assistant", content: "Voice Engine: Speech Recognition not supported in this browser context." }]);
+      return;
+    }
+    if (isListening) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    setIsListening(true);
+    setVoiceTranscript("");
+    logEvent("Voice Command Engine Activated", "neural");
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      let final = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      setVoiceTranscript(interim || final);
+      if (final.trim()) {
+        setIsListening(false);
+        setVoiceTranscript("");
+        resolveNeuralIntent(final.trim());
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      setIsListening(false);
+      setVoiceTranscript("");
+      setMessages(prev => [...prev, { role: "assistant", content: `Voice Engine Error: ${event.error}` }]);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setVoiceTranscript("");
+    };
+
+    recognition.start();
   };
 
   const handleNeuralSend = () => {
@@ -757,6 +822,7 @@ export default function App() {
             { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
             { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
             { id: 'vault', icon: FolderOpen, label: 'Vault' },
+            { id: 'time', icon: Clock, label: 'Timeline' },
             { id: 'logs', icon: Activity, label: 'History' },
             { id: 'sim', icon: Zap, label: 'Simulation' }
           ].map((item) => (
@@ -767,6 +833,10 @@ export default function App() {
                 else if (item.id === 'vault') setShowVault(true);
                 else if (item.id === 'logs') setShowLogs(true);
                 else if (item.id === 'sim') setSimMode(true);
+                else if (item.id === 'time') {
+                  loadMemories();
+                  setShowTimeMachine(true);
+                }
                 else { handleContextSwitch('dev'); }
               }}
               className={cn(
@@ -844,12 +914,29 @@ export default function App() {
             <div className="flex items-center gap-5 px-4 py-2">
               <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
               <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={isListening ? voiceTranscript : searchQuery}
+                onChange={(e) => !isListening && setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchIntent}
-                placeholder="Detecting Neural Intent..."
-                className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
+                placeholder={isListening ? "🎙 Listening for your command..." : "Detecting Neural Intent..."}
+                className={cn("bg-transparent border-none outline-none text-2xl w-full font-light transition-colors", isListening ? "text-red-300 placeholder:text-red-900" : "text-white placeholder:text-slate-700")}
+                readOnly={isListening}
               />
+              {/* Voice Engine Mic Button */}
+              <button
+                onClick={startVoiceCapture}
+                title="Activate Voice Command"
+                className={cn(
+                  "relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 flex-shrink-0",
+                  isListening
+                    ? "bg-red-500/20 border border-red-500/60 text-red-400"
+                    : "bg-white/5 border border-white/10 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/40 hover:bg-indigo-500/10"
+                )}
+              >
+                {isListening && (
+                  <span className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
+                )}
+                {isListening ? <Mic className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
+              </button>
               <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
             </div>
           </motion.div>
@@ -1565,6 +1652,65 @@ export default function App() {
           >
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             <span className="text-xs font-bold text-white uppercase tracking-widest">Ingesting Knowledge into Vector DB...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Memory Time-Machine Modal */}
+      <AnimatePresence>
+        {showTimeMachine && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/60 backdrop-blur-md"
+          >
+            <div className="w-full max-w-5xl h-[85vh] glass-bright rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl relative">
+              <div className="absolute inset-0 pointer-events-none opacity-[0.03] grayscale mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+              
+              <div className="p-8 border-b border-white/5 flex items-center justify-between z-10">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-purple-500/20 rounded-2xl text-purple-400">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Photographic Memory Timeline</h2>
+                    <p className="text-slate-400 text-sm mt-1">Autonomous cognitive snapshots of your digital context</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowTimeMachine(false)} className="text-slate-400 hover:text-white px-4 py-2 uppercase tracking-widest text-xs font-bold transition-colors">Close [ESC]</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar z-10">
+                {photographicMemories.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                    <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
+                    <p>No visual memories recorded yet.</p>
+                    <p className="text-xs mt-2 opacity-50">Agent captures desktop context periodically.</p>
+                  </div>
+                ) : (
+                  <div className="relative border-l border-white/10 ml-6 pl-8 flex flex-col gap-12">
+                    {photographicMemories.map((mem) => (
+                      <div key={mem.id} className="relative group">
+                        {/* Timeline Node */}
+                        <div className="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-[#020617] border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] group-hover:scale-125 transition-transform" />
+                        
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-purple-400 font-bold tracking-widest text-xs">{mem.timestamp}</span>
+                          <span className="text-slate-600 text-xs uppercase tracking-widest px-2 py-0.5 rounded border border-white/5 bg-white/5">Auto-Snapshot</span>
+                        </div>
+                        
+                        <div className="glass p-6 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-colors">
+                          <p className="text-slate-300 leading-relaxed font-light text-sm whitespace-pre-wrap">
+                            {mem.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
