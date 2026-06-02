@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot, Search, LayoutDashboard, FolderOpen, Activity,
@@ -152,6 +153,15 @@ export default function App() {
         setAutostart(await isEnabled());
       } catch (e) {}
       try {
+        let permissionGranted = await isPermissionGranted();
+        if (!permissionGranted) {
+          const permission = await requestPermission();
+          permissionGranted = permission === 'granted';
+        }
+      } catch (e) {
+        console.error("Failed to setup notifications:", e);
+      }
+      try {
         await invoke("start_photographic_memory");
       } catch (e) {
         console.error("Failed to start memory agent:", e);
@@ -227,7 +237,13 @@ export default function App() {
   });
 
   // --- LOGIC: MEMORY & INTENT ---
-  const logEvent = (event: string, type: TimelineType) => {
+  const notifyUser = (title: string, body: string) => {
+    isPermissionGranted().then(granted => {
+      if (granted) sendNotification({ title, body });
+    });
+  };
+
+  const logEvent = (event: string, type: TimelineType, notify = false) => {
     setTimeline(prev => [{
       id: Date.now(),
       type,
@@ -235,6 +251,9 @@ export default function App() {
       time: new Date().toLocaleTimeString()
     }, ...prev].slice(0, 50));
     invoke("log_event", { eventType: type, message: event }).catch(() => { });
+    if (notify) {
+      notifyUser("Oasis OS Kernel", event);
+    }
   };
 
   const resolveNeuralIntent = (query: string) => {
@@ -259,7 +278,7 @@ export default function App() {
       else if (q.includes("deploy") || (q.includes("launch") && !q.includes("workspace") && !q.includes("crate"))) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster..." }]);
         invoke('trigger_deploy', { env: 'Global' }).catch(() => { });
-        logEvent("Deployment Sequence Alpha Initiated", "deploy");
+        logEvent("Deployment Sequence Alpha Initiated", "deploy", true);
       } 
       else if (q.includes("git") || q.includes("commit") || q.includes("push") || q.includes("review code") || (q.includes("review") && q.includes("push")) || q.includes("review and push") || q.includes("code and push")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status..." }]);
@@ -283,7 +302,7 @@ export default function App() {
                setMessages(prev => [...prev, { role: "assistant", content: "Pushing to remote origin..." }]);
                await invoke("execute_neural_command", { command: `git add . ; git commit -m "${commitMessage.trim().replace(/"/g, '')}" ; git push` });
                setMessages(prev => [...prev, { role: "assistant", content: "Codebase securely pushed to GitHub." }]);
-               logEvent("Autonomous Git Push Complete", "system");
+               logEvent("Autonomous Git Push Complete", "system", true);
             }
           } catch(e) {
             setMessages(prev => [...prev, { role: "assistant", content: `Git execution failed: ${e}` }]);
@@ -297,7 +316,7 @@ export default function App() {
           { id: Date.now().toString(), title, type: 'manifested', content: `Autonomous architect manifested this module. Ready for ${title} integration.` }
         ]);
         setMessages(prev => [...prev, { role: "assistant", content: `Architect: Manifesting '${title}' strategic module...` }]);
-        logEvent(`Autonomous Module '${title}' Scaffolding Complete`, "system");
+        logEvent(`Autonomous Module '${title}' Scaffolding Complete`, "system", true);
       } else if (q.includes("sim") || q.includes("sandbox") || q.includes("project")) {
         setSimMode(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating Strategic Venture Sandbox..." }]);
@@ -711,16 +730,17 @@ export default function App() {
             const cmdMatch = llmResponse.match(/\[CMD\](.*?)\[\/CMD\]/is);
             if (cmdMatch && cmdMatch[1]) {
                const cmd = cmdMatch[1].trim();
-               logEvent(`Cron Agent '${agent.title}' executing: ${cmd}`, 'deploy');
+               logEvent(`Cron Agent '${agent.title}' executing: ${cmd}`, 'deploy', true);
                const execResult = await invoke("execute_neural_command", { command: cmd }) as string;
                if (!execResult.includes("no output")) {
                  setProactiveAlert({ suggestion: `Agent Output: ${execResult.substring(0, 100)}`, action: cmd });
+                 notifyUser(`Agent Alert: ${agent.title}`, execResult.substring(0, 100));
                }
             } else {
                logEvent(`Cron Agent '${agent.title}' Report: ${llmResponse.substring(0, 100)}...`, 'system');
             }
           } catch(e) {
-            logEvent(`Cron Agent '${agent.title}' failed execution.`, 'system');
+            logEvent(`Cron Agent '${agent.title}' failed execution.`, 'system', true);
           }
         }, agent.interval);
         intervals.push(intervalId);
