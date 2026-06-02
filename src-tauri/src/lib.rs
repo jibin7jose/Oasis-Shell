@@ -970,12 +970,14 @@ fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<(), St
                         let encode_ok = image::RgbaImage::from_raw(width, height, raw_bytes)
                             .map(image::DynamicImage::ImageRgba8)
                             .map(|dyn_img| {
-                                // Downsample to 640x360 JPEG for fast llava inference
-                                dyn_img.resize(640, 360, image::imageops::FilterType::Triangle)
+                                // Downsample to 1280x720 JPEG for accurate llava inference
+                                dyn_img.resize(1280, 720, image::imageops::FilterType::Lanczos3)
                             })
                             .and_then(|small| {
                                 let mut small_buffer = Cursor::new(Vec::new());
-                                small.write_to(&mut small_buffer, image::ImageFormat::Jpeg).ok()?;
+                                // Quality 85 for better text readability
+                                let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut small_buffer, 85);
+                                small.write_with_encoder(encoder).ok()?;
                                 Some(general_purpose::STANDARD.encode(small_buffer.into_inner()))
                             });
                         if let Some(b64) = encode_ok {
@@ -1001,7 +1003,7 @@ fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<(), St
 
                             let body = serde_json::json!({
                                 "model": "llava",
-                                "prompt": "Describe precisely what is visible on this desktop screen. Include visible text, open applications, and context.",
+                                "prompt": "You are an AI assistant analyzing a REAL screenshot of a developer's desktop. Describe ONLY what you actually see - do not hallucinate or guess. State: 1) What applications/windows are open, 2) What file or project is visible, 3) What text or code is readable. Be precise and factual.",
                                 "images": [b64],
                                 "stream": false
                             });
