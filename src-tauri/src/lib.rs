@@ -274,7 +274,7 @@ async fn generate_crate_name(apps: Vec<WindowInfo>) -> Result<String, String> {
     let app_titles: Vec<String> = apps.iter().map(|a| a.title.clone()).collect();
     let prompt = format!("I am saving a 'Desktop Context Crate' on my AI OS. Here are the open window titles: {}.\n\nSuggest a single, punchy, 3-4 word title for this workspace context (e.g. 'Figma UI & React Dev', 'Market Research Pulse'). Return ONLY the title string.", app_titles.join(", "));
     
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
     let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
@@ -525,14 +525,14 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
     };
 
     // 4. Generate Semantic Response via Gemma3
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": final_prompt, "stream": false });
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": final_prompt, "stream": false });
     let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(response) = json["response"].as_str() {
         Ok(response.to_string())
     } else {
-        Err("Failed to parse local AI inference response".into())
+        Err(format!("Failed to parse local AI inference response. Ollama API returned: {}", json.to_string()))
     }
 }
 
@@ -543,7 +543,7 @@ async fn check_ai_status() -> Result<serde_json::Value, String> {
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     let models = json["models"].as_array().ok_or("Invalid Ollama response")?;
-    let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma3:4b"));
+    let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma4:latest"));
     let has_embed = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("nomic-embed-text"));
     let has_vision = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("llava"));
     
