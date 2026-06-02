@@ -136,6 +136,9 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
 
+  // In-App Notification State
+  const [toast, setToast] = useState<{title: string, body: string, id: number} | null>(null);
+
   // Memory State
   const [photographicMemories, setPhotographicMemories] = useState<any[]>([]);
 
@@ -238,6 +241,11 @@ export default function App() {
 
   // --- LOGIC: MEMORY & INTENT ---
   const notifyUser = (title: string, body: string) => {
+    // Show beautiful in-app toast
+    setToast({ title, body, id: Date.now() });
+    setTimeout(() => setToast(null), 5000);
+    
+    // Attempt native OS notification
     isPermissionGranted().then(granted => {
       if (granted) sendNotification({ title, body });
     });
@@ -286,8 +294,9 @@ export default function App() {
         (async () => {
           try {
             const gitStatus = await invoke("execute_neural_command", { command: "git status -s" }) as string;
-            if (!gitStatus.trim()) {
+            if (!gitStatus.trim() || gitStatus.includes("no output")) {
               setMessages(prev => [...prev, { role: "assistant", content: "Git status is clean. No code to review." }]);
+              notifyUser("Git Sentinel", "Workspace is already clean.");
               return;
             }
             setMessages(prev => [...prev, { role: "assistant", content: `Uncommitted Changes Detected:\n${gitStatus}\n\nGenerating autonomous commit message...` }]);
@@ -1731,6 +1740,29 @@ export default function App() {
                 )}
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* In-App Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, x: 100, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.9 }}
+            className="fixed bottom-8 right-8 z-[100] glass-bright p-5 rounded-2xl border border-indigo-500/30 shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-start gap-4 max-w-sm"
+          >
+            <div className="p-2 bg-indigo-500/20 rounded-xl text-indigo-400">
+              <Activity className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-white font-bold tracking-wide text-sm">{toast.title}</h4>
+              <p className="text-slate-400 text-xs mt-1 leading-relaxed">{toast.body}</p>
+            </div>
+            <button onClick={() => setToast(null)} className="absolute top-2 right-2 text-slate-500 hover:text-white">
+               ✕
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
