@@ -572,6 +572,23 @@ fn execute_neural_command(command: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn generate_commit_message(diff: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let prompt = format!("You are a Senior Engineer. Summarize this git diff into a concise, professional 1-line git commit message starting with feat: or fix:. DO NOT include quotes, markdown formatting, or any extra conversational text. Return ONLY the commit string. Diff: {}", diff.chars().take(2000).collect::<String>());
+    
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(response) = json["response"].as_str() {
+        Ok(response.to_string())
+    } else {
+        Err("Failed to parse LLM response for git commit".into())
+    }
+}
+
+
 
 #[tauri::command]
 async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
@@ -1053,6 +1070,7 @@ pub fn run() {
             start_telemetry_server,
             generate_crate_name,
             execute_neural_command,
+            generate_commit_message,
             check_ai_status,
             start_proactive_sentience,
             sync_hardware_aura,
