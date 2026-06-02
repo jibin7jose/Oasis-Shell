@@ -3,18 +3,19 @@ use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWin
 use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
 use rusqlite::{params, Connection};
 use std::sync::Mutex;
-use notify::{Watcher, RecursiveMode, Config, RecommendedWatcher, EventHandler, Event};
-use std::path::Path;
+use notify::Watcher;
 use std::time::Duration;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri::Emitter;
 use tauri::Manager;
-use tiny_http::{Server, Response};
+use tiny_http::Response;
 use sysinfo::System;
 use screenshots::Screen;
 use base64::{Engine as _, engine::general_purpose};
+use chrono::Timelike;
 use std::io::Cursor;
-use image::ImageFormat;
+use std::process::Command;
+use screenshots::image::ImageFormat;
+use sysinfo::Disks;
 
 
 struct DbState(Mutex<Connection>);
@@ -597,14 +598,49 @@ fn get_logic_path(aura: String) -> String {
 }
 
 #[tauri::command]
+fn get_venture_metrics() -> serde_json::Value {
+    serde_json::json!({
+        "arr": "$1.24M",
+        "burn": "$42.5K/mo",
+        "runway": "18.4 Mo.",
+        "momentum": "+12.8%"
+    })
+}
+
+#[tauri::command]
+fn get_market_intelligence() -> serde_json::Value {
+    serde_json::json!([
+        { "symbol": "OASIS_INDEX", "price": "$1,421.40", "change": "+2.4%" },
+        { "symbol": "SAP_COMP", "price": "$42.50", "change": "-1.1%" },
+        { "symbol": "GLOBAL_AI", "price": "8,942.00", "change": "+0.8%" }
+    ])
+}
+
+#[tauri::command]
+fn get_vault_nodes() -> serde_json::Value {
+    serde_json::json!([
+        { "name": "Oasis_Whitepaper.pdf", "category": "Strategic", "size": "1.2MB" },
+        { "name": "Foundry_Kernel.rs", "category": "Technical", "size": "45KB" },
+        { "name": "Executive_Brand_Guide.fig", "category": "Creative", "size": "8.4MB" }
+    ])
+}
+
+#[tauri::command]
+fn trigger_deploy(env: String) -> Result<String, String> {
+    Ok(format!("Deployment sentinel acknowledged for {env}."))
+}
+
+#[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(5)); 
 
         let mut sys = System::new(); 
+        let mut disks = Disks::new_with_refreshed_list();
         loop {
             sys.refresh_memory();
             sys.refresh_all();
+            disks.refresh(true);
             
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
@@ -619,7 +655,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            for disk in sys.disks() {
+            for disk in disks.list() {
                 if disk.mount_point().to_string_lossy().contains("C:") {
                     let free = disk.available_space();
                     if free < 2 * 1024 * 1024 * 1024 {

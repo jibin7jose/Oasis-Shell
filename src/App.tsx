@@ -18,6 +18,34 @@ const contexts = [
   { id: 'growth', name: 'Capital Matrix', icon: PulseIcon, aura: 'rgba(16, 185, 129, 0.4)' }
 ];
 
+type TimelineType = 'neural' | 'deploy' | 'system';
+
+type TimelineEvent = {
+  id: number;
+  type: TimelineType;
+  event: string;
+  time: string;
+};
+
+type VaultNode = {
+  name: string;
+  category: string;
+  size: string;
+};
+
+type WindowInfo = {
+  title: string;
+  pid: number;
+  exe_path: string;
+};
+
+type NeuralLog = {
+  id?: number;
+  event_type: string;
+  message: string;
+  timestamp: string;
+};
+
 export default function App() {
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
@@ -48,10 +76,21 @@ export default function App() {
     { symbol: "GLOBAL_AI", price: "8,942.00", change: "+0.8%" }
   ]);
 
-  const [timeline, setTimeline] = useState([
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([
     { id: 1, type: 'system', event: 'Oasis Foundry Kernel Initialized', time: '09:42:00' },
     { id: 2, type: 'neural', event: 'Venture Metrics Synced with Rust Kernel', time: '09:42:15' }
   ]);
+
+  const [vaultNodes, setVaultNodes] = useState<VaultNode[]>([
+    { name: 'Oasis_Whitepaper.pdf', category: 'Strategic', size: '1.2MB' },
+    { name: 'Foundry_Kernel.rs', category: 'Technical', size: '45KB' },
+    { name: 'Executive_Brand_Guide.fig', category: 'Creative', size: '8.4MB' },
+    { name: 'Q3_Revenue_Projection.xlsx', category: 'Strategic', size: '220KB' },
+    { name: 'Neural_Engine_Docs.md', category: 'Technical', size: '12KB' }
+  ]);
+
+  const [activeWindows, setActiveWindows] = useState<WindowInfo[]>([]);
+  const [bridgeStatus, setBridgeStatus] = useState("Booting");
 
   const [dynamicModules, setDynamicModules] = useState([
     { id: 'core-insights', title: 'Strategic Insights', type: 'core', content: 'Burn rate optimized at $42.5K. Recommend accelerating Series A outreach.' }
@@ -62,13 +101,14 @@ export default function App() {
   });
 
   // --- LOGIC: MEMORY & INTENT ---
-  const logEvent = (event: string, type: 'neural' | 'deploy' | 'system') => {
+  const logEvent = (event: string, type: TimelineType) => {
     setTimeline(prev => [{ 
       id: Date.now(), 
       type, 
       event, 
       time: new Date().toLocaleTimeString() 
     }, ...prev].slice(0, 50));
+    invoke("log_event", { eventType: type, message: event }).catch(() => {});
   };
 
   const resolveNeuralIntent = (query: string) => {
@@ -140,9 +180,23 @@ export default function App() {
       try {
         const metrics = await invoke("get_venture_metrics") as any;
         const intel = await invoke("get_market_intelligence") as any;
+        const vault = await invoke("get_vault_nodes") as VaultNode[];
+        const windows = await invoke("get_running_windows") as WindowInfo[];
+        const logs = await invoke("get_logs") as NeuralLog[];
         if (!simMode) setFounderMetrics(metrics);
         setMarketIntel(intel);
+        setVaultNodes(vault);
+        setActiveWindows(windows);
+        if (logs.length > 0) {
+          setTimeline(logs.map((entry) => ({
+            id: entry.id || Date.parse(entry.timestamp) || Date.now(),
+            type: ['neural', 'deploy', 'system'].includes(entry.event_type) ? entry.event_type as TimelineType : 'system',
+            event: entry.message,
+            time: new Date(entry.timestamp).toLocaleTimeString()
+          })).slice(0, 50));
+        }
         setLastSync(new Date().toLocaleTimeString());
+        setBridgeStatus("Native");
       } catch (e) {
         if (!simMode) {
           setFounderMetrics({
@@ -150,6 +204,7 @@ export default function App() {
           });
         }
         setLastSync(new Date().toLocaleTimeString() + " (Simulated)");
+        setBridgeStatus("Simulated");
       }
     };
     syncFoundryData();
@@ -408,8 +463,8 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                    {[
-                     { name: 'Edge Cluster', status: 'Deployed', prog: 100, color: 'emerald' },
-                     { name: 'Core Stable', status: 'Active', prog: 100, color: 'indigo' },
+                     { name: 'Native Bridge', status: bridgeStatus, prog: bridgeStatus === 'Native' ? 100 : 45, color: bridgeStatus === 'Native' ? 'emerald' : 'purple' },
+                     { name: 'Window Scanner', status: `${activeWindows.length} Active`, prog: Math.min(100, activeWindows.length * 12), color: 'indigo' },
                      { name: 'Architecture', status: 'Manifesting', prog: 65, color: 'purple' }
                    ].map((env) => (
                      <div key={env.name} className="space-y-3">
@@ -477,22 +532,16 @@ export default function App() {
                 <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
              </div>
              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
-                {[
-                  { name: 'Oasis_Whitepaper.pdf', cat: 'Strategic', size: '1.2MB' },
-                  { name: 'Foundry_Kernel.rs', cat: 'Technical', size: '45KB' },
-                  { name: 'Executive_Brand_Guide.fig', cat: 'Creative', size: '8.4MB' },
-                  { name: 'Q3_Revenue_Projection.xlsx', cat: 'Strategic', size: '220KB' },
-                  { name: 'Neural_Engine_Docs.md', cat: 'Technical', size: '12KB' }
-                ].map((node) => (
+                {vaultNodes.map((node) => (
                   <div key={node.name} className="glass-bright p-8 rounded-[2rem] border border-white/5 hover:border-indigo-500/30 transition-all group flex flex-col justify-between aspect-square">
                      <div className="flex justify-between items-start">
-                        <div className={cn("p-4 rounded-xl", node.cat === 'Strategic' ? "bg-amber-500/10 text-amber-500" : node.cat === 'Technical' ? "bg-indigo-500/10 text-indigo-500" : "bg-purple-500/10 text-purple-500")}>
+                        <div className={cn("p-4 rounded-xl", node.category === 'Strategic' ? "bg-amber-500/10 text-amber-500" : node.category === 'Technical' ? "bg-indigo-500/10 text-indigo-500" : "bg-purple-500/10 text-purple-500")}>
                            <Shield className="w-6 h-6" />
                         </div>
                         <span className="text-[10px] font-bold text-slate-500 uppercase">{node.size}</span>
                      </div>
                      <div>
-                        <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest block mb-2">{node.cat}</span>
+                        <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest block mb-2">{node.category}</span>
                         <h4 className="text-lg font-bold text-white truncate">{node.name}</h4>
                      </div>
                   </div>

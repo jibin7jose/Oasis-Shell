@@ -7,6 +7,7 @@
     "dev": "tauri dev",
     "frontend": "vite --port 1420",
     "build": "tauri build",
+    "build:web": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "sync": "powershell -ExecutionPolicy Bypass -File ./scripts/sync.ps1"
