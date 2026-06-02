@@ -1,6 +1,6 @@
 [package]
 name = "oasis-shell"
-version = "1.0.0"
+version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
@@ -26,22 +26,12 @@ serde_json = "1"
 sysinfo = "0.33.0"
 windows = { version = "0.58.0", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_ProcessStatus"] }
 rusqlite = { version = "0.33.0", features = ["bundled"] }
-r2d2 = "0.8"
-r2d2_sqlite = "0.26"
 chrono = { version = "0.4.39", features = ["serde"] }
 notify = "8.0.0"
-reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 walkdir = "2.5.0"
 tiny_http = "0.12.0"
 screenshots = "0.8.10"
 base64 = "0.22.1"
 image = "0.25.5"
-aes-gcm = "0.10.3"
-aead = "0.5.2"
-pbkdf2 = { version = "0.12.2", features = ["simple"] }
-hmac = "0.12.1"
-sha2 = "0.10.6"
-tokio = { version = "1", features = ["full"] }
-dotenvy = "0.15"
-uuid = { version = "1", features = ["v4"] }
-local-ip-address = "0.6"
+tauri-plugin-autostart = "2.5.1"

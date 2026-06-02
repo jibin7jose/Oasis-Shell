@@ -1,1446 +1,32 @@
 use serde::{Serialize, Deserialize};
-use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_SHOWWINDOW};
-use windows::Win32::Foundation::HWND;
-use rusqlite::params;
-use r2d2_sqlite::SqliteConnectionManager;
-use r2d2::Pool;
+use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextW, IsWindowVisible, GetWindowThreadProcessId, GetWindowRect, IsZoomed};
+use windows::Win32::Foundation::{RECT, HWND, LPARAM, BOOL};
+use rusqlite::{params, Connection};
 use std::sync::Mutex;
 use notify::Watcher;
 use std::time::Duration;
 use tauri::Emitter;
 use tauri::Manager;
-use sysinfo::Disks;
-use base64::Engine as _;
-use aes_gcm::{Aes256Gcm, Nonce, Key, aead::{Aead, KeyInit}};
-use pbkdf2::pbkdf2_hmac;
-use sha2::Sha256;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use tiny_http::Response;
+use sysinfo::System;
+use screenshots::Screen;
+use base64::{Engine as _, engine::general_purpose};
 use chrono::Timelike;
-use std::fs;
-pub mod vault;
-pub mod macros;
-pub mod golems;
-pub mod system;
-pub mod ai;
-pub mod mirror;
-pub mod chronos;
-pub mod ledger;
-pub mod oracle;
-pub mod search;
-pub mod vision;
-pub mod state;
-pub mod access;
-pub mod strategy;
-pub mod graph;
-pub mod health;
-pub mod reports;
-pub use chronos::{
-    capture_chronos_snapshot_with_pool,
-    chronos_snapshot_from_row,
-    seek_chronos_history_with_pool,
-};
-pub use ledger::{
-    get_pinned_contexts_with_pool,
-    index_strategic_asset_with_pool,
-    persist_oracle_alert_with_pool,
-    persist_risk_scenario_with_pool,
-    pin_context_with_pool,
-};
-pub use oracle::{
-    get_system_resilience_audit_with_pool,
-    trigger_oracle_audit_with_pool,
-};
-pub use search::{
-    delete_pinned_context_with_pool,
-    get_neural_logs_with_pool,
-    seek_chronos_with_pool,
-    get_audit_logs,
-};
-pub use state::{
-    create_chronos_snapshot_to_path,
-    get_chronos_ledger_from_path,
-    load_venture_state_from_path,
-    save_venture_state_to_path,
-};
-pub use access::{
-    biometric_session_is_valid_at,
-    build_collective_node,
-    broadcast_distributed_aura,
-    check_biometric_status,
-    get_collective_nodes,
-    is_biometric_session_valid,
-    register_remote_node,
-    trigger_biometric_scan,
-};
-pub use vision::{
-    create_restore_point,
-    invoke_multimodal_oracle,
-    trigger_hardware_symbiosis,
-};
-pub use strategy::{
-    market_bias_label,
-    neural_wisdom_for_color,
-    neural_workforce_for_market_index,
-    pending_manifests_for_color,
-};
-pub use graph::{
-    build_neural_graph_with_pool,
-    get_all_files_from_pool,
-    get_neural_brief_from_pool,
-};
-pub use health::{
-    fiscal_report_from_pool,
-    logic_path_for_aura,
-    log_compute_to_pool,
-    predictive_intents_for_conditions,
-    venture_integrity_from_pool,
-};
-pub use reports::{
-    generate_strategic_report_to_dir,
-    generate_venture_audit_to_dir,
-    relocate_foundry_storage_to_dir,
-};
-pub use mirror::{receive_neural_mirror, receive_neural_mirror_with_pool};
-use access::COLLECTIVE_REGISTRY;
-use vault::{
-    vault_delete_secret_with_pool,
-    vault_delete_all_secrets_with_pool,
-    vault_export_secrets_backup_with_pool,
-    vault_get_secret_with_session_key_with_pool,
-    vault_list_secret_metadata_with_pool,
-    vault_restore_secrets_backup_with_pool,
-    vault_store_secret_with_session_key_with_pool,
-};
-use golems::{GolemTask, GOLEM_REGISTRY};
-use system::WindowInfo;
+use std::io::Cursor;
+use std::process::Command;
+use screenshots::image::ImageFormat;
+use sysinfo::Disks;
 
 
-static FOUNDER_KEY_STATE: Mutex<Option<[u8; 32]>> = Mutex::new(None);
-static FOUNDER_KEY_DPAPI_BLOB: Mutex<Option<Vec<u8>>> = Mutex::new(None);
-static LAST_AUTH_TIME: Mutex<Option<chrono::DateTime<chrono::Local>>> = Mutex::new(None);
-static SECRET_MUTATION_COOLDOWNS: std::sync::LazyLock<Mutex<HashMap<String, chrono::DateTime<chrono::Local>>>> =
-    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
-static ALLOWED_SECRET_NAMES: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    HashSet::from([
-        "OPENAI_API_KEY",
-        "DEEPSEEK_API_KEY",
-        "OASIS_MASTER_KEY",
-        "OASIS_FOUNDER_SECRET",
-    ])
-});
+struct DbState(Mutex<Connection>);
+struct TelemetryState(Mutex<sysinfo::System>);
 
-pub fn is_vault_session_valid() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        let state = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-        if state.is_none() {
-            return false;
-        }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let state = FOUNDER_KEY_STATE.lock().unwrap();
-        if state.is_none() {
-            return false;
-        }
-    }
-    
-    let last_auth = LAST_AUTH_TIME.lock().unwrap();
-    if let Some(time) = *last_auth {
-        let now = chrono::Local::now();
-        let diff = now.signed_duration_since(time);
-        if diff.num_minutes() < 10 {
-            return true;
-        }
-    }
-    false
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PinnedContext {
-    pub id: i64,
-    pub name: String,
-    pub state_blob: String,
-    pub aura_color: String,
-    pub timestamp: String,
-}
-
-
-#[derive(Clone, Debug)]
-pub struct OasisConfig {
-    pub ollama_url: String,
-    pub broadcast_port: u16,
-    pub neural_engine_endpoint: String,
-}
-
-impl OasisConfig {
-    pub fn load() -> Self {
-        let _ = dotenvy::dotenv(); // Load .env if present
-        Self {
-            ollama_url: std::env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into()),
-            broadcast_port: std::env::var("BROADCAST_PORT")
-                .ok()
-                .and_then(|p| p.parse().ok())
-                .unwrap_or(4040),
-            neural_engine_endpoint: std::env::var("NEURAL_ENGINE_ENDPOINT").unwrap_or_else(|_| "http://localhost:11434".into()),
-        }
-    }
-}
-
-pub struct AppState {
-    pub pool: Pool<SqliteConnectionManager>,
-    pub config: OasisConfig,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContextCrate {
     pub id: Option<i32>,
     pub name: String,
-    pub description: String,
-    pub aura_color: String,
-    pub apps: String,
     pub timestamp: String,
-    pub integrity: i32,
-    pub arr: f32,
-    pub burn: f32,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ShellAction {
-    pub r#type: String,
-    pub payload: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EconomicSignal {
-    pub trend: String,
-    pub impact: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HardwareStatus {
-    pub focus_mode: String,
-    pub aura_intensity: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VentureMetrics {
-    pub arr: String,
-    pub burn: String,
-    pub runway: String,
-    pub momentum: String,
-    pub stress_color: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VentureStress {
-    pub index: f32,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PendingManifest {
-    pub id: String,
-    pub title: String,
-    pub rationale: String,
-    pub code_draft: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VentureEntity {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    pub peak_arr: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AssetMetadata {
-    pub file_path: String,
-    pub debt: f32,
-    pub authorizer: String,
-    pub risk: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CLIDirective {
-    pub cmd: String,
-    pub args: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CLIResponse {
-    pub output: String,
-    pub aura_color: String,
-}
-
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SynthesisReport {
-    pub id: String,
-    pub venture_name: String,
-    pub strategic_narrative: String,
-    pub confidence_score: f32,
-    pub market_context: String,
-    pub actionable_outreach: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StorageReport {
-    pub current_path: String,
-    pub target_path: String,
-    pub transferred_bytes: u64,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BoardroomInsight {
-    pub persona: String,
-    pub advice: String,
-    pub risk: f32,
-    pub score: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DebateManifest {
-    pub task_id: String,
-    pub insights: Vec<BoardroomInsight>,
-    pub consensus_aura: String,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OasConfig {
-    pub aura_ip: String,
-    pub focus_active: bool,
-    pub strategic_threshold: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FiscalReport {
-    pub total_burn: f32,
-    pub token_load: i64,
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VentureSnapshot {
-    pub id: String,
-    pub name: String,
-    pub timestamp: String,
-    pub metrics: VentureMetrics,
-    pub market: MarketIntelligence,
-    pub dominance_index: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AegisLedger {
-    pub ventures: std::collections::HashMap<String, VentureSnapshot>,
-    pub global_integrity: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Scenarios {
-    pub pessimistic: Vec<f32>,
-    pub baseline: Vec<f32>,
-    pub optimistic: Vec<f32>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OracleForecast {
-    pub recommendation: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SpectralAnomaly {
-    pub id: String,
-    pub source: String, // "Kernel", "Network", "FileSystem"
-    pub description: String,
-    pub risk_level: f32, // 0.0 to 1.0 (Entropy Score)
-    pub timestamp: String,
-    pub associated_pid: Option<u32>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ForgeManifest {
-    pub id: String,
-    pub target_id: String, // Anomaly ID or Project ID
-    pub rationale: String,
-    pub code_diff: String,
-    pub confidence: f32,
-    pub aura: String, // emerald (fix), amber (warning), indigo (blueprint)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CollectiveNode {
-    pub id: String,
-    pub ip: String,
-    pub port: u16,
-    pub hostname: String,
-    pub status: String, // "Active", "Offline", "Syncing"
-    pub last_pulse: String,
-    pub aura: String,
-    pub latency_ms: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RiskScenario {
-    pub id: Option<i32>,
-    pub scenario: String,
-    pub probability: f32,
-    pub impact_rating: String,
-    pub defensive_strategy: String,
-    pub associated_venture: String,
-    pub timestamp: String,
-}
-
-#[tauri::command]
-async fn get_risk_simulations(state: tauri::State<'_, AppState>) -> Result<Vec<RiskScenario>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, scenario, probability, impact_rating, defensive_strategy, associated_venture, timestamp FROM risk_simulations ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
-    
-    let rows = stmt.query_map([], |row| {
-        Ok(RiskScenario {
-            id: Some(row.get(0)?),
-            scenario: row.get(1)?,
-            probability: row.get(2)?,
-            impact_rating: row.get(3)?,
-            defensive_strategy: row.get(4)?,
-            associated_venture: row.get(5)?,
-            timestamp: row.get(6)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut simulations = Vec::new();
-    for r in rows {
-        if let Ok(sim) = r {
-            simulations.push(sim);
-        }
-    }
-    Ok(simulations)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChronosSnapshot {
-    pub timestamp: String,
-    pub nodes: Vec<serde_json::Value>,
-    pub links: Vec<serde_json::Value>,
-    pub metrics: Option<VentureMetrics>,
-    pub market: Option<MarketIntelligence>,
-    pub windows: Vec<serde_json::Value>,
-    pub integrity: f32,
-    pub entropy_index: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MirrorPayload {
-    pub venture: VentureSnapshot,
-    pub crates: Vec<ContextCrate>,
-    pub signature: String,
-}
-
-#[tauri::command]
-async fn invoke_neural_mirror(
-    state: tauri::State<'_, AppState>,
-    node_id: String,
-    venture_id: String
-) -> Result<String, String> {
-    if !is_vault_session_valid() {
-        return Err("Founder Authentication Required for Mirror Handshake.".into());
-    }
-
-    let node = {
-        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-        registry
-            .get(&node_id)
-            .cloned()
-            .ok_or("Target Node not found in Collective Registry.")?
-    };
-    
-    // Gather Venture Data
-    let ledger = get_aegis_ledger().await?;
-    let venture = ledger.ventures.get(&venture_id).ok_or("Venture not found in local Aegis Ledger.")?.clone();
-    
-    // Gather Associated Crates (Simplified: get all for now or filter by tags)
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates").map_err(|e| e.to_string())?;
-    let crate_rows = stmt.query_map([], |row| {
-        Ok(ContextCrate {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            aura_color: row.get(3)?,
-            apps: row.get(4)?,
-            timestamp: row.get(5)?,
-            integrity: row.get(6)?,
-            arr: row.get(7)?,
-            burn: row.get(8)?,
-            status: row.get(9)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut crates = Vec::new();
-    for c in crate_rows {
-        if let Ok(crate_obj) = c {
-            crates.push(crate_obj);
-        }
-    }
-
-    let _payload = MirrorPayload {
-        venture,
-        crates,
-        signature: "OASIS_FOUNDER_SIG_V1".into(),
-    };
-
-    // SIMULATED P2P TRANSMISSION (In a real setup, we'd POST to node.ip)
-    let _client = reqwest::Client::new();
-    let _target_url = format!("http://{}:{}/neural-mirror", node.ip, node.port);
-    
-    // For this simulation, we log the intent and return success
-    // Neural Mirror Synchronized
-    
-    // We'll also manifest a neural log for the user
-    db.execute(
-        "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
-        rusqlite::params!["Network", format!("Aegis Mirror Initiated for {}. Node: {}", venture_id, node_id), chrono::Local::now().to_rfc3339()],
-    ).map_err(|e| e.to_string())?;
-
-    Ok(format!("Neural Mirroring Complete. Venture context reflected on node {}.", node_id))
-}
-
-#[tauri::command]
-async fn capture_chronos_snapshot(
-  state: tauri::State<'_, AppState>,
-  nodes: Vec<serde_json::Value>, 
-  links: Vec<serde_json::Value>,
-  metrics: Option<VentureMetrics>,
-  market: Option<MarketIntelligence>,
-  windows: Vec<serde_json::Value>,
-  integrity: f32
-) -> Result<String, String> {
-    capture_chronos_snapshot_with_pool(&state.pool, nodes, links, metrics, market, windows, integrity)
-}
-
-#[tauri::command]
-async fn seek_chronos_history(state: tauri::State<'_, AppState>) -> Result<Vec<ChronosSnapshot>, String> {
-    seek_chronos_history_with_pool(&state.pool)
-}
-
-#[tauri::command]
-async fn manifest_chronos_voyage(state: tauri::State<'_, AppState>, timestamp: String) -> Result<serde_json::Value, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT data FROM chronos_history WHERE timestamp = ?1").map_err(|e| e.to_string())?;
-    let data_str: String = stmt.query_row([timestamp], |row| row.get(0)).map_err(|e| e.to_string())?;
-    
-    let snapshot: serde_json::Value = serde_json::from_str(&data_str).map_err(|e| e.to_string())?;
-    
-    // 1. Restore Windows (Physical Shift)
-    if let Some(windows) = snapshot["windows"].as_array() {
-        for win in windows {
-            if let (Some(hwnd_val), Some(x), Some(y), Some(w), Some(h)) = (
-                win["hwnd"].as_u64(),
-                win["position"]["x"].as_i64(),
-                win["position"]["y"].as_i64(),
-                win["size"]["width"].as_i64(),
-                win["size"]["height"].as_i64(),
-            ) {
-                let hwnd = HWND(hwnd_val as *mut _);
-                unsafe {
-                    let _ = SetWindowPos(hwnd, HWND(0 as *mut _), x as i32, y as i32, w as i32, h as i32, SWP_NOZORDER | SWP_SHOWWINDOW);
-                }
-            }
-        }
-    }
-
-    Ok(snapshot)
-}
-
-#[cfg(test)]
-mod chronos_tests {
-    use super::chronos_snapshot_from_row;
-
-    #[test]
-    fn chronos_row_parser_round_trips_core_fields() {
-        let snapshot = chronos_snapshot_from_row(
-            "2026-04-24T22:00:00Z".into(),
-            serde_json::json!({
-                "nodes": [{"id": "n1"}],
-                "links": [{"id": "l1"}],
-                "metrics": {"arr": "1", "burn": "2", "runway": "3", "momentum": "4", "stress_color": "#fff"},
-                "market": {"market_index": 1.0, "index_change": "+1%", "ai_ticker": []},
-                "windows": [{"title": "Main"}]
-            }).to_string(),
-            87.5,
-        );
-
-        assert_eq!(snapshot.timestamp, "2026-04-24T22:00:00Z");
-        assert_eq!(snapshot.nodes.len(), 1);
-        assert_eq!(snapshot.links.len(), 1);
-        assert_eq!(snapshot.windows.len(), 1);
-        assert_eq!(snapshot.integrity, 87.5);
-    }
-}
-
-
-#[tauri::command]
-async fn resuscitate_ghost_snapshot(windows: Vec<system::WindowSnapshot>) -> Result<String, String> {
-    system::set_window_layout(windows).await?;
-    Ok("Temporal Resuscitation Complete: Ghost Layout manifested on Physical OS.".into())
-}
-
-#[tauri::command]
-async fn derive_mitigation_macro(
-    anomaly_category: String,
-    _current_metrics: serde_json::Value
-) -> Result<serde_json::Value, String> {
-    if !is_vault_session_valid() {
-        return Err("Founder Authentication required for Neural Mitigation.".into());
-    }
-
-    let prompt = match anomaly_category.as_str() {
-        "CPU_SPIKE" => "Detected a critical CPU spike (>85%). Synthesize a localized PowerShell defensive macro to identify the top 3 resource-intensive user processes and demote their priority to 'BelowNormal'. Rationale: Resource Balancing.",
-        "MEM_LEAK" => "Detected memory saturation. Synthesize a PowerShell macro to clear the system standby list and restart the non-essential Oasis caching service. Rationale: Memory Reclamation.",
-        "INTEGRITY_DROP" => "Detected Venture Integrity breach. Synthesize a PowerShell macro to perform a deep-scan of the active Context Crate directories and verify neural checksums. Rationale: Integrity Restoration.",
-        _ => "Synthesize a generic system stability optimization macro. Rationale: Preventive Maintenance."
-    };
-
-    let client = reqwest::Client::new();
-    let res = client.post("http://localhost:11434/api/generate")
-        .json(&serde_json::json!({
-            "model": "gemma3",
-            "prompt": format!("{} Provide the response as a JSON object with: title, rationale, and code_draft (PowerShell).", prompt),
-            "stream": false,
-            "format": "json"
-        }))
-        .send().await.map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let mut response_content = json["response"].as_str().ok_or("Invalid LLM response")?.trim();
-    
-    // Clean potential markdown wrap
-    if response_content.starts_with("```json") {
-        response_content = response_content.trim_start_matches("```json").trim_end_matches("```");
-    }
-
-    let mut manifest: serde_json::Value = serde_json::from_str(response_content).map_err(|_| "Synthesis Parsing Failure")?;
-    
-    // Inject metadata
-    if let Some(obj) = manifest.as_object_mut() {
-        obj.insert("id".to_string(), serde_json::json!(format!("HEURISTIC_{}", chrono::Local::now().timestamp())));
-        obj.insert("source".to_string(), serde_json::json!("Heuristic Guardian"));
-        obj.insert("anomaly".to_string(), serde_json::json!(anomaly_category));
-    }
-
-    Ok(manifest)
-}
-
-#[tauri::command]
-async fn synthesize_founder_directive(
-    query: String
-) -> Result<Vec<ShellAction>, String> {
-    if !is_vault_session_valid() {
-        return Err("Founder Authentication required for Strategic Directives.".into());
-    }
-
-    let prompt = format!(
-        "You are the Oasis Shell Kernel. Translate this user directive into a JSON array of Shell actions: '{}'.
-        Supported actions: 
-        - SWITCH_VIEW (payload: {{ view_id: string }})
-        - OPEN_VAULT (payload: null)
-        - LOCK_VAULT (payload: null)
-        - SYSTEM_NOTIFICATION (payload: {{ message: string }})
-        - RESUSCITATE_LATEST (payload: null)
-        - INITIATE_P2P (payload: {{ node_id: string }})
-        - EXECUTE_MACRO (payload: {{ macro_id: string }})
-        - SEAL_ASSET (payload: {{ path: string, title: string }})
-
-        Response MUST be a strict JSON array of ShellAction objects with 'type' and 'payload' fields.",
-        query
-    );
-
-    let client = reqwest::Client::new();
-    let res = client.post("http://localhost:11434/api/generate")
-        .json(&serde_json::json!({
-            "model": "gemma3",
-            "prompt": prompt,
-            "stream": false,
-            "format": "json"
-        }))
-        .send().await.map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let response_content = json["response"].as_str().ok_or("Invalid LLM response")?.trim();
-    
-    let actions: Vec<ShellAction> = serde_json::from_str(response_content).map_err(|e| format!("Parsing Directive Failed: {}", e))?;
-
-    Ok(actions)
-}
-
-#[tauri::command]
-async fn manifest_forge_intent(state: tauri::State<'_, AppState>, anomaly_id: String, source: String) -> Result<ForgeManifest, String> {
-    let client = reqwest::Client::new();
-    let config = &state.config;
-    let prompt = format!(
-        "Role: Oasis AI Forge Engine (Gemma-4 Generation).
-        Target Anomaly: {} from {}.
-        Goal: Manifest a technical 'Stability Manifest' (Fix) for this breach.
-        Return ONLY valid JSON with keys: 'rationale' (1 sentence tech reason), 'code_diff' (Suggested fix or policy), 'confidence' (0.0 to 1.0).",
-        anomaly_id, source
-    );
-
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        // Clean and parse
-        let clean_json = resp.trim_matches('`').replace("json", "").trim().to_string();
-        let mut manifest: ForgeManifest = serde_json::from_str(&clean_json).map_err(|e| format!("Forge Parse Error: {}. Response: {}", e, clean_json))?;
-        manifest.id = format!("FORGE_{}", chrono::Local::now().timestamp());
-        manifest.target_id = anomaly_id;
-        manifest.aura = if manifest.confidence > 0.8 { "emerald".into() } else { "amber".into() };
-        Ok(manifest)
-    } else {
-        Err("Forge Resonance Failed: LLM unreachable.".into())
-    }
-}
-
-#[tauri::command]
-async fn derive_predictive_simulation(
-    state: tauri::State<'_, AppState>,
-    venture_id: String,
-    metrics: VentureMetrics
-) -> Result<RiskScenario, String> {
-    let client = reqwest::Client::new();
-    let config = &state.config;
-    
-    let prompt = format!(
-        "Role: Oasis Neural Oracle (Strategic Risk Simulation).
-        Venture: {}.
-        Current Metrics: ARR: {}, Burn: {}, Runway: {}, Momentum: {}.
-        Goal: Synthesize a high-fidelity 'Black Swan' risk scenario (a non-obvious systemic failure).
-        
-        Return ONLY valid JSON with these exact keys:
-        'scenario' (3-sentence narrative of the failure),
-        'probability' (float 0.0-1.0),
-        'impact_rating' (e.g., 'CRITICAL', 'SEVERE', 'CATASTROPHIC'),
-        'defensive_strategy' (a clear technical or strategic directive to mitigate).",
-        venture_id, metrics.arr, metrics.burn, metrics.runway, metrics.momentum
-    );
-
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        // Clean and parse
-        let clean_json = resp.trim_matches('`').replace("json", "").trim().to_string();
-        let mut sim: RiskScenario = serde_json::from_str(&clean_json).map_err(|e| format!("Oracle Parse Error: {}. Response: {}", e, clean_json))?;
-        
-        sim.associated_venture = venture_id;
-        sim.timestamp = chrono::Local::now().to_rfc3339();
-        
-        // Persist to Ledger
-        let db = state.pool.get().map_err(|e| e.to_string())?;
-        db.execute(
-            "INSERT INTO risk_simulations (scenario, probability, impact_rating, defensive_strategy, associated_venture, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![sim.scenario, sim.probability, sim.impact_rating, sim.defensive_strategy, sim.associated_venture, sim.timestamp],
-        ).map_err(|e| e.to_string())?;
-        
-        let last_id: i32 = db.query_row("SELECT last_insert_rowid()", [], |r| r.get(0)).unwrap_or(0);
-        sim.id = Some(last_id);
-
-        Ok(sim)
-    } else {
-        Err("Oracle Resonance Failed: Simulation engine unreachable.".into())
-    }
-}
-
-#[tauri::command]
-async fn get_spectral_anomalies() -> Result<Vec<SpectralAnomaly>, String> {
-    // Simulated eBPF pull from the Spectral Buffer
-    Ok(vec![
-        SpectralAnomaly {
-            id: "ANOM-884".into(),
-            source: "Kernel".into(),
-            description: "High-frequency Syscall: RegOpenKeyExW (Unauthorized Hive)".into(),
-            risk_level: 0.82,
-            timestamp: chrono::Local::now().to_rfc3339(),
-            associated_pid: Some(1024),
-        }
-    ])
-}
-
-#[tauri::command]
-async fn invoke_oracle_prediction(venture_id: String) -> Result<OracleForecast, String> {
-    let ledger = get_aegis_ledger().await?;
-    if let Some(venture) = ledger.ventures.get(&venture_id) {
-        // SAVING METRICS FOR THE PYTHON ORACLE
-        let cache_path = std::path::PathBuf::from(".oracle_cache.json");
-        let cache_data = serde_json::to_string(&venture).map_err(|e| e.to_string())?;
-        std::fs::write(&cache_path, cache_data).map_err(|e| e.to_string())?;
-
-        // EXECUTE PYTHON ORACLE ENGINE
-        let output = std::process::Command::new("python")
-            .arg("oracle_engine.py")
-            .output()
-            .map_err(|e| format!("Failed to execute oracle_engine.py: {}", e))?;
-
-        if !output.status.success() {
-            return Err(format!("Oracle engine execution failed: {}", String::from_utf8_lossy(&output.stderr)));
-        }
-
-        let forecast: OracleForecast = serde_json::from_slice(&output.stdout)
-            .map_err(|e| format!("Failed to parse oracle output: {}. Output: {}", e, String::from_utf8_lossy(&output.stdout)))?;
-
-        Ok(forecast)
-    } else {
-        Err("Venture not found in Aegis Ledger for Oracle prediction.".to_string())
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EncryptedBlob {
-    pub id: String,
-    pub title: String,
-    pub original_path: String,
-    pub encrypted_path: String,
-    pub timestamp: String,
-    pub aura_intensity: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SentinelVault {
-    pub blobs: HashMap<String, EncryptedBlob>,
-    pub security_resonance: f32,
-}
-
-fn seal_founder_session(secret: &str) -> Result<String, String> {
-    let expected_secret = std::env::var("OASIS_FOUNDER_SECRET")
-        .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
-        .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
-
-    if secret.trim().is_empty() {
-        return Err("Founder secret is required.".into());
-    }
-
-    if secret != expected_secret {
-        return Err("Founder authentication failed. Invalid neural key.".into());
-    }
-
-    let mut password_key = [0u8; 32];
-    let salt = b"OASIS_NEURAL_SALT_45_LEX_FOUNDRY"; // Consistent salt for the primary cipher
-    
-    pbkdf2_hmac::<Sha256>(secret.as_bytes(), salt, 100_000, &mut password_key);
-
-    #[cfg(target_os = "windows")]
-    {
-        let protected = dpapi_protect_key_material(password_key)?;
-        let mut blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-        *blob = Some(protected);
-        let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-        *state = None;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-        *state = Some(password_key);
-    }
-    
-    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
-    *auth_time = Some(chrono::Local::now());
-    
-    Ok("Founder Aura Authenticated. Sentinel Archive Unlocked.".into())
-}
-
-#[cfg(target_os = "windows")]
-fn dpapi_protect_key_material(key: [u8; 32]) -> Result<Vec<u8>, String> {
-    let key_b64 = base64::engine::general_purpose::STANDARD.encode(key);
-    let script = format!(
-        "$p='{0}';$b=[Convert]::FromBase64String($p);$enc=[System.Security.Cryptography.ProtectedData]::Protect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Convert]::ToBase64String($enc)",
-        key_b64
-    );
-    let output = std::process::Command::new("powershell")
-        .args(["-NoProfile", "-Command", &script])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-    let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    base64::engine::general_purpose::STANDARD
-        .decode(out.as_bytes())
-        .map_err(|e| e.to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn dpapi_unprotect_key_material(blob: &[u8]) -> Result<[u8; 32], String> {
-    let blob_b64 = base64::engine::general_purpose::STANDARD.encode(blob);
-    let script = format!(
-        "$p='{0}';$b=[Convert]::FromBase64String($p);$dec=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Convert]::ToBase64String($dec)",
-        blob_b64
-    );
-    let output = std::process::Command::new("powershell")
-        .args(["-NoProfile", "-Command", &script])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-    let out = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(out.as_bytes())
-        .map_err(|e| e.to_string())?;
-    if bytes.len() != 32 {
-        return Err("Invalid unprotected key length.".to_string());
-    }
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&bytes);
-    Ok(key)
-}
-
-fn active_founder_session_key() -> Result<[u8; 32], String> {
-    #[cfg(target_os = "windows")]
-    {
-        let blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-        let encrypted = blob
-            .as_ref()
-            .ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())?;
-        return dpapi_unprotect_key_material(encrypted);
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let state = FOUNDER_KEY_STATE.lock().unwrap();
-        state.ok_or("Sentinel Vault Locked: Founder Authentication Required.".to_string())
-    }
-}
-
-fn require_fresh_biometric_for_high_risk() -> Result<(), String> {
-    let session = access::BIOMETRIC_SESSION.lock().unwrap();
-    if biometric_session_is_valid_at(*session, chrono::Local::now()) {
-        return Ok(());
-    }
-    Err("Biometric revalidation required for this high-risk action.".to_string())
-}
-
-fn clear_founder_session() {
-    let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-    if let Some(mut key) = *state {
-        key.fill(0);
-    }
-    *state = None;
-
-    let mut blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-    if let Some(bytes) = blob.as_mut() {
-        bytes.fill(0);
-    }
-    *blob = None;
-
-    let mut auth_time = LAST_AUTH_TIME.lock().unwrap();
-    *auth_time = None;
-}
-
-fn resolve_secret_for_runtime(pool: &Pool<SqliteConnectionManager>, name: &str) -> Result<String, String> {
-    if let Ok(session_key) = active_founder_session_key() {
-        if let Ok(secret) = vault_get_secret_with_session_key_with_pool(pool, name.to_string(), session_key) {
-            return Ok(secret);
-        }
-    }
-
-    let master_key = std::env::var("OASIS_MASTER_KEY")
-        .or_else(|_| std::env::var("OASIS_FOUNDER_SECRET"))
-        .map_err(|_| "No founder master key available for secret migration fallback.".to_string())?;
-    vault::vault_get_secret_with_pool(pool, name.to_string(), master_key)
-}
-
-fn validate_secret_name(name: &str) -> Result<String, String> {
-    let normalized = name.trim().to_uppercase();
-    if normalized.is_empty() {
-        return Err("Secret name is required.".to_string());
-    }
-    if !ALLOWED_SECRET_NAMES.contains(normalized.as_str()) {
-        return Err(format!("Secret '{}' is not allowed by policy.", normalized));
-    }
-    Ok(normalized)
-}
-
-fn enforce_secret_mutation_cooldown(name: &str) -> Result<(), String> {
-    let now = chrono::Local::now();
-    let mut state = SECRET_MUTATION_COOLDOWNS.lock().unwrap();
-    if let Some(last) = state.get(name) {
-        let elapsed = now.signed_duration_since(*last).num_seconds();
-        if elapsed < 5 {
-            return Err(format!("Secret mutation cooldown active for '{}'. Retry in {}s.", name, 5 - elapsed));
-        }
-    }
-    state.insert(name.to_string(), now);
-    Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct SecretHealthEntry {
-    name: String,
-    required: bool,
-    present: bool,
-    stale: bool,
-    updated_at: Option<String>,
-    status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct SecretAuditEntry {
-    timestamp: String,
-    message: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct KeyCustodyStatus {
-    hardware_backed: bool,
-    vault_unlocked: bool,
-    auth_fresh_seconds: i64,
-    biometric_fresh: bool,
-}
-
-#[cfg(test)]
-mod secret_policy_tests {
-    use super::{
-        active_founder_session_key, clear_founder_session, enforce_secret_mutation_cooldown, is_vault_session_valid,
-        validate_secret_name, LAST_AUTH_TIME, SECRET_MUTATION_COOLDOWNS,
-    };
-    #[cfg(not(target_os = "windows"))]
-    use super::FOUNDER_KEY_STATE;
-
-    #[test]
-    fn validate_secret_name_enforces_allowlist() {
-        let ok = validate_secret_name("openai_api_key").expect("allowlisted");
-        assert_eq!(ok, "OPENAI_API_KEY");
-        assert!(validate_secret_name("CUSTOM_TOKEN").is_err());
-    }
-
-    #[test]
-    fn cooldown_blocks_immediate_repeat_mutations() {
-        let secret = "OPENAI_API_KEY";
-        {
-            let mut map = SECRET_MUTATION_COOLDOWNS.lock().unwrap();
-            map.remove(secret);
-        }
-        assert!(enforce_secret_mutation_cooldown(secret).is_ok());
-        assert!(enforce_secret_mutation_cooldown(secret).is_err());
-    }
-
-    #[test]
-    fn lock_clears_session_and_blocks_access() {
-        #[cfg(target_os = "windows")]
-        {
-            let mut blob = super::FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-            *blob = Some(vec![1, 2, 3, 4]);
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            let mut state = FOUNDER_KEY_STATE.lock().unwrap();
-            *state = Some([9u8; 32]);
-        }
-        {
-            let mut auth = LAST_AUTH_TIME.lock().unwrap();
-            *auth = Some(chrono::Local::now());
-        }
-        clear_founder_session();
-        assert!(!is_vault_session_valid());
-        assert!(active_founder_session_key().is_err());
-    }
-}
-
-#[tauri::command]
-async fn authenticate_founder(secret: String) -> Result<String, String> {
-    seal_founder_session(&secret)
-}
-
-#[tauri::command]
-async fn bootstrap_founder_access() -> Result<bool, String> {
-    let secret = std::env::var("OASIS_FOUNDER_SECRET")
-        .or_else(|_| std::env::var("OASIS_MASTER_KEY"))
-        .map_err(|_| "Founder secret is not configured. Set OASIS_FOUNDER_SECRET or OASIS_MASTER_KEY.".to_string())?;
-
-    match seal_founder_session(&secret) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
-}
-
-#[tauri::command]
-async fn is_vault_unlocked() -> Result<bool, String> {
-    Ok(is_vault_session_valid())
-}
-
-#[tauri::command]
-async fn lock_sentinel() -> Result<(), String> {
-    clear_founder_session();
-    Ok(())
-}
-
-#[tauri::command]
-async fn provision_secret(state: tauri::State<'_, AppState>, name: String, value: String) -> Result<(), String> {
-    let normalized_name = validate_secret_name(&name)?;
-    if value.trim().is_empty() {
-        return Err("Secret value is required.".to_string());
-    }
-    enforce_secret_mutation_cooldown(&normalized_name)?;
-    let session_key = active_founder_session_key()?;
-    vault_store_secret_with_session_key_with_pool(&state.pool, normalized_name.clone(), value, session_key)?;
-    let _ = log_event(
-        state.clone(),
-        "security".into(),
-        format!("Secret provisioned: {}", normalized_name),
-    );
-    Ok(())
-}
-
-#[tauri::command]
-async fn rotate_secret(state: tauri::State<'_, AppState>, name: String, value: String) -> Result<(), String> {
-    let normalized_name = validate_secret_name(&name)?;
-    if value.trim().is_empty() {
-        return Err("Secret value is required.".to_string());
-    }
-    enforce_secret_mutation_cooldown(&normalized_name)?;
-    let session_key = active_founder_session_key()?;
-    vault_store_secret_with_session_key_with_pool(&state.pool, normalized_name.clone(), value, session_key)?;
-    let _ = log_event(
-        state.clone(),
-        "security".into(),
-        format!("Secret rotated: {}", normalized_name),
-    );
-    Ok(())
-}
-
-#[tauri::command]
-async fn delete_secret(state: tauri::State<'_, AppState>, name: String) -> Result<bool, String> {
-    let normalized_name = validate_secret_name(&name)?;
-    enforce_secret_mutation_cooldown(&normalized_name)?;
-    let _ = active_founder_session_key()?;
-    let deleted = vault_delete_secret_with_pool(&state.pool, normalized_name.clone())?;
-    if deleted {
-        let _ = log_event(
-            state.clone(),
-            "security".into(),
-            format!("Secret deleted: {}", normalized_name),
-        );
-    }
-    Ok(deleted)
-}
-
-#[tauri::command]
-async fn export_secrets_backup(state: tauri::State<'_, AppState>, target_path: String) -> Result<String, String> {
-    require_fresh_biometric_for_high_risk()?;
-    let session_key = active_founder_session_key()?;
-    let out = vault_export_secrets_backup_with_pool(&state.pool, target_path, session_key)?;
-    let _ = log_event(state.clone(), "security".into(), "Secret backup exported".into());
-    Ok(out)
-}
-
-#[tauri::command]
-async fn restore_secrets_backup(
-    state: tauri::State<'_, AppState>,
-    source_path: String,
-    replace_existing: bool,
-) -> Result<usize, String> {
-    require_fresh_biometric_for_high_risk()?;
-    let session_key = active_founder_session_key()?;
-    let restored = vault_restore_secrets_backup_with_pool(&state.pool, source_path, replace_existing, session_key)?;
-    let _ = log_event(
-        state.clone(),
-        "security".into(),
-        format!("Secret backup restored ({} entries)", restored),
-    );
-    Ok(restored)
-}
-
-#[tauri::command]
-async fn revoke_all_secrets(state: tauri::State<'_, AppState>) -> Result<usize, String> {
-    require_fresh_biometric_for_high_risk()?;
-    let _ = active_founder_session_key()?;
-    let removed = vault_delete_all_secrets_with_pool(&state.pool)?;
-    let _ = log_event(
-        state.clone(),
-        "security".into(),
-        format!("All secrets revoked ({} entries)", removed),
-    );
-    Ok(removed)
-}
-
-#[tauri::command]
-async fn get_secret_health(state: tauri::State<'_, AppState>) -> Result<Vec<SecretHealthEntry>, String> {
-    let meta = vault_list_secret_metadata_with_pool(&state.pool)?;
-    let mut by_name: HashMap<String, String> = HashMap::new();
-    for m in meta {
-        by_name.insert(m.name, m.updated_at);
-    }
-
-    let required_keys = vec!["OPENAI_API_KEY", "DEEPSEEK_API_KEY"];
-    let mut out = Vec::new();
-    for key in required_keys {
-        let updated = by_name.get(key).cloned();
-        let stale = if let Some(ts) = &updated {
-            chrono::DateTime::parse_from_rfc3339(ts)
-                .map(|dt| chrono::Local::now().signed_duration_since(dt.with_timezone(&chrono::Local)).num_days() > 30)
-                .unwrap_or(false)
-        } else {
-            false
-        };
-        let present = updated.is_some();
-        let status = if !present {
-            "missing"
-        } else if stale {
-            "stale"
-        } else {
-            "healthy"
-        };
-        out.push(SecretHealthEntry {
-            name: key.to_string(),
-            required: true,
-            present,
-            stale,
-            updated_at: updated,
-            status: status.to_string(),
-        });
-    }
-    Ok(out)
-}
-
-#[tauri::command]
-async fn get_secret_security_events(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<SecretAuditEntry>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let lim = if limit <= 0 { 20 } else { limit.min(200) };
-    let mut stmt = db
-        .prepare("SELECT timestamp, message FROM neural_logs WHERE event_type = 'security' AND message LIKE 'Secret%' ORDER BY id DESC LIMIT ?1")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([lim], |row| {
-            Ok(SecretAuditEntry {
-                timestamp: row.get(0)?,
-                message: row.get(1)?,
-            })
-        })
-        .map_err(|e| e.to_string())?;
-    let mut events = Vec::new();
-    for r in rows {
-        events.push(r.map_err(|e| e.to_string())?);
-    }
-    Ok(events)
-}
-
-#[tauri::command]
-async fn get_key_custody_status() -> Result<KeyCustodyStatus, String> {
-    let now = chrono::Local::now();
-    let auth_fresh_seconds = {
-        let last_auth = LAST_AUTH_TIME.lock().unwrap();
-        last_auth
-            .map(|t| now.signed_duration_since(t).num_seconds())
-            .unwrap_or(-1)
-    };
-    let biometric_fresh = {
-        let bio = access::BIOMETRIC_SESSION.lock().unwrap();
-        biometric_session_is_valid_at(*bio, now)
-    };
-    let hardware_backed = {
-        #[cfg(target_os = "windows")]
-        {
-            let blob = FOUNDER_KEY_DPAPI_BLOB.lock().unwrap();
-            blob.is_some()
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            false
-        }
-    };
-
-    Ok(KeyCustodyStatus {
-        hardware_backed,
-        vault_unlocked: is_vault_session_valid(),
-        auth_fresh_seconds,
-        biometric_fresh,
-    })
-}
-
-#[tauri::command]
-async fn verify_strategic_asset_integrity(file_path: String, expected_hash: String) -> Result<bool, String> {
-    let path = std::path::Path::new(&file_path);
-    if !path.exists() {
-        return Err("Strategic Asset Not Found for Verification.".into());
-    }
-
-    let content = std::fs::read(path).map_err(|e| e.to_string())?;
-    
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(&content);
-    let current_hash = format!("{:x}", hasher.finalize());
-
-    Ok(current_hash == expected_hash)
-}
-
-#[tauri::command]
-async fn seal_strategic_asset(file_path: String, title: String) -> Result<String, String> {
-    let path = std::path::PathBuf::from(&file_path);
-    if !path.exists() {
-        return Err("Strategic Target Not Found for Sealing.".into());
-    }
-
-    let data = std::fs::read(&path).map_err(|e| e.to_string())?;
-    
-    // Neural Key Derivation: In V4.5.1 we pull the session key from memory
-    let session_key = active_founder_session_key()?;
-    
-    let key = Key::<Aes256Gcm>::from_slice(&session_key); 
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(b"UNIQUE_SALT_44"); 
-
-    let ciphertext = cipher.encrypt(nonce, data.as_ref()).map_err(|e| e.to_string())?;
-    
-    let vault_dir = std::path::Path::new(".sentinel_vault");
-    if !vault_dir.exists() {
-        std::fs::create_dir(vault_dir).map_err(|e| e.to_string())?;
-    }
-    
-    let blob_id = format!("BLOB_{}", chrono::Local::now().timestamp());
-    let enc_path = vault_dir.join(format!("{}.enc", blob_id));
-    std::fs::write(&enc_path, ciphertext).map_err(|e| e.to_string())?;
-
-    // UPDATE SENTINEL LEDGER
-    let ledger_path = ".sentinel_vault.json";
-    let mut vault = if std::path::Path::new(ledger_path).exists() {
-        let content = std::fs::read_to_string(ledger_path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<SentinelVault>(&content).unwrap_or(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 })
-    } else {
-        SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 }
-    };
-
-    vault.blobs.insert(blob_id.clone(), EncryptedBlob {
-        id: blob_id,
-        title,
-        original_path: file_path,
-        encrypted_path: enc_path.to_string_lossy().into(),
-        timestamp: chrono::Local::now().to_rfc3339(),
-        aura_intensity: 0.95,
-    });
-    vault.security_resonance += 0.05;
-
-    let vault_data = serde_json::to_string(&vault).map_err(|e| e.to_string())?;
-    std::fs::write(ledger_path, vault_data).map_err(|e| e.to_string())?;
-
-    // ZERO-KNOWLEDGE HARDENING: Erase original file after encryption verify
-    if std::path::Path::new(&enc_path).exists() {
-        let _ = std::fs::remove_file(&path);
-    }
-
-    Ok("Strategic Asset Sealed and Original Purged from Host OS.".into())
-}
-
-#[tauri::command]
-async fn unseal_strategic_asset(blob_id: String) -> Result<String, String> {
-    let ledger_path = ".sentinel_vault.json";
-    let content = std::fs::read_to_string(ledger_path).map_err(|e| e.to_string())?;
-    let mut vault: SentinelVault = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
-    if let Some(blob) = vault.blobs.get(&blob_id).cloned() {
-        let ciphertext = std::fs::read(&blob.encrypted_path).map_err(|e| e.to_string())?;
-        
-        // Session Key Derivation (V4.5.1)
-        let session_key = active_founder_session_key()?;
-        
-        let key = Key::<Aes256Gcm>::from_slice(&session_key);
-        let cipher = Aes256Gcm::new(key);
-        let nonce = Nonce::from_slice(b"UNIQUE_SALT_44");
-
-        let plaintext = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|e| e.to_string())?;
-        
-        std::fs::write(&blob.original_path, plaintext).map_err(|e| e.to_string())?;
-        
-        vault.blobs.remove(&blob_id); // Remove from vault on unseal
-        let vault_data = serde_json::to_string(&vault).map_err(|e| e.to_string())?;
-        std::fs::write(ledger_path, vault_data).map_err(|e| e.to_string())?;
-
-        Ok(format!("Asset Unsealed and Restored to {}.", blob.original_path))
-    } else {
-        Err("Spectral Target not found in the Sentinel Ledger.".into())
-    }
-}
-
-#[tauri::command]
-async fn get_sentinel_ledger() -> Result<SentinelVault, String> {
-    let path = ".sentinel_vault.json";
-    if std::path::Path::new(path).exists() {
-        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        Ok(serde_json::from_str(&content).unwrap_or(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 }))
-    } else {
-        Ok(SentinelVault { blobs: HashMap::new(), security_resonance: 1.0 })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AgentBranch {
-    pub tag: String,
-    pub title: String,
-    pub description: String,
-    pub risk_level: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NeuralAgent {
-    pub id: String,
-    pub name: String,
-    pub role: String,
-    pub status: String,
-    pub recommendation: String,
-    pub branches: Vec<AgentBranch>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NeuralWisdom {
-    pub recommendation: String,
-    pub insight: String,
-    pub confidence: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OracleAlert {
-    pub title: String,
-    pub body: String,
-    pub divergence_level: String,
-    pub economic_signal: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct EconomicPulse {
-    pub headline: String,
-    pub category: String, // TECH, MACRO, CRYPTO, etc.
-    pub timestamp: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MarketIntelligence {
-    pub sentiment: String,
-    pub index_change: String,
-    pub sectors_active: Vec<String>,
-    pub market_index: f32,
-    pub sector_divergence: f32,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StrategicMemory {
-    id: i32,
-    content: String,
-    metadata: String,
-    score: f32,
-    timestamp: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CodeModule {
-    pub name: String,
-    pub language: String,
-    pub content: String,
+    pub apps: String, // JSON string of applications
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1450,7 +36,89 @@ pub struct NeuralLog {
     pub message: String,
     pub timestamp: String,
 }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WindowInfo {
+    pub title: String,
+    pub pid: u32,
+    pub exe_path: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+    pub is_maximized: bool,
+}
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HardwareTelemetry {
+    pub cpu_usage: f32,
+    pub ram_usage: f32,
+    pub disk_usage: f32,
+}
+
+#[tauri::command]
+fn get_running_windows() -> Vec<WindowInfo> {
+    let mut windows: Vec<WindowInfo> = Vec::new();
+
+    unsafe {
+        let _ = EnumWindows(Some(enum_window_callback), LPARAM(&mut windows as *mut Vec<WindowInfo> as isize));
+    }
+
+    windows
+}
+
+unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let windows = &mut *(lparam.0 as *mut Vec<WindowInfo>);
+
+    if IsWindowVisible(hwnd).as_bool() {
+        let mut buffer = [0u16; 512];
+        let length = GetWindowTextW(hwnd, &mut buffer);
+        let title = String::from_utf16_lossy(&buffer[..length as usize]);
+
+        if !title.is_empty() && title != "Program Manager" && title != "Settings" {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            
+            use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+            use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
+            
+            let mut exe_path = String::new();
+            if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                let mut path_buffer = [0u16; 1024];
+                let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
+                if path_len > 0 {
+                    exe_path = String::from_utf16_lossy(&path_buffer[..path_len as usize]);
+                }
+                let _ = windows::Win32::Foundation::CloseHandle(handle);
+            }
+
+            if !exe_path.is_empty() && !exe_path.contains("oasis-shell") {
+                // Better deduplication: Allow multiple windows of same app ONLY if they have different titles
+                let is_duplicate = windows.iter().any(|w| w.exe_path == exe_path && w.title == title);
+                let mut rect = RECT::default();
+                let _ = GetWindowRect(hwnd, &mut rect);
+                
+                // Ignore tiny invisible background windows
+                let w = rect.right - rect.left;
+                let h = rect.bottom - rect.top;
+                
+                if !is_duplicate && w > 50 && h > 50 {
+                    let is_maximized = IsZoomed(hwnd).as_bool();
+                    windows.push(WindowInfo {
+                        title,
+                        pid,
+                        exe_path,
+                        x: rect.left,
+                        y: rect.top,
+                        width: w,
+                        height: h,
+                        is_maximized,
+                    });
+                }
+            }
+        }
+    }
+    BOOL(1)
+}
 
 #[tauri::command]
 fn sync_project(message: Option<String>) -> Result<(), String> {
@@ -1470,7 +138,7 @@ fn sync_project(message: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
+fn start_watcher(path: String) -> Result<(), String> {
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
         let mut watcher = notify::RecommendedWatcher::new(move |res| {
@@ -1481,7 +149,6 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
 
         // Blocking local reqwest client for background thread
         let client = reqwest::blocking::Client::new();
-        let config = OasisConfig::load();
 
         for res in rx {
             if let Ok(event) = res {
@@ -1504,18 +171,17 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
                         });
 
                         // Fire and forget embedding to local LLM
-                        if let Ok(res) = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send() {
+                        if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&req_body).send() {
                             if let Ok(json) = res.json::<serde_json::Value>() {
                                 if let Some(embedding) = json["embedding"].as_array() {
                                     if let Ok(vector_str) = serde_json::to_string(embedding) {
-                                        if let Ok(conn) = rusqlite::Connection::open("oasis_shell.db") {
+                                        if let Ok(conn) = rusqlite::Connection::open("oasis_crates.db") {
                                             // Delete old version if exists, insert new
                                             let _ = conn.execute("DELETE FROM file_embeddings WHERE filepath = ?1", rusqlite::params![fp]);
                                             let _ = conn.execute(
                                                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                                                 rusqlite::params![name, fp, safe_content, vector_str],
                                             );
-                                            let _ = app.emit("cortex-refresh", serde_json::json!({ "type": "file_updated", "file": name }));
                                         }
                                     }
                                 }
@@ -1531,166 +197,154 @@ fn start_watcher(app: tauri::AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn save_crate(
-    state: tauri::State<'_, AppState>, 
-    name: String, 
-    description: String, 
-    aura_color: String, 
-    apps: Vec<WindowInfo>,
-    integrity: i32,
-    arr: f32,
-    burn: f32,
-    status: String
-) -> Result<(), String> {
-    let timestamp = chrono::Local::now().to_rfc3339();
+fn save_crate(state: tauri::State<DbState>, name: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
-    
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    db.execute(
-        "INSERT INTO context_crates (name, description, aura_color, apps, timestamp, integrity, arr, burn, status) 
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        (name, description, aura_color, apps_json, timestamp, integrity, arr, burn, status),
+    let timestamp = chrono::Local::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO context_crates (name, apps, timestamp) VALUES (?1, ?2, ?3)",
+        params![name, apps_json, timestamp],
     ).map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-async fn get_crates(state: tauri::State<'_, AppState>) -> Result<Vec<ContextCrate>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates ORDER BY id DESC")
-        .map_err(|e| e.to_string())?;
+fn update_crate(state: tauri::State<DbState>, id: i32, name: String, apps: Vec<WindowInfo>) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     
-    let crates = stmt.query_map([], |row| {
-        Ok(ContextCrate {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            aura_color: row.get(3)?,
-            apps: row.get(4)?,
-            timestamp: row.get(5)?,
-            integrity: row.get(6)?,
-            arr: row.get(7)?,
-            burn: row.get(8)?,
-            status: row.get(9)?,
-        })
-    }).map_err(|e| e.to_string())?
-    .collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE context_crates SET name = ?1, apps = ?2 WHERE id = ?3",
+        params![name, apps_json, id],
+    ).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
 
+#[tauri::command]
+fn get_hardware_telemetry(state: tauri::State<TelemetryState>) -> Result<HardwareTelemetry, String> {
+    let mut sys = state.0.lock().unwrap();
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    
+    let cpu_usage = sys.global_cpu_usage();
+    let ram_usage = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
+    
+    Ok(HardwareTelemetry {
+        cpu_usage,
+        ram_usage,
+        disk_usage: 45.0, // Placeholder
+    })
+}
+
+#[tauri::command]
+fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, name, apps, timestamp FROM context_crates").map_err(|e| e.to_string())?;
+    
+    let crate_iter = stmt.query_map([], |row| {
+        Ok(ContextCrate {
+            id: Some(row.get(0)?),
+            name: row.get(1)?,
+            apps: row.get(2)?,
+            timestamp: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut crates = Vec::new();
+    for c in crate_iter {
+        crates.push(c.map_err(|e| e.to_string())?);
+    }
+    
     Ok(crates)
 }
 
 #[tauri::command]
-async fn get_nexus_pulse(state: tauri::State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let crates = get_crates(state).await?;
-    let mut pulse = Vec::new();
-    
-    for c in crates {
-        pulse.push(serde_json::json!({
-            "id": c.id,
-            "name": c.name,
-            "integrity": c.integrity,
-            "arr": c.arr,
-            "burn": c.burn,
-            "status": c.status,
-            "aura": c.aura_color,
-            "timestamp": c.timestamp
-        }));
-    }
-    
-    Ok(pulse)
-}
-
-#[tauri::command]
-async fn delete_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    db.execute("DELETE FROM context_crates WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+fn delete_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-async fn synthesize_crate_aura(state: tauri::State<'_, AppState>, apps: Vec<WindowInfo>) -> Result<serde_json::Value, String> {
+async fn generate_crate_name(apps: Vec<WindowInfo>) -> Result<String, String> {
     let client = reqwest::Client::new();
-    let config = &state.config;
     let app_titles: Vec<String> = apps.iter().map(|a| a.title.clone()).collect();
-    let prompt = format!("Analyze these open window titles: {}.\n\nReturn a JSON object with:\n1. 'name': A 3-4 word punchy title.\n2. 'description': A one-sentence strategic summary.\n3. 'aura_color': A hex color string that fits the vibe (e.g. emerald for growth, amber for stress, indigo for dev).\n\nRespond ONLY with the JSON object.", app_titles.join(", "));
+    let prompt = format!("I am saving a 'Desktop Context Crate' on my AI OS. Here are the open window titles: {}.\n\nSuggest a single, punchy, 3-4 word title for this workspace context (e.g. 'Figma UI & React Dev', 'Market Research Pulse'). Return ONLY the title string.", app_titles.join(", "));
     
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false, "format": "json" });
-    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
-    if let Some(suggestion_str) = json["response"].as_str() {
-        let parsed: serde_json::Value = serde_json::from_str(suggestion_str).unwrap_or_else(|_| {
-            serde_json::json!({
-                "name": "Manual Context Layer",
-                "description": "Custom neural manifold defined by the founder.",
-                "aura_color": "#4f46e5"
-            })
-        });
-        Ok(parsed)
+    if let Some(suggestion) = json["response"].as_str() {
+        Ok(suggestion.trim_matches('"').to_string())
     } else {
-        Ok(serde_json::json!({
-            "name": "Neural Default",
-            "description": "Standard operating context.",
-            "aura_color": "#6366f1"
-        }))
+        Ok("Manual Context Layer".into())
     }
 }
 
 
 #[tauri::command]
-async fn launch_crate(state: tauri::State<'_, AppState>, id: i32) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
+fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT apps FROM context_crates WHERE id = ?1").map_err(|e| e.to_string())?;
     
-    let apps_json: String = stmt.query_row([id], |row| row.get(0)).map_err(|e| format!("Crate {} not found in ledger: {}", id, e))?;
+    let apps_json: String = stmt.query_row(params![id], |row| row.get(0)).map_err(|e| e.to_string())?;
     let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
 
-    for app_info in apps {
-        if !app_info.exe_path.is_empty() {
-             let _ = std::process::Command::new(app_info.exe_path).spawn();
+    for app in &apps {
+        if !app.exe_path.is_empty() {
+            let _ = std::process::Command::new(&app.exe_path).spawn();
         }
     }
     
+    // Spawn background thread to restore window placement after they open
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        
+        unsafe extern "system" fn position_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let apps = &mut *(lparam.0 as *mut Vec<WindowInfo>);
+            if IsWindowVisible(hwnd).as_bool() {
+                let mut pid = 0u32;
+                GetWindowThreadProcessId(hwnd, Some(&mut pid));
+                
+                use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
+                use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
+                
+                let mut exe_path = String::new();
+                if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                    let mut path_buffer = [0u16; 1024];
+                    let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
+                    if path_len > 0 { exe_path = String::from_utf16_lossy(&path_buffer[..path_len as usize]); }
+                    let _ = windows::Win32::Foundation::CloseHandle(handle);
+                }
+
+                if let Some(pos) = apps.iter().position(|a| a.exe_path == exe_path) {
+                    let app = apps.remove(pos);
+                    use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, HWND_TOP};
+                    let _ = SetWindowPos(hwnd, HWND_TOP, app.x, app.y, app.width, app.height, SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+            }
+            BOOL(1)
+        }
+
+        let mut apps_clone = apps.clone();
+        unsafe {
+            let _ = EnumWindows(Some(position_callback), LPARAM(&mut apps_clone as *mut Vec<WindowInfo> as isize));
+        }
+    });
+    
     Ok(())
 }
 
 #[tauri::command]
-async fn export_crate_manifest(state: tauri::State<'_, AppState>, id: i32, target_path: String) -> Result<String, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT name, description, aura_color, apps, timestamp, integrity, arr, burn, status FROM context_crates WHERE id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let crate_data: ContextCrate = stmt.query_row([id], |row| {
-        Ok(ContextCrate {
-            id: Some(id),
-            name: row.get(0)?,
-            description: row.get(1)?,
-            aura_color: row.get(2)?,
-            apps: row.get(3)?,
-            timestamp: row.get(4)?,
-            integrity: row.get(5)?,
-            arr: row.get(6)?,
-            burn: row.get(7)?,
-            status: row.get(8)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let content = serde_json::to_string_pretty(&crate_data).map_err(|e| e.to_string())?;
-    let filename = format!("crate_{}_{}.json", crate_data.name.replace(" ", "_"), id);
-    let final_path = std::path::Path::new(&target_path).join(filename);
-    
-    fs::write(&final_path, content).map_err(|e| e.to_string())?;
-    Ok(final_path.to_string_lossy().to_string())
-}
-
-
-#[tauri::command]
-fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: String) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
+fn log_event(state: tauri::State<DbState>, event_type: String, message: String) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
 
-    db.execute(
+    conn.execute(
         "INSERT INTO neural_logs (event_type, message, timestamp) VALUES (?1, ?2, ?3)",
         params![event_type, message, timestamp],
     ).map_err(|e| e.to_string())?;
@@ -1699,9 +353,9 @@ fn log_event(state: tauri::State<'_, AppState>, event_type: String, message: Str
 }
 
 #[tauri::command]
-fn oas_save_resume_analysis(state: tauri::State<'_, AppState>, role: String, score: i32) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    db.execute(
+fn save_resume_analysis(state: tauri::State<DbState>, role: String, score: i32) -> Result<(), String> {
+    let conn = state.0.lock().unwrap();
+    conn.execute(
         "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
         [role, score.to_string()],
     ).map_err(|e| e.to_string())?;
@@ -1709,8 +363,8 @@ fn oas_save_resume_analysis(state: tauri::State<'_, AppState>, role: String, sco
 }
 
 #[tauri::command]
-fn oas_get_latest_resume_analysis(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let conn = state.pool.get().map_err(|e| e.to_string())?;
+fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+    let conn = state.0.lock().unwrap();
     let mut stmt = conn.prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1").map_err(|e| e.to_string())?;
     let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
     
@@ -1724,178 +378,15 @@ fn oas_get_latest_resume_analysis(state: tauri::State<'_, AppState>) -> Result<s
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SearchResult {
-    pub filename: String,
-    pub filepath: String,
-    pub score: f32,
-    pub preview: String,
-    pub last_modified: String,
-    pub size: u64,
-}
-
-#[tauri::command]
-async fn search_semantic_nodes(state: tauri::State<'_, AppState>, query: String) -> Result<Vec<SearchResult>, String> {
-    let client = reqwest::Client::new();
-    let config = &state.config;
-    let req_body = serde_json::json!({
-        "model": "nomic-embed-text",
-        "prompt": query
-    });
-    
-    let res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    let embedding_val = json["embedding"].as_array().ok_or("No embedding in response")?;
-    let query_vector: Vec<f32> = embedding_val.iter().map(|v| v.as_f64().unwrap() as f32).collect();
-    
-    let conn = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare("SELECT filename, filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
-    
-    let rows = stmt.query_map([], |row| {
-        let filename: String = row.get(0)?;
-        let filepath: String = row.get(1)?;
-        let content: String = row.get(2)?;
-        let vector_str: String = row.get(3)?;
-        let vector: Vec<f32> = serde_json::from_str(&vector_str).unwrap();
-        
-        let mut dot: f32 = 0.0;
-        let mut norm_a: f32 = 0.0;
-        let mut norm_b: f32 = 0.0;
-        
-        for (a, b) in query_vector.iter().zip(vector.iter()) {
-            dot += a * b;
-            norm_a += a * a;
-            norm_b += b * b;
-        }
-        
-        let score = if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a.sqrt() * norm_b.sqrt()) };
-        
-        let meta = std::fs::metadata(&filepath).ok();
-        let last_modified = meta
-            .as_ref()
-            .and_then(|m| m.modified().ok())
-            .map(|t| {
-                let datetime: chrono::DateTime<chrono::Local> = t.into();
-                datetime.format("%Y-%m-%d %H:%M").to_string()
-            })
-            .unwrap_or_else(|| "Unknown".into());
-        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-
-        Ok(SearchResult {
-            filename,
-            filepath,
-            score,
-            preview: if content.len() > 150 { format!("{}...", &content[..150]) } else { content },
-            last_modified,
-            size: size,
-        })
-    }).map_err(|e| e.to_string())?;
-    
-    let mut results: Vec<SearchResult> = rows.filter_map(|r| r.ok()).collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-    
-    Ok(results.into_iter().take(8).collect())
-}
-
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
 }
 
 #[tauri::command]
-async fn index_strategic_asset(state: tauri::State<'_, AppState>, content: String, metadata: String) -> Result<(), String> {
-    let client = reqwest::Client::new();
-    let body = serde_json::json!({
-        "model": "nomic-embed-text",
-        "prompt": content
-    });
-
-    let res = client.post(format!("{}/api/embeddings", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let embedding = json["embedding"].as_array().ok_or("Failed to manifest embedding vector")?;
-    let vector_json = serde_json::to_string(&embedding).map_err(|e| e.to_string())?;
-
-    index_strategic_asset_with_pool(&state.pool, content, metadata, vector_json)
-}
-
-#[tauri::command]
-async fn get_strategic_assets(state: tauri::State<'_, AppState>) -> Result<Vec<StrategicMemory>, String> {
-    let pool = state.pool.clone();
-    let conn = pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare("SELECT id, content, metadata, score, timestamp FROM strategic_memory ORDER BY id DESC").map_err(|e| e.to_string())?;
-    
-    let rows = stmt.query_map([], |row| {
-        Ok(StrategicMemory {
-            id: row.get(0)?,
-            content: row.get(1)?,
-            metadata: row.get(2)?,
-            score: row.get(3)?,
-            timestamp: row.get(4)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut assets = Vec::new();
-    for asset in rows {
-        assets.push(asset.map_err(|e| e.to_string())?);
-    }
-    Ok(assets)
-}
-
-#[tauri::command]
-async fn query_strategic_memory(state: tauri::State<'_, AppState>, query: String) -> Result<Vec<StrategicMemory>, String> {
-    let client = reqwest::Client::new();
-    let body = serde_json::json!({
-        "model": "nomic-embed-text",
-        "prompt": query
-    });
-
-    let res = client.post(format!("{}/api/embeddings", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let query_vector: Vec<f32> = json["embedding"].as_array()
-        .ok_or("Failed to manifest query vector")?
-        .iter()
-        .map(|v| v.as_f64().unwrap() as f32)
-        .collect();
-
-    let pool = state.pool.clone();
-    let conn = pool.get().map_err(|e| e.to_string())?;
-    
-    let mut stmt = conn.prepare("SELECT id, content, metadata, vector, timestamp FROM strategic_memory").map_err(|e| e.to_string())?;
-    
-    let rows = stmt.query_map([], |row| {
-        let id: i32 = row.get(0)?;
-        let content: String = row.get(1)?;
-        let metadata: String = row.get(2)?;
-        let vector_str: String = row.get(3)?;
-        let timestamp: String = row.get(4)?;
-        
-        let vector: Vec<f32> = serde_json::from_str(&vector_str).unwrap();
-        let score = cosine_similarity(&query_vector, &vector);
-
-        Ok(StrategicMemory { id, content, metadata, score, timestamp })
-    }).map_err(|e| e.to_string())?;
-    
-    let mut results: Vec<StrategicMemory> = rows.filter_map(|r| r.ok()).collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-    
-    Ok(results.into_iter().take(5).collect())
-}
-
-#[tauri::command]
-async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result<i32, String> {
+async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Result<i32, String> {
     let mut files = Vec::new();
     for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
         if entry.file_type().is_file() {
@@ -1924,7 +415,7 @@ async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result
             "prompt": content
         });
         
-        let res = match client.post(format!("{}/api/embeddings", state.config.ollama_url)).json(&req_body).send().await {
+        let res = match client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await {
             Ok(r) => r,
             Err(_) => continue, // skip if ollama fails
         };
@@ -1936,7 +427,7 @@ async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result
         
         if let Some(embedding) = json["embedding"].as_array() {
             let vector_str = serde_json::to_string(embedding).unwrap();
-            let conn = state.pool.get().map_err(|e| e.to_string())?;
+            let conn = state.0.lock().unwrap();
             let _ = conn.execute(
                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![name, fp, content, vector_str],
@@ -1948,662 +439,14 @@ async fn index_folder(state: tauri::State<'_, AppState>, path: String) -> Result
 }
 
 #[tauri::command]
-async fn get_venture_metrics() -> Result<VentureMetrics, String> {
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_all();
-    
-    let cpu_load = sys.global_cpu_usage();
-    let mem_used_percent = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
-    
-    // STARTUP-GRADE LOGIC: System health directly influences the 'Stress Color' of the Venture Dashboard
-    let stress = if cpu_load > 85.0 || mem_used_percent > 90.0 { "#ef4444" } // RUBY (Critical)
-                else if cpu_load > 60.0 { "#f59e0b" } // AMBER (Scaling)
-                else { "#10b981" }; // EMERALD (Optimal)
-    
-    Ok(VentureMetrics {
-        arr: format!("${:.2}M", 1.24 + (cpu_load as f32 / 1000.0)),
-        burn: format!("${:.1}K/mo", 42.5 + (mem_used_percent / 10.0)),
-        runway: format!("{:.1} Mo.", 18.4 - (mem_used_percent / 20.0)),
-        momentum: format!("{:+}%", 12.8 + (cpu_load as f32 / 50.0)),
-        stress_color: stress.into(),
-    })
-}
-
-#[tauri::command]
-async fn manifest_code_module(name: String) -> Result<String, String> {
-    let path = format!("manifested/{}.ts", name.replace(" ", "_").to_lowercase());
-    let dir = std::path::Path::new("manifested");
-    if !dir.exists() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
-    
-    let boilerplate = format!(
-        "// OASIS FOUNDRY: AUTONOMOUS ARCHITECT MANIFEST\n// Module: {}\n// Status: PROVISIONAL\n\nexport const {} = () => {{\n  console.log(\"Oasis Strategy Module {} Initialized.\");\n}};",
-        name, name.replace(" ", ""), name
-    );
-    
-    std::fs::write(&path, boilerplate).map_err(|e| e.to_string())?;
-    Ok(format!("Strategic Module '{}' Manifested in {}", name, path))
-}
-
-#[tauri::command]
-async fn authorize_branch(agent_id: String, branch_tag: String) -> Result<String, String> {
-    let path = format!("manifested/{}_branch_{}.ts", agent_id, branch_tag);
-    let manifest = format!("// FOUNDER AUTHORIZED MANIFEST\n// Agent: {}\n// Branch: {}\n// OS Pulse: Realified\n", agent_id, branch_tag);
-    std::fs::write(&path, manifest).map_err(|e| e.to_string())?;
-    Ok(format!("Strategic Branch [{}] Manifested to Filesystem. Golem active.", branch_tag))
-}
-
-#[tauri::command]
-async fn get_neural_wisdom(stress_color: String) -> Result<NeuralWisdom, String> {
-    Ok(neural_wisdom_for_color(&stress_color))
-}
-
-#[tauri::command]
-async fn get_market_intelligence(state: tauri::State<'_, AppState>) -> Result<MarketIntelligence, String> {
-    let news = get_economic_news().await.unwrap_or_default();
+async fn semantic_search(state: tauri::State<'_, DbState>, query: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    
-    let news_context = news.iter().map(|n| n.headline.clone()).collect::<Vec<_>>().join("\n");
-    let prompt = format!(
-        "Analyze these market headlines and provide a JSON response with keys: \
-        'sentiment' (Short string, e.g. 'Bullish Convergence'), 'index_change' (Percentage string), \
-        'sectors_active' (List of strings), 'market_index' (Float), 'sector_divergence' (Float). \n\n \
-        HEADLINES:\n{}", news_context
-    );
-
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false, "format": "json" });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        let intel: MarketIntelligence = serde_json::from_str(resp).map_err(|e| e.to_string())?;
-        Ok(intel)
-    } else {
-        Ok(MarketIntelligence {
-            sentiment: "Stagnant".into(),
-            index_change: "0.0%".into(),
-            sectors_active: vec!["General".into()],
-            market_index: 100.0,
-            sector_divergence: 0.0,
-        })
-    }
-}
-
-
-#[tauri::command]
-async fn get_aegis_ledger() -> Result<AegisLedger, String> {
-    let path = std::path::PathBuf::from(".aegis_ledger.json");
-    if !path.exists() {
-        return Ok(AegisLedger { ventures: std::collections::HashMap::new(), global_integrity: 100.0 });
-    }
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&content).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn sync_venture_to_aegis(venture_id: String, name: String, metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
-    let mut ledger = get_aegis_ledger().await?;
-    let dominance = (metrics.arr.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(1.0) * 10.0) - (metrics.burn.replace('$', "").replace('M', "").parse::<f32>().unwrap_or(0.5) * 2.0);
-    
-    ledger.ventures.insert(venture_id.clone(), VentureSnapshot {
-        id: venture_id,
-        name,
-        metrics,
-        market,
-        timestamp: chrono::Local::now().to_rfc3339(),
-        dominance_index: dominance,
-    });
-    
-    ledger.global_integrity = ledger.ventures.values().map(|v| v.dominance_index).sum::<f32>() / (ledger.ventures.len() as f32).max(1.0);
-    
-    let path = std::path::PathBuf::from(".aegis_ledger.json");
-    let content = serde_json::to_string_pretty(&ledger).map_err(|e| e.to_string())?;
-    std::fs::write(path, content).map_err(|e| e.to_string())?;
-    Ok("Venture State Synchronized with Aegis Bridge.".to_string())
-}
-
-#[tauri::command]
-async fn mirror_venture_intelligence(source_id: String) -> Result<Vec<String>, String> {
-    let ledger = get_aegis_ledger().await?;
-    if let Some(venture) = ledger.ventures.get(&source_id) {
-        let wisdom = vec![
-            format!("Mirroring Capital Strategy from {}: ARR Focus @ {}", venture.name, venture.metrics.arr),
-            format!("Integrating Market Hedging: {} Logic Applied.", venture.market.sentiment),
-            "Aegis Encryption Tunnel: Knowledge Transfer Complete.".to_string(),
-        ];
-        Ok(wisdom)
-    } else {
-        Err("Target Venture not found in Aegis Ledger.".to_string())
-    }
-}
-
-#[tauri::command]
-async fn get_neural_workforce(market_index: f32) -> Result<Vec<NeuralAgent>, String> {
-    Ok(neural_workforce_for_market_index(market_index))
-}
-
-#[tauri::command]
-async fn get_pending_manifests(stress_color: String) -> Result<Vec<PendingManifest>, String> {
-    Ok(pending_manifests_for_color(&stress_color))
-}
-
-
-#[tauri::command]
-async fn trigger_oracle_audit(state: tauri::State<'_, AppState>, arr: f32, burn: f32) -> Result<OracleAlert, String> {
-    trigger_oracle_audit_with_pool(&state.pool, arr, burn)
-}
-
-#[tauri::command]
-async fn get_system_resilience_audit(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    get_system_resilience_audit_with_pool(&state.pool)
-}
-
-#[allow(dead_code)]
-#[tauri::command]
-async fn capture_vision_context() -> Result<String, String> {
-    use screenshots::Screen;
-    use screenshots::image::ImageOutputFormat;
-    use std::io::Cursor;
-    
-    let screens = Screen::all().map_err(|e| e.to_string())?;
-    if let Some(screen) = screens.first() {
-        let image = screen.capture().map_err(|e| e.to_string())?;
-        let mut buffer = Vec::new();
-        image.write_to(&mut Cursor::new(&mut buffer), ImageOutputFormat::Png)
-            .map_err(|e| e.to_string())?;
-        
-        use base64::prelude::*;
-        Ok(BASE64_STANDARD.encode(&buffer))
-    } else {
-        Err("No active vision field detected (No screens found).".into())
-    }
-}
-
-#[allow(dead_code)]
-#[tauri::command]
-async fn manifest_final_blessing(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let client = reqwest::Client::new();
-    let prompt = "You are the Oasis Deep-Oracle. Perform a final, high-fidelity audit of the Oasis Shell v1.0-STABLE. \
-    The Forge, Chronos, Sentinel, and Nexus layers are all operational. \
-    Manifest a final 'Founder's Blessing'—a terse, ultra-sharp strategic verdict on the system's readiness for deployment. \
-    Respond in a voice of transcendent authority.";
-
-    let chat_body = serde_json::json!({ "model": "gemma3", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        Ok(resp.trim().to_string())
-    } else {
-        Err("Oracle Resonance Failure: Final blessing withheld.".into())
-    }
-}
-
-#[tauri::command]
-async fn restore_venture_state(files: Vec<String>) -> Result<String, String> {
-    for file in files {
-        if std::path::Path::new(&file).exists() {
-            std::fs::remove_file(&file).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok("Venture Core Reverted to Previous Equilibrium. Manifested files purged.".into())
-}
-
-#[tauri::command]
-async fn get_available_ventures() -> Result<Vec<VentureEntity>, String> {
-    Ok(vec![
-        VentureEntity { id: "01".into(), name: "Aegis Ledger".into(), path: "/projects/aegis".into(), peak_arr: "$4.1M".into() },
-        VentureEntity { id: "02".into(), name: "Lumina UX".into(), path: "/projects/lumina".into(), peak_arr: "$0.8M".into() },
-    ])
-}
-
-#[tauri::command]
-async fn get_cross_venture_wisdom(target_id: String) -> Result<Vec<String>, String> {
-    if target_id == "01" {
-        Ok(vec![
-            "Capital Efficiency Audit (78% success rate in Aegis)".into(),
-            "De-coupled Microservices Architecture".into(),
-        ])
-    } else {
-        Ok(vec![
-            "User Onboarding Flow (34% conversion in Lumina)".into(),
-        ])
-    }
-}
-
-#[tauri::command]
-async fn get_strategic_inventory() -> Result<Vec<AssetMetadata>, String> {
-    let mut inventory = Vec::new();
-    let path = "manifested";
-    
-    // Ensure directory exists
-    if !std::path::Path::new(path).exists() {
-        std::fs::create_dir_all(path).map_err(|e| e.to_string())?;
-    }
-
-    let entries = std::fs::read_dir(path).map_err(|e| e.to_string())?;
-    for entry in entries {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let metadata = entry.metadata().map_err(|e| e.to_string())?;
-        let file_name = entry.file_name().into_string().unwrap_or_default();
-        if file_name.trim().is_empty() || !metadata.is_file() {
-            continue;
-        }
-        
-        // Calculate Pseudo-Debt based on actual file size (e.g., larger = more complex/debt)
-        let debt = (metadata.len() as f32 / 100.0).min(100.0);
-        let risk = if debt > 60.0 { "Ruby (Debt)" } else if debt > 30.0 { "Amber (Scale)" } else { "Emerald (Solid)" };
-
-        inventory.push(AssetMetadata {
-            file_path: format!("{}/{}", path, file_name),
-            debt,
-            authorizer: "Oasis Golem".into(),
-            risk: risk.into(),
-        });
-    }
-
-    Ok(inventory)
-}
-
-#[tauri::command]
-async fn save_venture_state(metrics: VentureMetrics) -> Result<String, String> {
-    save_venture_state_to_path(&metrics, std::path::Path::new(".foundry_state.json"))
-}
-
-#[tauri::command]
-async fn load_venture_state() -> Result<VentureMetrics, String> {
-    load_venture_state_from_path(std::path::Path::new(".foundry_state.json"))
-}
-
-#[tauri::command]
-async fn create_chronos_snapshot(metrics: VentureMetrics, market: MarketIntelligence) -> Result<String, String> {
-    create_chronos_snapshot_to_path(
-        metrics,
-        market,
-        std::path::Path::new(".chronos_ledger.json"),
-    )
-}
-
-
-
-#[tauri::command]
-async fn get_chronos_ledger() -> Result<Vec<VentureSnapshot>, String> {
-    get_chronos_ledger_from_path(std::path::Path::new(".chronos_ledger.json"))
-}
-
-
-#[tauri::command]
-async fn execute_cli_directive(
-    state: tauri::State<'_, AppState>,
-    directive: CLIDirective,
-    stress_color: String,
-) -> Result<CLIResponse, String> {
-    match directive.cmd.as_str() {
-        "status" => {
-            let stats = system::run_system_diagnostic().await?;
-            let metrics = load_venture_state().await?;
-            Ok(CLIResponse {
-                output: format!(
-                    "CPU {:.1}% | MEM {:.1}% | Path {} | ARR {} | Burn {} | Runway {}",
-                    stats.cpu_load,
-                    stats.mem_used,
-                    stats.path_status,
-                    metrics.arr,
-                    metrics.burn,
-                    metrics.runway
-                ),
-                aura_color: if stats.cpu_load > 85.0 || stats.mem_used > 85.0 {
-                    "#f59e0b".into()
-                } else {
-                    "#10b981".into()
-                },
-            })
-        }
-        "audit" => {
-            let process_count = system::get_process_list().await?.len();
-            let disk_count = system::get_storage_map().await?.len();
-            let asset_count = get_strategic_inventory().await?.len();
-            let db = state.pool.get().map_err(|e| e.to_string())?;
-            let ledger_entries: i64 = db
-                .query_row("SELECT COUNT(*) FROM neural_logs", [], |row| row.get(0))
-                .unwrap_or(0);
-
-            Ok(CLIResponse {
-                output: format!(
-                    "Audit complete. Processes: {} | Disks: {} | Strategic Assets: {} | Neural Logs: {}",
-                    process_count, disk_count, asset_count, ledger_entries
-                ),
-                aura_color: stress_color,
-            })
-        }
-        "ls" => {
-            if directive.args.contains(&"--strategic".to_string()) {
-                let inventory = get_strategic_inventory().await?;
-                let output = if inventory.is_empty() {
-                    "Strategic inventory is empty.".to_string()
-                } else {
-                    inventory
-                        .iter()
-                        .take(10)
-                        .map(|asset| format!("{} [{} | debt {:.1}]", asset.file_path, asset.risk, asset.debt))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                };
-                Ok(CLIResponse {
-                    output,
-                    aura_color: "#6366f1".into(),
-                })
-            } else {
-                Ok(CLIResponse {
-                    output: "Foundry Project Node Listing... (Raw Mode)".into(),
-                    aura_color: "#94a3b8".into(),
-                })
-            }
-        },
-        "manifest" => Ok(CLIResponse {
-            output: format!("Golem Manifesting Module: {} via Oas-Shell.", directive.args.join(" ")),
-            aura_color: "#6366f1".into(),
-        }),
-        "rewind" => Ok(CLIResponse {
-            output: "Reality Rewound to Previous Snapshot via Oas-Shell.".into(),
-            aura_color: "#10b981".into(),
-        }),
-        _ => Err("Invalid Oas Directive. Try 'status', 'audit', 'ls --strategic', 'manifest' [title], or 'rewind'.".into()),
-    }
-}
-
-#[tauri::command]
-async fn get_economic_news() -> Result<Vec<EconomicPulse>, String> {
-    let client = reqwest::Client::new();
-    let res = client.get("https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    
-    let story_ids: Vec<u64> = res.json().await.map_err(|e| e.to_string())?;
-    let mut news = Vec::new();
-    
-    for id in story_ids.iter().take(5) {
-        if let Ok(story_res) = client.get(format!("https://hacker-news.firebaseio.com/v0/item/{}.json?print=pretty", id)).send().await {
-            if let Ok(story) = story_res.json::<serde_json::Value>().await {
-                if let Some(title) = story["title"].as_str() {
-                    let category = if title.to_lowercase().contains("ai") || title.to_lowercase().contains("neural") {
-                        "TECH/AI"
-                    } else if title.to_lowercase().contains("crypto") || title.to_lowercase().contains("blockchain") {
-                        "CRYPTO"
-                    } else {
-                        "MACRO"
-                    };
-
-                    news.push(EconomicPulse {
-                        headline: title.to_string(),
-                        category: category.to_string(),
-                        timestamp: chrono::Local::now().to_rfc3339(),
-                    });
-                }
-            }
-        }
-    }
-
-    if news.is_empty() {
-        news.push(EconomicPulse {
-            headline: "Oasis Web Bridge Offline. Using Strategic Drift Buffer.".into(),
-            category: "SYSTEM".into(),
-            timestamp: chrono::Local::now().to_rfc3339(),
-        });
-    }
-
-    Ok(news)
-}
-
-#[tauri::command]
-async fn generate_venture_synthesis(state: tauri::State<'_, AppState>, venture_id: String) -> Result<SynthesisReport, String> {
-    let client = reqwest::Client::new();
-    
-    // 1. GATHER REAL DATA (Fiscal Metrics & Economic Pulse)
-    let metrics = load_venture_state().await?;
-    let news = get_economic_news().await?;
-    let news_context = news.iter().map(|p| p.headline.as_str()).collect::<Vec<_>>().join(" | ");
-
-    // 2. SYNTHESIZE VIA GOLEM (Internal Reasoning)
-    let prompt = format!(
-        "ACT AS A VENTURE PARTNER. Synthesize a strategic pitch for '{}'. \
-        Current Stats: ARR {} | Burn {} | Runway {}. \
-        Market Context (Live HN Pulse): {}. \
-        Task: Create a high-fidelity 'Strategic Narrative' and 3 'Actionable Outreach' bullets for investors. \
-        Output ONLY valid JSON with keys: 'narrative', 'context', 'outreach'.",
-        venture_id, metrics.arr, metrics.burn, metrics.runway, news_context
-    );
-
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    let raw_response = json["response"].as_str().ok_or("No Golem response")?;
-    let synth_data: serde_json::Value = serde_json::from_str(raw_response.trim_matches('`')).unwrap_or(serde_json::json!({
-        "narrative": "Strategic expansion prioritized based on core efficiency.",
-        "context": "Market volatility warrants conservative scaling.",
-        "outreach": ["Focus on Series A Seed extensions", "Target efficiency-first angels"]
-    }));
-
-    let report = SynthesisReport {
-        id: format!("SYNTH_{}", chrono::Local::now().format("%Y%m%d_%H%M")),
-        venture_name: venture_id,
-        strategic_narrative: synth_data["narrative"].as_str().unwrap_or("Default Narrative").into(),
-        confidence_score: 0.88,
-        market_context: synth_data["context"].as_str().unwrap_or("Dynamic Context Layer").into(),
-        actionable_outreach: synth_data["outreach"].as_array().unwrap_or(&vec![]).iter().map(|v| v.as_str().unwrap_or("").into()).collect(),
-    };
-
-    // 3. PERSIST TO SENTINEL VAULT AS PROVISIONAL ASSET
-    let report_json = serde_json::to_string(&report).map_err(|e| e.to_string())?;
-    let doc_path = format!("vault/synthesis_{}.json", report.id);
-    std::fs::create_dir_all("vault").map_err(|e| e.to_string())?;
-    std::fs::write(&doc_path, report_json).map_err(|e| e.to_string())?;
-
-    Ok(report)
-}
-
-#[tauri::command]
-async fn sync_physical_aura(color_hex: String) -> Result<(), String> {
-    let client = reqwest::Client::new();
-    let _config_path = "oas_relocation_map.json"; // Using existing config for simplicity
-    
-    // Default WLED target for strategic testing
-    let target_ip = "192.168.1.100"; 
-    let url = format!("http://{}/json/state", target_ip);
-
-    let color_rgb = if color_hex == "emerald" { vec![0, 255, 130] }
-                    else if color_hex == "amber" { vec![255, 160, 0] }
-                    else if color_hex == "rose" { vec![255, 50, 80] }
-                    else if color_hex == "indigo" { vec![80, 70, 255] }
-                    else { vec![255, 255, 255] };
-
-    let payload = serde_json::json!({
-        "on": true,
-        "bri": 200,
-        "seg": [{ "col": [color_rgb] }]
-    });
-
-    // Fire and forget (don't block kernel if hardware is offline)
-    let _ = client.post(&url)
-        .timeout(std::time::Duration::from_millis(500))
-        .json(&payload)
-        .send()
-        .await;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn derive_boardroom_debate(state: tauri::State<'_, AppState>, task: String, context: String) -> Result<DebateManifest, String> {
-    let client = reqwest::Client::new();
-    let personas = vec![
-        ("THE ARCHITECT", "Focus on technical elegance, code debt, and long-term infrastructure stability."),
-        ("THE GROWTH HACKER", "Focus on speed-to-market, ARR impact, and user growth at all costs."),
-        ("THE RISK AUDITOR", "Focus on burn-rate efficiency, security pitfalls, and catastrophic failure edge cases.")
-    ];
-
-    let mut insights = Vec::new();
-    
-    // Simulate concurrent neural perspectives (Ollama sequential for now but persona-wrapped)
-    for (name, role) in personas {
-        let prompt = format!(
-            "ACT AS {}. Analyze the following startup task: '{}'. \n\
-            MARKET CONTEXT: {}. \n\
-            Output ONLY valid JSON with keys: 'advice' (1 sentence), 'risk' (0-1), 'score' (0-100).",
-            role, task, context
-        );
-
-        let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-        if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await {
-            if let Ok(json) = res.json::<serde_json::Value>().await {
-                if let Some(resp) = json["response"].as_str() {
-                    let insight_data: serde_json::Value = serde_json::from_str(resp.trim_matches('`')).unwrap_or(serde_json::json!({
-                        "advice": "Neural layer timeout. Strategic drift detected.",
-                        "risk": 0.5,
-                        "score": 50
-                    }));
-                    
-                    insights.push(BoardroomInsight {
-                        persona: name.to_string(),
-                        advice: insight_data["advice"].as_str().unwrap_or("Insight Missing").into(),
-                        risk: insight_data["risk"].as_f64().unwrap_or(0.5) as f32,
-                        score: insight_data["score"].as_i64().unwrap_or(50) as i32,
-                    });
-                }
-            }
-        }
-    }
-
-    // 3. AI-Generated Consensus Summary
-    let summary_prompt = format!(
-        "As the BOARDROOM ORACLE, synthesize the following perspectives on the task '{}':\n{}\n\
-        Provide a 2-sentence definitive strategic consensus.",
-        task, 
-        insights.iter().map(|i| format!("{}: {}", i.persona, i.advice)).collect::<Vec<_>>().join("\n")
-    );
-
-    let summary_body = serde_json::json!({ "model": "gemma3:4b", "prompt": summary_prompt, "stream": false });
-    let summary = if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&summary_body).send().await {
-        if let Ok(json) = res.json::<serde_json::Value>().await {
-            json["response"].as_str().unwrap_or("Strategic deadlock. No consensus manifested.").to_string()
-        } else {
-            "Consensus synthesis error.".to_string()
-        }
-    } else {
-        "Neural bridge offline for summary.".to_string()
-    };
-
-    let consensus_aura = if insights.iter().any(|i| i.risk > 0.8) { "volatile" } else { "stable" }.to_string();
-    
-    Ok(DebateManifest {
-        task_id: format!("DEBATE_{}", chrono::Local::now().format("%H%M%S")),
-        insights,
-        consensus_aura,
-        summary,
-    })
-}
-
-#[tauri::command]
-async fn invoke_deep_oracle(state: tauri::State<'_, AppState>, task: String, context: String) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-
-    let api_key = resolve_secret_for_runtime(&state.pool, "DEEPSEEK_API_KEY")
-        .unwrap_or_else(|_| "MOCK_KEY".into());
-
-    if api_key == "MOCK_KEY" {
-        let prompt = format!(
-            "You are the local oracle for the Oasis Shell. Use concise strategic reasoning based only on the task and context provided. \
-            Respond with valid JSON containing 'thought_trace' and 'advice'. \
-            Task: {}. Context: {}.",
-            task, context
-        );
-        let body = serde_json::json!({
-            "model": "gemma3:4b",
-            "prompt": prompt,
-            "stream": false,
-            "format": {
-                "type": "object",
-                "properties": {
-                    "thought_trace": { "type": "string" },
-                    "advice": { "type": "string" }
-                },
-                "required": ["thought_trace", "advice"]
-            }
-        });
-
-        let res = client.post(format!("{}/api/generate", state.config.ollama_url))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-        let raw_response = json["response"].as_str().ok_or("No local oracle response")?;
-        let local_json: serde_json::Value = serde_json::from_str(raw_response.trim_matches('`'))
-            .map_err(|e| format!("Invalid local oracle JSON: {}", e))?;
-
-        return Ok(serde_json::json!({
-            "thought_trace": local_json["thought_trace"].as_str().unwrap_or("Local oracle reasoning completed."),
-            "advice": local_json["advice"].as_str().unwrap_or("Local oracle did not return a final directive."),
-            "status": "LOCAL_ORACLE"
-        }));
-    }
-
-    let body = serde_json::json!({
-        "model": "deepseek-reasoner",
-        "messages": [
-            { "role": "system", "content": "You are the Deep-Oracle, the final strategic arbiter of the Oasis Shell. Analyze startup tasks with deep reasoning." },
-            { "role": "user", "content": format!("Task: {}. Context: {}. Respond with a JSON object containing 'thought_trace' (your reasoning process) and 'advice' (your final directive).", task, context) }
-        ],
-        "response_format": { "type": "json_object" }
-    });
-
-    let res = client.post("https://api.deepseek.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let choice = &json["choices"][0]["message"];
-    let thought = choice["reasoning_content"].as_str().unwrap_or("Neural synthesis in progress...");
-    let content_str = choice["content"].as_str().unwrap_or("{}");
-    let content_json: serde_json::Value = serde_json::from_str(content_str).unwrap_or_default();
-
-    Ok(serde_json::json!({
-        "thought_trace": thought,
-        "advice": content_json["advice"].as_str().unwrap_or(&content_str),
-        "status": "ORACLE_MANIFESTED"
-    }))
-}
-
-#[tauri::command]
-async fn generate_strategic_report(summary: String, oracle_advice: String) -> Result<serde_json::Value, String> {
-    generate_strategic_report_to_dir(&summary, &oracle_advice, std::path::Path::new("vault/reports"))
-}
-
-#[tauri::command]
-async fn relocate_foundry_storage(target_path: String) -> Result<StorageReport, String> {
-    relocate_foundry_storage_to_dir(std::path::Path::new(&target_path))
-}
-
-#[tauri::command]
-async fn generate_venture_audit() -> Result<String, String> {
-    generate_venture_audit_to_dir(std::path::Path::new("manifested"))
-}
-
-#[tauri::command]
-async fn semantic_search(state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-    let config = &state.config;
     let req_body = serde_json::json!({
         "model": "nomic-embed-text",
         "prompt": query
     });
     
-    let res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&req_body).send().await.map_err(|e| e.to_string())?;
+    let res = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     let query_vector: Vec<f32> = serde_json::from_value(json["embedding"].clone()).unwrap_or_default();
     
@@ -2614,11 +457,11 @@ async fn semantic_search(state: tauri::State<'_, AppState>, query: String) -> Re
     let mut results = Vec::new();
     
     {
-        let conn = state.pool.get().map_err(|e| e.to_string())?;
-        let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").map_err(|e| e.to_string())?;
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT filename, filepath, vector FROM file_embeddings").unwrap();
         let rows = stmt.query_map([], |row| {
             Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
-        }).map_err(|e| e.to_string())?;
+        }).unwrap();
         
         for row in rows {
             if let Ok((filename, filepath, vec_str)) = row {
@@ -2636,13 +479,12 @@ async fn semantic_search(state: tauri::State<'_, AppState>, query: String) -> Re
 }
 
 #[tauri::command]
-async fn rag_query(state: tauri::State<'_, AppState>, query: String) -> Result<String, String> {
+async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<String, String> {
     let client = reqwest::Client::new();
-    let config = &state.config;
     
     // 1. Embed query
     let embed_body = serde_json::json!({ "model": "nomic-embed-text", "prompt": &query });
-    let embed_res = client.post(format!("{}/api/embeddings", config.ollama_url)).json(&embed_body).send().await.map_err(|e| e.to_string())?;
+    let embed_res = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send().await.map_err(|e| e.to_string())?;
     let embed_json: serde_json::Value = embed_res.json().await.map_err(|e| e.to_string())?;
     let query_vector: Vec<f32> = serde_json::from_value(embed_json["embedding"].clone()).unwrap_or_default();
     
@@ -2653,11 +495,11 @@ async fn rag_query(state: tauri::State<'_, AppState>, query: String) -> Result<S
         let mut results: Vec<Match> = Vec::new();
         
         {
-        let conn = state.pool.get().map_err(|e| e.to_string())?;
-        let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").map_err(|e| e.to_string())?;
-        let rows = stmt.query_map([], |row| {
-            Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
-        }).map_err(|e| e.to_string())?;
+            let conn = state.0.lock().unwrap();
+            let mut stmt = conn.prepare("SELECT filepath, content, vector FROM file_embeddings").unwrap();
+            let rows = stmt.query_map([], |row| {
+                Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)? ))
+            }).unwrap();
             
             for row in rows {
                 if let Ok((filepath, content, vec_str)) = row {
@@ -2683,25 +525,25 @@ async fn rag_query(state: tauri::State<'_, AppState>, query: String) -> Result<S
     };
 
     // 4. Generate Semantic Response via Gemma3
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": final_prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": final_prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     if let Some(response) = json["response"].as_str() {
         Ok(response.to_string())
     } else {
-        Err("Failed to parse local AI inference response".into())
+        Err(format!("Failed to parse local AI inference response. Ollama API returned: {}", json.to_string()))
     }
 }
 
 #[tauri::command]
-async fn check_ai_status(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+async fn check_ai_status() -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let res = client.get(format!("{}/api/tags", state.config.ollama_url)).send().await.map_err(|e| e.to_string())?;
+    let res = client.get("http://localhost:11434/api/tags").send().await.map_err(|e| e.to_string())?;
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     
     let models = json["models"].as_array().ok_or("Invalid Ollama response")?;
-    let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma3:4b"));
+    let has_gemma = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("gemma4:latest"));
     let has_embed = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("nomic-embed-text"));
     let has_vision = models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("llava"));
     
@@ -2713,81 +555,6 @@ async fn check_ai_status(state: tauri::State<'_, AppState>) -> Result<serde_json
         "ready": has_gemma && has_embed && has_vision
     }))
 }
-
-#[tauri::command]
-async fn execute_neural_intent(state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
-    
-    // 1. Semantic Intent Retrieval (RAG)
-    let context = rag_query(state.clone(), query.clone()).await.unwrap_or_else(|_| "No local context found.".into());
-    
-    // 2. Directive Synthesis
-    let prompt = format!(
-        "System: Oasis Agentic Shell. You are a tool-use expert. 
-        Analyze the query and decide which internal tool to use.
-        Tools: [VAULT_SEAL, SYSTEM_SCAN, SYNC_GITHUB, ORACLE_FORECAST, EXEC_COMMAND, CHRONOS_SCRUB].
-        If a tool matches, output ONLY the tool tag and parameters: [TOOL] tool_name [PARAM] value [/TOOL].
-        
-        Examples:
-        - 'Seal /my/file.ts' -> [TOOL] VAULT_SEAL [PARAM] /my/file.ts [/TOOL]
-        - 'Run diagnostic' -> [TOOL] SYSTEM_SCAN [PARAM] null [/TOOL]
-        - 'Open VS Code', 'Start Notepad' -> [TOOL] EXEC_COMMAND [PARAM] Start-Process code [/TOOL]
-        - 'Check network' -> [TOOL] EXEC_COMMAND [PARAM] ping 8.8.8.8 -n 2 [/TOOL]
-        - 'Deep link Chronos timeline to market event for: NVIDIA' -> [TOOL] CHRONOS_SCRUB [PARAM] NVIDIA [/TOOL]
-        
-        If no tool matches, respond naturally as an AI assistant.
-        
-        Context: {}
-        User Request: {}", 
-        context, query
-    );
-    
-    let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let ai_response = json["response"].as_str().unwrap_or("Thinking...").to_string();
-
-    // 3. Tool Execution Engine
-    if ai_response.contains("[TOOL]") {
-        let tool_part = ai_response.split("[TOOL]").nth(1).unwrap().split("[/TOOL]").next().unwrap().trim();
-        let mut split = tool_part.split("[PARAM]");
-        let name = split.next().unwrap().trim();
-        let param = split.next().unwrap_or("").trim();
-
-        match name {
-            "VAULT_SEAL" => {
-                let _ = seal_strategic_asset(param.to_string(), "Autonomous Seal".into()).await.map_err(|e| format!("Vault Seal Failure: {}", e))?;
-                return Ok(serde_json::json!({ "content": format!("Neural Intent: Asset successfully sealed in the Sentinel Vault: {}.", param), "tool": "VAULT_SEAL" }));
-            },
-            "SYSTEM_SCAN" => {
-                let stats = system::run_system_diagnostic().await.map_err(|e| format!("Diagnostic failure: {}", e))?;
-                // Correctly mapping for UI consistency
-                let mut data = serde_json::to_value(stats).unwrap();
-                data["cpu_load"] = data["cpu_load"].clone();
-                return Ok(serde_json::json!({ "content": format!("Neural Intent: System Scan Complete. CPU @ {}%, Mem @ {}%. Health: Optimal.", data["cpu_load"], data["mem_used"]), "tool": "SYSTEM_SCAN", "data": data }));
-            },
-            "SYNC_GITHUB" => {
-                let _ = sync_project(Some(query)).map_err(|e| format!("GitHub Sync Failure: {}", e))?;
-                return Ok(serde_json::json!({ "content": "Neural Intent: Initiating Oasis Pulse. Sync with GitHub successful.", "tool": "SYNC_GITHUB" }));
-            },
-            "ORACLE_FORECAST" => {
-                let forecast = invoke_oracle_prediction("oasis_core_alpha".into()).await.map_err(|e| format!("Oracle Vision Failure: {}", e))?;
-                return Ok(serde_json::json!({ "content": format!("Neural Intent: Oracle Vision received. Recommendation: {}.", forecast.recommendation), "tool": "ORACLE_FORECAST", "data": forecast }));
-            },
-            "EXEC_COMMAND" => {
-                let exec_result = execute_neural_command(param.to_string()).unwrap_or_else(|e| format!("Error: {}", e));
-                return Ok(serde_json::json!({ "content": format!("Executed OS Command: {}\n\n{}", param, exec_result), "tool": "EXEC_COMMAND" }));
-            },
-            "CHRONOS_SCRUB" => {
-                return Ok(serde_json::json!({ "content": format!("Chronos Deep Link initiated. Scrubbing timeline to exact point of volatility for {}.", param), "tool": "CHRONOS_SCRUB", "data": param }));
-            },
-            _ => {}
-        }
-    }
-
-    Ok(serde_json::json!({ "content": ai_response, "tool": "NONE" }))
-}
-
 
 
 #[tauri::command]
@@ -2805,22 +572,86 @@ fn execute_neural_command(command: String) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn generate_commit_message(diff: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let prompt = format!("You are a Senior Engineer. Summarize this git diff into a concise, professional 1-line git commit message starting with feat: or fix:. DO NOT include quotes, markdown formatting, or any extra conversational text. Return ONLY the commit string. Diff: {}", diff.chars().take(2000).collect::<String>());
+    
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(response) = json["response"].as_str() {
+        Ok(response.to_string())
+    } else {
+        Err("Failed to parse LLM response for git commit".into())
+    }
+}
+
+
 
 #[tauri::command]
-async fn get_neural_graph(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    build_neural_graph_with_pool(&state.pool)
+async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+    #[derive(serde::Serialize)]
+    struct Node { id: String, group: i32 }
+    #[derive(serde::Serialize)]
+    struct Link { source: String, target: String, value: f32 }
+    
+    let mut nodes = Vec::new();
+    let mut links = Vec::new();
+    let mut files_data = Vec::new();
+
+    {
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT filename, vector FROM file_embeddings LIMIT 100").unwrap();
+        let rows = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))).unwrap();
+        for row in rows.flatten() {
+            if let Ok(vec) = serde_json::from_str::<Vec<f32>>(&row.1) {
+                files_data.push((row.0.clone(), vec));
+                let group = if row.0.ends_with(".ts") || row.0.ends_with(".tsx") { 1 } else if row.0.ends_with(".rs") { 2 } else { 3 };
+                nodes.push(Node { id: row.0.clone(), group });
+            }
+        }
+    }
+
+    // Calculate relationships (only strong ones >= 0.5)
+    for i in 0..files_data.len() {
+        for j in (i + 1)..files_data.len() {
+            let score = cosine_similarity(&files_data[i].1, &files_data[j].1);
+            if score > 0.5 {
+                links.push(Link { source: files_data[i].0.clone(), target: files_data[j].0.clone(), value: score });
+            }
+        }
+    }
+
+    Ok(serde_json::json!({ "nodes": nodes, "links": links }))
 }
 
 #[tauri::command]
-async fn get_neural_brief(state: tauri::State<'_, AppState>, filename: String) -> Result<String, String> {
-    get_neural_brief_from_pool(&state.pool, filename)
+async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+    #[derive(serde::Serialize)]
+    struct FileEntry { id: i32, filename: String, filepath: String, snippet: String }
+    let mut entries = Vec::new();
+
+    {
+        let conn = state.0.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").unwrap();
+        let rows = stmt.query_map([], |row| Ok((
+            row.get::<_, i32>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?
+        ))).unwrap();
+        for row in rows.flatten() {
+            let snippet = if row.3.len() > 150 { row.3[..150].to_string() + "..." } else { row.3 };
+            entries.push(FileEntry { id: row.0, filename: row.1, filepath: row.2, snippet });
+        }
+    }
+    
+    Ok(serde_json::json!(entries))
 }
 
 #[tauri::command]
-async fn get_all_files(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
-    get_all_files_from_pool(&state.pool)
-}
-
 fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
         if let Ok(server) = tiny_http::Server::http("0.0.0.0:4040") {
@@ -2829,7 +660,7 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                 
                 // CORS Preflight
                 if request.method() == &tiny_http::Method::Options {
-                    let response = tiny_http::Response::empty(204)
+                    let response = Response::empty(204)
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap())
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET, POST, OPTIONS"[..]).unwrap())
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type"[..]).unwrap());
@@ -2844,71 +675,14 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
                             let _ = app.emit("scout-telemetry", json);
                         }
                     }
-                } else if url == "/collective/handshake" && request.method() == &tiny_http::Method::Post {
-                    let mut content = String::new();
-                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
-                        if let Ok(peer) = serde_json::from_str::<CollectiveNode>(&content) {
-                            let mut registry = COLLECTIVE_REGISTRY.lock().unwrap();
-                            registry.insert(peer.id.clone(), peer.clone());
-                            let _ = app.emit("collective-update", peer);
-                            
-                            let response = tiny_http::Response::from_string("{\"status\":\"SYNCED\"}")
-                                .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
-                            let _ = request.respond(response);
-                            continue;
-                        }
-                    }
-                } else if url == "/neural-aura-sync" && request.method() == &tiny_http::Method::Post {
-                    let mut content = String::new();
-                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                            let _ = app.emit("collective-aura-sync", json);
-                        }
-                    }
-                    let response = tiny_http::Response::from_string("OK")
-                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
-                    let _ = request.respond(response);
-                    continue;
-                } else if url == "/venture-handover" && request.method() == &tiny_http::Method::Post {
-                    let mut content = String::new();
-                    if let Ok(_) = request.as_reader().read_to_string(&mut content) {
-                        if let Ok(crate_data) = serde_json::from_str::<ContextCrate>(&content) {
-                            let _ = app.emit("collective-handover-received", crate_data);
-                        }
-                    }
-                    let response = tiny_http::Response::from_string("MANIFEST_RECEIVED")
-                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
-                    let _ = request.respond(response);
-                    continue;
-                } else if url == "/consortium/manifest" {
-                    let mut ventures_summary = Vec::new();
-                    {
-                        let registry = system::VENTURE_REGISTRY.lock().unwrap();
-                        for v in registry.values() {
-                            ventures_summary.push(format!("{} ({})", v.name, v.forge_mode));
-                        }
-                    }
-                    
-                    let manifest = serde_json::json!({
-                        "id": "LOCAL-NODE", // In production this would be a persistent ID
-                        "hostname": "Oasis-Strategic-Node",
-                        "active_ventures": ventures_summary,
-                        "timestamp": chrono::Local::now().to_rfc3339(),
-                    });
-                    
-                    let response = tiny_http::Response::from_string(manifest.to_string())
-                        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
-                        .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
-                    let _ = request.respond(response);
-                    continue;
-                } else if url == "/heartbeat" || url == "/collective/pulse" || url == "/consortium/pulse" {
-                    let response = tiny_http::Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
+                } else if url == "/heartbeat" {
+                    let response = Response::from_string("{\"status\":\"active\",\"aura\":\"emerald\",\"ready\":true,\"online\":true}")
                         .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                     let _ = request.respond(response);
                     continue;
                 }
                 
-                let response = tiny_http::Response::from_string("OK")
+                let response = Response::from_string("OK")
                     .with_header(tiny_http::Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap());
                 let _ = request.respond(response);
             }
@@ -2918,101 +692,60 @@ fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn execute_neural_commission(state: tauri::State<'_, AppState>, task: String, agent_id: String) -> Result<PendingManifest, String> {
-   // 1. Log the starting pulse of the Neural Workhorse
-   let _ = log_strategic_pulse(state.clone(), format!("task_start_{}", agent_id), "amber".into());
-   
-   // 2. Invoke Neural RAG (Retrieval Augmented Golem) context search
-   let context = match rag_query(state.clone(), task.clone()).await {
-       Ok(ctx) => ctx,
-       Err(_) => "Local context search yielded null results. Proceeding on base weights.".into()
-   };
-   
-   // 3. Construct the Neural Instruction for the Golem Engine
-   let prompt = format!(
-       "System Identity: Oasis Neural Golem (ID: {}). Strategic Objective: {}. Domain Context: {}. Respond ONLY in a JSON format: {{ \"rationale\": \"EXPLAIN STRATEGY\", \"code\": \"MARKDOWN CODE BLOCK\" }}",
-       agent_id, task, context
-   );
-   
-   let client = reqwest::Client::new();
-   let body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-   let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await.map_err(|e| e.to_string())?;
-   let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-   
-   let resp_str = json["response"].as_str().unwrap_or("{}");
-   
-   // Extract JSON from potential Markdown formatting in the model's output
-   let clean_json = if resp_str.contains("```json") {
-       resp_str.split("```json").nth(1).unwrap().split("```").next().unwrap().trim()
-   } else { resp_str };
-
-   let parsed: serde_json::Value = serde_json::from_str(clean_json).unwrap_or(serde_json::json!({
-       "rationale": format!("Neural Golem {} initiated an autonomous strategic refactor sequence.", agent_id),
-       "code": resp_str
-   }));
-
-   // 4. Log the Manifest Manifestation Pulse
-   let _ = log_strategic_pulse(state.clone(), format!("manifest_ready_{}", agent_id), "emerald".into());
-
-   Ok(PendingManifest {
-       id: format!("MNFST_{}", chrono::Local::now().timestamp()),
-       title: task,
-       rationale: parsed["rationale"].as_str().unwrap_or("Autonomous Neural Manifestation").to_string(),
-       code_draft: parsed["code"].as_str().unwrap_or(resp_str).to_string(),
-   })
-}
-
-
-#[tauri::command]
-fn log_strategic_pulse(state: tauri::State<'_, AppState>, node_id: String, status: String) -> Result<(), String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let timestamp = chrono::Local::now().to_rfc3339();
-    let _ = db.execute(
-        "INSERT INTO strategic_pulses (node_id, status, timestamp) VALUES (?1, ?2, ?3)",
-        rusqlite::params![node_id, status, timestamp],
-    );
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_predictive_intents(state: tauri::State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let integrity = venture_integrity_from_pool(&state.pool)?;
-    let mut sys = sysinfo::System::new_all();
-    sys.refresh_cpu_usage();
-    let cpu_load = sys.global_cpu_usage();
-    Ok(predictive_intents_for_conditions(integrity, cpu_load, !is_vault_session_valid()))
-}
-
-#[tauri::command]
-fn get_venture_integrity(state: tauri::State<'_, AppState>) -> Result<f32, String> {
-    venture_integrity_from_pool(&state.pool)
-}
-
-#[tauri::command]
-fn get_fiscal_report(state: tauri::State<'_, AppState>) -> Result<FiscalReport, String> {
-    fiscal_report_from_pool(&state.pool)
-}
-
-#[tauri::command]
-fn log_compute_pulse(state: tauri::State<'_, AppState>, tokens: i64, cost: f32) -> Result<(), String> {
-    log_compute_to_pool(&state.pool, tokens, cost)
-}
-
-#[tauri::command]
 fn get_logic_path(aura: String) -> String {
-    logic_path_for_aura(&aura)
+    match aura.as_str() {
+        "dev" => "Native Logic > Cargo Link > Build Cycle > Pulse".into(),
+        "design" => "Mesh Logic > Texture Link > GLTF Build > Sync".into(),
+        "gaming" => "Stream Logic > Frame Pulse > Latency Sync > Record".into(),
+        "research" => "Query Logic > Semantic Link > Vector Search > Archive".into(),
+        _ => "Idle Logic > Waiting for Neural Intent".into()
+    }
+}
+
+#[tauri::command]
+fn get_venture_metrics() -> serde_json::Value {
+    serde_json::json!({
+        "arr": "$1.24M",
+        "burn": "$42.5K/mo",
+        "runway": "18.4 Mo.",
+        "momentum": "+12.8%"
+    })
+}
+
+#[tauri::command]
+fn get_market_intelligence() -> serde_json::Value {
+    serde_json::json!([
+        { "symbol": "OASIS_INDEX", "price": "$1,421.40", "change": "+2.4%" },
+        { "symbol": "SAP_COMP", "price": "$42.50", "change": "-1.1%" },
+        { "symbol": "GLOBAL_AI", "price": "8,942.00", "change": "+0.8%" }
+    ])
+}
+
+#[tauri::command]
+fn get_vault_nodes() -> serde_json::Value {
+    serde_json::json!([
+        { "name": "Oasis_Whitepaper.pdf", "category": "Strategic", "size": "1.2MB" },
+        { "name": "Foundry_Kernel.rs", "category": "Technical", "size": "45KB" },
+        { "name": "Executive_Brand_Guide.fig", "category": "Creative", "size": "8.4MB" }
+    ])
+}
+
+#[tauri::command]
+fn trigger_deploy(env: String) -> Result<String, String> {
+    Ok(format!("Deployment sentinel acknowledged for {env}."))
 }
 
 #[tauri::command]
 fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(5)); 
+        std::thread::sleep(Duration::from_secs(5)); 
 
-        let mut sys = sysinfo::System::new(); 
+        let mut sys = System::new(); 
+        let mut disks = Disks::new_with_refreshed_list();
         loop {
             sys.refresh_memory();
             sys.refresh_all();
-            let disks = Disks::new_with_refreshed_list();
+            disks.refresh(true);
             
             let total_mem = sys.total_memory();
             let used_mem = sys.used_memory();
@@ -3041,24 +774,11 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 
             sys.refresh_cpu_all();
             let cpu_usage = sys.global_cpu_usage();
-            if cpu_usage > 90.0 {
+            if cpu_usage > 70.0 {
                 let _ = app.emit("proactive-pulse", serde_json::json!({
-                    "suggestion": "CPU Load Critical (90%+). Consider pausing heavy rendering or background indexing.",
-                    "action": "PERF_GUARD"
+                    "suggestion": format!("High CPU load detected ({}%). Should I optimize your active Aura for performance?", cpu_usage as i32),
+                    "action": "CPU_OPTIMIZE"
                 }));
-            }
-
-            // DOOMSDAY PROCESS SYNC: Detect context-shifting apps
-            let mut detected_contexts = Vec::new();
-            for process in sys.processes().values() {
-                let name = process.name().to_string_lossy().to_string().to_lowercase();
-                if name.contains("code") || name.contains("terminal") || name.contains("rust") || name.contains("studio") { detected_contexts.push("dev"); }
-                if name.contains("chart") || name.contains("trading") || name.contains("tradingview") || name.contains("binance") { detected_contexts.push("growth"); }
-                if name.contains("maya") || name.contains("blender") || name.contains("photoshop") || name.contains("figma") { detected_contexts.push("design"); }
-            }
-
-            if !detected_contexts.is_empty() {
-                let _ = app.emit("cortex-context-sync", serde_json::json!({ "contexts": detected_contexts }));
             }
 
             let now = chrono::Local::now();
@@ -3082,7 +802,7 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
 
             // NEURAL GIT SCOUT (Level 16)
             #[cfg(target_os = "windows")]
-            let git_check = std::process::Command::new("powershell")
+            let git_check = Command::new("powershell")
                 .args(["-Command", "git status --short"])
                 .output();
 
@@ -3097,38 +817,23 @@ fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            std::thread::sleep(std::time::Duration::from_secs(120)); // Pulsing every 2 minutes
+            std::thread::sleep(Duration::from_secs(120)); // Pulsing every 2 minutes
         }
     });
     Ok(())
 }
 
 #[tauri::command]
-async fn sync_hardware_aura(target_ip: String, hex_color: String) -> Result<(), String> {
-    if target_ip.is_empty() || target_ip == "192.168.1.100" { return Ok(()); }
-    
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(800))
-        .build()
-        .map_err(|e| e.to_string())?;
+fn sync_hardware_aura(aura: String) -> Result<(), String> {
+    let ps_cmd = match aura.as_str() {
+        "gaming" => "(New-Object -ComObject WScript.Shell).SendKeys([char]175); (New-Object -ComObject WScript.Shell).SendKeys([char]175)", 
+        "dev" => "(New-Object -ComObject WScript.Shell).SendKeys([char]174); (New-Object -ComObject WScript.Shell).SendKeys([char]174)",
+        _ => "echo 'Aura Parity Nominal'",
+    };
 
-    // Clean hex
-    let hex = hex_color.replace('#', "");
-    if hex.len() != 6 { return Err("Invalid Hex Sequence".into()); }
-
-    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
-    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
-    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
-
-    let body = serde_json::json!({
-        "on": true,
-        "bri": 255,
-        "seg": [{"col": [[r, g, b]]}]
-    });
-
-    let url = format!("http://{}/json/state", target_ip);
-    // Silent fail if device offline for ultra-low latency
-    let _ = client.post(url).json(&body).send().await;
+    let _ = Command::new("powershell")
+        .args(["-Command", ps_cmd])
+        .spawn();
 
     Ok(())
 }
@@ -3190,9 +895,9 @@ fn get_nearby_projects() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn get_logs(state: tauri::State<'_, AppState>) -> Result<Vec<NeuralLog>, String> {
-    let db = state.pool.get().map_err(|e| e.to_string())?;
-    let mut stmt = db.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
+fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
+    let conn = state.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50").map_err(|e| e.to_string())?;
     
     let log_iter = stmt.query_map([], |row| {
         Ok(NeuralLog {
@@ -3213,83 +918,20 @@ fn get_logs(state: tauri::State<'_, AppState>) -> Result<Vec<NeuralLog>, String>
 
 #[tauri::command]
 async fn capture_screenshot() -> Result<String, String> {
-    let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
+    let screens = Screen::all().map_err(|e| e.to_string())?;
     if let Some(screen) = screens.first() {
         let image = screen.capture().map_err(|e| e.to_string())?;
-        let mut buffer = std::io::Cursor::new(Vec::new());
+        let mut buffer = Cursor::new(Vec::new());
         // Use PNG for high fidelity visual reasoning
-        image
-            .write_to(&mut buffer, screenshots::image::ImageFormat::Png)
-            .map_err(|e| e.to_string())?;
-        Ok(base64::engine::general_purpose::STANDARD.encode(buffer.get_ref()))
+        image.write_to(&mut buffer, ImageFormat::Png).map_err(|e| e.to_string())?;
+        Ok(general_purpose::STANDARD.encode(buffer.get_ref()))
     } else {
         Err("No screen found".to_string())
     }
 }
 
 #[tauri::command]
-async fn analyze_work_context(state: tauri::State<'_, AppState>) -> Result<String, String> {
-    let screenshot_b64 = capture_screenshot().await?;
-    let client = reqwest::Client::new();
-    
-    // Attempt Vision analysis via local Ollama (Llava/Gemma)
-    let body = serde_json::json!({
-        "model": "llava:7b",
-        "prompt": "Identify the primary programming language or technical task visible in this screen. Output exactly 1-2 words. (e.g. 'Rust Backend', 'React UI', 'Neural Ethics').",
-        "images": [screenshot_b64],
-        "stream": false
-    });
-
-    if let Ok(res) = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&body).send().await {
-        if let Ok(json) = res.json::<serde_json::Value>().await {
-            if let Some(resp) = json["response"].as_str() {
-                return Ok(resp.trim().to_string());
-            }
-        }
-    }
-    
-    Ok("Generic Workflow".into())
-}
-
-
-#[tauri::command]
-async fn pin_context(state: tauri::State<'_, AppState>, name: String, state_blob: String, aura: String) -> Result<i64, String> {
-    pin_context_with_pool(&state.pool, name, state_blob, aura)
-}
-
-#[tauri::command]
-async fn get_pinned_contexts(state: tauri::State<'_, AppState>) -> Result<Vec<PinnedContext>, String> {
-    get_pinned_contexts_with_pool(&state.pool)
-}
-
-#[tauri::command]
-async fn get_neural_logs(state: tauri::State<'_, AppState>, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    get_neural_logs_with_pool(&state.pool, limit)
-}
-
-
-#[tauri::command]
-async fn delete_pinned_context(state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    delete_pinned_context_with_pool(&state.pool, id)
-}
-
-
-#[tauri::command]
-async fn seek_chronos(state: tauri::State<'_, AppState>, query: String, limit: i32) -> Result<Vec<serde_json::Value>, String> {
-    seek_chronos_with_pool(&state.pool, query, limit)
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LatticePoint {
-    pub label: String,
-    pub x_pct: f32,
-    pub y_pct: f32,
-    pub intensity: f32,
-    pub category: String, // "CODE", "MARKET", "SYSTEM", "ERROR"
-}
-
-#[tauri::command]
-async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, prompt: String) -> Result<String, String> {
+async fn query_vision(image_base64: String, prompt: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let body = serde_json::json!({
         "model": "llava",
@@ -3298,7 +940,7 @@ async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, p
         "stream": false
     });
 
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
+    let res = client.post("http://localhost:11434/api/generate")
         .json(&body)
         .send()
         .await
@@ -3311,732 +953,252 @@ async fn query_vision(state: tauri::State<'_, AppState>, image_base64: String, p
 }
 
 #[tauri::command]
-async fn query_lattice_points(state: tauri::State<'_, AppState>, image_base64: String) -> Result<Vec<LatticePoint>, String> {
-    let client = reqwest::Client::new();
-    let prompt = "Analyze this screen and identify 3-5 key points of strategic interest. For each point, provide a label, category (CODE, MARKET, SYSTEM, or ERROR), and rough screen coordinates as percentages (0-100). Return ONLY a JSON array of objects with keys: label, x_pct, y_pct, intensity (0.0-1.0), category.";
-    
-    let body = serde_json::json!({
-        "model": "llava",
-        "prompt": prompt,
-        "images": [image_base64],
-        "stream": false,
-        "format": "json"
+fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<(), String> {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(30)); // 30 seconds
+            
+            // Capture Screen
+            if let Ok(screens) = Screen::all() {
+                if let Some(screen) = screens.first() {
+                    if let Ok(image) = screen.capture() {
+                        let mut buffer = Cursor::new(Vec::new());
+                        if image.write_to(&mut buffer, ImageFormat::Png).is_ok() {
+                            let b64 = general_purpose::STANDARD.encode(buffer.get_ref());
+                            
+                            // Query Vision (Blocking)
+                            let client = reqwest::blocking::Client::new();
+                            // Check if llava is available first
+                            let tags_res = client.get("http://localhost:11434/api/tags").send();
+                            let llava_ready = tags_res.ok()
+                                .and_then(|r| r.json::<serde_json::Value>().ok())
+                                .and_then(|j| j["models"].as_array().map(|models| 
+                                    models.iter().any(|m| m["name"].as_str().unwrap_or("").contains("llava"))
+                                ))
+                                .unwrap_or(false);
+
+                            if !llava_ready {
+                                println!("Photographic Memory: Waiting for llava model to download...");
+                                continue;
+                            }
+
+                            let body = serde_json::json!({
+                                "model": "llava",
+                                "prompt": "Describe precisely what is visible on this desktop screen. Include visible text, open applications, and context.",
+                                "images": [b64],
+                                "stream": false
+                            });
+
+                            if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&body).send() {
+                                if let Ok(json) = res.json::<serde_json::Value>() {
+                                    if let Some(desc) = json["response"].as_str() {
+                                        println!("Photographic Memory Captured: {}", desc);
+                                        if let Ok(conn) = Connection::open("oasis_crates.db") {
+                                            let r = conn.execute(
+                                                "INSERT INTO photographic_memory (description) VALUES (?1)",
+                                                params![desc],
+                                            );
+                                            println!("DB Insert Result: {:?}", r);
+                                        } else {
+                                            println!("Failed to open DB for memory");
+                                        }
+                                    } else {
+                                        println!("LLM response missing 'response' field: {:?}", json);
+                                    }
+                                } else {
+                                    println!("Failed to parse LLM JSON");
+                                }
+                            } else {
+                                println!("Failed to send request to Ollama LLM");
+                            }
+                        } else {
+                            println!("Failed to write screenshot to PNG");
+                        }
+                    } else {
+                        println!("Failed to capture screen");
+                    }
+                } else {
+                    println!("No screens found");
+                }
+            } else {
+                println!("Failed to get screens");
+            }
+        }
     });
+    Ok(())
+}
 
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?
-        .json::<serde_json::Value>()
-        .await
-        .map_err(|e| e.to_string())?;
+#[tauri::command]
+async fn query_photographic_memory(query: String) -> Result<String, String> {
+    let mut context_block = String::new();
+    if let Ok(conn) = Connection::open("oasis_crates.db") {
+        if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20") {
+            if let Ok(rows) = stmt.query_map([], |row| Ok(( row.get::<_, String>(0)?, row.get::<_, String>(1)? ))) {
+                for row in rows.flatten() {
+                    context_block.push_str(&format!("Time: {}\nDescription: {}\n\n", row.0, row.1));
+                }
+            }
+        }
+    }
 
-    let response_str = res["response"].as_str().unwrap_or("[]");
-    let points: Vec<LatticePoint> = serde_json::from_str(response_str).unwrap_or_else(|_| vec![]);
+    if context_block.is_empty() {
+        return Ok("I have no photographic memories saved yet.".to_string());
+    }
+
+    let client = reqwest::Client::new();
+    let prompt = format!("You are an AI with a photographic memory of the user's desktop. Using the chronological desktop screenshots descriptions below, answer the user's question.\n\nMemories:\n{}\n\nQuestion: {}", context_block, query);
     
-    Ok(points)
+    let chat_body = serde_json::json!({ "model": "gemma4:latest", "prompt": prompt, "stream": false });
+    let res = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await.map_err(|e| e.to_string())?;
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    if let Some(response) = json["response"].as_str() {
+        Ok(response.to_string())
+    } else {
+        Err("Failed to parse LLM response for memory query".into())
+    }
 }
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[tauri::command]
-async fn transcribe_audio(state: tauri::State<'_, AppState>, audio_data: Vec<u8>) -> Result<String, String> {
-    let client = reqwest::Client::new();
-    
-    let part = reqwest::multipart::Part::bytes(audio_data)
-        .file_name("intent.webm")
-        .mime_str("audio/webm").map_err(|e| e.to_string())?;
-
-    let form = reqwest::multipart::Form::new()
-        .text("model", "whisper-1")
-        .part("file", part);
-
-    let api_key = resolve_secret_for_runtime(&state.pool, "OPENAI_API_KEY").unwrap_or_default();
-    if api_key.is_empty() {
-        return Ok("System: Whisper logic mapped. Provide OPENAI_API_KEY for live streaming.".into())
-    }
-
-    let req = client.post("https://api.openai.com/v1/audio/transcriptions")
-        .bearer_auth(api_key)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let resp_json: serde_json::Value = req.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(text) = resp_json["text"].as_str() {
-        Ok(text.to_string())
-    } else {
-        Err("Whisper transcription failed to return text".into())
-    }
-}
-
-#[tauri::command]
-async fn get_documentation_index() -> Result<Vec<String>, String> {
-    let docs_path = std::path::Path::new("../blog/docs");
-    let mut entries = Vec::new();
-    
-    if docs_path.exists() {
-        for entry in std::fs::read_dir(docs_path).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.ends_with(".html") {
-                entries.push(name.replace(".html", ""));
-            }
-        }
-
-        // Add Logs
-        let logs_path = docs_path.join("logs");
-        if logs_path.exists() {
-            for entry in std::fs::read_dir(logs_path).map_err(|e| e.to_string())? {
-                let entry = entry.map_err(|e| e.to_string())?;
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.ends_with(".html") {
-                    entries.push(format!("logs/{}", name.replace(".html", "")));
-                }
-            }
-        }
-    }
-    Ok(entries)
-}
-
-#[tauri::command]
-async fn get_documentation_chapter(id: String) -> Result<String, String> {
-    let file_path = format!("../blog/docs/{}.html", id);
-    let path = std::path::Path::new(&file_path);
-    if !path.exists() {
-        return Err(format!("Chapter {} not found in neural hub.", id));
-    }
-
-    std::fs::read_to_string(path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn manifest_temporal_log(state: tauri::State<'_, AppState>, metrics: serde_json::Value) -> Result<String, String> {
-    let client = reqwest::Client::new();
-    let prompt = format!(
-        "Role: Oasis AI Oracle (Gemma-4 Synthesis).
-         Context: Strategic Snapshot of the Oasis Shell v1.0.
-         Metrics: {}.
-         Goal: Manifest a terse, high-fidelity dev-log entry for the 'Manual Hub'.
-         Output ONLY HTML: An <article> with <h3>Title</h3>, <p>Summary</p>, and a <ul class='neural-metrics'> list. Use Tailwind-like classes: text-white, text-slate-400.",
-        metrics.to_string()
-    );
-
-    let chat_body = serde_json::json!({ "model": "gemma3:4b", "prompt": prompt, "stream": false });
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url)).json(&chat_body).send().await.map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    if let Some(resp) = json["response"].as_str() {
-        let logs_path = std::path::Path::new("../blog/docs/logs");
-        if !logs_path.exists() {
-            std::fs::create_dir_all(logs_path).map_err(|e| e.to_string())?;
-        }
-        
-        let id = chrono::Local::now().format("%Y-%m-%d_%H%M%S").to_string();
-        let file_path = logs_path.join(format!("{}.html", id));
-        let clean_resp = resp.trim_matches('`').replace("html", "").trim().to_string();
-        std::fs::write(file_path, &clean_resp).map_err(|e| e.to_string())?;
-        
-        Ok(format!("Temporal Snapshot Synthesized: {}", id))
-    } else {
-        Err("Oracle Resonance Failed: Log generation breach.".into())
-    }
-}
-
-#[allow(dead_code)]
-async fn collective_pulse_loop(_app: tauri::AppHandle) {
-    loop {
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        // Pulse logic as before...
-    }
-}
-
-async fn collective_resonance_loop(app: tauri::AppHandle) {
-    use std::sync::Arc;
-    use tokio::net::UdpSocket;
-    use std::net::SocketAddr;
-
-    let socket = Arc::new(UdpSocket::bind("0.0.0.0:4040").await.expect("Failed to bind Resonance UDP Socket"));
-    socket.set_broadcast(true).expect("Failed to set UDP broadcast");
-
-    let socket_broadcast = Arc::clone(&socket);
-    let _app_clone = app.clone();
-    // Broadcast Task
-    tokio::spawn(async move {
-        loop {
-            let broadcast_addr: SocketAddr = "255.255.255.255:4040".parse().unwrap();
-            let msg = format!("OASIS_NODE_ALIVE|{}", local_ip_address::local_ip().unwrap());
-            let _ = socket_broadcast.send_to(msg.as_bytes(), broadcast_addr).await;
-            tokio::time::sleep(Duration::from_secs(30)).await;
-        }
-    });
-
-    // Discovery Task
-    let mut buf = [0u8; 1024];
-    loop {
-        if let Ok((len, _addr)) = socket.recv_from(&mut buf).await {
-            let msg = String::from_utf8_lossy(&buf[..len]);
-            if msg.starts_with("OASIS_NODE_ALIVE|") {
-                let ip = msg.replace("OASIS_NODE_ALIVE|", "");
-                
-                let mut local_ip = "0.0.0.0".to_string();
-                if let Ok(ip_addr) = local_ip_address::local_ip() {
-                    local_ip = ip_addr.to_string();
-                }
-
-                if ip != local_ip {
-                    let mut registry = system::CONSORTIUM_REGISTRY.lock().unwrap();
-                    let id = format!("NODE-{}", ip.replace(".", "-"));
-                    if !registry.contains_key(&id) {
-                        registry.insert(id.clone(), system::MeshNode {
-                            id: id.clone(),
-                            ip: ip.clone(),
-                            hostname: format!("Oasis Mesh Peer ({})", ip),
-                            integrity: 100,
-                            active_ventures: vec![],
-                            last_seen: chrono::Local::now().to_rfc3339(),
-                            latency_ms: 0,
-                            aura: "indigo".into(),
-                        });
-                        let _ = app.emit("consortium-node-discovered", id);
-                    } else if let Some(node) = registry.get_mut(&id) {
-                        node.last_seen = chrono::Local::now().to_rfc3339();
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[tauri::command]
-async fn collective_aura_sync(_state: tauri::State<'_, AppState>, integrity: f32, status: String) -> Result<(), String> {
-    let registry = {
-        let registry = COLLECTIVE_REGISTRY.lock().unwrap();
-        registry.values().cloned().collect::<Vec<CollectiveNode>>()
-    };
-    let client = reqwest::Client::new();
-    let payload = serde_json::json!({
-        "integrity": integrity,
-        "status": status,
-        "source": "MASTER_COMMAND_NODE"
-    });
-
-    for node in registry {
-        if node.status == "Active" {
-            let url = format!("http://{}:{}/neural-aura-sync", node.ip, node.port);
-            let _ = client.post(url).json(&payload).send().await;
-        }
-    }
-    Ok(())
-}
-
-
-#[tauri::command]
-async fn install_oas_binary() -> Result<String, String> {
-    // Logic for binary installation/sync
-    Ok("OAS Binary Synchronized and Verified.".into())
-}
-
-pub async fn cmd_set_shell_clickthrough(window: tauri::Window, ignore: bool) -> Result<(), String> {
-    window.set_ignore_cursor_events(ignore).map_err(|e| e.to_string())?;
-    Ok(())
-}
-
-pub async fn cmd_get_active_host_window() -> Result<WindowInfo, String> {
-    Ok(WindowInfo {
-        title: "Host Workspace".into(),
-        pid: 0,
-        exe_path: "explorer.exe".into(),
-        x: 0,
-        y: 0,
-        width: 1920,
-        height: 1080,
-        is_maximized: false,
-    })
-}
-
-
-
-pub async fn cmd_manifest_reality_bridge_thought(app: tauri::AppHandle, state: tauri::State<'_, AppState>, query: String) -> Result<serde_json::Value, String> {
-    use tauri::Emitter;
-    use screenshots::Screen;
-    use screenshots::image::ImageOutputFormat;
-    use std::io::Cursor;
-    use base64::Engine as _;
-    
-    // 1. VISIONARY SENSING
-    let _ = app.emit("reality-bridge-pulse", "VISIONARY_SENSING");
-    let screens = Screen::all().map_err(|e| e.to_string())?;
-    let screen = screens.first().ok_or("No strategic display detected.")?;
-    let image = screen.capture().map_err(|e| e.to_string())?;
-    let mut buffer = Vec::new();
-    image
-        .write_to(&mut Cursor::new(&mut buffer), ImageOutputFormat::Png)
-        .map_err(|e| e.to_string())?;
-    let image_b64 = base64::engine::general_purpose::STANDARD.encode(buffer);
-
-    // Invoke Multimodal Oracle
-    let vision_result = invoke_multimodal_oracle(state.clone(), image_b64, query.clone()).await?;
-
-    // 2. SYSTEMIC TELEMETRY
-    let _ = app.emit("reality-bridge-pulse", "SYSTEMIC_TELEMETRY");
-    use crate::system::run_system_diagnostic;
-    let telemetry = run_system_diagnostic().await.map_err(|e| e.to_string())?;
-
-    // 3. STRATEGIC SYNTHESIS
-    let _ = app.emit("reality-bridge-pulse", "STRATEGIC_SYNTHESIS");
-    let client = reqwest::Client::new();
-    let prompt = format!(
-        "You are the Oasis Reality Bridge. Synthesize the final strategic verdict. \n\
-        FOUNDER QUERY: {} \n\
-        VISION CONTEXT: {:?} \n\
-        TELEMETRY CONTEXT: {:?} \n\
-        Manifest a high-fidelity derivation combining physical reality (Vision) with digital health (Telemetry).",
-        query, vision_result, telemetry
-    );
-
-    let body = serde_json::json!({
-        "model": "gemma3",
-        "prompt": prompt,
-        "stream": false,
-        "format": "json"
-    });
-
-    let res = client.post(format!("{}/api/generate", state.config.ollama_url))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let insight = json["response"].as_str().unwrap_or("{}");
-    let parsed: serde_json::Value = serde_json::from_str(insight).unwrap_or(serde_json::json!({ "final_insight": insight }));
-
-    Ok(serde_json::json!({
-        "vision": vision_result,
-        "telemetry": telemetry,
-        "synthesis": parsed
-    }))
-}
-
 pub fn run() {
-    let context = tauri::generate_context!();
+    let conn = Connection::open("oasis_crates.db").expect("failed to open database");
     
-    // We build the app first to get access to path resolution
-    let app = tauri::Builder::default()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS context_crates (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            apps TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS neural_logs (
+            id INTEGER PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            message TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create logs table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS resume_analysis (
+            id INTEGER PRIMARY KEY,
+            role TEXT NOT NULL,
+            match_score INTEGER NOT NULL,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )",
+        [],
+    ).expect("failed to create resume analysis table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS file_embeddings (
+            id INTEGER PRIMARY KEY,
+            filename TEXT NOT NULL,
+            filepath TEXT NOT NULL,
+            content TEXT NOT NULL,
+            vector TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create vector table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS photographic_memory (
+            id INTEGER PRIMARY KEY,
+            timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            description TEXT NOT NULL
+        )",
+        [],
+    ).expect("failed to create photographic memory table");
+    tauri::Builder::default()
+        .manage(DbState(Mutex::new(conn)))
+        .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
+        .setup(|app| {
+            tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Oasis Sentient OS")
+                .on_tray_icon_event(|tray, event| match event {
+                    tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } => {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show().and_then(|_| window.set_focus());
+                        }
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .plugin(tauri_plugin_global_shortcut::Builder::new()
             .with_shortcut("CommandOrControl+Shift+Space").expect("failed to register shortcut")
-            .with_handler(|app, _shortcut, event| {
+            .with_shortcut("CommandOrControl+`").expect("failed to register terminal shortcut")
+            .with_handler(|app, shortcut, event| {
                 if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                     if let Some(window) = app.get_webview_window("main") {
-                        let _ = if window.is_visible().unwrap_or(false) {
-                            window.hide()
+                        if shortcut.matches(tauri_plugin_global_shortcut::Modifiers::CONTROL | tauri_plugin_global_shortcut::Modifiers::META | tauri_plugin_global_shortcut::Modifiers::SHIFT, tauri_plugin_global_shortcut::Code::Space) {
+                            let _ = if window.is_visible().unwrap_or(false) {
+                                window.hide()
+                            } else {
+                                window.show().and_then(|_| window.set_focus())
+                            };
                         } else {
-                            window.show().and_then(|_| window.set_focus())
-                        };
+                            // It's the terminal shortcut!
+                            let _ = window.show().and_then(|_| window.set_focus());
+                            let _ = window.emit("toggle-sentient-terminal", ());
+                        }
                     }
                 }
             })
             .build()
         )
         .invoke_handler(tauri::generate_handler![
-            system::get_running_windows, 
+            get_running_windows, 
             sync_project, 
             save_crate, 
+            update_crate,
             get_crates,
+            get_hardware_telemetry,
+            delete_crate,
             start_watcher,
             launch_crate,
-            delete_crate,
-            export_crate_manifest,
             log_event,
             get_logs,
             get_nearby_projects,
             get_neuroforge_profile,
             get_nexus_health,
-            oas_save_resume_analysis,
-            oas_get_latest_resume_analysis,
+            save_resume_analysis,
+            get_latest_resume_analysis,
             index_folder,
             semantic_search,
             rag_query,
-            transcribe_audio,
             get_neural_graph,
             get_all_files,
-
-            golems::complete_golem_task,
-            install_oas_binary,
-
-            synthesize_crate_aura,
+            start_telemetry_server,
+            generate_crate_name,
             execute_neural_command,
+            generate_commit_message,
             check_ai_status,
             start_proactive_sentience,
+            start_photographic_memory,
+            query_photographic_memory,
             sync_hardware_aura,
-            get_documentation_index,
-            get_documentation_chapter,
-            manifest_temporal_log,
             capture_screenshot,
             query_vision,
-            query_lattice_points,
             get_logic_path,
             get_venture_metrics,
-            get_market_intelligence,
-
-            manifest_code_module,
-            generate_venture_audit,
-            analyze_work_context,
-            get_neural_brief,
-            invoke_deep_oracle,
-            generate_strategic_report,
-            get_neural_wisdom,
-            trigger_oracle_audit,
-            get_neural_workforce,
-            get_pending_manifests,
-            golems::execute_golem_manifest,
-            get_economic_news,
-            trigger_hardware_symbiosis,
-            create_restore_point,
-            restore_venture_state,
-            get_available_ventures,
-            get_cross_venture_wisdom,
-            execute_cli_directive,
-            get_strategic_inventory,
-            system::run_system_diagnostic,
-            save_venture_state,
-            load_venture_state,
-            authorize_branch,
-            create_chronos_snapshot,
-            get_chronos_ledger,
-            get_aegis_ledger,
-            sync_venture_to_aegis,
-            mirror_venture_intelligence,
-            invoke_oracle_prediction,
-            authenticate_founder,
-            bootstrap_founder_access,
-            provision_secret,
-            rotate_secret,
-            delete_secret,
-            export_secrets_backup,
-            restore_secrets_backup,
-            revoke_all_secrets,
-            get_secret_health,
-            get_secret_security_events,
-            get_key_custody_status,
-            seal_strategic_asset,
-            unseal_strategic_asset,
-            get_sentinel_ledger,
-            is_vault_unlocked,
-            lock_sentinel,
-            golems::register_new_golem,
-            golems::delete_golem,
-            search_semantic_nodes,
-            log_strategic_pulse,
-            get_venture_integrity,
-            log_compute_pulse,
-            get_fiscal_report,
-            execute_neural_commission,
-            generate_venture_synthesis,
-            relocate_foundry_storage,
-            derive_boardroom_debate,
-            get_strategic_assets,
-            verify_strategic_asset_integrity,
-            sync_physical_aura,
-            execute_neural_intent,
-            system::get_process_list,
-            system::get_storage_map,
-            system::get_system_devices,
-            system::read_directory,
-            system::launch_path,
-            system::delete_path,
-            system::rename_path,
-            system::kill_quarantine_process,
-            system::suspend_process,
-            system::resume_process,
-            system::set_process_priority,
-            system::get_process_priority,
-            system::get_battery_health_wmi,
-            golems::get_active_golems,
-            golems::register_golem_task,
-            golems::update_golem_task,
-            golems::release_golem_workforce,
-            golems::get_golem_proposals,
-            golems::resolve_golem_proposal,
-            pin_context,
-            get_pinned_contexts,
-            delete_pinned_context,
-            get_predictive_intents,
-            get_neural_logs,
-            seek_chronos,
-            system::get_active_windows,
-            system::set_window_layout,
-            system::launch_context_apps,
-            get_spectral_anomalies,
-            manifest_forge_intent,
-            register_remote_node,
-            get_collective_nodes,
-            broadcast_distributed_aura,
-            capture_chronos_snapshot,
-            seek_chronos_history,
-            vault::vault_store_secret,
-            vault::vault_get_secret,
-            vault::vault_list_secrets,
-            vault::vault_list_secrets_metadata,
-            vault::vault_delete_secret,
-            macros::forge_macro_intent,
-            macros::execute_macro_golem,
-            macros::execute_visual_macro,
-            macros::sign_macro_golem,
-            macros::get_macro_inventory,
-            macros::get_automation_tasks,
-            macros::execute_automation_task,
-            get_audit_logs,
-            get_nexus_pulse,
-            derive_predictive_simulation,
-            get_risk_simulations,
-            invoke_neural_mirror,
-            receive_neural_mirror,
-            resuscitate_ghost_snapshot,
-            derive_mitigation_macro,
-            get_system_resilience_audit,
-            check_biometric_status,
-            trigger_biometric_scan,
-            is_biometric_session_valid,
-            synthesize_founder_directive,
-            invoke_multimodal_oracle,
-            index_strategic_asset,
-            query_strategic_memory,
-            collective_aura_sync,
-            golems::hatch_autonomous_golem,
-            golems::decommission_golem,
-            golems::manifest_architectural_blueprint,
-            golems::get_architectural_manifests,
-            manifest_chronos_voyage,
-            system::manifest_new_venture,
-            system::launch_sub_venture,
-            system::stop_sub_venture,
-            system::list_active_ventures,
-            system::purge_sub_venture,
-            system::manifest_knowledge_crate,
-            system::get_oracle_pulse,
-            system::run_sandbox_audit,
-            system::run_adversarial_simulation,
-            system::sweep_venture_health,
-            system::recover_dead_ventures,
-            system::get_all_build_manifests,
-            system::get_consortium_nodes,
-            system::get_sentinel_alerts,
-            system::get_global_threat_level,
-            system::run_security_audit,
-            system::trigger_system_lockdown,
-            ai::get_agent_collective,
-            ai::invoke_golem_debate,
-            mirror::get_neural_mutations,
-            mirror::analyze_system_genome,
-            mirror::verify_system_mutation,
-            mirror::apply_neural_mutation,
+            trigger_deploy,
+            get_vault_nodes,
+            get_market_intelligence
         ])
-
-
-
-        .setup(|app| {
-            use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code};
-            let app_handle = app.handle().clone();
-            
-            // Register Manifestation Hotkey (Alt+Space)
-            let overlay_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
-            app.global_shortcut().on_shortcut(overlay_shortcut, move |_app, _shortcut, event| {
-                if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                    let window = _app.get_webview_window("main").unwrap();
-                    let is_visible = window.is_visible().unwrap();
-                    if is_visible {
-                        let _ = window.hide();
-                    } else {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            }).unwrap();
-
-            // Initial Ambient Mode configuration
-            let main_window = app.get_webview_window("main").expect("failed to get main window");
-            let _ = main_window.set_ignore_cursor_events(true);
-            let _ = main_window.set_shadow(false);
-            
-            // Resolve storage paths
-            let app_data_dir = app_handle.path().app_local_data_dir().expect("failed to resolve app data dir");
-            if !app_data_dir.exists() {
-                let _ = std::fs::create_dir_all(&app_data_dir);
-            }
-            
-            // Initialize Crates Directory
-            let crates_dir = app_data_dir.join("crates");
-            if !crates_dir.exists() {
-                let _ = std::fs::create_dir_all(&crates_dir);
-            }
-
-            let db_path = app_data_dir.join("oasis_shell.db");
-            let manager = SqliteConnectionManager::file(&db_path);
-            let pool = Pool::new(manager).expect("failed to create db pool");
-            
-            // Enable WAL Mode and other hardeners
-            {
-                let conn = pool.get().expect("failed to get conn from pool");
-                let _ = conn.execute("PRAGMA journal_mode=WAL", []);
-                let _ = conn.execute("PRAGMA synchronous=NORMAL", []);
-                
-                // DB Table Initialization
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS context_crates (
-                    id INTEGER PRIMARY KEY, 
-                    name TEXT NOT NULL, 
-                    description TEXT,
-                    aura_color TEXT,
-                    apps TEXT NOT NULL, 
-                    timestamp TEXT NOT NULL,
-                    integrity INTEGER DEFAULT 100,
-                    arr REAL DEFAULT 0.0,
-                    burn REAL DEFAULT 0.0,
-                    status TEXT DEFAULT 'Offline'
-                )", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS neural_logs (id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, message TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS file_embeddings (id INTEGER PRIMARY KEY, filename TEXT NOT NULL, filepath TEXT NOT NULL, content TEXT NOT NULL, vector TEXT NOT NULL)", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS pinned_contexts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, state_blob TEXT NOT NULL, aura_color TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS system_secrets (name TEXT PRIMARY KEY, secret_blob BLOB NOT NULL, nonce BLOB NOT NULL, salt BLOB NOT NULL, timestamp TEXT NOT NULL)", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS chronos_history (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, data TEXT NOT NULL, integrity REAL NOT NULL)", []);
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS strategic_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, metadata TEXT NOT NULL, vector TEXT NOT NULL, timestamp TEXT NOT NULL)", []);
-                
-                // Golem Consolidation Table
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS golem_registry (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    aura TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    progress REAL DEFAULT 0.0
-                )", []);
-
-                // Automation & Audit Tables
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS automation_tasks (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    schedule TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    last_run INTEGER
-                )", []);
-                
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS audit_logs (
-                    id TEXT PRIMARY KEY,
-                    timestamp INTEGER NOT NULL,
-                    action TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    details TEXT NOT NULL
-                )", []);
-
-                // Risk Oracle Forge Table
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS risk_simulations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    scenario TEXT NOT NULL,
-                    probability REAL NOT NULL,
-                    impact_rating TEXT NOT NULL,
-                    defensive_strategy TEXT NOT NULL,
-                    associated_venture TEXT,
-                    timestamp TEXT NOT NULL
-                )", []);
-
-                let _ = conn.execute("CREATE TABLE IF NOT EXISTS oracle_predictions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    divergence_level TEXT NOT NULL,
-                    timestamp TEXT NOT NULL
-                )", []);
-            }
-
-            // Manage state
-            app.manage(AppState { pool, config: OasisConfig::load() });
-
-            // Initialize Workforce if empty
-            {
-                let mut registry = GOLEM_REGISTRY.lock().unwrap();
-                if registry.is_empty() {
-                    registry.insert("G-ALPHA".into(), GolemTask {
-                        id: "G-ALPHA".into(),
-                        name: "Golem Alpha".into(),
-                        status: "Awaiting Mission...".into(),
-                        progress: 0.0,
-                        aura: "indigo".into(),
-                        mission: None,
-                        thought_trace: None,
-                        is_autonomous: true,
-                        evolution_history: vec![],
-                        evolution_count: 0,
-                    });
-                    registry.insert("G-BETA".into(), GolemTask {
-                        id: "G-BETA".into(),
-                        name: "Golem Beta".into(),
-                        status: "Collecting Intelligence...".into(),
-                        progress: 0.0,
-                        aura: "emerald".into(),
-                        mission: None,
-                        thought_trace: None,
-                        is_autonomous: true,
-                        evolution_history: vec![],
-                        evolution_count: 0,
-                    });
-                }
-            }
-
-            // Background threads
-            let pulse_handle = app_handle.clone();
-            std::thread::spawn(move || {
-                loop {
-                    std::thread::sleep(std::time::Duration::from_secs(60));
-                    let _ = pulse_handle.emit("chronos-pulse", ());
-                }
-            });
-            
-            let _ = start_telemetry_server(app_handle.clone());
-            
-            // Start Sentinel Monitor
-            start_sentinel_monitor(app_handle.clone());
-            
-            let resonance_handle = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                collective_resonance_loop(resonance_handle).await;
-            });
-
-            Ok(())
-        })
-        .build(context)
-        .expect("error while building tauri application");
-
-    app.run(|_app_handle, _event| {});
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
-fn start_sentinel_monitor(app: tauri::AppHandle) {
-    use notify::{Watcher, RecursiveMode, Config};
-    use std::path::Path;
-    use tauri::Emitter;
-
-    std::thread::spawn(move || {
-        let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = notify::RecommendedWatcher::new(tx, Config::default()).expect("Failed to create Sentinel Watcher");
-
-        // Watch ventures directory
-        if let Err(e) = watcher.watch(Path::new("ventures"), RecursiveMode::Recursive) {
-            eprintln!("Sentinel Watcher Error: {:?}", e);
-            return;
-        }
-
-        loop {
-            // 1. File Integrity Monitoring (FIM)
-            if let Ok(Ok(event)) = rx.recv_timeout(std::time::Duration::from_secs(5)) {
-                let _ = app.emit("sentinel-event", format!("{:?}", event.kind));
-            }
-
-            // 2. Periodic Behavioral Scan
-            // In a real environment, we'd check GlobalThreatLevel here
-        }
-    });
-}
-
-
-
