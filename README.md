@@ -1,55 +1,114 @@
-# 🌌 Oasis Shell: Master Manifest v3.4.0
+<div align="center">
+  <img src="https://raw.githubusercontent.com/jibin7jose/Oasis-Shell/main/public/Screenshot%202026-06-02%20222403.png" alt="Oasis Shell Interface" width="800" />
+  
+  <br/>
+  <br/>
 
-## 🔭 Architectural Philosophy
-The Oasis Shell is a high-fidelity, high-concurrency operating environment designed for strategic founders. It transitions the workspace from a series of disconnected tools into a unified, thread-safe, and forensically audited command center.
+  <h1>🌌 Oasis-Shell Sentient OS</h1>
+  <p><strong>An autonomous, AI-driven digital workspace powered by Rust & React</strong></p>
+
+  <p>
+    <a href="https://github.com/tauri-apps/tauri"><img src="https://img.shields.io/badge/Tauri-FFC13B?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri" /></a>
+    <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" /></a>
+    <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust" /></a>
+    <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" /></a>
+    <a href="https://ollama.ai/"><img src="https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white" alt="Ollama" /></a>
+  </p>
+</div>
+
+<hr/>
+
+## 🔮 What is Oasis-Shell?
+
+Oasis-Shell is not just a terminal or a dashboard—it is a **Sentient Operating System layer**. Built with a lightning-fast Rust backend (Tauri) and a beautiful React/Tailwind frontend, it acts as an autonomous digital assistant that watches your screen, manages your code, and interacts with you via natural language and voice commands.
+
+## 🚀 Key Features
+
+### 🧠 Photographic Memory Engine
+The OS runs a silent background agent in Rust that takes a snapshot of your screen every 30 seconds. It uses a local `llava` vision model to analyze the screen, extracting context about what you're working on. 
+- **Time-Machine UI:** Browse a chronological timeline of your visual history.
+- **Neural Querying:** Ask *"What was I working on earlier?"* and the OS will query its SQLite memory bank to answer factually.
+
+### 🎙️ Voice Command Engine
+A fully integrated Web Speech API pipeline allows hands-free control of your OS.
+- Just say **"Review code and push"**, and the system will automatically run `git status`, generate a commit message using AI, and push your code to GitHub.
+- Trigger complex deployments or memory recalls without touching your keyboard.
+
+### 🤖 Proactive AI Agents (Cron Workers)
+Deploy autonomous agents with custom prompts that run on a schedule.
+- E.g. *"Check if CPU usage is over 80%. If yes, warn me."*
+- Agents execute silently in the background and surface alerts only when necessary.
+
+### 🌐 3D Strategic Cortex
+A visual force-directed graph (powered by `react-force-graph-3d`) that maps out your strategic objectives, context crates, and system modules in an interactive 3D space.
+
+### 📦 Context Crates (Workspaces)
+Group applications, files, and tasks into isolated "Crates". Switch contexts instantly (e.g., from *Creative Forge* to *Strategic Core*) with a single click.
 
 ---
 
-## 🛠 Core Internal Hardening
+## 🏗️ Architecture & Stack
 
-### 1. High-Concurrency Ledger Engine (`r2d2`)
-The backend has been migrated from a single-threaded `Mutex<Connection>` to a production-grade **SQLite Connection Pool** powered by `r2d2`.
-- **WAL Mode**: Write-Ahead Logging is enabled by default to allow concurrent reads and writes.
-- **Synchronous NORMAL**: Optimized for high-speed SSD throughput while maintaining forensic integrity.
-- **Pooled Access**: All Tauri commands now utilize `state.pool.get()` for non-blocking database interactions.
+```mermaid
+graph TD;
+    A[React / Vite Frontend] -->|Tauri IPC| B(Rust Core Kernel);
+    B -->|System APIs| C[Windows OS];
+    B -->|Screen Capture| D[screenshots Crate];
+    B -->|Vision Inference| E[Ollama / Llava];
+    B -->|Text Inference| F[Ollama / Gemma4];
+    B -->|Persistence| G[(SQLite DB)];
+    
+    A -->|Voice Capture| H[Web Speech API];
+    H -->|Intent| A;
+```
 
-### 2. Forensic Persistence Layer
-All system state is now consolidated into the centralized `oasis_shell.db` ledger:
-- **Chronos Snapshots**: Every world-state change is etched into the ledger for temporal navigation.
-- **Sentinel Vault**: High-risk assets are sealed via AES-256-GCM, with keys derived from the Founder Signature.
-- **Neural Logs**: Real-time behavioral telemetry and AI synthesis events are forensically tracked.
-- **Strategic Golems**: The autonomous workforce registry is now a SQL-backed inventory, purging legacy JSON dependencies.
-
-### 3. Structural Resilience (`SpectralBoundary`)
-The frontend implements a **Isolationist Panel Strategy**.
-- Each major dashboard node (Forge, Workforce, Dashboard, Nexus) is wrapped in a `SpectralBoundary`.
-- Component-level entropy or JS crashes are isolated, allowing the Founder to "reconstruct" specific panels without crashing the entire Shell.
-
----
-
-## 🛰 Neural Endpoints
-
-| Endpoint | Logic | Persistence |
-| :--- | :--- | :--- |
-| `get_nexus_pulse` | Portfolio Integrity Aggregation | `context_crates` |
-| `register_new_golem` | Autonomous Agent Enrollment | `golem_registry` |
-| `execute_neural_intent` | LLM-Driven System Routing | `neural_logs` |
-| `vault_seal_asset` | AES-256 Forensic Sealing | `system_secrets` |
-| `get_chronos_ledger` | Temporal Buffer Navigation | `chronos_history` |
+### Tech Stack Highlights:
+- **Frontend:** React, TypeScript, TailwindCSS, Framer Motion, Lucide Icons, ForceGraph3D.
+- **Backend:** Rust, Tauri, rusqlite, reqwest, image processing (v0.25).
+- **AI / LLMs:** Local Ollama running `llava` (Vision) and `gemma4` (Text/Agents).
 
 ---
 
-## 🛡 Security Protocol
-- **Vault Gating**: Sensitive operations (Refactor, Purge, Vault Access) require an active `OASIS_FOUNDER_SECRET` handshake.
-- **Signed Macros**: AI-synthesized PowerShell macros must be signed by the founder before execution.
-- **Path Isolation**: All persistence is localized to the `app_local_data_dir`, isolated from system-wide temp folders.
+## ⚙️ Installation & Setup
+
+Ensure you have [Node.js](https://nodejs.org/), [Rust](https://www.rust-lang.org/tools/install), and [Ollama](https://ollama.ai/) installed.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/jibin7jose/Oasis-Shell.git
+   cd Oasis-Shell
+   ```
+
+2. **Install frontend dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Pull required Local LLMs:**
+   ```bash
+   ollama pull gemma4:latest
+   ollama pull llava
+   ```
+
+4. **Run the OS:**
+   ```bash
+   npm run dev
+   ```
+
+*(Note: The project uses a custom `.cargo/config.toml` to redirect build artifacts to `C:\dev\cargo-target` to bypass strict Windows AppLocker/Smart App Control policies.)*
 
 ---
 
-## 🚀 Deployment Status
-- **Backend Status**: Hardened (r2d2 / WAL)
-- **Persistence Status**: Consolidated (SQL-Centric)
-- **UI Status**: Resilient (SpectralBoundaries Active)
-- **Neural Lattice**: Synchronized (Gemma3 / LLava)
+## 📸 The Interface
 
-**"In entropy, we forge the order of the venture."**
+The user interface features a premium glass-morphic aesthetic, designed to feel like a high-tech command center. 
+
+- **Dark Mode Native:** Deep slate and indigo palettes.
+- **Animated Substrates:** Glowing background auras that change color based on your active context.
+- **Data-Dense Metrics:** Real-time RAM, CPU, and Runway metrics beautifully formatted.
+
+<br/>
+
+<div align="center">
+  <i>"The future of computing is autonomous."</i>
+</div>
