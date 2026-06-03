@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import { useSoundscape } from "./hooks/useSoundscape";
+import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -235,6 +236,11 @@ export default function App() {
     arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%"
   });
   const [telemetry, setTelemetry] = useState({ cpu_usage: 0, ram_usage: 0, disk_usage: 0 });
+
+  useHeuristicGuardian(telemetry, (category, action) => {
+    setProactiveAlert({ suggestion: `Anomaly Detected: ${category}. Auto-mitigation ready.`, action });
+    notifyUser(`Heuristic Guardian Alert`, `Detected ${category}. Review mitigation action.`);
+  });
 
   const [marketIntel, setMarketIntel] = useState([
     { symbol: "OASIS_INDEX", price: "$1,421.40", change: "+2.4%" },
