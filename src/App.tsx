@@ -187,14 +187,19 @@ export default function App() {
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     
-    // Listen for global shortcut from Rust backend
-    const unlisten = listen('toggle-sentient-terminal', () => {
+    // Listen for global shortcuts from Rust backend
+    const unlistenTerminal = listen('toggle-sentient-terminal', () => {
       setShowTerminal(prev => !prev);
+    });
+    
+    const unlistenPalette = listen('toggle-command-palette', () => {
+      setShowCommandPalette(prev => !prev);
     });
 
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown);
-      unlisten.then(f => f());
+      unlistenTerminal.then(f => f());
+      unlistenPalette.then(f => f());
     };
   }, []);
 
@@ -1121,11 +1126,12 @@ export default function App() {
               </div>
               <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Live Feed Active</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {[
                 { name: 'Native Bridge', status: bridgeStatus, prog: bridgeStatus === 'Native' ? 100 : 45, color: bridgeStatus === 'Native' ? 'emerald' : 'purple' },
                 { name: 'CPU Usage', status: `${telemetry.cpu_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.cpu_usage), color: telemetry.cpu_usage > 80 ? 'red' : 'indigo' },
-                { name: 'Memory Load', status: `${telemetry.ram_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.ram_usage), color: telemetry.ram_usage > 85 ? 'red' : 'purple' }
+                { name: 'Memory Load', status: `${telemetry.ram_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.ram_usage), color: telemetry.ram_usage > 85 ? 'red' : 'purple' },
+                { name: 'Disk Space', status: `${telemetry.disk_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.disk_usage), color: telemetry.disk_usage > 90 ? 'red' : 'cyan' }
               ].map((env) => (
                 <div key={env.name} className="space-y-3">
                   <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500">
@@ -1133,7 +1139,7 @@ export default function App() {
                     <span>{env.status}</span>
                   </div>
                   <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : "bg-purple-500")} />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : env.color === 'cyan' ? "bg-cyan-500" : env.color === 'red' ? "bg-red-500" : "bg-purple-500")} />
                   </div>
                 </div>
               ))}
@@ -1688,28 +1694,52 @@ export default function App() {
         )}
 
         {simMode && (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-[#020617]/40 backdrop-blur-3xl">
-            <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-12 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.1)] relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
-              <div className="flex items-center justify-between mb-16">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-black/80 backdrop-blur-3xl">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
+            
+            <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-16 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.15)] relative overflow-hidden backdrop-blur-xl">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-400 to-amber-500/0 opacity-70" />
+              <div className="flex items-center justify-between mb-16 relative z-10">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-[0.4em] mb-1">Strategic Sandbox</span>
-                  <h2 className="text-4xl font-bold text-white tracking-tighter">Venture Simulation Portal</h2>
+                  <span className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mb-2 flex items-center gap-3">
+                    <Activity className="w-4 h-4 animate-pulse" /> Strategic Sandbox
+                  </span>
+                  <h2 className="text-4xl font-black text-white tracking-tighter">Venture Simulation Portal</h2>
                 </div>
-                <button onClick={() => setSimMode(false)} className="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-amber-500/20">Commit Simulation</button>
+                <button onClick={() => setSimMode(false)} className="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-[11px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:shadow-[0_0_40px_rgba(245,158,11,0.6)] transform hover:-translate-y-1">
+                  Commit Simulation
+                </button>
               </div>
-              <div className="grid grid-cols-1 gap-12">
+              
+              <div className="grid grid-cols-1 gap-12 relative z-10">
                 {[
-                  { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr' },
-                  { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn' },
-                  { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum' }
+                  { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr', color: 'text-emerald-400', accent: 'accent-emerald-500' },
+                  { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn', color: 'text-red-400', accent: 'accent-red-500' },
+                  { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum', color: 'text-amber-400', accent: 'accent-amber-500' }
                 ].map((sim) => (
-                  <div key={sim.key} className="space-y-6">
-                    <div className="flex justify-between items-end">
-                      <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">{sim.label}</label>
-                      <span className="text-3xl font-bold text-white tracking-tighter">{sim.key === 'arr' ? '$' : ''}{sim.val}{sim.unit}</span>
+                  <div key={sim.key} className="space-y-6 group">
+                    <div className="flex justify-between items-end border-b border-white/5 pb-4 group-hover:border-white/10 transition-colors">
+                      <label className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        {sim.key === 'arr' && <Zap className="w-4 h-4 text-emerald-500" />}
+                        {sim.key === 'burn' && <Activity className="w-4 h-4 text-red-500" />}
+                        {sim.key === 'momentum' && <PulseIcon className="w-4 h-4 text-amber-500" />}
+                        {sim.label}
+                      </label>
+                      <span className={cn("text-4xl font-black tracking-tighter drop-shadow-md", sim.color)}>
+                        {sim.key === 'arr' ? '$' : ''}{sim.val}<span className="text-lg opacity-70 ml-1">{sim.unit}</span>
+                      </span>
                     </div>
-                    <input type="range" min={sim.min} max={sim.max} step={0.1} value={sim.val} onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-amber-500" />
+                    <div className="relative pt-2">
+                      <input 
+                        type="range" 
+                        min={sim.min} 
+                        max={sim.max} 
+                        step={0.1} 
+                        value={sim.val} 
+                        onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))} 
+                        className={cn("w-full h-2 bg-black/40 rounded-full appearance-none cursor-pointer border border-white/5", sim.accent)} 
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1718,32 +1748,44 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Floating Chat Robot */}
+      {/* Floating Holographic Assistant */}
       <div className="fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600]">
         <AnimatePresence>
           {showAI && (
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 50 }} className="w-96 h-[550px] glass rounded-[2.5rem] border-white/10 shadow-3xl overflow-hidden flex flex-col mb-4">
-              <header className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.03]">
-                <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Neural Link Stable</span>
-                <div className="flex gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" /></div>
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 50, filter: "blur(10px)" }} animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, scale: 0.9, y: 50, filter: "blur(10px)" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="w-96 h-[550px] glass-bright rounded-[2.5rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(99,102,241,0.2)] overflow-hidden flex flex-col mb-4 backdrop-blur-3xl relative">
+              <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
+              <header className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20 relative z-10 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                  <BrainCircuit className="w-5 h-5 text-indigo-400 animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-widest text-indigo-300">Sentient Link Stable</span>
+                </div>
+                <div className="flex gap-1.5 p-2 bg-indigo-500/10 rounded-full border border-indigo-500/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0.15s' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
               </header>
-              <div className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar">
+              <div className="flex-1 p-6 overflow-y-auto space-y-5 custom-scrollbar relative z-10">
                 {messages.map((m, i) => (
-                  <div key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm", m.role === 'user' ? "ml-auto bg-indigo-600 text-white" : "mr-auto glass text-slate-300 shadow-lg")}>{m.content}</div>
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm font-medium leading-relaxed shadow-lg", m.role === 'user' ? "ml-auto bg-indigo-600/90 text-white border border-indigo-500/30 rounded-tr-sm" : "mr-auto glass-bright text-indigo-100 border border-white/10 rounded-tl-sm")}>
+                    {m.content}
+                  </motion.div>
                 ))}
-                {isThinking && <div className="p-4 glass rounded-2xl w-fit animate-pulse tracking-widest text-[10px] font-bold text-indigo-400">THINKING...</div>}
+                {isThinking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 glass rounded-2xl w-fit flex items-center gap-2 border border-white/5 rounded-tl-sm text-indigo-300">
+                  <Activity className="w-3 h-3 animate-spin" /> <span className="text-[10px] font-bold uppercase tracking-widest">Synthesizing...</span>
+                </motion.div>}
               </div>
-              <div className="p-6 bg-black/20">
-                <div className="flex items-center glass rounded-2xl px-5 py-3 border-white/10">
-                  <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white" />
-                  <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-white transition-colors"><Zap size={18} /></button>
+              <div className="p-6 bg-gradient-to-b from-transparent to-black/60 relative z-10">
+                <div className="flex items-center bg-black/40 rounded-2xl px-5 py-4 border border-indigo-500/30 shadow-inner group transition-all hover:border-indigo-400/50">
+                  <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white placeholder:text-indigo-200/40" />
+                  <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-indigo-200 hover:scale-110 transition-all bg-indigo-500/10 p-2 rounded-xl border border-indigo-500/20"><Zap size={16} /></button>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-        <button onClick={() => setShowAI(!showAI)} className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-500/40 hover:scale-105 transition-all">
-          <Bot className="w-9 h-9" />
+        <button onClick={() => setShowAI(!showAI)} className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105 transition-all border border-indigo-400/30", showAI ? "bg-indigo-600" : "bg-gradient-to-br from-indigo-500 to-purple-600")}>
+          <BrainCircuit className={cn("w-9 h-9", showAI ? "animate-pulse" : "")} />
         </button>
       </div>
       {/* Guardian Notification HUD */}
