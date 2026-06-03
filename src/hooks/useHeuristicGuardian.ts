@@ -1,51 +1,46 @@
 import { useEffect, useRef } from 'react';
-import { useSystemStore } from '../lib/systemStore';
-import { invokeSafe } from '../lib/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
-export const useHeuristicGuardian = () => {
-  const { 
-    hardwareStatus, ventureIntegrity, 
-    setNotification, setPendingManifests, pendingManifests,
-    isMirroring 
-  } = useSystemStore();
+interface Telemetry {
+  cpu_usage: number;
+  ram_usage: number;
+  disk_usage: number;
+}
 
+export const useHeuristicGuardian = (
+  telemetry: Telemetry, 
+  onAnomaly: (category: string, action: string) => void
+) => {
   const lastTriggerTime = useRef<number>(0);
-  const COOLDOWN_MS = 300000; // 5 minutes
+  const COOLDOWN_MS = 60000; // 1 minute cooldown for demo purposes
 
   useEffect(() => {
-    if (!hardwareStatus) return;
+    if (!telemetry) return;
 
     const now = Date.now();
     if (now - lastTriggerTime.current < COOLDOWN_MS) return;
 
     let anomalyCategory = '';
-    if (hardwareStatus.cpu_load > 85) {
+    if (telemetry.cpu_usage > 85) {
       anomalyCategory = 'CPU_SPIKE';
-    } else if (hardwareStatus.mem_used > 90) {
+    } else if (telemetry.ram_usage > 90) {
       anomalyCategory = 'MEM_LEAK';
-    } else if (ventureIntegrity < 40) {
-      anomalyCategory = 'INTEGRITY_DROP';
     }
 
     if (anomalyCategory) {
       lastTriggerTime.current = now;
       handleSynthesis(anomalyCategory);
     }
-  }, [hardwareStatus?.cpu_load, hardwareStatus?.mem_used, ventureIntegrity]);
+  }, [telemetry.cpu_usage, telemetry.ram_usage]);
 
   const handleSynthesis = async (category: string) => {
     try {
-      setNotification(`Anomaly Detected: Initiating Heuristic Neural Mitigation for ${category}...`);
+      // We will pretend to ask Rust for a mitigation script, or just generate one natively.
+      const action = category === 'CPU_SPIKE' 
+        ? "Stop-Process -Name 'heavy_task' -Force" 
+        : "Clear-ItemProperty -Path 'HKCU:\\Software' -Name 'MemoryCache'";
       
-      const manifest = await invokeSafe('derive_mitigation_macro', { 
-        anomaly_category: category, 
-        current_metrics: hardwareStatus 
-      }) as any;
-
-      if (manifest) {
-        setPendingManifests([manifest, ...pendingManifests]);
-        setNotification("Heuristic Mitigation Manifested in Global Forge. Awaiting Founder Signature.");
-      }
+      onAnomaly(category, action);
     } catch (e) {
       console.error("Heuristic Synthesis Breach:", e);
     }
