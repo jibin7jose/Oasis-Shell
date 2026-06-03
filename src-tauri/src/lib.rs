@@ -656,8 +656,14 @@ async fn semantic_search(
     Ok(serde_json::json!(results))
 }
 
+
+
 #[tauri::command]
-async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<String, String> {
+async fn rag_query(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, DbState>,
+    query: String,
+) -> Result<String, String> {
     let client = reqwest::Client::new();
 
     // 1. Embed query
@@ -729,25 +735,35 @@ async fn rag_query(state: tauri::State<'_, DbState>, query: String) -> Result<St
         format!("Answer the user's question using ONLY the provided local file context. If the user asks for a file operation, suggest a command in [CMD] command [/CMD] format.\n\nContext block:{}\n\nQuestion: {}", context_block, query)
     };
 
-    // 4. Generate Semantic Response via Gemma3
+    // 4. Generate Semantic Response via Gemma3 (Streaming!)
     let chat_body =
-        serde_json::json!({ "model": "gemma4:latest", "prompt": final_prompt, "stream": false });
-    let res = client
+        serde_json::json!({ "model": "gemma4:latest", "prompt": final_prompt, "stream": true });
+    let mut res = client
         .post("http://localhost:11434/api/generate")
         .json(&chat_body)
         .send()
         .await
         .map_err(|e| e.to_string())?;
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
 
-    if let Some(response) = json["response"].as_str() {
-        Ok(response.to_string())
-    } else {
-        Err(format!(
-            "Failed to parse local AI inference response. Ollama API returned: {}",
-            json.to_string()
-        ))
+    let mut full_response = String::new();
+
+    while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+        if let Ok(text) = String::from_utf8(chunk.to_vec()) {
+            for line in text.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                    if let Some(token) = json["response"].as_str() {
+                        full_response.push_str(token);
+                        let _ = app.emit("llm-token", token);
+                    }
+                }
+            }
+        }
     }
+
+    Ok(full_response)
 }
 
 #[tauri::command]
