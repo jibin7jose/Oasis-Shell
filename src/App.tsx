@@ -10,6 +10,7 @@ import {
   Plus, Activity as PulseIcon, UploadCloud, Eye, Mic, MicOff, Clock, Image as ImageIcon
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
+import { useSoundscape } from "./hooks/useSoundscape";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -57,6 +58,33 @@ type ContextCrate = {
 };
 
 export default function App() {
+  const { playClick, playNotification, startEngine, updateEngine, playPulse } = useSoundscape();
+
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      startEngine();
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+    
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('a') || target.closest('.cursor-pointer')) {
+        playClick();
+      }
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+    document.addEventListener('click', handleGlobalClick);
+    
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [startEngine, playClick]);
+
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
   const [searchQuery, setSearchQuery] = useState("");
@@ -249,6 +277,7 @@ export default function App() {
   const notifyUser = (title: string, body: string) => {
     // Show beautiful in-app toast
     setToast({ title, body, id: Date.now() });
+    playNotification();
     setTimeout(() => setToast(null), 5000);
     
     // Attempt native OS notification
@@ -398,16 +427,32 @@ export default function App() {
         logEvent("Executive Metrics Audit Completed", "neural");
       } else {
         // True LLM Intent Parsing & Action Execution
-        setMessages(prev => [...prev, { role: "assistant", content: "Synthesizing neural intent..." }]);
+        setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+        let unlistenToken: any;
+        listen('llm-token', (event: any) => {
+          setMessages(prev => {
+             const newMsgs = [...prev];
+             if (newMsgs[newMsgs.length - 1].role === 'assistant') {
+                newMsgs[newMsgs.length - 1].content += event.payload;
+             }
+             return newMsgs;
+          });
+        }).then(f => unlistenToken = f);
+
         (async () => {
           try {
             const llmResponse = await invoke("rag_query", { query }) as string;
+            if (unlistenToken) unlistenToken();
             
             // Parse for executable system commands
             const cmdMatch = llmResponse.match(/\[CMD\](.*?)\[\/CMD\]/is);
             if (cmdMatch && cmdMatch[1]) {
                const cmd = cmdMatch[1].trim();
-               setMessages(prev => [...prev, { role: "assistant", content: `Neural Directive Authorized. Executing system command: \`${cmd}\`` }]);
+               setMessages(prev => {
+                 const newMsgs = [...prev];
+                 newMsgs[newMsgs.length - 1].content = `Neural Directive Authorized. Executing system command:\n\`${cmd}\``;
+                 return newMsgs;
+               });
                logEvent(`Autonomous System Command: ${cmd}`, 'deploy');
                
                try {
@@ -712,6 +757,7 @@ export default function App() {
         setActiveWindows(windows);
         setContextCrates(crates);
         setTelemetry(hardware);
+        updateEngine(hardware.cpu_usage);
         if (logs.length > 0) {
           setTimeline(logs.map((entry) => ({
             id: entry.id || Date.parse(entry.timestamp) || Date.now(),
@@ -1390,10 +1436,18 @@ export default function App() {
                        if (e.key === 'Enter' && ragQuery.trim()) {
                          setIsRagging(true);
                          setRagAnswer("");
+                         
+                         let unlistenVaultToken: any;
+                         listen('llm-token', (event: any) => {
+                           setRagAnswer(prev => prev + event.payload);
+                         }).then(f => unlistenVaultToken = f);
+
                          try {
                             const answer = await invoke("rag_query", { query: ragQuery });
+                            if (unlistenVaultToken) unlistenVaultToken();
                             setRagAnswer(answer as string);
                          } catch(err) {
+                            if (unlistenVaultToken) unlistenVaultToken();
                             setRagAnswer("Error querying the Sentient Vault.");
                          }
                          setIsRagging(false);
