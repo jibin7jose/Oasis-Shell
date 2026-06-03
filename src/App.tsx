@@ -1568,34 +1568,37 @@ export default function App() {
         </AnimatePresence>
 
         {showLogs && (
-          <motion.div initial={{ opacity: 0, x: 500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 500 }} className="fixed inset-y-0 right-0 z-[400] w-[450px] glass-bright border-l border-white/10 p-12 backdrop-blur-4xl flex flex-col">
-            <div className="flex items-center justify-between mb-12">
+          <motion.div initial={{ opacity: 0, x: 500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 500 }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed inset-y-0 right-0 z-[400] w-[450px] bg-black/80 border-l border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.6)]">
+            {/* Ambient Background */}
+            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
+            <div className="flex items-center justify-between mb-12 relative z-10">
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Ledger</span>
-                <h2 className="text-3xl font-bold text-white tracking-tighter">Cognitive Timeline</h2>
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Activity className="w-3 h-3 animate-pulse" /> Foundry Ledger</span>
+                <h2 className="text-3xl font-black text-white tracking-tighter">Cognitive Timeline</h2>
               </div>
-              <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-6 h-6 rotate-45" /></button>
+              <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/20"><Plus className="w-6 h-6 rotate-45" /></button>
             </div>
-            <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4">
+            <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4 z-10">
               <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
-              <div className="space-y-12">
-                {timeline.map((event) => (
-                  <div key={event.id} className="relative pl-12">
-                    <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-[#020617] flex items-center justify-center z-10", event.type === 'neural' ? "bg-indigo-500" : event.type === 'deploy' ? "bg-emerald-500" : "bg-slate-600")}>
+              <div className="space-y-8 pb-10">
+                {timeline.map((event, i) => (
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={event.id} className="relative pl-12 group">
+                    <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-black flex items-center justify-center z-10 shadow-[0_0_15px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-110", event.type === 'neural' ? "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]" : event.type === 'deploy' ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-slate-600")}>
                       <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                     </div>
-                    <div className="glass p-5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-mono text-slate-500">{event.time}</span>
-                        <span className={cn("text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded",
-                          event.type === 'neural' ? "text-indigo-400 bg-indigo-400/10" :
-                            event.type === 'deploy' ? "text-emerald-400 bg-emerald-400/10" :
-                              "text-slate-400 bg-slate-400/10"
+                    <div className="glass-bright p-5 rounded-2xl border border-white/5 group-hover:border-indigo-500/30 group-hover:bg-white/[0.03] transition-all relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="flex justify-between items-center mb-3 relative z-10">
+                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5"><Clock className="w-3 h-3 text-slate-500" /> {event.time}</span>
+                        <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
+                          event.type === 'neural' ? "text-indigo-300 bg-indigo-500/10 border-indigo-500/20" :
+                            event.type === 'deploy' ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" :
+                              "text-slate-300 bg-slate-500/10 border-slate-500/20"
                         )}>{event.type}</span>
                       </div>
-                      <p className="text-sm text-slate-300 font-medium leading-relaxed">{event.event}</p>
+                      <p className="text-sm text-slate-200 font-light leading-relaxed relative z-10">{event.event}</p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1603,61 +1606,66 @@ export default function App() {
         )}
 
         {showSettings && (
-          <motion.div initial={{ opacity: 0, x: -500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -500 }} className="fixed inset-y-0 left-0 z-[400] w-[450px] glass-bright border-r border-white/10 p-12 backdrop-blur-4xl flex flex-col shadow-[100px_0_100px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between mb-12">
+          <motion.div initial={{ opacity: 0, x: -500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -500 }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed inset-y-0 left-0 z-[400] w-[450px] bg-black/80 border-r border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[30px_0_60px_rgba(0,0,0,0.6)]">
+            {/* Ambient Background */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-purple-500/10 via-transparent to-transparent pointer-events-none" />
+            <div className="flex items-center justify-between mb-12 relative z-10">
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">System Configuration</span>
-                <h2 className="text-3xl font-bold text-white tracking-tighter">Kernel Settings</h2>
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Settings className="w-3 h-3 animate-[spin_4s_linear_infinite]" /> System Configuration</span>
+                <h2 className="text-3xl font-black text-white tracking-tighter">Kernel Settings</h2>
               </div>
-              <button onClick={() => setShowSettings(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-6 h-6 rotate-45" /></button>
+              <button onClick={() => setShowSettings(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/20"><Plus className="w-6 h-6 rotate-45" /></button>
             </div>
             
-            <div className="flex-1 space-y-8 overflow-y-auto custom-scrollbar pr-4">
+            <div className="flex-1 space-y-10 overflow-y-auto custom-scrollbar pr-4 z-10 pb-10">
               <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Local AI Engine</h3>
-                <div className="p-4 glass rounded-2xl border border-white/5 space-y-3">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Local AI Engine</h3>
+                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-4 hover:border-purple-500/30 transition-colors">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Inference Model</span>
-                    <span className="text-xs font-mono text-indigo-400 bg-indigo-400/10 px-2 py-1 rounded border border-indigo-400/20">gemma3:4b</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-purple-400" /> Inference Model</span>
+                    <span className="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2.5 py-1.5 rounded-lg border border-purple-500/20 shadow-inner">gemma3:4b</span>
                   </div>
+                  <div className="w-full h-[1px] bg-white/5" />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Embedding Model</span>
-                    <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded border border-emerald-400/20">nomic-embed-text</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-400" /> Embedding Model</span>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 shadow-inner">nomic-embed-text</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sentient Vault (Vector DB)</h3>
-                <div className="p-4 glass rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Sentient Vault (Vector DB)</h3>
+                <div className="p-5 glass-bright rounded-3xl border border-white/5 flex flex-col gap-5 hover:border-indigo-500/30 transition-colors">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Indexed Nodes</span>
-                    <span className="text-xs font-bold text-slate-300">{vaultNodes.length} Files</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2"><FolderOpen className="w-4 h-4 text-indigo-400" /> Indexed Nodes</span>
+                    <span className="text-[11px] font-bold text-slate-200 bg-white/5 px-3 py-1 rounded-lg border border-white/10">{vaultNodes.length} Files</span>
                   </div>
-                  <button className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-colors border border-red-500/20">
+                  <button className="w-full py-3.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest rounded-2xl transition-all border border-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]">
                     Purge All Vector Data
                   </button>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hardware Telemetry Node</h3>
-                <div className="p-4 glass rounded-2xl border border-white/5 space-y-3">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Hardware Telemetry Node</h3>
+                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-4 hover:border-cyan-500/30 transition-colors">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Polling Rate</span>
-                    <span className="text-xs font-mono text-slate-300">2000ms</span>
+                    <span className="text-sm font-medium text-white flex items-center gap-2"><PulseIcon className="w-4 h-4 text-cyan-400" /> Polling Rate</span>
+                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2.5 py-1.5 rounded-lg border border-cyan-500/20">2000ms</span>
                   </div>
+                  <div className="w-full h-[1px] bg-white/5" />
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Background Process</span>
-                    <div className="w-8 h-4 bg-indigo-500 rounded-full relative">
-                      <div className="absolute right-1 top-0.5 w-3 h-3 bg-white rounded-full shadow" />
+                    <span className="text-sm font-medium text-white flex items-center gap-2"><Shield className="w-4 h-4 text-slate-400" /> Background Process</span>
+                    <div className="w-10 h-5 bg-cyan-500/20 border border-cyan-500/30 rounded-full relative shadow-[0_0_10px_rgba(34,211,238,0.2)]">
+                      <div className="absolute right-1 top-0.5 w-3.5 h-3.5 bg-cyan-400 rounded-full shadow-[0_0_5px_rgba(34,211,238,0.8)]" />
                     </div>
                   </div>
                 </div>
               </div>
+              
               <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">System Boot Sequence</h3>
-                <div className="p-4 glass rounded-2xl border border-white/5 space-y-3">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">System Boot Sequence</h3>
+                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-3 hover:border-white/20 transition-colors">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-white">Initialize Oasis on Windows Startup</span>
                     <button 
@@ -1667,9 +1675,9 @@ export default function App() {
                           else { await enable(); setAutostart(true); }
                         } catch(e) { console.error("Autostart Error:", e); }
                       }}
-                      className={cn("w-12 h-6 rounded-full relative transition-colors", autostart ? "bg-indigo-500" : "bg-white/10")}
+                      className={cn("w-12 h-6 rounded-full relative transition-all duration-300", autostart ? "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]" : "bg-white/10 border border-white/5")}
                     >
-                      <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow", autostart ? "left-7" : "left-1")} />
+                      <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md duration-300", autostart ? "left-7" : "left-1")} />
                     </button>
                   </div>
                 </div>
