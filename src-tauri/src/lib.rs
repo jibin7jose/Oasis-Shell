@@ -292,13 +292,28 @@ fn get_hardware_telemetry(
     sys.refresh_cpu_usage();
     sys.refresh_memory();
 
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let mut total_disk_space = 0;
+    let mut total_disk_used = 0;
+    
+    for disk in &disks {
+        total_disk_space += disk.total_space();
+        total_disk_used += disk.total_space() - disk.available_space();
+    }
+    
+    let disk_usage = if total_disk_space > 0 {
+        (total_disk_used as f32 / total_disk_space as f32) * 100.0
+    } else {
+        0.0
+    };
+
     let cpu_usage = sys.global_cpu_usage();
     let ram_usage = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
     Ok(HardwareTelemetry {
         cpu_usage,
         ram_usage,
-        disk_usage: 45.0, // Placeholder
+        disk_usage,
     })
 }
 
@@ -1525,6 +1540,8 @@ pub fn run() {
                 .expect("failed to register shortcut")
                 .with_shortcut("CommandOrControl+`")
                 .expect("failed to register terminal shortcut")
+                .with_shortcut("CommandOrControl+Space")
+                .expect("failed to register command palette shortcut")
                 .with_handler(|app, shortcut, event| {
                     if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                         if let Some(window) = app.get_webview_window("main") {
@@ -1539,8 +1556,16 @@ pub fn run() {
                                 } else {
                                     window.show().and_then(|_| window.set_focus())
                                 };
+                            } else if shortcut.matches(
+                                tauri_plugin_global_shortcut::Modifiers::CONTROL
+                                    | tauri_plugin_global_shortcut::Modifiers::META,
+                                tauri_plugin_global_shortcut::Code::Space,
+                            ) {
+                                // Command Palette shortcut
+                                let _ = window.show().and_then(|_| window.set_focus());
+                                let _ = window.emit("toggle-command-palette", ());
                             } else {
-                                // It's the terminal shortcut!
+                                // Terminal shortcut
                                 let _ = window.show().and_then(|_| window.set_focus());
                                 let _ = window.emit("toggle-sentient-terminal", ());
                             }
