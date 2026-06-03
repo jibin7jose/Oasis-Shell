@@ -1,0 +1,409 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud } from 'lucide-react';
+
+const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
+
+export const MainCommandStage = (props: any) => {
+  const {
+    contexts, activeContext, lastSync, marketIntel, resolveNeuralIntent, isListening,
+    voiceTranscript, searchQuery, setSearchQuery, handleSearchIntent, isThinking,
+    startVoiceCapture, simMode, simMetrics, founderMetrics, cronAgents, setCronAgents,
+    newAgentTitle, setNewAgentTitle, newAgentPrompt, setNewAgentPrompt, bridgeStatus,
+    telemetry, crateError, crateName, setCrateName, saveActiveCrate, crateBusy,
+    activeWindows, contextCrates, editingCrate, setEditingCrate, exportCrate,
+    deleteContextCrate, launchContextCrate, handleUpdateCrate, removeAppFromEditingCrate,
+    getCrateAppCount, handleContextSwitch, scanActiveWindows, suggestCrateName, importCrate
+  } = props;
+
+  return (
+      <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
+          <div className="flex items-center gap-12">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                {contexts.find(c => c.id === activeContext)?.name} Context
+                <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.6-PRO</span>
+              </h1>
+            </div>
+
+            <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
+
+            <div className="hidden md:flex flex-col">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Last System Sync</span>
+              <span className="text-xs font-mono text-indigo-400/80 tracking-tighter animate-pulse">{lastSync}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8">
+            {marketIntel.map((m, i) => (
+              <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
+                <PulseIcon className={cn("w-3.5 h-3.5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")} />
+                <span>{m.symbol}: <span className="text-white">{m.price}</span></span>
+                <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.change}</span>
+              </div>
+            ))}
+            <div className="h-8 w-[1px] bg-white/5 mx-2" />
+            <button onClick={() => resolveNeuralIntent("Sync Metrics")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
+              Neural Sync
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
+          {/* Neural Intent Bar */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className={cn(
+              "w-full max-w-2xl rounded-[2.5rem] p-6 shadow-3xl transition-all duration-500 mb-12 relative overflow-hidden",
+              isListening ? "glass bg-cyan-900/30 border border-cyan-500/40 shadow-[0_0_50px_rgba(34,211,238,0.15)]" : "glass-bright border border-white/5 hover:border-white/10"
+            )}
+          >
+            {/* Voice Wave Animation Background */}
+            <AnimatePresence>
+              {isListening && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+                >
+                  <div className="absolute w-96 h-96 bg-cyan-500/30 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '2s' }} />
+                  <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-400/20 via-transparent to-transparent animate-ping opacity-50" style={{ animationDuration: '3s' }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center gap-5 px-4 py-2 relative z-10">
+              {isListening ? (
+                <Mic className="w-7 h-7 text-cyan-400 animate-pulse drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+              ) : (
+                <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" : "text-slate-600")} />
+              )}
+              
+              <input
+                value={isListening ? voiceTranscript : searchQuery}
+                onChange={(e) => !isListening && setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchIntent}
+                placeholder={isListening ? "Listening... Speak your directive." : "Detecting Neural Intent..."}
+                className={cn(
+                  "bg-transparent border-none outline-none text-2xl w-full font-light transition-colors tracking-wide", 
+                  isListening ? "text-cyan-100 placeholder:text-cyan-500/60" : "text-white placeholder:text-slate-700"
+                )}
+                readOnly={isListening}
+              />
+              
+              {/* Voice Engine Mic Button */}
+              <button
+                onClick={startVoiceCapture}
+                title="Activate Voice Command Engine"
+                className={cn(
+                  "relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500 flex-shrink-0 group",
+                  isListening
+                    ? "bg-cyan-500/20 border border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] text-cyan-300"
+                    : "bg-white/5 border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-500/40 hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                )}
+              >
+                {isListening && (
+                  <>
+                    <span className="absolute inset-0 rounded-full border border-cyan-400 animate-ping" style={{ animationDuration: '1.5s' }} />
+                    <span className="absolute inset-0 rounded-full border border-cyan-300 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+                  </>
+                )}
+                {isListening ? (
+                  <div className="flex items-center gap-[3px] h-4">
+                    <div className="w-[3px] h-3 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '0ms' }} />
+                    <div className="w-[3px] h-4 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '150ms' }} />
+                    <div className="w-[3px] h-2 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '300ms' }} />
+                  </div>
+                ) : (
+                  <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />
+                )}
+              </button>
+              {!isListening && <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter</kbd>}
+            </div>
+          </motion.div>
+
+          {/* Metrics Ribbon */}
+          <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+            {[
+              { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
+              { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
+              { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
+              { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: PulseIcon }
+            ].map((m, i) => (
+              <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
+                <m.icon className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
+                  <div className="text-xl font-bold text-white">{m.val}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Proactive AI Cron Agents */}
+          <div className="w-full max-w-5xl mb-12">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">Autonomous Systems</span>
+                <h3 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+                  <Bot className="w-6 h-6 text-purple-400" /> Proactive AI Agents
+                </h3>
+              </div>
+              <button 
+                onClick={() => {
+                  if(newAgentTitle && newAgentPrompt) {
+                    setCronAgents(prev => [...prev, { id: Date.now().toString(), title: newAgentTitle, prompt: newAgentPrompt, interval: 60000, active: true }]);
+                    setNewAgentTitle("");
+                    setNewAgentPrompt("");
+                  }
+                }}
+                className="px-6 py-3 glass bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all"
+              >
+                + Deploy Agent
+              </button>
+            </div>
+            
+            {/* New Agent Input */}
+            <div className="glass p-6 rounded-3xl border border-purple-500/20 mb-8 flex gap-4 bg-purple-500/5">
+              <input 
+                value={newAgentTitle} onChange={e => setNewAgentTitle(e.target.value)} 
+                placeholder="Agent Name (e.g. Sweeper)" 
+                className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-purple-500/50 w-1/4"
+              />
+              <input 
+                value={newAgentPrompt} onChange={e => setNewAgentPrompt(e.target.value)} 
+                placeholder="System Prompt (e.g. 'Check memory every minute and close edge')" 
+                className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-purple-500/50 flex-1"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {cronAgents.map((agent) => (
+                <motion.div
+                  key={agent.id}
+                  className={cn(
+                    "glass rounded-[2rem] p-8 border relative overflow-hidden group min-h-[280px] flex flex-col justify-between transition-all duration-500",
+                    agent.active ? "border-purple-500/40 shadow-[0_0_30px_-10px_rgba(168,85,247,0.3)]" : "border-white/5 opacity-60"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-0 right-0 w-32 h-32 blur-[50px] transition-all",
+                    agent.active ? "bg-purple-500/20" : "bg-transparent"
+                  )} />
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className={cn("w-3 h-3 rounded-full animate-pulse", agent.active ? "bg-purple-400" : "bg-slate-600")} />
+                      <h3 className="text-lg font-bold tracking-tight text-white">{agent.title}</h3>
+                    </div>
+                    <button 
+                      onClick={() => setCronAgents(prev => prev.map(a => a.id === agent.id ? { ...a, active: !a.active } : a))}
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl transition-all border",
+                        agent.active ? "text-red-400 bg-red-400/10 border-red-500/20 hover:bg-red-400/20" : "text-emerald-400 bg-emerald-400/10 border-emerald-500/20 hover:bg-emerald-400/20"
+                      )}
+                    >
+                      {agent.active ? "Halt" : "Activate"}
+                    </button>
+                  </div>
+
+                  <div className="flex-1 space-y-4 relative z-10">
+                    <div className="p-5 rounded-2xl bg-black/40 border border-white/5">
+                      <p className="text-sm text-slate-300 leading-relaxed font-mono">
+                        <span className="text-purple-400 font-bold block mb-2 text-[10px] uppercase tracking-widest">Directive:</span> 
+                        {agent.prompt}
+                      </p>
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      Interval: {agent.interval / 1000} Seconds
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hardware Telemetry Node */}
+          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <Activity className="w-6 h-6 text-indigo-400" />
+                <h3 className="text-lg font-bold tracking-tight text-white">Hardware Telemetry</h3>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Live Feed Active</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { name: 'Native Bridge', status: bridgeStatus, prog: bridgeStatus === 'Native' ? 100 : 45, color: bridgeStatus === 'Native' ? 'emerald' : 'purple' },
+                { name: 'CPU Usage', status: `${telemetry.cpu_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.cpu_usage), color: telemetry.cpu_usage > 80 ? 'red' : 'indigo' },
+                { name: 'Memory Load', status: `${telemetry.ram_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.ram_usage), color: telemetry.ram_usage > 85 ? 'red' : 'purple' },
+                { name: 'Disk Space', status: `${telemetry.disk_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.disk_usage), color: telemetry.disk_usage > 90 ? 'red' : 'cyan' }
+              ].map((env) => (
+                <div key={env.name} className="space-y-3">
+                  <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500">
+                    <span>{env.name}</span>
+                    <span>{env.status}</span>
+                  </div>
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : env.color === 'cyan' ? "bg-cyan-500" : env.color === 'red' ? "bg-red-500" : "bg-purple-500")} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Context Crates */}
+          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <FolderOpen className="w-6 h-6 text-indigo-400" />
+                <div>
+                  <h3 className="text-lg font-bold tracking-tight text-white">Context Crates</h3>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{activeWindows.length} windows detected</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={scanActiveWindows} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-white rounded-xl border border-white/5 disabled:opacity-40">
+                  Scan
+                </button>
+                <button onClick={suggestCrateName} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-white rounded-xl border border-white/5 disabled:opacity-40">
+                  Name
+                </button>
+                <button onClick={importCrate} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 rounded-xl border border-purple-500/30 disabled:opacity-40">
+                  Import
+                </button>
+                <button onClick={saveActiveCrate} disabled={crateBusy} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl disabled:opacity-40">
+                  Save
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
+              <div className="space-y-5">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Crate Name</span>
+                  <input
+                    value={crateName}
+                    onChange={(e) => setCrateName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+                <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                  {activeWindows.slice(0, 6).map((win) => (
+                    <div key={`${win.pid}-${win.title}`} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/5 px-4 py-3">
+                      <span className="text-xs text-slate-300 truncate">{win.title}</span>
+                      <span className="text-[9px] font-mono text-slate-500">{win.pid}</span>
+                    </div>
+                  ))}
+                  {activeWindows.length === 0 && (
+                    <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3 text-xs text-slate-500">
+                      No active windows scanned yet.
+                    </div>
+                  )}
+                </div>
+                {crateError && <p className="text-xs text-amber-400 font-medium">{crateError}</p>}
+              </div>
+
+              <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2 perspective-1000">
+                {contextCrates.map((crate) => {
+                  const isEditing = editingCrate?.id === crate.id;
+                  return (
+                    <motion.div 
+                      key={crate.id || crate.timestamp} 
+                      className="relative w-full"
+                      animate={{ rotateX: isEditing ? 180 : 0 }}
+                      transition={{ duration: 0.6, type: "spring" }}
+                      style={{ transformStyle: "preserve-3d" }}
+                    >
+                      {/* FRONT OF CARD */}
+                      <div 
+                        className="glass-bright border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4"
+                        style={{ backfaceVisibility: "hidden" }}
+                      >
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-white truncate">{crate.name}</h4>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            {getCrateAppCount(crate)} apps saved
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditingCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 rounded-xl border border-purple-500/20 disabled:opacity-40 transition-colors">
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => exportCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-xl border border-emerald-500/20 disabled:opacity-40 transition-colors" title="Export to Clipboard">
+                            <UploadCloud className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => deleteContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-xl border border-red-500/20 disabled:opacity-40 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
+                          </button>
+                          <button onClick={() => launchContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-4 py-2 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-emerald-500/20 disabled:opacity-40">
+                            Launch
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* BACK OF CARD (EDITOR) */}
+                      {isEditing && (
+                        <div 
+                          className="absolute inset-0 glass-bright border border-indigo-500/30 rounded-2xl p-4 flex flex-col gap-3"
+                          style={{ backfaceVisibility: "hidden", transform: "rotateX(180deg)" }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <input 
+                              value={editingCrate.name} 
+                              onChange={(e) => setEditingCrate({ ...editingCrate, name: e.target.value })}
+                              className="w-full bg-black/40 rounded-lg px-3 py-1.5 text-xs font-bold text-white outline-none border border-white/5 focus:border-indigo-500/50"
+                            />
+                            <button onClick={handleUpdateCrate} className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-bold uppercase rounded-lg">Save</button>
+                            <button onClick={() => setEditingCrate(null)} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold uppercase rounded-lg">Cancel</button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+                            {JSON.parse(editingCrate.apps || "[]").map((app: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-1.5 rounded-lg group">
+                                <span className="text-[10px] text-slate-300 truncate max-w-[150px]">{app.title || "Unknown Window"}</span>
+                                <button onClick={() => removeAppFromEditingCrate(idx)} className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Plus className="w-3 h-3 rotate-45" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+                {contextCrates.length === 0 && (
+                  <div className="glass-bright border border-white/5 rounded-2xl p-6 text-sm text-slate-500">
+                    Saved workspaces will appear here.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-8 pb-12">
+            {contexts.map((ctx) => {
+              const Icon = ctx.icon;
+              const isActive = activeContext === ctx.id;
+              return (
+                <motion.button
+                  key={ctx.id}
+                  onClick={() => handleContextSwitch(ctx.id)}
+                  whileHover={{ y: -5 }}
+                  className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
+                >
+                  <div className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center border transition-all shadow-2xl", isActive ? "bg-indigo-600 border-white/20 shadow-indigo-500/40" : "glass border-transparent hover:border-white/10")}>
+                    <Icon className={cn("w-8 h-8", isActive ? "text-white" : "text-slate-500")} />
+                  </div>
+                  <span className={cn("text-[9px] font-bold uppercase tracking-[0.3em]", isActive ? "text-white" : "text-slate-600")}>{ctx.name}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+
+  );
+};

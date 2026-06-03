@@ -42,17 +42,36 @@ A drop-down, global terminal that accepts natural language directives. It interp
 A beautiful, chronologically ordered ledger of every action the AI has taken on your behalf. Complete with color-coded, glowing nodes for Neural events, Deployments, and System telemetry.
 
 ### 📈 Venture Simulation Portal
-A sandbox environment for forecasting and modeling. Adjust ARR, Burn Rate, and Growth Momentum using custom amber-glowing sliders, and commit your strategic simulations directly to the system memory.
+### 📸 Photographic Memory (Time-Machine)
+An autonomous background daemon that periodically captures your active viewport, summarizes it using the LLaVA Vision Model, and commits it to a local vector store. You can query your own history natively via semantic search (e.g., "What was I working on before lunch?").
+
+### 🛡️ Heuristic Guardian
+An active telemetry supervisor that monitors CPU/RAM and disk loads. If an anomaly (like a severe memory leak) is detected, the Guardian consults the local LLM to dynamically synthesize a safe PowerShell mitigation script on the fly.
+
+### 🎙️ Voice Intent Engine
+Interact with your OS using natural language voice commands. The system records your intent, transcribes it, and routes it through a semantic intent dispatcher to execute complex macros, auto-commit Git workflows, or launch workspaces completely hands-free.
 
 ---
 
 ## 🛠️ Architecture & Tech Stack
 
-* **Frontend**: React 18, TypeScript, Tailwind CSS, Framer Motion, Lucide React
-* **Backend**: Rust, Tauri v2
-* **State Management**: React Hooks + Context API
-* **AI Engine**: Local LLM Inference (Gemma3 / LLaVA via Ollama)
+### 🦀 Modular Rust Backend
+The monolithic architecture has been fully decoupled into highly specialized, cohesive domains:
+* `ai.rs` - Neural Engine, Vector Embeddings, RAG Pipeline
+* `vision.rs` - LLaVA integration, Desktop Screen Capture, Photographic Memory
+* `telemetry.rs` - Hardware Monitoring, Win32 Window Traversal
+* `crates.rs` - Context-Aware Workspace Management & SQLite persistence
+* `nexus.rs` - Executive Dashboard Metrics, System Logs, Sentience Routines
+* `widget.rs` - Heads-Up Display (HUD) and Window Management
+
+### 🎨 Frontend
+* **UI/UX**: React 18, TypeScript, Tailwind CSS, Framer Motion, Lucide React
 * **3D Rendering**: Three.js / React Force Graph 3D
+* **State Management**: Zustand / React Context
+
+### 🧠 Intelligence
+* **Local LLM Inference**: Gemma4 / LLaVA (via Ollama)
+* **Storage**: SQLite (`rusqlite`)
 
 ---
 

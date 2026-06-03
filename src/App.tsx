@@ -7,11 +7,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot, Search, LayoutDashboard, FolderOpen, Activity,
   Settings, Zap, BrainCircuit, Shield, Terminal,
-  Plus, Activity as PulseIcon, UploadCloud, Eye, Mic, MicOff, Clock, Image as ImageIcon
+  Plus, Activity as PulseIcon, UploadCloud, Eye, Mic, MicOff, Clock, Image as ImageIcon,
+  Minimize2, Maximize2
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
-import { useSoundscape } from "./hooks/useSoundscape";
 import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
+import { TimeMachineModal } from "./components/overlays/TimeMachineModal";
+import { VisionScannerOverlay } from "./components/overlays/VisionScannerOverlay";
+import { MainCommandStage } from "./components/layout/MainCommandStage";
+import { GuardianHUD } from "./components/overlays/GuardianHUD";
+
+
+import { CommandPalette } from "./components/overlays/CommandPalette";
+
+
+import { PremiumToast } from "./components/overlays/PremiumToast";
+import { HolographicAssistant } from "./components/overlays/HolographicAssistant";
+import { CommandTerminal } from "./components/panels/CommandTerminal";
+import { SentientVault } from "./components/panels/SentientVault";
+import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
+import { SettingsPanel } from "./components/panels/SettingsPanel";
+import { ExecutiveSidebar } from "./components/layout/ExecutiveSidebar";
+import { CognitiveTimeline } from "./components/panels/CognitiveTimeline";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -59,32 +76,6 @@ type ContextCrate = {
 };
 
 export default function App() {
-  const { playClick, playNotification, startEngine, updateEngine, playPulse } = useSoundscape();
-
-  useEffect(() => {
-    const handleFirstInteraction = () => {
-      startEngine();
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
-    };
-    
-    const handleGlobalClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('a') || target.closest('.cursor-pointer')) {
-        playClick();
-      }
-    };
-
-    document.addEventListener('click', handleFirstInteraction);
-    document.addEventListener('keydown', handleFirstInteraction);
-    document.addEventListener('click', handleGlobalClick);
-    
-    return () => {
-      document.removeEventListener('click', handleFirstInteraction);
-      document.removeEventListener('keydown', handleFirstInteraction);
-      document.removeEventListener('click', handleGlobalClick);
-    };
-  }, [startEngine, playClick]);
 
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
@@ -93,6 +84,17 @@ export default function App() {
   const [isScanningScreen, setIsScanningScreen] = useState(false);
   const [lastSync, setLastSync] = useState("Never");
   const [showAI, setShowAI] = useState(false);
+  const [isWidgetMode, setIsWidgetMode] = useState(false);
+  
+  const toggleWidgetMode = async () => {
+    try {
+      await invoke("set_widget_mode", { enable: !isWidgetMode });
+      setIsWidgetMode(!isWidgetMode);
+    } catch (e) {
+      console.error("Failed to toggle widget mode", e);
+    }
+  };
+
   const [assistantInput, setAssistantInput] = useState("");
   const [messages, setMessages] = useState([{ role: "assistant", content: "Oasis Neural Link Established." }]);
   const [proactiveAlert, setProactiveAlert] = useState<{suggestion: string, action: string} | null>(null);
@@ -283,7 +285,6 @@ export default function App() {
   const notifyUser = (title: string, body: string) => {
     // Show beautiful in-app toast
     setToast({ title, body, id: Date.now() });
-    playNotification();
     setTimeout(() => setToast(null), 5000);
     
     // Attempt native OS notification
@@ -361,10 +362,10 @@ export default function App() {
       }
       else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
         const title = query.replace(/create|architect|build module/gi, "").trim() || "New Dynamic Module";
-        setDynamicModules(prev => [
-          ...prev,
-          { id: Date.now().toString(), title, type: 'manifested', content: `Autonomous architect manifested this module. Ready for ${title} integration.` }
-        ]);
+        notifyUser('Architect', 'Manifesting module: ' + title);
+
+
+
         setMessages(prev => [...prev, { role: "assistant", content: `Architect: Manifesting '${title}' strategic module...` }]);
         logEvent(`Autonomous Module '${title}' Scaffolding Complete`, "system", true);
       } else if (q.includes("sim") || q.includes("sandbox") || q.includes("project")) {
@@ -763,7 +764,6 @@ export default function App() {
         setActiveWindows(windows);
         setContextCrates(crates);
         setTelemetry(hardware);
-        updateEngine(hardware.cpu_usage);
         if (logs.length > 0) {
           setTimeline(logs.map((entry) => ({
             id: entry.id || Date.parse(entry.timestamp) || Date.now(),
@@ -869,6 +869,66 @@ export default function App() {
     }
   };
 
+  if (isWidgetMode) {
+    return (
+      <div className="w-full h-full h-screen bg-black/60 backdrop-blur-3xl border-l border-r border-white/10 flex flex-col p-5 font-sans select-none overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.8)]" style={{ WebkitAppRegion: 'drag' } as any}>
+         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none" />
+         
+         <div className="flex items-center justify-between mb-8 relative z-10" style={{ WebkitAppRegion: 'no-drag' } as any}>
+           <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-3">
+              <div className={cn("w-2 h-2 rounded-full shadow-[0_0_10px_currentColor]", isThinking ? "bg-amber-400 animate-pulse text-amber-400" : "bg-emerald-400 text-emerald-400")} />
+              Oasis HUD
+           </span>
+           <button onClick={toggleWidgetMode} className="text-slate-400 hover:text-white transition-colors p-1.5 hover:bg-white/10 rounded-lg">
+              <Maximize2 className="w-4 h-4" />
+           </button>
+         </div>
+
+         {/* Telemetry */}
+         <div className="space-y-6 relative z-10" style={{ WebkitAppRegion: 'no-drag' } as any}>
+            {/* CPU */}
+            <div>
+               <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider">
+                 <span>System Load</span>
+                 <span className={telemetry.cpu_usage > 85 ? "text-red-400 font-black" : ""}>{telemetry.cpu_usage.toFixed(1)}%</span>
+               </div>
+               <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/5 shadow-inner">
+                 <div className={cn("h-full transition-all duration-500 shadow-[0_0_10px_currentColor]", telemetry.cpu_usage > 85 ? "bg-red-500 text-red-500" : "bg-indigo-500 text-indigo-500")} style={{ width: `${Math.min(100, telemetry.cpu_usage)}%` }} />
+               </div>
+            </div>
+            
+            {/* RAM */}
+            <div>
+               <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-2 tracking-wider">
+                 <span>Memory Alloc</span>
+                 <span className={telemetry.ram_usage > 90 ? "text-red-400 font-black" : ""}>{telemetry.ram_usage.toFixed(1)}%</span>
+               </div>
+               <div className="h-1.5 bg-black rounded-full overflow-hidden border border-white/5 shadow-inner">
+                 <div className={cn("h-full transition-all duration-500 shadow-[0_0_10px_currentColor]", telemetry.ram_usage > 90 ? "bg-red-500 text-red-500" : "bg-purple-500 text-purple-500")} style={{ width: `${Math.min(100, telemetry.ram_usage)}%` }} />
+               </div>
+            </div>
+         </div>
+
+         {/* Mini Neural Input */}
+         <div className="mt-auto relative z-10" style={{ WebkitAppRegion: 'no-drag' } as any}>
+            <div className="relative">
+              <Terminal className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input 
+                onKeyDown={(e) => {
+                   if(e.key === 'Enter') {
+                      resolveNeuralIntent(e.currentTarget.value);
+                      e.currentTarget.value = "";
+                   }
+                }}
+                placeholder="Directive..." 
+                className="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 shadow-inner placeholder:text-slate-600 transition-colors" 
+              />
+            </div>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30"
@@ -900,454 +960,10 @@ export default function App() {
       </div>
 
       {/* Level 9 Executive Sidebar */}
-      <motion.aside
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className="relative z-50 w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-10"
-      >
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group cursor-pointer hover:scale-110 transition-transform mb-12">
-          <Bot className="w-7 h-7 text-white" />
-        </div>
-
-        <nav className="flex-1 flex flex-col gap-6 items-center">
-          {[
-            { id: 'dash', icon: LayoutDashboard, label: 'Dash' },
-            { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
-            { id: 'vault', icon: FolderOpen, label: 'Vault' },
-            { id: 'time', icon: Clock, label: 'Timeline' },
-            { id: 'logs', icon: Activity, label: 'History' },
-            { id: 'sim', icon: Zap, label: 'Simulation' }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (item.id === 'graph') setShowGraph(true);
-                else if (item.id === 'vault') setShowVault(true);
-                else if (item.id === 'logs') setShowLogs(true);
-                else if (item.id === 'sim') setSimMode(true);
-                else if (item.id === 'time') {
-                  loadMemories();
-                  setShowTimeMachine(true);
-                }
-                else { handleContextSwitch('dev'); }
-              }}
-              className={cn(
-                "p-4 rounded-2xl transition-all group relative",
-                (item.id === 'sim' && simMode) ? "bg-amber-500/20 text-amber-500" : "text-slate-500 hover:text-white hover:bg-white/5"
-              )}
-            >
-              <item.icon className="w-6 h-6" />
-              <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
-                {item.label}
-              </span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="flex flex-col gap-6 items-center mt-auto">
-          <button
-            onClick={() => setSimMode(!simMode)}
-            className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
-              simMode ? "bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
-            )}
-          >
-            <Zap className={cn("w-6 h-6", simMode && "animate-pulse")} />
-          </button>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-4 text-slate-500 hover:text-white transition-colors">
-            <Settings className="w-6 h-6" />
-          </button>
-        </div>
-      </motion.aside>
+      <ExecutiveSidebar setShowGraph={setShowGraph} setShowVault={setShowVault} setShowLogs={setShowLogs} setSimMode={setSimMode} simMode={simMode} loadMemories={loadMemories} setShowTimeMachine={setShowTimeMachine} handleContextSwitch={handleContextSwitch} toggleWidgetMode={toggleWidgetMode} showSettings={showSettings} setShowSettings={setShowSettings} />
 
       {/* Main Command Stage */}
-      <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
-          <div className="flex items-center gap-12">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                {contexts.find(c => c.id === activeContext)?.name} Context
-                <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.6-PRO</span>
-              </h1>
-            </div>
-
-            <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
-
-            <div className="hidden md:flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Last System Sync</span>
-              <span className="text-xs font-mono text-indigo-400/80 tracking-tighter animate-pulse">{lastSync}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-8">
-            {marketIntel.map((m, i) => (
-              <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
-                <PulseIcon className={cn("w-3.5 h-3.5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")} />
-                <span>{m.symbol}: <span className="text-white">{m.price}</span></span>
-                <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.change}</span>
-              </div>
-            ))}
-            <div className="h-8 w-[1px] bg-white/5 mx-2" />
-            <button onClick={() => resolveNeuralIntent("Sync Metrics")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-              Neural Sync
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
-          {/* Neural Intent Bar */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className={cn(
-              "w-full max-w-2xl rounded-[2.5rem] p-6 shadow-3xl transition-all duration-500 mb-12 relative overflow-hidden",
-              isListening ? "glass bg-cyan-900/30 border border-cyan-500/40 shadow-[0_0_50px_rgba(34,211,238,0.15)]" : "glass-bright border border-white/5 hover:border-white/10"
-            )}
-          >
-            {/* Voice Wave Animation Background */}
-            <AnimatePresence>
-              {isListening && (
-                <motion.div
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
-                >
-                  <div className="absolute w-96 h-96 bg-cyan-500/30 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '2s' }} />
-                  <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-400/20 via-transparent to-transparent animate-ping opacity-50" style={{ animationDuration: '3s' }} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="flex items-center gap-5 px-4 py-2 relative z-10">
-              {isListening ? (
-                <Mic className="w-7 h-7 text-cyan-400 animate-pulse drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
-              ) : (
-                <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" : "text-slate-600")} />
-              )}
-              
-              <input
-                value={isListening ? voiceTranscript : searchQuery}
-                onChange={(e) => !isListening && setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchIntent}
-                placeholder={isListening ? "Listening... Speak your directive." : "Detecting Neural Intent..."}
-                className={cn(
-                  "bg-transparent border-none outline-none text-2xl w-full font-light transition-colors tracking-wide", 
-                  isListening ? "text-cyan-100 placeholder:text-cyan-500/60" : "text-white placeholder:text-slate-700"
-                )}
-                readOnly={isListening}
-              />
-              
-              {/* Voice Engine Mic Button */}
-              <button
-                onClick={startVoiceCapture}
-                title="Activate Voice Command Engine"
-                className={cn(
-                  "relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500 flex-shrink-0 group",
-                  isListening
-                    ? "bg-cyan-500/20 border border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] text-cyan-300"
-                    : "bg-white/5 border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-500/40 hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                )}
-              >
-                {isListening && (
-                  <>
-                    <span className="absolute inset-0 rounded-full border border-cyan-400 animate-ping" style={{ animationDuration: '1.5s' }} />
-                    <span className="absolute inset-0 rounded-full border border-cyan-300 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
-                  </>
-                )}
-                {isListening ? (
-                  <div className="flex items-center gap-[3px] h-4">
-                    <div className="w-[3px] h-3 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '0ms' }} />
-                    <div className="w-[3px] h-4 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '150ms' }} />
-                    <div className="w-[3px] h-2 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '300ms' }} />
-                  </div>
-                ) : (
-                  <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />
-                )}
-              </button>
-              {!isListening && <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter</kbd>}
-            </div>
-          </motion.div>
-
-          {/* Metrics Ribbon */}
-          <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-            {[
-              { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
-              { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
-              { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-              { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: PulseIcon }
-            ].map((m, i) => (
-              <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
-                <m.icon className="w-5 h-5 text-indigo-400" />
-                <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                  <div className="text-xl font-bold text-white">{m.val}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Proactive AI Cron Agents */}
-          <div className="w-full max-w-5xl mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">Autonomous Systems</span>
-                <h3 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-                  <Bot className="w-6 h-6 text-purple-400" /> Proactive AI Agents
-                </h3>
-              </div>
-              <button 
-                onClick={() => {
-                  if(newAgentTitle && newAgentPrompt) {
-                    setCronAgents(prev => [...prev, { id: Date.now().toString(), title: newAgentTitle, prompt: newAgentPrompt, interval: 60000, active: true }]);
-                    setNewAgentTitle("");
-                    setNewAgentPrompt("");
-                  }
-                }}
-                className="px-6 py-3 glass bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all"
-              >
-                + Deploy Agent
-              </button>
-            </div>
-            
-            {/* New Agent Input */}
-            <div className="glass p-6 rounded-3xl border border-purple-500/20 mb-8 flex gap-4 bg-purple-500/5">
-              <input 
-                value={newAgentTitle} onChange={e => setNewAgentTitle(e.target.value)} 
-                placeholder="Agent Name (e.g. Sweeper)" 
-                className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-purple-500/50 w-1/4"
-              />
-              <input 
-                value={newAgentPrompt} onChange={e => setNewAgentPrompt(e.target.value)} 
-                placeholder="System Prompt (e.g. 'Check memory every minute and close edge')" 
-                className="bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-purple-500/50 flex-1"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {cronAgents.map((agent) => (
-                <motion.div
-                  key={agent.id}
-                  className={cn(
-                    "glass rounded-[2rem] p-8 border relative overflow-hidden group min-h-[280px] flex flex-col justify-between transition-all duration-500",
-                    agent.active ? "border-purple-500/40 shadow-[0_0_30px_-10px_rgba(168,85,247,0.3)]" : "border-white/5 opacity-60"
-                  )}
-                >
-                  <div className={cn(
-                    "absolute top-0 right-0 w-32 h-32 blur-[50px] transition-all",
-                    agent.active ? "bg-purple-500/20" : "bg-transparent"
-                  )} />
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4 relative z-10">
-                      <div className={cn("w-3 h-3 rounded-full animate-pulse", agent.active ? "bg-purple-400" : "bg-slate-600")} />
-                      <h3 className="text-lg font-bold tracking-tight text-white">{agent.title}</h3>
-                    </div>
-                    <button 
-                      onClick={() => setCronAgents(prev => prev.map(a => a.id === agent.id ? { ...a, active: !a.active } : a))}
-                      className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl transition-all border",
-                        agent.active ? "text-red-400 bg-red-400/10 border-red-500/20 hover:bg-red-400/20" : "text-emerald-400 bg-emerald-400/10 border-emerald-500/20 hover:bg-emerald-400/20"
-                      )}
-                    >
-                      {agent.active ? "Halt" : "Activate"}
-                    </button>
-                  </div>
-
-                  <div className="flex-1 space-y-4 relative z-10">
-                    <div className="p-5 rounded-2xl bg-black/40 border border-white/5">
-                      <p className="text-sm text-slate-300 leading-relaxed font-mono">
-                        <span className="text-purple-400 font-bold block mb-2 text-[10px] uppercase tracking-widest">Directive:</span> 
-                        {agent.prompt}
-                      </p>
-                    </div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      Interval: {agent.interval / 1000} Seconds
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-
-          {/* Hardware Telemetry Node */}
-          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <Activity className="w-6 h-6 text-indigo-400" />
-                <h3 className="text-lg font-bold tracking-tight text-white">Hardware Telemetry</h3>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Live Feed Active</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[
-                { name: 'Native Bridge', status: bridgeStatus, prog: bridgeStatus === 'Native' ? 100 : 45, color: bridgeStatus === 'Native' ? 'emerald' : 'purple' },
-                { name: 'CPU Usage', status: `${telemetry.cpu_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.cpu_usage), color: telemetry.cpu_usage > 80 ? 'red' : 'indigo' },
-                { name: 'Memory Load', status: `${telemetry.ram_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.ram_usage), color: telemetry.ram_usage > 85 ? 'red' : 'purple' },
-                { name: 'Disk Space', status: `${telemetry.disk_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.disk_usage), color: telemetry.disk_usage > 90 ? 'red' : 'cyan' }
-              ].map((env) => (
-                <div key={env.name} className="space-y-3">
-                  <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500">
-                    <span>{env.name}</span>
-                    <span>{env.status}</span>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : env.color === 'cyan' ? "bg-cyan-500" : env.color === 'red' ? "bg-red-500" : "bg-purple-500")} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Context Crates */}
-          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <FolderOpen className="w-6 h-6 text-indigo-400" />
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight text-white">Context Crates</h3>
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{activeWindows.length} windows detected</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button onClick={scanActiveWindows} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-white rounded-xl border border-white/5 disabled:opacity-40">
-                  Scan
-                </button>
-                <button onClick={suggestCrateName} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-white rounded-xl border border-white/5 disabled:opacity-40">
-                  Name
-                </button>
-                <button onClick={importCrate} disabled={crateBusy} className="px-4 py-2 glass text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-purple-300 rounded-xl border border-purple-500/30 disabled:opacity-40">
-                  Import
-                </button>
-                <button onClick={saveActiveCrate} disabled={crateBusy} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl disabled:opacity-40">
-                  Save
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-6">
-              <div className="space-y-5">
-                <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Crate Name</span>
-                  <input
-                    value={crateName}
-                    onChange={(e) => setCrateName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50"
-                  />
-                </div>
-                <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-2 pr-2">
-                  {activeWindows.slice(0, 6).map((win) => (
-                    <div key={`${win.pid}-${win.title}`} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/5 px-4 py-3">
-                      <span className="text-xs text-slate-300 truncate">{win.title}</span>
-                      <span className="text-[9px] font-mono text-slate-500">{win.pid}</span>
-                    </div>
-                  ))}
-                  {activeWindows.length === 0 && (
-                    <div className="rounded-xl bg-white/5 border border-white/5 px-4 py-3 text-xs text-slate-500">
-                      No active windows scanned yet.
-                    </div>
-                  )}
-                </div>
-                {crateError && <p className="text-xs text-amber-400 font-medium">{crateError}</p>}
-              </div>
-
-              <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2 perspective-1000">
-                {contextCrates.map((crate) => {
-                  const isEditing = editingCrate?.id === crate.id;
-                  return (
-                    <motion.div 
-                      key={crate.id || crate.timestamp} 
-                      className="relative w-full"
-                      animate={{ rotateX: isEditing ? 180 : 0 }}
-                      transition={{ duration: 0.6, type: "spring" }}
-                      style={{ transformStyle: "preserve-3d" }}
-                    >
-                      {/* FRONT OF CARD */}
-                      <div 
-                        className="glass-bright border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4"
-                        style={{ backfaceVisibility: "hidden" }}
-                      >
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-white truncate">{crate.name}</h4>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            {getCrateAppCount(crate)} apps saved
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setEditingCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 rounded-xl border border-purple-500/20 disabled:opacity-40 transition-colors">
-                            <Settings className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => exportCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-xl border border-emerald-500/20 disabled:opacity-40 transition-colors" title="Export to Clipboard">
-                            <UploadCloud className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => deleteContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-xl border border-red-500/20 disabled:opacity-40 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
-                          </button>
-                          <button onClick={() => launchContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-4 py-2 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-emerald-500/20 disabled:opacity-40">
-                            Launch
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* BACK OF CARD (EDITOR) */}
-                      {isEditing && (
-                        <div 
-                          className="absolute inset-0 glass-bright border border-indigo-500/30 rounded-2xl p-4 flex flex-col gap-3"
-                          style={{ backfaceVisibility: "hidden", transform: "rotateX(180deg)" }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <input 
-                              value={editingCrate.name} 
-                              onChange={(e) => setEditingCrate({ ...editingCrate, name: e.target.value })}
-                              className="w-full bg-black/40 rounded-lg px-3 py-1.5 text-xs font-bold text-white outline-none border border-white/5 focus:border-indigo-500/50"
-                            />
-                            <button onClick={handleUpdateCrate} className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-bold uppercase rounded-lg">Save</button>
-                            <button onClick={() => setEditingCrate(null)} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold uppercase rounded-lg">Cancel</button>
-                          </div>
-                          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1">
-                            {JSON.parse(editingCrate.apps || "[]").map((app: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between bg-white/5 px-3 py-1.5 rounded-lg group">
-                                <span className="text-[10px] text-slate-300 truncate max-w-[150px]">{app.title || "Unknown Window"}</span>
-                                <button onClick={() => removeAppFromEditingCrate(idx)} className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Plus className="w-3 h-3 rotate-45" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-                {contextCrates.length === 0 && (
-                  <div className="glass-bright border border-white/5 rounded-2xl p-6 text-sm text-slate-500">
-                    Saved workspaces will appear here.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-8 pb-12">
-            {contexts.map((ctx) => {
-              const Icon = ctx.icon;
-              const isActive = activeContext === ctx.id;
-              return (
-                <motion.button
-                  key={ctx.id}
-                  onClick={() => handleContextSwitch(ctx.id)}
-                  whileHover={{ y: -5 }}
-                  className={cn("flex flex-col items-center gap-4 group", isActive ? "opacity-100" : "opacity-30 hover:opacity-100")}
-                >
-                  <div className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center border transition-all shadow-2xl", isActive ? "bg-indigo-600 border-white/20 shadow-indigo-500/40" : "glass border-transparent hover:border-white/10")}>
-                    <Icon className={cn("w-8 h-8", isActive ? "text-white" : "text-slate-500")} />
-                  </div>
-                  <span className={cn("text-[9px] font-bold uppercase tracking-[0.3em]", isActive ? "text-white" : "text-slate-600")}>{ctx.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-      </main>
+      <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />
 
       {/* OVERLAYS */}
       <AnimatePresence>
@@ -1409,565 +1025,21 @@ export default function App() {
           </motion.div>
         )}
 
-        {showVault && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-3xl p-10 md:p-20 flex flex-col pt-10 overflow-hidden">
-            {/* Background Vault Glows */}
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] pointer-events-none" />
-            
-            <div className="flex items-center justify-between mb-12 relative z-10">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Foundry Protocol Activated</span>
-                <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tighter flex items-center gap-4">
-                  <FolderOpen className="w-12 h-12 text-indigo-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" /> Sentient Vault
-                </h2>
-              </div>
-              <button onClick={() => setShowVault(false)} className="group flex items-center gap-3 px-6 py-3 glass rounded-2xl text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                 <span className="text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100">Close</span>
-                 <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 transition-transform group-hover:rotate-90" />
-              </button>
-            </div>
-            
-            <div className="w-full max-w-5xl mx-auto mb-12 relative z-10">
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
-                <div className="relative flex items-center bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                  <div className="pl-6 text-indigo-400">
-                    <Search className="w-6 h-6" />
-                  </div>
-                  <input 
-                     value={ragQuery}
-                     onChange={e => setRagQuery(e.target.value)}
-                     onKeyDown={async (e) => {
-                       if (e.key === 'Enter' && ragQuery.trim()) {
-                         setIsRagging(true);
-                         setRagAnswer("");
-                         
-                         let unlistenVaultToken: any;
-                         listen('llm-token', (event: any) => {
-                           setRagAnswer(prev => prev + event.payload);
-                         }).then(f => unlistenVaultToken = f);
-
-                         try {
-                            const answer = await invoke("rag_query", { query: ragQuery });
-                            if (unlistenVaultToken) unlistenVaultToken();
-                            setRagAnswer(answer as string);
-                         } catch(err) {
-                            if (unlistenVaultToken) unlistenVaultToken();
-                            setRagAnswer("Error querying the Sentient Vault.");
-                         }
-                         setIsRagging(false);
-                       }
-                     }}
-                     placeholder="Query the Sentient Vault (e.g., 'Extract Q3 metrics from reports')"
-                     className="w-full bg-transparent px-6 py-6 text-xl font-light text-white placeholder:text-slate-500 outline-none transition-all"
-                  />
-                  {isRagging && (
-                    <div className="pr-6">
-                      <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <AnimatePresence>
-              {ragAnswer && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0, y: -20 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -20 }}
-                  className="w-full max-w-5xl mx-auto mb-12 relative z-10 overflow-hidden"
-                >
-                   <div className="p-8 bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-3xl backdrop-blur-2xl shadow-[0_0_30px_rgba(99,102,241,0.15)] relative mt-4">
-                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-50" />
-                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-3">
-                       <div className="p-1.5 bg-indigo-500/20 rounded-lg border border-indigo-500/30 text-indigo-400"><BrainCircuit className="w-4 h-4" /></div> AI Synthesis
-                     </h3>
-                     <p className="text-lg text-indigo-50 font-light leading-relaxed whitespace-pre-wrap">{ragAnswer}</p>
-                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="flex-1 max-w-7xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 overflow-y-auto custom-scrollbar pr-4 pb-20 relative z-10">
-              {vaultNodes.map((node, i) => (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ delay: i * 0.05, duration: 0.4 }}
-                  key={node.name} 
-                  className="glass-bright p-8 rounded-[2rem] border border-white/5 hover:border-indigo-500/40 hover:bg-white/[0.02] transition-all duration-300 group flex flex-col justify-between aspect-square relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] cursor-pointer"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className={cn("p-4 rounded-2xl shadow-inner", node.category === 'Strategic' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : node.category === 'Technical' ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20")}>
-                      <Shield className="w-7 h-7" />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-black/20 px-3 py-1 rounded-full border border-white/5">{node.size}</span>
-                  </div>
-                  
-                  <div className="relative z-10 mt-8">
-                    <span className={cn("text-[10px] font-bold uppercase tracking-widest block mb-2", node.category === 'Strategic' ? "text-amber-400/80" : node.category === 'Technical' ? "text-indigo-400/80" : "text-purple-400/80")}>
-                      {node.category} Node
-                    </span>
-                    <h4 className="text-xl font-bold text-white leading-tight mb-4 line-clamp-2">{node.name}</h4>
-                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button className="text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-indigo-400 transition-colors">Access</button>
-                      <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <button className="text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-indigo-400 transition-colors">Vectorize</button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
+        <SentientVault show={showVault} onClose={() => setShowVault(false)} vaultNodes={vaultNodes} ragQuery={ragQuery} setRagQuery={setRagQuery} ragAnswer={ragAnswer} setRagAnswer={setRagAnswer} isRagging={isRagging} setIsRagging={setIsRagging} />
         {/* Quake-style Sentient Terminal */}
-        <AnimatePresence>
-          {showTerminal && (
-            <motion.div 
-              initial={{ y: "-100%", opacity: 0 }} 
-              animate={{ y: 0, opacity: 1 }} 
-              exit={{ y: "-100%", opacity: 0 }} 
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 right-0 h-[65vh] z-[300] bg-black/80 backdrop-blur-3xl border-b border-indigo-500/30 flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.6),0_10px_30px_rgba(99,102,241,0.2)] overflow-hidden"
-            >
-              {/* Terminal Ambient Glows */}
-              <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
-              <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+        <CommandTerminal show={showTerminal} onClose={() => setShowTerminal(false)} analyzeScreen={analyzeScreen} isThinking={isThinking} messages={messages} searchQuery={searchQuery} setSearchQuery={setSearchQuery} resolveNeuralIntent={resolveNeuralIntent} />
+        <CognitiveTimeline show={showLogs} onClose={() => setShowLogs(false)} timeline={timeline} />
 
-              {/* Terminal Header */}
-              <div className="flex items-center justify-between px-10 py-5 border-b border-white/10 bg-gradient-to-r from-black/60 via-indigo-950/20 to-black/60 relative z-10 shadow-md">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-                    <Terminal className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black text-indigo-300 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Foundry Command Center
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">Kernel v0.1.0-alpha • Secure Neural Link</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button onClick={analyzeScreen} disabled={isThinking} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 rounded-xl border border-indigo-500/20 disabled:opacity-40 transition-all text-xs font-bold uppercase tracking-widest group shadow-[0_0_15px_rgba(99,102,241,0.1)]">
-                    <Eye className="w-4 h-4 group-hover:scale-110 transition-transform" /> Trigger Vision Scan
-                  </button>
-                  <button onClick={() => setShowTerminal(false)} className="text-slate-400 hover:text-white p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 transition-all group">
-                    <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 group-hover:rotate-90 transition-all" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Terminal Body */}
-              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-6 relative z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-[length:100px_100px] opacity-90 mix-blend-overlay flex flex-col">
-                <div className="flex-1 flex flex-col justify-end space-y-6">
-                  {messages.map((msg, i) => (
-                    <motion.div 
-                      initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      key={i} 
-                      className={cn("flex flex-col max-w-4xl", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", msg.role === 'user' ? "text-indigo-400" : "text-purple-400")}>
-                          {msg.role === 'user' ? 'Operator Directive' : 'Oasis Kernel Synthesized'}
-                        </span>
-                        {msg.role !== 'user' && <BrainCircuit className="w-3 h-3 text-purple-400" />}
-                      </div>
-                      <div className={cn(
-                        "p-5 rounded-3xl text-sm font-mono whitespace-pre-wrap leading-relaxed shadow-lg relative overflow-hidden group",
-                        msg.role === 'user' 
-                          ? "bg-indigo-600/90 text-indigo-50 border border-indigo-400/30 rounded-tr-sm shadow-indigo-600/20" 
-                          : "bg-black/40 text-purple-100 border border-purple-500/20 rounded-tl-sm backdrop-blur-md",
-                        msg.content.includes("Analyze my screen") && "border-cyan-500/50 shadow-[0_0_20px_rgba(34,211,238,0.2)] bg-cyan-900/40"
-                      )}>
-                        {msg.role !== 'user' && <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple-400 to-indigo-500 opacity-50" />}
-                        {msg.content}
-                      </div>
-                    </motion.div>
-                  ))}
-                  
-                  {isThinking && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col max-w-4xl mr-auto items-start">
-                      <span className="text-[9px] font-bold text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                        Oasis Kernel Processing <Activity className="w-3 h-3 animate-spin" />
-                      </span>
-                      <div className="flex items-center gap-2 p-5 bg-black/40 rounded-3xl rounded-tl-sm border border-purple-500/20 backdrop-blur-md">
-                        <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(168,85,247,0.8)]" />
-                        <div className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(99,102,241,0.8)]" style={{ animationDelay: '0.15s' }} />
-                        <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(34,211,238,0.8)]" style={{ animationDelay: '0.3s' }} />
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-
-              {/* Terminal Input */}
-              <div className="p-8 bg-gradient-to-b from-transparent to-black/80 border-t border-indigo-500/20 relative z-20 backdrop-blur-xl">
-                <div className="max-w-4xl mx-auto relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
-                  <div className="relative flex items-center bg-black/60 border border-indigo-500/30 rounded-xl overflow-hidden shadow-2xl">
-                    <span className="absolute left-6 text-indigo-400 font-mono font-bold flex items-center gap-2">
-                      <Terminal className="w-4 h-4" /> <span className="animate-pulse">❯</span>
-                    </span>
-                    <input 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && searchQuery.trim()) {
-                          resolveNeuralIntent(searchQuery);
-                        }
-                      }}
-                      placeholder="Enter neural directive or execute system command..."
-                      className="w-full bg-transparent py-5 pl-16 pr-8 text-indigo-50 font-mono text-sm outline-none transition-all placeholder:text-indigo-400/40"
-                    />
-                    <kbd className="absolute right-6 hidden md:flex bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-[9px] font-bold text-indigo-300 uppercase tracking-widest shadow-inner">Enter</kbd>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {showLogs && (
-          <motion.div initial={{ opacity: 0, x: 500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 500 }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed inset-y-0 right-0 z-[400] w-[450px] bg-black/80 border-l border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.6)]">
-            {/* Ambient Background */}
-            <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-12 relative z-10">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Activity className="w-3 h-3 animate-pulse" /> Foundry Ledger</span>
-                <h2 className="text-3xl font-black text-white tracking-tighter">Cognitive Timeline</h2>
-              </div>
-              <button onClick={() => setShowLogs(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/20"><Plus className="w-6 h-6 rotate-45" /></button>
-            </div>
-            <div className="flex-1 relative overflow-y-auto custom-scrollbar pr-4 z-10">
-              <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-transparent" />
-              <div className="space-y-8 pb-10">
-                {timeline.map((event, i) => (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={event.id} className="relative pl-12 group">
-                    <div className={cn("absolute left-0 w-8 h-8 rounded-full border-4 border-black flex items-center justify-center z-10 shadow-[0_0_15px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-110", event.type === 'neural' ? "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]" : event.type === 'deploy' ? "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-slate-600")}>
-                      <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    </div>
-                    <div className="glass-bright p-5 rounded-2xl border border-white/5 group-hover:border-indigo-500/30 group-hover:bg-white/[0.03] transition-all relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="flex justify-between items-center mb-3 relative z-10">
-                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5"><Clock className="w-3 h-3 text-slate-500" /> {event.time}</span>
-                        <span className={cn("text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border",
-                          event.type === 'neural' ? "text-indigo-300 bg-indigo-500/10 border-indigo-500/20" :
-                            event.type === 'deploy' ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/20" :
-                              "text-slate-300 bg-slate-500/10 border-slate-500/20"
-                        )}>{event.type}</span>
-                      </div>
-                      <p className="text-sm text-slate-200 font-light leading-relaxed relative z-10">{event.event}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {showSettings && (
-          <motion.div initial={{ opacity: 0, x: -500 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -500 }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed inset-y-0 left-0 z-[400] w-[450px] bg-black/80 border-r border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[30px_0_60px_rgba(0,0,0,0.6)]">
-            {/* Ambient Background */}
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-purple-500/10 via-transparent to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-12 relative z-10">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><Settings className="w-3 h-3 animate-[spin_4s_linear_infinite]" /> System Configuration</span>
-                <h2 className="text-3xl font-black text-white tracking-tighter">Kernel Settings</h2>
-              </div>
-              <button onClick={() => setShowSettings(false)} className="w-12 h-12 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/20"><Plus className="w-6 h-6 rotate-45" /></button>
-            </div>
-            
-            <div className="flex-1 space-y-10 overflow-y-auto custom-scrollbar pr-4 z-10 pb-10">
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Local AI Engine</h3>
-                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-4 hover:border-purple-500/30 transition-colors">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-purple-400" /> Inference Model</span>
-                    <span className="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2.5 py-1.5 rounded-lg border border-purple-500/20 shadow-inner">gemma3:4b</span>
-                  </div>
-                  <div className="w-full h-[1px] bg-white/5" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-400" /> Embedding Model</span>
-                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20 shadow-inner">nomic-embed-text</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Sentient Vault (Vector DB)</h3>
-                <div className="p-5 glass-bright rounded-3xl border border-white/5 flex flex-col gap-5 hover:border-indigo-500/30 transition-colors">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white flex items-center gap-2"><FolderOpen className="w-4 h-4 text-indigo-400" /> Indexed Nodes</span>
-                    <span className="text-[11px] font-bold text-slate-200 bg-white/5 px-3 py-1 rounded-lg border border-white/10">{vaultNodes.length} Files</span>
-                  </div>
-                  <button className="w-full py-3.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest rounded-2xl transition-all border border-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]">
-                    Purge All Vector Data
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Hardware Telemetry Node</h3>
-                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-4 hover:border-cyan-500/30 transition-colors">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white flex items-center gap-2"><PulseIcon className="w-4 h-4 text-cyan-400" /> Polling Rate</span>
-                    <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 px-2.5 py-1.5 rounded-lg border border-cyan-500/20">2000ms</span>
-                  </div>
-                  <div className="w-full h-[1px] bg-white/5" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white flex items-center gap-2"><Shield className="w-4 h-4 text-slate-400" /> Background Process</span>
-                    <div className="w-10 h-5 bg-cyan-500/20 border border-cyan-500/30 rounded-full relative shadow-[0_0_10px_rgba(34,211,238,0.2)]">
-                      <div className="absolute right-1 top-0.5 w-3.5 h-3.5 bg-cyan-400 rounded-full shadow-[0_0_5px_rgba(34,211,238,0.8)]" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">System Boot Sequence</h3>
-                <div className="p-5 glass-bright rounded-3xl border border-white/5 space-y-3 hover:border-white/20 transition-colors">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-white">Initialize Oasis on Windows Startup</span>
-                    <button 
-                      onClick={async () => {
-                        try {
-                          if (autostart) { await disable(); setAutostart(false); }
-                          else { await enable(); setAutostart(true); }
-                        } catch(e) { console.error("Autostart Error:", e); }
-                      }}
-                      className={cn("w-12 h-6 rounded-full relative transition-all duration-300", autostart ? "bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]" : "bg-white/10 border border-white/5")}
-                    >
-                      <div className={cn("absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md duration-300", autostart ? "left-7" : "left-1")} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </motion.div>
-        )}
-
-        {simMode && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="fixed inset-0 z-[500] flex items-center justify-center p-20 bg-black/80 backdrop-blur-3xl">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
-            
-            <div className="w-full max-w-4xl glass-bright rounded-[3rem] p-16 border border-amber-500/20 shadow-[0_0_100px_rgba(245,158,11,0.15)] relative overflow-hidden backdrop-blur-xl">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/0 via-amber-400 to-amber-500/0 opacity-70" />
-              <div className="flex items-center justify-between mb-16 relative z-10">
-                <div className="flex flex-col">
-                  <span className="text-xs font-black text-amber-500 uppercase tracking-[0.4em] mb-2 flex items-center gap-3">
-                    <Activity className="w-4 h-4 animate-pulse" /> Strategic Sandbox
-                  </span>
-                  <h2 className="text-4xl font-black text-white tracking-tighter">Venture Simulation Portal</h2>
-                </div>
-                <button onClick={() => setSimMode(false)} className="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-[11px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:shadow-[0_0_40px_rgba(245,158,11,0.6)] transform hover:-translate-y-1">
-                  Commit Simulation
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-12 relative z-10">
-                {[
-                  { label: 'Target ARR (Pro-Forma)', val: simMetrics.arr, unit: 'M', min: 0.5, max: 10, key: 'arr', color: 'text-emerald-400', accent: 'accent-emerald-500' },
-                  { label: 'Estimated Burn Rate', val: simMetrics.burn, unit: 'K/mo', min: 10, max: 100, key: 'burn', color: 'text-red-400', accent: 'accent-red-500' },
-                  { label: 'Growth Momentum', val: simMetrics.momentum, unit: '%', min: 0, max: 50, key: 'momentum', color: 'text-amber-400', accent: 'accent-amber-500' }
-                ].map((sim) => (
-                  <div key={sim.key} className="space-y-6 group">
-                    <div className="flex justify-between items-end border-b border-white/5 pb-4 group-hover:border-white/10 transition-colors">
-                      <label className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        {sim.key === 'arr' && <Zap className="w-4 h-4 text-emerald-500" />}
-                        {sim.key === 'burn' && <Activity className="w-4 h-4 text-red-500" />}
-                        {sim.key === 'momentum' && <PulseIcon className="w-4 h-4 text-amber-500" />}
-                        {sim.label}
-                      </label>
-                      <span className={cn("text-4xl font-black tracking-tighter drop-shadow-md", sim.color)}>
-                        {sim.key === 'arr' ? '$' : ''}{sim.val}<span className="text-lg opacity-70 ml-1">{sim.unit}</span>
-                      </span>
-                    </div>
-                    <div className="relative pt-2">
-                      <input 
-                        type="range" 
-                        min={sim.min} 
-                        max={sim.max} 
-                        step={0.1} 
-                        value={sim.val} 
-                        onChange={(e) => setSimMetrics(prev => ({ ...prev, [sim.key]: parseFloat(e.target.value) }))} 
-                        className={cn("w-full h-2 bg-black/40 rounded-full appearance-none cursor-pointer border border-white/5", sim.accent)} 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
+        <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} vaultNodesCount={vaultNodes.length} autostart={autostart} setAutostart={setAutostart} />
+        <VentureSimulationPortal show={simMode} onClose={() => setSimMode(false)} metrics={simMetrics} setMetrics={setSimMetrics} />
       </AnimatePresence>
 
       {/* Floating Holographic Assistant */}
-      <div className="fixed bottom-10 right-10 flex flex-col items-end gap-6 z-[600]">
-        <AnimatePresence>
-          {showAI && (
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 50, filter: "blur(10px)" }} animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, scale: 0.9, y: 50, filter: "blur(10px)" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="w-96 h-[550px] glass-bright rounded-[2.5rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(99,102,241,0.2)] overflow-hidden flex flex-col mb-4 backdrop-blur-3xl relative">
-              <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
-              <header className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20 relative z-10 backdrop-blur-md">
-                <div className="flex items-center gap-3">
-                  <BrainCircuit className="w-5 h-5 text-indigo-400 animate-pulse" />
-                  <span className="text-xs font-black uppercase tracking-widest text-indigo-300">Sentient Link Stable</span>
-                </div>
-                <div className="flex gap-1.5 p-2 bg-indigo-500/10 rounded-full border border-indigo-500/20">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0.15s' }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0.3s' }} />
-                </div>
-              </header>
-              <div className="flex-1 p-6 overflow-y-auto space-y-5 custom-scrollbar relative z-10">
-                {messages.map((m, i) => (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={cn("max-w-[85%] p-4 rounded-2xl text-sm font-medium leading-relaxed shadow-lg", m.role === 'user' ? "ml-auto bg-indigo-600/90 text-white border border-indigo-500/30 rounded-tr-sm" : "mr-auto glass-bright text-indigo-100 border border-white/10 rounded-tl-sm")}>
-                    {m.content}
-                  </motion.div>
-                ))}
-                {isThinking && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 glass rounded-2xl w-fit flex items-center gap-2 border border-white/5 rounded-tl-sm text-indigo-300">
-                  <Activity className="w-3 h-3 animate-spin" /> <span className="text-[10px] font-bold uppercase tracking-widest">Synthesizing...</span>
-                </motion.div>}
-              </div>
-              <div className="p-6 bg-gradient-to-b from-transparent to-black/60 relative z-10">
-                <div className="flex items-center bg-black/40 rounded-2xl px-5 py-4 border border-indigo-500/30 shadow-inner group transition-all hover:border-indigo-400/50">
-                  <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleNeuralSend()} placeholder="Pulse Brain..." className="bg-transparent border-none outline-none text-sm w-full font-medium text-white placeholder:text-indigo-200/40" />
-                  <button onClick={handleNeuralSend} className="text-indigo-400 hover:text-indigo-200 hover:scale-110 transition-all bg-indigo-500/10 p-2 rounded-xl border border-indigo-500/20"><Zap size={16} /></button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button onClick={() => setShowAI(!showAI)} className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105 transition-all border border-indigo-400/30", showAI ? "bg-indigo-600" : "bg-gradient-to-br from-indigo-500 to-purple-600")}>
-          <BrainCircuit className={cn("w-9 h-9", showAI ? "animate-pulse" : "")} />
-        </button>
-      </div>
+      <HolographicAssistant showAI={showAI} setShowAI={setShowAI} messages={messages} isThinking={isThinking} assistantInput={assistantInput} setAssistantInput={setAssistantInput} handleNeuralSend={handleNeuralSend} />
       {/* Guardian Notification HUD */}
-      <AnimatePresence>
-        {proactiveAlert && (
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-            className="fixed bottom-32 right-10 w-96 bg-[#0B0F19]/90 backdrop-blur-xl border border-indigo-500/30 rounded-3xl p-5 shadow-[0_0_50px_-12px_rgba(99,102,241,0.5)] z-[700] overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent pointer-events-none" />
-            <div className="flex gap-4 relative">
-              <div className="p-3 bg-indigo-500/20 rounded-2xl shrink-0 h-fit border border-indigo-400/20">
-                <Shield className="w-6 h-6 text-indigo-400" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white mb-1 uppercase tracking-widest">Guardian Protocol</h4>
-                <p className="text-sm text-indigo-200/80 leading-relaxed mb-4">
-                  {proactiveAlert.suggestion}
-                </p>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => {
-                      invoke("execute_neural_command", { command: `echo Authorizing action: ${proactiveAlert.action}`});
-                      logEvent(`Guardian Executed: ${proactiveAlert.action}`, 'deploy');
-                      setProactiveAlert(null);
-                    }}
-                    className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20"
-                  >
-                    Authorize
-                  </button>
-                  <button 
-                    onClick={() => setProactiveAlert(null)}
-                    className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <GuardianHUD proactiveAlert={proactiveAlert} setProactiveAlert={setProactiveAlert} logEvent={logEvent} />
       {/* Global AI Command Palette */}
-      <AnimatePresence>
-        {showCommandPalette && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] flex items-start justify-center pt-[15vh] p-4 bg-black/80 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: -20, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.95, y: -20, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="w-full max-w-3xl glass-bright rounded-3xl shadow-[0_0_80px_rgba(99,102,241,0.2)] overflow-hidden border border-white/10 flex flex-col relative"
-            >
-              {/* Background ambient glow */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-indigo-500/30 rounded-full blur-[80px] pointer-events-none mix-blend-screen" />
-              
-              <div className="flex items-center gap-4 px-6 py-5 border-b border-white/5 relative z-10 bg-black/20">
-                <BrainCircuit className="w-6 h-6 text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Ask Oasis or launch a command (e.g. 'Launch vscode crate')..."
-                  value={commandInput}
-                  onChange={(e) => setCommandInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && commandInput.trim()) {
-                      resolveNeuralIntent(commandInput);
-                      setCommandInput("");
-                      setShowCommandPalette(false);
-                    }
-                    if (e.key === 'Escape') {
-                      setShowCommandPalette(false);
-                    }
-                  }}
-                  className="w-full bg-transparent border-none outline-none text-white text-xl font-light placeholder:text-slate-500/70"
-                />
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <kbd className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-slate-400 uppercase shadow-inner">Enter</kbd>
-                  <kbd className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-slate-400 uppercase shadow-inner">Esc</kbd>
-                </div>
-              </div>
-              
-              {/* Command Palette Suggestions */}
-              <div className="p-4 bg-black/40 backdrop-blur-md relative z-10 flex flex-col gap-1">
-                 <div className="px-4 py-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Suggested Directives</div>
-                 {[
-                   { icon: Terminal, label: 'Review code and push to origin', type: 'Git Automation' },
-                   { icon: Shield, label: 'Access Technical Vault Nodes', type: 'Foundry Protocol' },
-                   { icon: Eye, label: 'Trigger Omniscient Vision Scan', type: 'System Capability' }
-                 ].map((suggestion, idx) => (
-                   <button 
-                     key={idx} 
-                     onClick={() => {
-                        resolveNeuralIntent(suggestion.label);
-                        setCommandInput("");
-                        setShowCommandPalette(false);
-                     }}
-                     className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-indigo-500/20 group transition-all text-left border border-transparent hover:border-indigo-500/30"
-                   >
-                     <div className="flex items-center gap-4">
-                       <div className="p-2 bg-white/5 group-hover:bg-indigo-500/30 rounded-lg border border-white/5 group-hover:border-indigo-400/50 transition-colors">
-                         <suggestion.icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-300 transition-colors" />
-                       </div>
-                       <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion.label}</span>
-                     </div>
-                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{suggestion.type}</span>
-                   </button>
-                 ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Drag and Drop Knowledge Dropzone */}
+      <CommandPalette show={showCommandPalette} setShow={setShowCommandPalette} commandInput={commandInput} setCommandInput={setCommandInput} resolveNeuralIntent={resolveNeuralIntent} />
       <AnimatePresence>
         {isDragging && (
           <motion.div
@@ -2000,187 +1072,11 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Memory Time-Machine Modal */}
-      <AnimatePresence>
-        {showTimeMachine && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-2xl"
-          >
-            <div className="w-full max-w-6xl h-[90vh] glass-bright rounded-[2rem] border border-white/10 flex flex-col overflow-hidden shadow-[0_0_80px_rgba(168,85,247,0.15)] relative">
-              <div className="absolute inset-0 pointer-events-none opacity-[0.03] grayscale mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
-              
-              {/* Vibrant Ambient Glows */}
-              <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-[100px] pointer-events-none" />
-              <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none" />
-
-              <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between z-10 bg-black/20">
-                <div className="flex items-center gap-5">
-                  <motion.div 
-                    initial={{ rotate: -90, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ type: "spring", duration: 1 }}
-                    className="p-4 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-2xl text-purple-400 shadow-inner shadow-white/5 border border-white/10"
-                  >
-                    <Clock className="w-8 h-8" />
-                  </motion.div>
-                  <div>
-                    <h2 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-                      Photographic Memory
-                      <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs tracking-widest uppercase border border-purple-500/30">Live Sync</span>
-                    </h2>
-                    <p className="text-slate-400 text-sm mt-1.5 font-medium">Autonomous cognitive snapshots of your digital workflow over time.</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowTimeMachine(false)} className="group flex items-center gap-2 text-slate-400 hover:text-white px-5 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all uppercase tracking-widest text-xs font-bold border border-white/5 hover:border-white/10">
-                  <span>Close</span>
-                  <span className="opacity-50 group-hover:opacity-100">[ESC]</span>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar z-10">
-                {photographicMemories.length === 0 ? (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    className="h-full flex flex-col items-center justify-center text-slate-500"
-                  >
-                    <div className="relative">
-                      <ImageIcon className="w-24 h-24 mb-6 opacity-20" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#020617] to-transparent" />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-300 mb-2">No Memories Recorded</h3>
-                    <p className="text-sm opacity-60 max-w-sm text-center">The Sentient OS hasn't captured any visual context snapshots yet. Let it run in the background to build your timeline.</p>
-                  </motion.div>
-                ) : (
-                  <div className="relative border-l-2 border-white/10 ml-8 pl-10 flex flex-col gap-12 pb-20">
-                    {photographicMemories.map((mem, i) => (
-                      <motion.div 
-                        initial={{ opacity: 0, x: -30 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.1, duration: 0.4, type: "spring" }}
-                        key={mem.id} 
-                        className="relative group"
-                      >
-                        {/* Interactive Timeline Node */}
-                        <div className="absolute -left-[49px] top-2 w-4 h-4 rounded-full bg-[#020617] border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] group-hover:scale-150 group-hover:border-white transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(168,85,247,0.8)] z-20" />
-                        
-                        {/* Timeline connecting line glow on hover */}
-                        <div className="absolute -left-[42px] top-6 bottom-[-48px] w-0.5 bg-gradient-to-b from-purple-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        
-                        <div className="flex items-center gap-4 mb-4">
-                          <span className="text-white font-bold tracking-widest text-sm bg-purple-600/40 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 backdrop-blur-md">
-                            {mem.timestamp}
-                          </span>
-                          <span className="text-slate-400 text-xs uppercase tracking-widest px-3 py-1 rounded-full border border-white/5 bg-white/5 flex items-center gap-1.5">
-                            <ImageIcon className="w-3.5 h-3.5 text-indigo-400" /> Visual Context
-                          </span>
-                        </div>
-                        
-                        <div className="glass p-8 rounded-3xl border border-white/5 group-hover:border-purple-500/40 group-hover:bg-white/[0.04] transition-all duration-500 relative overflow-hidden shadow-lg hover:shadow-purple-900/20">
-                           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                           
-                           <p className="text-slate-300 leading-relaxed font-normal text-sm whitespace-pre-wrap relative z-10">
-                            {mem.description}
-                           </p>
-                           
-                           <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-3 relative z-10">
-                             <button className="px-4 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-xs font-bold tracking-widest uppercase text-purple-300 transition-all flex items-center gap-2 border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                               <Search className="w-4 h-4" /> Deep Dive
-                             </button>
-                             <button className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold tracking-widest uppercase text-slate-300 transition-all flex items-center gap-2 border border-white/5 hover:border-white/10">
-                               <FolderOpen className="w-4 h-4" /> Restore Workspace
-                             </button>
-                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <TimeMachineModal show={showTimeMachine} onClose={() => setShowTimeMachine(false)} memories={photographicMemories} />
 
       {/* Premium In-App Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="fixed bottom-10 right-10 z-[2000] w-96 glass-bright rounded-2xl border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(99,102,241,0.2)] overflow-hidden group"
-          >
-            {/* Ambient Background Glow */}
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 pointer-events-none" />
-            
-            <div className="p-5 flex items-start gap-4 relative z-10">
-              <div className="p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl text-indigo-400 border border-indigo-500/30 shadow-inner">
-                <Zap className="w-5 h-5 animate-pulse" />
-              </div>
-              <div className="flex-1 pt-0.5">
-                <h4 className="text-white font-bold tracking-widest text-xs uppercase">{toast.title}</h4>
-                <p className="text-slate-300 text-sm mt-1.5 leading-relaxed font-medium">{toast.body}</p>
-              </div>
-              <button 
-                onClick={() => setToast(null)} 
-                className="text-slate-400 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/20 rounded-lg border border-transparent hover:border-white/10"
-              >
-                 <span className="text-xs font-bold px-1">✕</span>
-              </button>
-            </div>
-            
-            {/* Animated Countdown Progress Bar */}
-            <motion.div 
-              initial={{ width: "100%" }}
-              animate={{ width: "0%" }}
-              transition={{ duration: 5, ease: "linear" }}
-              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-[length:200%_auto] animate-gradient"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Vision Inference Scanner Overlay */}
-      <AnimatePresence>
-        {isScanningScreen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[3000] pointer-events-none flex flex-col items-center justify-center overflow-hidden"
-          >
-            {/* The scanning laser line */}
-            <motion.div 
-              initial={{ y: "-50vh" }}
-              animate={{ y: "50vh" }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
-              className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_30px_10px_rgba(34,211,238,0.5)] z-[3001]"
-            />
-            {/* Scan Overlay background */}
-            <div className="absolute inset-0 bg-cyan-900/10 backdrop-blur-[2px] mix-blend-overlay" />
-            
-            {/* Scanner HUD target */}
-            <div className="relative z-[3002] border border-cyan-500/50 rounded-3xl p-12 bg-black/40 backdrop-blur-md flex flex-col items-center">
-               <Eye className="w-16 h-16 text-cyan-400 mb-4 animate-pulse drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
-               <h3 className="text-2xl font-bold text-white tracking-widest uppercase shadow-black drop-shadow-md">Omniscient Vision</h3>
-               <p className="text-cyan-300 font-mono text-sm mt-2 flex items-center gap-2">
-                 <Activity className="w-4 h-4 animate-spin" /> Analyzing Pixel Matrix...
-               </p>
-               
-               {/* Corner brackets */}
-               <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400 rounded-tl-xl" />
-               <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-400 rounded-tr-xl" />
-               <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-400 rounded-bl-xl" />
-               <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400 rounded-br-xl" />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      <PremiumToast toast={toast} setToast={setToast} />
+      <VisionScannerOverlay isScanning={isScanningScreen} />
     </div>
   );
 }
