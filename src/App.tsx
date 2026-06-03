@@ -61,6 +61,7 @@ export default function App() {
   const [activeContext, setActiveContext] = useState('dev');
   const [searchQuery, setSearchQuery] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [isScanningScreen, setIsScanningScreen] = useState(false);
   const [lastSync, setLastSync] = useState("Never");
   const [showAI, setShowAI] = useState(false);
   const [assistantInput, setAssistantInput] = useState("");
@@ -427,6 +428,7 @@ export default function App() {
   const analyzeScreen = async () => {
     setMessages(prev => [...prev, { role: "user", content: "Analyze my screen and tell me what I am looking at." }]);
     setIsThinking(true);
+    setIsScanningScreen(true);
     try {
       const base64Image = await invoke("capture_screenshot") as string;
       const visionResult = await invoke("query_vision", { 
@@ -436,10 +438,14 @@ export default function App() {
       
       setMessages(prev => [...prev, { role: "system", content: visionResult }]);
       logEvent("Omniscient Vision analysis complete", 'neural');
+      notifyUser("Vision Inference Complete", "Screen analysis has been processed.");
     } catch(err) {
       setMessages(prev => [...prev, { role: "system", content: "Vision capabilities offline or Ollama 'llava' model not running." }]);
+      logEvent("Omniscient Vision offline", 'system', true);
+      notifyUser("Vision Engine Offline", "Ensure Ollama and 'llava' model are running locally.");
     } finally {
       setIsThinking(false);
+      setIsScanningScreen(false);
     }
   };
 
@@ -938,35 +944,71 @@ export default function App() {
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="w-full max-w-2xl glass-bright rounded-[2.5rem] p-6 shadow-3xl border border-white/5 hover:border-white/10 transition-all mb-12"
+            className={cn(
+              "w-full max-w-2xl rounded-[2.5rem] p-6 shadow-3xl transition-all duration-500 mb-12 relative overflow-hidden",
+              isListening ? "glass bg-cyan-900/30 border border-cyan-500/40 shadow-[0_0_50px_rgba(34,211,238,0.15)]" : "glass-bright border border-white/5 hover:border-white/10"
+            )}
           >
-            <div className="flex items-center gap-5 px-4 py-2">
-              <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse" : "text-slate-600")} />
+            {/* Voice Wave Animation Background */}
+            <AnimatePresence>
+              {isListening && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+                >
+                  <div className="absolute w-96 h-96 bg-cyan-500/30 rounded-full blur-[80px] animate-pulse" style={{ animationDuration: '2s' }} />
+                  <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-400/20 via-transparent to-transparent animate-ping opacity-50" style={{ animationDuration: '3s' }} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center gap-5 px-4 py-2 relative z-10">
+              {isListening ? (
+                <Mic className="w-7 h-7 text-cyan-400 animate-pulse drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+              ) : (
+                <Search className={cn("w-7 h-7 transition-colors", isThinking ? "text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" : "text-slate-600")} />
+              )}
+              
               <input
                 value={isListening ? voiceTranscript : searchQuery}
                 onChange={(e) => !isListening && setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchIntent}
-                placeholder={isListening ? "🎙 Listening for your command..." : "Detecting Neural Intent..."}
-                className={cn("bg-transparent border-none outline-none text-2xl w-full font-light transition-colors", isListening ? "text-red-300 placeholder:text-red-900" : "text-white placeholder:text-slate-700")}
+                placeholder={isListening ? "Listening... Speak your directive." : "Detecting Neural Intent..."}
+                className={cn(
+                  "bg-transparent border-none outline-none text-2xl w-full font-light transition-colors tracking-wide", 
+                  isListening ? "text-cyan-100 placeholder:text-cyan-500/60" : "text-white placeholder:text-slate-700"
+                )}
                 readOnly={isListening}
               />
+              
               {/* Voice Engine Mic Button */}
               <button
                 onClick={startVoiceCapture}
-                title="Activate Voice Command"
+                title="Activate Voice Command Engine"
                 className={cn(
-                  "relative flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 flex-shrink-0",
+                  "relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-500 flex-shrink-0 group",
                   isListening
-                    ? "bg-red-500/20 border border-red-500/60 text-red-400"
-                    : "bg-white/5 border border-white/10 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/40 hover:bg-indigo-500/10"
+                    ? "bg-cyan-500/20 border border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] text-cyan-300"
+                    : "bg-white/5 border border-white/10 text-slate-500 hover:text-cyan-400 hover:border-cyan-500/40 hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.2)]"
                 )}
               >
                 {isListening && (
-                  <span className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
+                  <>
+                    <span className="absolute inset-0 rounded-full border border-cyan-400 animate-ping" style={{ animationDuration: '1.5s' }} />
+                    <span className="absolute inset-0 rounded-full border border-cyan-300 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+                  </>
                 )}
-                {isListening ? <Mic className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
+                {isListening ? (
+                  <div className="flex items-center gap-[3px] h-4">
+                    <div className="w-[3px] h-3 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '0ms' }} />
+                    <div className="w-[3px] h-4 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '150ms' }} />
+                    <div className="w-[3px] h-2 bg-cyan-400 rounded-full animate-[bounce_1s_infinite]" style={{ animationDelay: '300ms' }} />
+                  </div>
+                ) : (
+                  <Mic className="w-5 h-5 transition-transform group-hover:scale-110" />
+                )}
               </button>
-              <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Enter</kbd>
+              {!isListening && <kbd className="hidden md:flex bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enter</kbd>}
             </div>
           </motion.div>
 
@@ -1252,17 +1294,57 @@ export default function App() {
       {/* OVERLAYS */}
       <AnimatePresence>
         {showGraph && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-3xl">
-            <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 w-14 h-14 glass rounded-full flex items-center justify-center text-white z-[210] hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
-            <div className="w-full h-full">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-3xl overflow-hidden">
+            {/* Ambient Nebula Glows */}
+            <div className="absolute top-1/3 left-1/4 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
+            <div className="absolute bottom-1/3 right-1/4 w-[800px] h-[800px] bg-cyan-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
+            
+            {/* Control Panel Overlay */}
+            <div className="absolute top-10 left-10 z-[210] p-8 glass-bright border border-white/10 rounded-[2.5rem] w-80 shadow-[0_0_50px_rgba(99,102,241,0.15)] backdrop-blur-xl pointer-events-auto">
+               <div className="flex items-center gap-3 mb-6">
+                 <div className="p-3 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
+                   <BrainCircuit className="w-6 h-6 text-indigo-400" />
+                 </div>
+                 <h2 className="text-xl font-bold text-white tracking-wide">Strategic Cortex</h2>
+               </div>
+               <p className="text-xs text-indigo-200/60 leading-relaxed mb-8">
+                 Real-time visualization of your neural contexts, workspace dependencies, and knowledge architecture.
+               </p>
+               <div className="space-y-4">
+                 <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Nodes</span>
+                   <span className="text-sm font-mono text-indigo-400">{graphData.nodes.length}</span>
+                 </div>
+                 <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Neural Links</span>
+                   <span className="text-sm font-mono text-cyan-400">{graphData.links.length}</span>
+                 </div>
+               </div>
+               
+               <div className="mt-8 pt-6 border-t border-white/5">
+                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Telemetry Online
+                 </span>
+               </div>
+            </div>
+
+            <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 z-[210] group flex items-center gap-3 px-6 py-3 glass rounded-2xl text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] pointer-events-auto">
+               <span className="text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100">Exit Cortex</span>
+               <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 transition-transform group-hover:rotate-90" />
+            </button>
+
+            <div className="w-full h-full relative z-[205] cursor-move">
               {mounted && (
                 <ForceGraph3D
                   graphData={graphData}
                   backgroundColor="#00000000"
-                  nodeRelSize={simMode ? 10 : 10}
+                  nodeRelSize={simMode ? 12 : 12}
                   nodeColor={getNodeColor}
                   nodeLabel="id"
-                  linkColor={() => simMode ? "rgba(245, 158, 11, 0.3)" : "rgba(99, 102, 241, 0.3)"}
+                  linkColor={() => simMode ? "rgba(245, 158, 11, 0.4)" : "rgba(99, 102, 241, 0.4)"}
+                  linkWidth={2}
+                  nodeOpacity={0.9}
+                  linkOpacity={0.4}
                 />
               )}
             </div>
@@ -1270,67 +1352,108 @@ export default function App() {
         )}
 
         {showVault && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-[#020617]/95 backdrop-blur-3xl p-20 flex flex-col pt-10">
-            <div className="flex items-center justify-between mb-12">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-3xl p-10 md:p-20 flex flex-col pt-10 overflow-hidden">
+            {/* Background Vault Glows */}
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] pointer-events-none" />
+            
+            <div className="flex items-center justify-between mb-12 relative z-10">
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Foundry Protocol</span>
-                <h2 className="text-4xl font-bold text-white tracking-tighter flex items-center gap-4"><FolderOpen className="w-10 h-10 text-indigo-500" /> Sentient Venture Vault</h2>
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Foundry Protocol Activated</span>
+                <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tighter flex items-center gap-4">
+                  <FolderOpen className="w-12 h-12 text-indigo-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" /> Sentient Vault
+                </h2>
               </div>
-              <button onClick={() => setShowVault(false)} className="w-14 h-14 glass rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-all"><Plus className="w-8 h-8 rotate-45" /></button>
+              <button onClick={() => setShowVault(false)} className="group flex items-center gap-3 px-6 py-3 glass rounded-2xl text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                 <span className="text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100">Close</span>
+                 <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 transition-transform group-hover:rotate-90" />
+              </button>
             </div>
             
-            <div className="w-full max-w-4xl mx-auto mb-10 relative">
-              <input 
-                 value={ragQuery}
-                 onChange={e => setRagQuery(e.target.value)}
-                 onKeyDown={async (e) => {
-                   if (e.key === 'Enter' && ragQuery.trim()) {
-                     setIsRagging(true);
-                     setRagAnswer("");
-                     try {
-                        const answer = await invoke("rag_query", { query: ragQuery });
-                        setRagAnswer(answer as string);
-                     } catch(err) {
-                        setRagAnswer("Error querying the Sentient Vault.");
-                     }
-                     setIsRagging(false);
-                   }
-                 }}
-                 placeholder="Ask the Sentient Vault a question (e.g., 'What is our strategy?')"
-                 className="w-full bg-black/40 backdrop-blur-md border border-indigo-500/30 rounded-2xl px-8 py-5 text-lg font-medium text-white placeholder:text-indigo-300/40 outline-none focus:border-indigo-400 transition-all shadow-xl shadow-indigo-500/10"
-              />
-              {isRagging && <div className="absolute right-8 top-1/2 -translate-y-1/2 w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />}
+            <div className="w-full max-w-5xl mx-auto mb-12 relative z-10">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+                <div className="relative flex items-center bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="pl-6 text-indigo-400">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <input 
+                     value={ragQuery}
+                     onChange={e => setRagQuery(e.target.value)}
+                     onKeyDown={async (e) => {
+                       if (e.key === 'Enter' && ragQuery.trim()) {
+                         setIsRagging(true);
+                         setRagAnswer("");
+                         try {
+                            const answer = await invoke("rag_query", { query: ragQuery });
+                            setRagAnswer(answer as string);
+                         } catch(err) {
+                            setRagAnswer("Error querying the Sentient Vault.");
+                         }
+                         setIsRagging(false);
+                       }
+                     }}
+                     placeholder="Query the Sentient Vault (e.g., 'Extract Q3 metrics from reports')"
+                     className="w-full bg-transparent px-6 py-6 text-xl font-light text-white placeholder:text-slate-500 outline-none transition-all"
+                  />
+                  {isRagging && (
+                    <div className="pr-6">
+                      <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             <AnimatePresence>
               {ragAnswer && (
                 <motion.div 
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="w-full max-w-4xl mx-auto mb-12 p-8 bg-indigo-500/10 border border-indigo-500/30 rounded-3xl backdrop-blur-xl"
+                  initial={{ opacity: 0, height: 0, y: -20 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -20 }}
+                  className="w-full max-w-5xl mx-auto mb-12 relative z-10 overflow-hidden"
                 >
-                   <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                     <BrainCircuit className="w-4 h-4" /> AI Synthesis
-                   </h3>
-                   <p className="text-base text-indigo-100/90 leading-relaxed">{ragAnswer}</p>
+                   <div className="p-8 bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-3xl backdrop-blur-2xl shadow-[0_0_30px_rgba(99,102,241,0.15)] relative mt-4">
+                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-50" />
+                     <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-3">
+                       <div className="p-1.5 bg-indigo-500/20 rounded-lg border border-indigo-500/30 text-indigo-400"><BrainCircuit className="w-4 h-4" /></div> AI Synthesis
+                     </h3>
+                     <p className="text-lg text-indigo-50 font-light leading-relaxed whitespace-pre-wrap">{ragAnswer}</p>
+                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto custom-scrollbar pr-4">
-              {vaultNodes.map((node) => (
-                <div key={node.name} className="glass-bright p-8 rounded-[2rem] border border-white/5 hover:border-indigo-500/30 transition-all group flex flex-col justify-between aspect-square">
-                  <div className="flex justify-between items-start">
-                    <div className={cn("p-4 rounded-xl", node.category === 'Strategic' ? "bg-amber-500/10 text-amber-500" : node.category === 'Technical' ? "bg-indigo-500/10 text-indigo-500" : "bg-purple-500/10 text-purple-500")}>
-                      <Shield className="w-6 h-6" />
+            <div className="flex-1 max-w-7xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 overflow-y-auto custom-scrollbar pr-4 pb-20 relative z-10">
+              {vaultNodes.map((node, i) => (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ delay: i * 0.05, duration: 0.4 }}
+                  key={node.name} 
+                  className="glass-bright p-8 rounded-[2rem] border border-white/5 hover:border-indigo-500/40 hover:bg-white/[0.02] transition-all duration-300 group flex flex-col justify-between aspect-square relative overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] cursor-pointer"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className={cn("p-4 rounded-2xl shadow-inner", node.category === 'Strategic' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : node.category === 'Technical' ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20")}>
+                      <Shield className="w-7 h-7" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{node.size}</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-black/20 px-3 py-1 rounded-full border border-white/5">{node.size}</span>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest block mb-2">{node.category}</span>
-                    <h4 className="text-lg font-bold text-white truncate">{node.name}</h4>
+                  
+                  <div className="relative z-10 mt-8">
+                    <span className={cn("text-[10px] font-bold uppercase tracking-widest block mb-2", node.category === 'Strategic' ? "text-amber-400/80" : node.category === 'Technical' ? "text-indigo-400/80" : "text-purple-400/80")}>
+                      {node.category} Node
+                    </span>
+                    <h4 className="text-xl font-bold text-white leading-tight mb-4 line-clamp-2">{node.name}</h4>
+                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <button className="text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-indigo-400 transition-colors">Access</button>
+                      <div className="w-1 h-1 rounded-full bg-white/20" />
+                      <button className="text-[10px] font-bold uppercase tracking-widest text-white/70 hover:text-indigo-400 transition-colors">Vectorize</button>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </motion.div>
@@ -1344,53 +1467,100 @@ export default function App() {
               animate={{ y: 0, opacity: 1 }} 
               exit={{ y: "-100%", opacity: 0 }} 
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 right-0 h-[60vh] z-[300] bg-black/90 backdrop-blur-3xl border-b border-indigo-500/30 flex flex-col shadow-2xl shadow-indigo-500/20"
+              className="fixed top-0 left-0 right-0 h-[65vh] z-[300] bg-black/80 backdrop-blur-3xl border-b border-indigo-500/30 flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.6),0_10px_30px_rgba(99,102,241,0.2)] overflow-hidden"
             >
-              <div className="flex items-center justify-between px-8 py-4 border-b border-white/5 bg-white/5">
-                <div className="flex items-center gap-3">
-                  <Terminal className="w-5 h-5 text-indigo-400" />
-                  <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Oasis Sentient Terminal</span>
+              {/* Terminal Ambient Glows */}
+              <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+
+              {/* Terminal Header */}
+              <div className="flex items-center justify-between px-10 py-5 border-b border-white/10 bg-gradient-to-r from-black/60 via-indigo-950/20 to-black/60 relative z-10 shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                    <Terminal className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-indigo-300 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Foundry Command Center
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">Kernel v0.1.0-alpha • Secure Neural Link</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <button onClick={analyzeScreen} disabled={isThinking} className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 rounded-xl border border-indigo-500/20 disabled:opacity-40 transition-colors text-[10px] font-bold uppercase tracking-widest">
-                    <Eye className="w-3.5 h-3.5" /> Analyze Screen
+                  <button onClick={analyzeScreen} disabled={isThinking} className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 rounded-xl border border-indigo-500/20 disabled:opacity-40 transition-all text-xs font-bold uppercase tracking-widest group shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                    <Eye className="w-4 h-4 group-hover:scale-110 transition-transform" /> Trigger Vision Scan
                   </button>
-                  <button onClick={() => setShowTerminal(false)} className="text-slate-500 hover:text-white transition-colors">
-                    <Plus className="w-5 h-5 rotate-45" />
+                  <button onClick={() => setShowTerminal(false)} className="text-slate-400 hover:text-white p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 transition-all group">
+                    <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 group-hover:rotate-90 transition-all" />
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-4">
-                {messages.map((msg, i) => (
-                  <div key={i} className={cn("flex flex-col max-w-4xl", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{msg.role === 'user' ? 'Operator' : 'Oasis Kernel'}</span>
-                    <div className={cn("p-4 rounded-2xl text-sm font-mono whitespace-pre-wrap", msg.role === 'user' ? "bg-indigo-600 text-white" : "bg-white/5 text-indigo-100 border border-white/5", msg.content.includes("Analyze my screen") && "border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]")}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {isThinking && (
-                  <div className="flex items-center gap-2 p-4 bg-white/5 rounded-2xl w-fit border border-white/5">
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-                  </div>
-                )}
+
+              {/* Terminal Body */}
+              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-6 relative z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-[length:100px_100px] opacity-90 mix-blend-overlay flex flex-col">
+                <div className="flex-1 flex flex-col justify-end space-y-6">
+                  {messages.map((msg, i) => (
+                    <motion.div 
+                      initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      key={i} 
+                      className={cn("flex flex-col max-w-4xl", msg.role === 'user' ? "ml-auto items-end" : "mr-auto items-start")}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", msg.role === 'user' ? "text-indigo-400" : "text-purple-400")}>
+                          {msg.role === 'user' ? 'Operator Directive' : 'Oasis Kernel Synthesized'}
+                        </span>
+                        {msg.role !== 'user' && <BrainCircuit className="w-3 h-3 text-purple-400" />}
+                      </div>
+                      <div className={cn(
+                        "p-5 rounded-3xl text-sm font-mono whitespace-pre-wrap leading-relaxed shadow-lg relative overflow-hidden group",
+                        msg.role === 'user' 
+                          ? "bg-indigo-600/90 text-indigo-50 border border-indigo-400/30 rounded-tr-sm shadow-indigo-600/20" 
+                          : "bg-black/40 text-purple-100 border border-purple-500/20 rounded-tl-sm backdrop-blur-md",
+                        msg.content.includes("Analyze my screen") && "border-cyan-500/50 shadow-[0_0_20px_rgba(34,211,238,0.2)] bg-cyan-900/40"
+                      )}>
+                        {msg.role !== 'user' && <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-purple-400 to-indigo-500 opacity-50" />}
+                        {msg.content}
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {isThinking && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col max-w-4xl mr-auto items-start">
+                      <span className="text-[9px] font-bold text-purple-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                        Oasis Kernel Processing <Activity className="w-3 h-3 animate-spin" />
+                      </span>
+                      <div className="flex items-center gap-2 p-5 bg-black/40 rounded-3xl rounded-tl-sm border border-purple-500/20 backdrop-blur-md">
+                        <div className="w-2.5 h-2.5 bg-purple-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(168,85,247,0.8)]" />
+                        <div className="w-2.5 h-2.5 bg-indigo-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(99,102,241,0.8)]" style={{ animationDelay: '0.15s' }} />
+                        <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full animate-bounce shadow-[0_0_10px_rgba(34,211,238,0.8)]" style={{ animationDelay: '0.3s' }} />
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
-              <div className="p-6 bg-black/50 border-t border-white/5">
-                <div className="max-w-4xl mx-auto relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-mono font-bold">{">"}</span>
-                  <input 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && searchQuery.trim()) {
-                        resolveNeuralIntent(searchQuery);
-                      }
-                    }}
-                    placeholder="Enter neural directive..."
-                    className="w-full bg-transparent border border-indigo-500/30 rounded-xl py-4 pl-10 pr-6 text-indigo-100 font-mono outline-none focus:border-indigo-500 transition-all placeholder:text-indigo-900/50"
-                  />
+
+              {/* Terminal Input */}
+              <div className="p-8 bg-gradient-to-b from-transparent to-black/80 border-t border-indigo-500/20 relative z-20 backdrop-blur-xl">
+                <div className="max-w-4xl mx-auto relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
+                  <div className="relative flex items-center bg-black/60 border border-indigo-500/30 rounded-xl overflow-hidden shadow-2xl">
+                    <span className="absolute left-6 text-indigo-400 font-mono font-bold flex items-center gap-2">
+                      <Terminal className="w-4 h-4" /> <span className="animate-pulse">❯</span>
+                    </span>
+                    <input 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && searchQuery.trim()) {
+                          resolveNeuralIntent(searchQuery);
+                        }
+                      }}
+                      placeholder="Enter neural directive or execute system command..."
+                      className="w-full bg-transparent py-5 pl-16 pr-8 text-indigo-50 font-mono text-sm outline-none transition-all placeholder:text-indigo-400/40"
+                    />
+                    <kbd className="absolute right-6 hidden md:flex bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-[9px] font-bold text-indigo-300 uppercase tracking-widest shadow-inner">Enter</kbd>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1617,16 +1787,20 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[1000] flex items-start justify-center pt-[15vh] p-4 bg-black/80 backdrop-blur-md"
           >
             <motion.div
-              initial={{ scale: 0.95, y: -20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: -20 }}
-              className="w-full max-w-2xl glass-panel p-2 shadow-2xl overflow-hidden"
+              initial={{ scale: 0.95, y: -20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: -20, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-3xl glass-bright rounded-3xl shadow-[0_0_80px_rgba(99,102,241,0.2)] overflow-hidden border border-white/10 flex flex-col relative"
             >
-              <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl">
-                <Search className="w-5 h-5 text-indigo-400" />
+              {/* Background ambient glow */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-indigo-500/30 rounded-full blur-[80px] pointer-events-none mix-blend-screen" />
+              
+              <div className="flex items-center gap-4 px-6 py-5 border-b border-white/5 relative z-10 bg-black/20">
+                <BrainCircuit className="w-6 h-6 text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
                 <input
                   autoFocus
                   type="text"
@@ -1639,13 +1813,44 @@ export default function App() {
                       setCommandInput("");
                       setShowCommandPalette(false);
                     }
+                    if (e.key === 'Escape') {
+                      setShowCommandPalette(false);
+                    }
                   }}
-                  className="w-full bg-transparent border-none outline-none text-white text-sm font-medium placeholder:text-slate-500"
+                  className="w-full bg-transparent border-none outline-none text-white text-xl font-light placeholder:text-slate-500/70"
                 />
-                <div className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 bg-white/10 rounded-md text-[10px] font-bold text-slate-400 uppercase">Enter</kbd>
-                  <kbd className="px-2 py-1 bg-white/10 rounded-md text-[10px] font-bold text-slate-400 uppercase">Esc</kbd>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <kbd className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-slate-400 uppercase shadow-inner">Enter</kbd>
+                  <kbd className="px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-slate-400 uppercase shadow-inner">Esc</kbd>
                 </div>
+              </div>
+              
+              {/* Command Palette Suggestions */}
+              <div className="p-4 bg-black/40 backdrop-blur-md relative z-10 flex flex-col gap-1">
+                 <div className="px-4 py-2 text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Suggested Directives</div>
+                 {[
+                   { icon: Terminal, label: 'Review code and push to origin', type: 'Git Automation' },
+                   { icon: Shield, label: 'Access Technical Vault Nodes', type: 'Foundry Protocol' },
+                   { icon: Eye, label: 'Trigger Omniscient Vision Scan', type: 'System Capability' }
+                 ].map((suggestion, idx) => (
+                   <button 
+                     key={idx} 
+                     onClick={() => {
+                        resolveNeuralIntent(suggestion.label);
+                        setCommandInput("");
+                        setShowCommandPalette(false);
+                     }}
+                     className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-indigo-500/20 group transition-all text-left border border-transparent hover:border-indigo-500/30"
+                   >
+                     <div className="flex items-center gap-4">
+                       <div className="p-2 bg-white/5 group-hover:bg-indigo-500/30 rounded-lg border border-white/5 group-hover:border-indigo-400/50 transition-colors">
+                         <suggestion.icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-300 transition-colors" />
+                       </div>
+                       <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion.label}</span>
+                     </div>
+                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{suggestion.type}</span>
+                   </button>
+                 ))}
               </div>
             </motion.div>
           </motion.div>
@@ -1689,52 +1894,97 @@ export default function App() {
       <AnimatePresence>
         {showTimeMachine && (
           <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/60 backdrop-blur-md"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-2xl"
           >
-            <div className="w-full max-w-5xl h-[85vh] glass-bright rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl relative">
+            <div className="w-full max-w-6xl h-[90vh] glass-bright rounded-[2rem] border border-white/10 flex flex-col overflow-hidden shadow-[0_0_80px_rgba(168,85,247,0.15)] relative">
               <div className="absolute inset-0 pointer-events-none opacity-[0.03] grayscale mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
               
-              <div className="p-8 border-b border-white/5 flex items-center justify-between z-10">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-purple-500/20 rounded-2xl text-purple-400">
-                    <Clock className="w-6 h-6" />
-                  </div>
+              {/* Vibrant Ambient Glows */}
+              <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/20 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none" />
+
+              <div className="px-10 py-8 border-b border-white/5 flex items-center justify-between z-10 bg-black/20">
+                <div className="flex items-center gap-5">
+                  <motion.div 
+                    initial={{ rotate: -90, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ type: "spring", duration: 1 }}
+                    className="p-4 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-2xl text-purple-400 shadow-inner shadow-white/5 border border-white/10"
+                  >
+                    <Clock className="w-8 h-8" />
+                  </motion.div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white tracking-tight">Photographic Memory Timeline</h2>
-                    <p className="text-slate-400 text-sm mt-1">Autonomous cognitive snapshots of your digital context</p>
+                    <h2 className="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                      Photographic Memory
+                      <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs tracking-widest uppercase border border-purple-500/30">Live Sync</span>
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-1.5 font-medium">Autonomous cognitive snapshots of your digital workflow over time.</p>
                   </div>
                 </div>
-                <button onClick={() => setShowTimeMachine(false)} className="text-slate-400 hover:text-white px-4 py-2 uppercase tracking-widest text-xs font-bold transition-colors">Close [ESC]</button>
+                <button onClick={() => setShowTimeMachine(false)} className="group flex items-center gap-2 text-slate-400 hover:text-white px-5 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all uppercase tracking-widest text-xs font-bold border border-white/5 hover:border-white/10">
+                  <span>Close</span>
+                  <span className="opacity-50 group-hover:opacity-100">[ESC]</span>
+                </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar z-10">
+              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar z-10">
                 {photographicMemories.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                    <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
-                    <p>No visual memories recorded yet.</p>
-                    <p className="text-xs mt-2 opacity-50">Agent captures desktop context periodically.</p>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                    className="h-full flex flex-col items-center justify-center text-slate-500"
+                  >
+                    <div className="relative">
+                      <ImageIcon className="w-24 h-24 mb-6 opacity-20" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#020617] to-transparent" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-300 mb-2">No Memories Recorded</h3>
+                    <p className="text-sm opacity-60 max-w-sm text-center">The Sentient OS hasn't captured any visual context snapshots yet. Let it run in the background to build your timeline.</p>
+                  </motion.div>
                 ) : (
-                  <div className="relative border-l border-white/10 ml-6 pl-8 flex flex-col gap-12">
-                    {photographicMemories.map((mem) => (
-                      <div key={mem.id} className="relative group">
-                        {/* Timeline Node */}
-                        <div className="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-[#020617] border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] group-hover:scale-125 transition-transform" />
+                  <div className="relative border-l-2 border-white/10 ml-8 pl-10 flex flex-col gap-12 pb-20">
+                    {photographicMemories.map((mem, i) => (
+                      <motion.div 
+                        initial={{ opacity: 0, x: -30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1, duration: 0.4, type: "spring" }}
+                        key={mem.id} 
+                        className="relative group"
+                      >
+                        {/* Interactive Timeline Node */}
+                        <div className="absolute -left-[49px] top-2 w-4 h-4 rounded-full bg-[#020617] border-2 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] group-hover:scale-150 group-hover:border-white transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(168,85,247,0.8)] z-20" />
                         
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="text-purple-400 font-bold tracking-widest text-xs">{mem.timestamp}</span>
-                          <span className="text-slate-600 text-xs uppercase tracking-widest px-2 py-0.5 rounded border border-white/5 bg-white/5">Auto-Snapshot</span>
+                        {/* Timeline connecting line glow on hover */}
+                        <div className="absolute -left-[42px] top-6 bottom-[-48px] w-0.5 bg-gradient-to-b from-purple-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        
+                        <div className="flex items-center gap-4 mb-4">
+                          <span className="text-white font-bold tracking-widest text-sm bg-purple-600/40 px-4 py-1.5 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 backdrop-blur-md">
+                            {mem.timestamp}
+                          </span>
+                          <span className="text-slate-400 text-xs uppercase tracking-widest px-3 py-1 rounded-full border border-white/5 bg-white/5 flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5 text-indigo-400" /> Visual Context
+                          </span>
                         </div>
                         
-                        <div className="glass p-6 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-colors">
-                          <p className="text-slate-300 leading-relaxed font-light text-sm whitespace-pre-wrap">
+                        <div className="glass p-8 rounded-3xl border border-white/5 group-hover:border-purple-500/40 group-hover:bg-white/[0.04] transition-all duration-500 relative overflow-hidden shadow-lg hover:shadow-purple-900/20">
+                           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                           
+                           <p className="text-slate-300 leading-relaxed font-normal text-sm whitespace-pre-wrap relative z-10">
                             {mem.description}
-                          </p>
+                           </p>
+                           
+                           <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-3 relative z-10">
+                             <button className="px-4 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-xs font-bold tracking-widest uppercase text-purple-300 transition-all flex items-center gap-2 border border-purple-500/20 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                               <Search className="w-4 h-4" /> Deep Dive
+                             </button>
+                             <button className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold tracking-widest uppercase text-slate-300 transition-all flex items-center gap-2 border border-white/5 hover:border-white/10">
+                               <FolderOpen className="w-4 h-4" /> Restore Workspace
+                             </button>
+                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 )}
@@ -1744,25 +1994,79 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* In-App Toast Notification */}
+      {/* Premium In-App Toast Notification */}
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, x: 100, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 100, scale: 0.9 }}
-            className="fixed bottom-8 right-8 z-[100] glass-bright p-5 rounded-2xl border border-indigo-500/30 shadow-[0_0_40px_rgba(99,102,241,0.2)] flex items-start gap-4 max-w-sm"
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="fixed bottom-10 right-10 z-[2000] w-96 glass-bright rounded-2xl border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.5),0_0_20px_rgba(99,102,241,0.2)] overflow-hidden group"
           >
-            <div className="p-2 bg-indigo-500/20 rounded-xl text-indigo-400">
-              <Activity className="w-5 h-5 animate-pulse" />
+            {/* Ambient Background Glow */}
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 pointer-events-none" />
+            
+            <div className="p-5 flex items-start gap-4 relative z-10">
+              <div className="p-2.5 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl text-indigo-400 border border-indigo-500/30 shadow-inner">
+                <Zap className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="flex-1 pt-0.5">
+                <h4 className="text-white font-bold tracking-widest text-xs uppercase">{toast.title}</h4>
+                <p className="text-slate-300 text-sm mt-1.5 leading-relaxed font-medium">{toast.body}</p>
+              </div>
+              <button 
+                onClick={() => setToast(null)} 
+                className="text-slate-400 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/20 rounded-lg border border-transparent hover:border-white/10"
+              >
+                 <span className="text-xs font-bold px-1">✕</span>
+              </button>
             </div>
-            <div>
-              <h4 className="text-white font-bold tracking-wide text-sm">{toast.title}</h4>
-              <p className="text-slate-400 text-xs mt-1 leading-relaxed">{toast.body}</p>
+            
+            {/* Animated Countdown Progress Bar */}
+            <motion.div 
+              initial={{ width: "100%" }}
+              animate={{ width: "0%" }}
+              transition={{ duration: 5, ease: "linear" }}
+              className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-[length:200%_auto] animate-gradient"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Vision Inference Scanner Overlay */}
+      <AnimatePresence>
+        {isScanningScreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[3000] pointer-events-none flex flex-col items-center justify-center overflow-hidden"
+          >
+            {/* The scanning laser line */}
+            <motion.div 
+              initial={{ y: "-50vh" }}
+              animate={{ y: "50vh" }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              className="absolute left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_30px_10px_rgba(34,211,238,0.5)] z-[3001]"
+            />
+            {/* Scan Overlay background */}
+            <div className="absolute inset-0 bg-cyan-900/10 backdrop-blur-[2px] mix-blend-overlay" />
+            
+            {/* Scanner HUD target */}
+            <div className="relative z-[3002] border border-cyan-500/50 rounded-3xl p-12 bg-black/40 backdrop-blur-md flex flex-col items-center">
+               <Eye className="w-16 h-16 text-cyan-400 mb-4 animate-pulse drop-shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
+               <h3 className="text-2xl font-bold text-white tracking-widest uppercase shadow-black drop-shadow-md">Omniscient Vision</h3>
+               <p className="text-cyan-300 font-mono text-sm mt-2 flex items-center gap-2">
+                 <Activity className="w-4 h-4 animate-spin" /> Analyzing Pixel Matrix...
+               </p>
+               
+               {/* Corner brackets */}
+               <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400 rounded-tl-xl" />
+               <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-400 rounded-tr-xl" />
+               <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-400 rounded-bl-xl" />
+               <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400 rounded-br-xl" />
             </div>
-            <button onClick={() => setToast(null)} className="absolute top-2 right-2 text-slate-500 hover:text-white">
-               ✕
-            </button>
           </motion.div>
         )}
       </AnimatePresence>
