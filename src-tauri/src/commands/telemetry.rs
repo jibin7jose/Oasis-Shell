@@ -117,7 +117,12 @@ pub fn get_hardware_telemetry(
     // Convert to MB/s
     let network_up = total_up / 1024.0 / 1024.0;
     let network_down = total_down / 1024.0 / 1024.0;
-    let gpu_usage = 14.5; // Placeholder for GPU telemetry via external crate
+    let gpu_usage = std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8_lossy(&out.stdout).trim().parse::<f32>().ok())
+        .unwrap_or(0.0);
 
     Ok(HardwareTelemetry {
         cpu_usage,

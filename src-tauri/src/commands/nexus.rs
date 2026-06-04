@@ -244,7 +244,6 @@ pub fn start_proactive_sentience(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
 
-            sys.refresh_cpu_all();
             let cpu_usage = sys.global_cpu_usage();
             if cpu_usage > 70.0 {
                 let _ = app.emit("proactive-pulse", serde_json::json!({
