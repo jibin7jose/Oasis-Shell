@@ -175,6 +175,11 @@ pub fn run() {
             commands::nexus::get_logic_path,
             commands::nexus::get_venture_metrics,
             commands::nexus::trigger_deploy,
+            commands::golems::get_active_golems,
+            commands::golems::get_golem_proposals,
+            commands::golems::get_neural_workforce,
+            commands::golems::execute_golem_manifest,
+            commands::golems::resolve_golem_proposal,
             commands::nexus::get_vault_nodes,
             commands::nexus::get_market_intelligence
         ])

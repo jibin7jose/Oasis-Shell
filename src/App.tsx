@@ -24,6 +24,7 @@ import { CommandPalette } from "./components/overlays/CommandPalette";
 import { PremiumToast } from "./components/overlays/PremiumToast";
 import { HolographicAssistant } from "./components/overlays/HolographicAssistant";
 import { CommandTerminal } from "./components/panels/CommandTerminal";
+import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { SentientVault } from "./components/panels/SentientVault";
 import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
@@ -152,6 +153,7 @@ export default function App() {
   const [showLogs, setShowLogs] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showWorkforce, setShowWorkforce] = useState(false);
   const [showTimeMachine, setShowTimeMachine] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [simMode, setSimMode] = useState(false);
@@ -961,7 +963,7 @@ export default function App() {
       </div>
 
       {/* Level 9 Executive Sidebar */}
-      <ExecutiveSidebar setShowGraph={setShowGraph} setShowVault={setShowVault} setShowLogs={setShowLogs} setSimMode={setSimMode} simMode={simMode} loadMemories={loadMemories} setShowTimeMachine={setShowTimeMachine} handleContextSwitch={handleContextSwitch} toggleWidgetMode={toggleWidgetMode} showSettings={showSettings} setShowSettings={setShowSettings} />
+      <ExecutiveSidebar setShowGraph={setShowGraph} setShowVault={setShowVault} setShowLogs={setShowLogs} setSimMode={setSimMode} simMode={simMode} loadMemories={loadMemories} setShowTimeMachine={setShowTimeMachine} handleContextSwitch={handleContextSwitch} toggleWidgetMode={toggleWidgetMode} showSettings={showSettings} setShowSettings={setShowSettings} setShowWorkforce={setShowWorkforce} />
 
       {/* Main Command Stage */}
       <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />
@@ -1041,6 +1043,7 @@ export default function App() {
         <CognitiveTimeline show={showLogs} onClose={() => setShowLogs(false)} timeline={timeline} />
 
         <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} vaultNodesCount={vaultNodes.length} autostart={autostart} setAutostart={setAutostart} />
+        <WorkforcePanel isOpen={showWorkforce} onClose={() => setShowWorkforce(false)} />
         <VentureSimulationPortal show={simMode} onClose={() => setSimMode(false)} metrics={simMetrics} setMetrics={setSimMetrics} />
       </AnimatePresence>
 

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { 
   Bot, 
   LayoutDashboard, 
+  Cpu, 
   BrainCircuit, 
   FolderOpen, 
   Clock, 
@@ -26,6 +27,7 @@ interface ExecutiveSidebarProps {
   toggleWidgetMode: () => void;
   showSettings: boolean;
   setShowSettings: (v: boolean) => void;
+  setShowWorkforce: (v: boolean) => void;
 }
 
 export const ExecutiveSidebar: React.FC<ExecutiveSidebarProps> = ({
