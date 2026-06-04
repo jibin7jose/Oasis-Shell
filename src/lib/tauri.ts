@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-export const isTauri = typeof (window as any).__TAURI__ !== "undefined";
+export const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
 export const invokeSafe = async <T = any>(cmd: string, payload?: Record<string, any>): Promise<T> => {
   if (!isTauri) {
