@@ -41,7 +41,8 @@ export const ExecutiveSidebar: React.FC<ExecutiveSidebarProps> = ({
   handleContextSwitch,
   toggleWidgetMode,
   showSettings,
-  setShowSettings
+  setShowSettings,
+  setShowWorkforce
 }) => {
   return (
     <motion.aside
@@ -59,6 +60,7 @@ export const ExecutiveSidebar: React.FC<ExecutiveSidebarProps> = ({
           { id: 'graph', icon: BrainCircuit, label: 'Cortex' },
           { id: 'vault', icon: FolderOpen, label: 'Vault' },
           { id: 'time', icon: Clock, label: 'Timeline' },
+          { id: 'workforce', icon: Cpu, label: 'Workforce' },
           { id: 'logs', icon: Activity, label: 'History' }
         ].map((item) => (
           <button
@@ -67,6 +69,7 @@ export const ExecutiveSidebar: React.FC<ExecutiveSidebarProps> = ({
               if (item.id === 'graph') setShowGraph(true);
               else if (item.id === 'vault') setShowVault(true);
               else if (item.id === 'logs') setShowLogs(true);
+              else if (item.id === 'workforce') setShowWorkforce(true);
               else if (item.id === 'sim') setSimMode(true);
               else if (item.id === 'time') {
                 loadMemories();
