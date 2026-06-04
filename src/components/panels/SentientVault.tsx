@@ -90,7 +90,7 @@ export const SentientVault: React.FC<SentientVaultProps> = ({
                      }
                    }}
                    placeholder="Query the Sentient Vault (e.g., 'Extract Q3 metrics from reports')"
-                   className="w-full bg-transparent px-6 py-6 text-xl font-light text-white placeholder:text-slate-500 outline-none transition-all"
+                   className="w-full bg-transparent px-6 h-20 text-xl font-light text-white placeholder:text-slate-500 outline-none transition-all leading-normal"
                 />
                 {isRagging && (
                   <div className="pr-6">

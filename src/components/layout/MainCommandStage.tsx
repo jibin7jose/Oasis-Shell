@@ -88,7 +88,7 @@ export const MainCommandStage = (props: any) => {
                 onKeyDown={handleSearchIntent}
                 placeholder={isListening ? "Listening... Speak your directive." : "Detecting Neural Intent..."}
                 className={cn(
-                  "bg-transparent border-none outline-none text-2xl w-full font-light transition-colors tracking-wide", 
+                  "bg-transparent border-none outline-none text-2xl w-full h-full py-2 font-light transition-colors tracking-wide", 
                   isListening ? "text-cyan-100 placeholder:text-cyan-500/60" : "text-white placeholder:text-slate-700"
                 )}
                 readOnly={isListening}

@@ -89,10 +89,12 @@ pub async fn get_neural_workforce() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub async fn execute_golem_manifest(id: String, title: String, code: String) -> Result<String, String> {
-    // Write out the proposed code to a new location or mock the merge
+pub async fn execute_golem_manifest(_id: String, title: String, code: String) -> Result<String, String> {
     let file_basename = title.replace(" ", "_").to_lowercase();
-    std::fs::write(&format!("{}.ts", file_basename), &code).unwrap_or_default();
+    let path = format!("{}.ts", file_basename);
+    std::fs::write(&path, &code).unwrap_or_default();
+    std::process::Command::new("git").args(["add", &path]).output().ok();
+    std::process::Command::new("git").args(["commit", "-m", &format!("feat(golem): auto-manifested {}", title)]).output().ok();
     Ok("Merged successfully".into())
 }
 
