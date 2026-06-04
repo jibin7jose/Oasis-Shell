@@ -749,6 +749,7 @@ export default function App() {
   // --- SYNC: BRIDGE ---
   useEffect(() => {
     const syncFoundryData = async () => {
+      try { await invoke('start_proactive_sentience'); await invoke('start_photographic_memory'); } catch(e) {}
       try {
         const metrics = await invoke("get_venture_metrics") as any;
         const intel = await invoke("get_market_intelligence") as any;
@@ -854,8 +855,8 @@ export default function App() {
     if (simMode) return "#f59e0b";
     switch (node.group) {
       case 'core': return '#6366f1';
-      case 'capital': return '#f59e0b';
-      case 'product': return '#a855f7';
+      case 'crate': return '#f59e0b';
+      case 'vault': return '#a855f7';
       case 'growth': return '#10b981';
       default: return '#94a3b8';
     }
@@ -1015,6 +1016,15 @@ export default function App() {
                   nodeRelSize={simMode ? 12 : 12}
                   nodeColor={getNodeColor}
                   nodeLabel="id"
+                  onNodeClick={(node: any) => {
+                    if (node.group === 'crate') {
+                      const crate = contextCrates.find(c => c.name === node.id);
+                      if (crate) launchContextCrate(crate);
+                    } else if (node.group === 'vault') {
+                      setShowVault(true);
+                      setRagQuery('Summarize ' + node.id);
+                    }
+                  }}
                   linkColor={() => simMode ? "rgba(245, 158, 11, 0.4)" : "rgba(99, 102, 241, 0.4)"}
                   linkWidth={2}
                   nodeOpacity={0.9}
