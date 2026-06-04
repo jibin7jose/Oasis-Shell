@@ -95,6 +95,7 @@ pub async fn execute_golem_manifest(_id: String, title: String, code: String) ->
     std::fs::write(&path, &code).unwrap_or_default();
     std::process::Command::new("git").args(["add", &path]).output().ok();
     std::process::Command::new("git").args(["commit", "-m", &format!("feat(golem): auto-manifested {}", title)]).output().ok();
+    std::process::Command::new("git").args(["push"]).output().ok();
     Ok("Merged successfully".into())
 }
 
