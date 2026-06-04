@@ -24,7 +24,7 @@ export const MainCommandStage = (props: any) => {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                {contexts.find(c => c.id === activeContext)?.name} Context
+                {contexts.find((c: any) => c.id === activeContext)?.name} Context
                 <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.6-PRO</span>
               </h1>
             </div>
@@ -38,7 +38,7 @@ export const MainCommandStage = (props: any) => {
           </div>
 
           <div className="flex items-center gap-8">
-            {marketIntel.map((m, i) => (
+            {marketIntel.map((m: any, i: number) => (
               <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
                 <PulseIcon className={cn("w-3.5 h-3.5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")} />
                 <span>{m.symbol}: <span className="text-white">{m.price}</span></span>
@@ -155,7 +155,7 @@ export const MainCommandStage = (props: any) => {
               <button 
                 onClick={() => {
                   if(newAgentTitle && newAgentPrompt) {
-                    setCronAgents(prev => [...prev, { id: Date.now().toString(), title: newAgentTitle, prompt: newAgentPrompt, interval: 60000, active: true }]);
+                    setCronAgents((prev: any) => [...prev, { id: Date.now().toString(), title: newAgentTitle, prompt: newAgentPrompt, interval: 60000, active: true }]);
                     setNewAgentTitle("");
                     setNewAgentPrompt("");
                   }
@@ -181,7 +181,7 @@ export const MainCommandStage = (props: any) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {cronAgents.map((agent) => (
+              {cronAgents.map((agent: any) => (
                 <motion.div
                   key={agent.id}
                   className={cn(
@@ -199,7 +199,7 @@ export const MainCommandStage = (props: any) => {
                       <h3 className="text-lg font-bold tracking-tight text-white">{agent.title}</h3>
                     </div>
                     <button 
-                      onClick={() => setCronAgents(prev => prev.map(a => a.id === agent.id ? { ...a, active: !a.active } : a))}
+                      onClick={() => setCronAgents((prev: any) => prev.map((a: any) => a.id === agent.id ? { ...a, active: !a.active } : a))}
                       className={cn(
                         "text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl transition-all border",
                         agent.active ? "text-red-400 bg-red-400/10 border-red-500/20 hover:bg-red-400/20" : "text-emerald-400 bg-emerald-400/10 border-emerald-500/20 hover:bg-emerald-400/20"
@@ -291,7 +291,7 @@ export const MainCommandStage = (props: any) => {
                   />
                 </div>
                 <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-2 pr-2">
-                  {activeWindows.slice(0, 6).map((win) => (
+                  {activeWindows.slice(0, 6).map((win: any) => (
                     <div key={`${win.pid}-${win.title}`} className="flex items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/5 px-4 py-3">
                       <span className="text-xs text-slate-300 truncate">{win.title}</span>
                       <span className="text-[9px] font-mono text-slate-500">{win.pid}</span>
@@ -307,7 +307,7 @@ export const MainCommandStage = (props: any) => {
               </div>
 
               <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar pr-2 perspective-1000">
-                {contextCrates.map((crate) => {
+                {contextCrates.map((crate: any) => {
                   const isEditing = editingCrate?.id === crate.id;
                   return (
                     <motion.div 
@@ -384,7 +384,7 @@ export const MainCommandStage = (props: any) => {
           </div>
 
           <div className="flex gap-8 pb-12">
-            {contexts.map((ctx) => {
+            {contexts.map((ctx: any) => {
               const Icon = ctx.icon;
               const isActive = activeContext === ctx.id;
               return (

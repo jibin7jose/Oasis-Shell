@@ -142,6 +142,10 @@ export interface SystemState {
   setShowNexus: (show: boolean) => void;
   showSentinel: boolean;
   setShowSentinel: (show: boolean) => void;
+  auraIp: string;
+  setAuraIp: (ip: string) => void;
+  sensoryFeedbackEnabled: boolean;
+  setSensoryFeedbackEnabled: (enabled: boolean) => void;
 }
 
 export type ChronosSnapshot = {
