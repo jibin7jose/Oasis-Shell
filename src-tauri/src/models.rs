@@ -38,6 +38,9 @@ pub struct HardwareTelemetry {
     pub cpu_usage: f32,
     pub ram_usage: f32,
     pub disk_usage: f32,
+    pub network_up: f32,
+    pub network_down: f32,
+    pub gpu_usage: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

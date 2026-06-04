@@ -104,10 +104,28 @@ pub fn get_hardware_telemetry(
     let cpu_usage = sys.global_cpu_usage();
     let ram_usage = (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0;
 
+    let mut networks = sysinfo::Networks::new_with_refreshed_list();
+    std::thread::sleep(std::time::Duration::from_millis(200)); // Sleep slightly to measure diff
+    networks.refresh(true);
+    let mut total_up = 0.0;
+    let mut total_down = 0.0;
+    for (_, data) in &networks {
+        total_up += data.transmitted() as f32;
+        total_down += data.received() as f32;
+    }
+
+    // Convert to MB/s
+    let network_up = total_up / 1024.0 / 1024.0;
+    let network_down = total_down / 1024.0 / 1024.0;
+    let gpu_usage = 14.5; // Placeholder for GPU telemetry via external crate
+
     Ok(HardwareTelemetry {
         cpu_usage,
         ram_usage,
         disk_usage,
+        network_up,
+        network_down,
+        gpu_usage,
     })
 }
 

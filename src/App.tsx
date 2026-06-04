@@ -237,7 +237,7 @@ export default function App() {
   const [founderMetrics, setFounderMetrics] = useState({
     arr: "$1.24M", burn: "$42.5K/mo", runway: "18.4 Mo.", momentum: "+12.8%"
   });
-  const [telemetry, setTelemetry] = useState({ cpu_usage: 0, ram_usage: 0, disk_usage: 0 });
+  const [telemetry, setTelemetry] = useState({ cpu_usage: 0, ram_usage: 0, disk_usage: 0, network_up: 0, network_down: 0, gpu_usage: 0 });
 
   useHeuristicGuardian(telemetry, (category, action) => {
     setProactiveAlert({ suggestion: `Anomaly Detected: ${category}. Auto-mitigation ready.`, action });
@@ -360,7 +360,7 @@ export default function App() {
           }
         })();
       }
-      else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
+      else if (q.includes('vision') || q.includes('look') || q.includes('see') || q.includes('screen')) { analyzeScreen(); } else if (q.includes("create") || q.includes("architect") || q.includes("build module")) {
         const title = query.replace(/create|architect|build module/gi, "").trim() || "New Dynamic Module";
         notifyUser('Architect', 'Manifesting module: ' + title);
 
@@ -490,7 +490,7 @@ export default function App() {
       const base64Image = await invoke("capture_screenshot") as string;
       const visionResult = await invoke("query_vision", { 
         imageBase64: base64Image, 
-        prompt: "You are the Oasis Kernel. Describe precisely what the user is working on right now based on this screenshot of their desktop. Keep it concise." 
+        prompt: "You are the Oasis Sentient Kernel. Analyze this screenshot of the user's active workspace. Identify exactly what IDE, terminal, or browser they are using. If they are looking at code, aggressively search for syntax errors, logic bugs, or architectural flaws and explain how to fix them. If they are reading documentation or a webpage, summarize the core concept. Provide a highly technical, dense, and actionable summary." 
       }) as string;
       
       setMessages(prev => [...prev, { role: "system", content: visionResult }]);
