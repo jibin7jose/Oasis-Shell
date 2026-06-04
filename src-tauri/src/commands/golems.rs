@@ -38,8 +38,11 @@ pub static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
 
 #[tauri::command]
 pub async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
-    let registry = GOLEM_REGISTRY.lock().unwrap();
-    let mut tasks: Vec<GolemTask> = registry.values().cloned().collect();
+    println!("get_active_golems CALLED");
+    let mut tasks = {
+        let registry = GOLEM_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect::<Vec<GolemTask>>()
+    };
     // Default mock data if empty
     if tasks.is_empty() {
         tasks.push(GolemTask {
@@ -60,8 +63,10 @@ pub async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
 
 #[tauri::command]
 pub async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
-    let registry = PROPOSAL_REGISTRY.lock().unwrap();
-    let mut props: Vec<GolemProposal> = registry.values().cloned().collect();
+    let mut props = {
+        let registry = PROPOSAL_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect::<Vec<GolemProposal>>()
+    };
     if props.is_empty() {
         props.push(GolemProposal {
             id: "PR-8483".into(),
