@@ -45,14 +45,15 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
           invokeSafe("get_neural_workforce") as Promise<any[]>
         ]);
         setActiveGolems(tasks ?? []);
-        setActiveProposals(props.filter(p => p.status === 'pending') ?? []);
+        setActiveProposals(props ? props.filter((p: any) => p.status === 'pending') : []);
         setWorkforce(wf ?? []);
         
         if (isOpen && onPlayNotification && props.length > 0) {
           onPlayNotification();
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Failed to fetch workforce state", e);
+        alert("Error in workforce: " + e.toString());
       }
     };
 
