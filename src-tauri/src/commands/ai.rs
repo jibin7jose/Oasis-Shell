@@ -135,6 +135,9 @@ pub async fn semantic_search(
         filename: String,
         filepath: String,
         content: String,
+        preview: String,
+        size: u64,
+        last_modified: String,
         score: f32,
     }
 
@@ -145,11 +148,31 @@ pub async fn semantic_search(
             if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
                 let score = cosine_similarity(&query_vector, &file_vec);
                 if score > 0.3 {
+                    let mut size = 0;
+                    let mut last_modified = String::from("Unknown");
+                    
+                    if let Ok(meta) = std::fs::metadata(&filepath) {
+                        size = meta.len();
+                        if let Ok(modified) = meta.modified() {
+                            let datetime: chrono::DateTime<chrono::Local> = modified.into();
+                            last_modified = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+                        }
+                    }
+                    
+                    let preview = if content.len() > 150 {
+                        format!("{}...", &content[..150])
+                    } else {
+                        content.clone()
+                    };
+
                     // threshold
                     results.push(Match {
                         filename,
                         filepath,
                         content,
+                        preview,
+                        size,
+                        last_modified,
                         score,
                     });
                 }

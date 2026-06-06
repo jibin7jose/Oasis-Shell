@@ -29,7 +29,7 @@ const CortexHUD: React.FC = () => {
   const handleCortexSearch = async () => {
     if (!cortexQuery.trim()) return;
     try {
-      const results: any[] = await invokeSafe("search_semantic_nodes", { query: cortexQuery });
+      const results: any[] = await invokeSafe("semantic_search", { query: cortexQuery });
       setCortexResults(results || []);
       setNotification(`Neural Search: Found ${results?.length || 0} semantic matches.`);
     } catch (err) {
