@@ -371,7 +371,7 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
 
 
 #[tauri::command]
-pub fn execute_cli_directive(cmd: String, args: Vec<String>) -> Result<serde_json::Value, String> {
+pub fn execute_cli_directive(cmd: String, args: Vec<String>) -> Result<String, String> {
     let mut command_str = cmd;
     
     for arg in args {
@@ -395,7 +395,5 @@ pub fn execute_cli_directive(cmd: String, args: Vec<String>) -> Result<serde_jso
         return Err(String::from_utf8_lossy(&output.stderr).to_string());
     };
 
-    Ok(serde_json::json!({
-        "output": res_text
-    }))
+    Ok(res_text)
 }

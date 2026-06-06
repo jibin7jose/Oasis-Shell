@@ -72,7 +72,7 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
       setLines(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         type: 'output',
-        content: response.output,
+        content: response,
         timestamp: new Date().toLocaleTimeString()
       }]);
     } catch (err: any) {
