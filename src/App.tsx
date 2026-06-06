@@ -24,6 +24,7 @@ import { CommandPalette } from "./components/overlays/CommandPalette";
 import { PremiumToast } from "./components/overlays/PremiumToast";
 import { HolographicAssistant } from "./components/overlays/HolographicAssistant";
 import { CommandTerminal } from "./components/panels/CommandTerminal";
+import { TerminalPanel } from "./components/panels/TerminalPanel";
 import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { SentientVault } from "./components/panels/SentientVault";
 import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
@@ -152,6 +153,7 @@ export default function App() {
   const [showVault, setShowVault] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [showRealTerminal, setShowRealTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showWorkforce, setShowWorkforce] = useState(false);
   const [showTimeMachine, setShowTimeMachine] = useState(false);
@@ -213,6 +215,10 @@ export default function App() {
       if (e.key === '`' && e.ctrlKey) {
         e.preventDefault();
         setShowTerminal(prev => !prev);
+      }
+      if (e.key === 't' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowRealTerminal(prev => !prev);
       }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
@@ -1049,6 +1055,10 @@ export default function App() {
 
       {/* Floating Holographic Assistant */}
       <HolographicAssistant showAI={showAI} setShowAI={setShowAI} messages={messages} isThinking={isThinking} assistantInput={assistantInput} setAssistantInput={setAssistantInput} handleNeuralSend={handleNeuralSend} />
+      
+      {/* Real Terminal Sandbox */}
+      <TerminalPanel isOpen={showRealTerminal} onClose={() => setShowRealTerminal(false)} />
+
       {/* Guardian Notification HUD */}
       <GuardianHUD proactiveAlert={proactiveAlert} setProactiveAlert={setProactiveAlert} logEvent={logEvent} />
       {/* Global AI Command Palette */}

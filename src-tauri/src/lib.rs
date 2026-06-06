@@ -163,6 +163,7 @@ pub fn run() {
 
             commands::crates::generate_crate_name,
             commands::ai::execute_neural_command,
+            commands::ai::execute_cli_directive,
             commands::ai::generate_commit_message,
             commands::ai::check_ai_status,
             commands::nexus::start_proactive_sentience,

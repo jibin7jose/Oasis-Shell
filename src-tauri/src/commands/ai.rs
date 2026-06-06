@@ -367,3 +367,38 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
         Err("Failed to parse LLM response for git commit".into())
     }
 }
+
+#[derive(serde::Deserialize)]
+pub struct CliDirective {
+    pub cmd: String,
+    pub args: Vec<String>,
+}
+
+#[tauri::command]
+pub fn execute_cli_directive(directive: CliDirective, stress_color: Option<String>) -> Result<serde_json::Value, String> {
+    let mut command_str = directive.cmd.clone();
+    for arg in directive.args {
+        command_str.push_str(" ");
+        command_str.push_str(&arg);
+    }
+
+    let output = std::process::Command::new("powershell")
+        .args(["-Command", &command_str])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let res_text = if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        if stdout.trim().is_empty() {
+            "Command executed successfully (no output).".into()
+        } else {
+            stdout
+        }
+    } else {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    };
+
+    Ok(serde_json::json!({
+        "output": res_text
+    }))
+}
