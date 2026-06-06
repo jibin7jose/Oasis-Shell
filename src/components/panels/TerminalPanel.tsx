@@ -65,8 +65,8 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
       const args = parts.slice(1);
 
       const response: any = await invokeSafe('execute_cli_directive', {
-        directive: { cmd, args },
-        stressColor
+        cmd, 
+        args
       });
 
       setLines(prev => [...prev, {
