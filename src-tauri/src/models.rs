@@ -34,6 +34,15 @@ pub struct WindowInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub cpu_usage: f32,
+    pub mem_usage: u64,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HardwareTelemetry {
     pub cpu_usage: f32,
     pub ram_usage: f32,
@@ -48,4 +57,33 @@ pub struct MemoryEntry {
     pub id: i32,
     pub timestamp: String,
     pub description: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PriorityAuditLog {
+    pub id: i32,
+    pub pid: u32,
+    pub name: String,
+    pub priority: String,
+    pub source: String,
+    pub time: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PriorityCacheEntry {
+    pub name: String,
+    pub priority: String,
+    pub source: String,
+    pub lastApplied: u64,
+    pub ignore: bool,
+    pub ttlDays: u32,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct FileInfo {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub last_modified: i64,
 }

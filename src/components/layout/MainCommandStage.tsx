@@ -1,10 +1,16 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud } from 'lucide-react';
+import SystemPanel from '../panels/SystemPanel';
+import { FileExplorerPanel } from '../panels/FileExplorerPanel';
+import { StoragePanel } from '../panels/StoragePanel';
+import TopBar from './TopBar';
+import { useSystemStore } from '../../lib/systemStore';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
 export const MainCommandStage = (props: any) => {
+  const { activeView } = useSystemStore();
   const {
     contexts, activeContext, lastSync, marketIntel, resolveNeuralIntent, isListening,
     voiceTranscript, searchQuery, setSearchQuery, handleSearchIntent, isThinking,
@@ -18,39 +24,7 @@ export const MainCommandStage = (props: any) => {
 
   return (
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
-          <div className="flex items-center gap-12">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Active Aura</span>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                {contexts.find((c: any) => c.id === activeContext)?.name} Context
-                <span className="ml-4 text-[9px] font-mono text-indigo-500/50 border border-indigo-500/20 px-2 py-0.5 rounded">V1.2.6-PRO</span>
-              </h1>
-            </div>
-
-            <div className="h-8 w-[1px] bg-white/5 hidden md:block" />
-
-            <div className="hidden md:flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Last System Sync</span>
-              <span className="text-xs font-mono text-indigo-400/80 tracking-tighter animate-pulse">{lastSync}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-8">
-            {marketIntel.map((m: any, i: number) => (
-              <div key={i} className="hidden lg:flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l border-white/5 pl-8 first:border-none">
-                <PulseIcon className={cn("w-3.5 h-3.5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")} />
-                <span>{m.symbol}: <span className="text-white">{m.price}</span></span>
-                <span className={cn("text-[8px] px-1.5 py-0.5 rounded-sm bg-white/5", m.change.includes('+') ? "text-emerald-400" : "text-amber-400")}>{m.change}</span>
-              </div>
-            ))}
-            <div className="h-8 w-[1px] bg-white/5 mx-2" />
-            <button onClick={() => resolveNeuralIntent("Sync Metrics")} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-              Neural Sync
-            </button>
-          </div>
-        </header>
+        <TopBar />
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
           {/* Neural Intent Bar */}
@@ -225,38 +199,28 @@ export const MainCommandStage = (props: any) => {
             </div>
           </div>
 
-          {/* Hardware Telemetry Node */}
-          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <Activity className="w-6 h-6 text-indigo-400" />
-                <h3 className="text-lg font-bold tracking-tight text-white">Hardware Telemetry</h3>
-              </div>
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-full">Live Feed Active</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[
-                { name: 'Native Bridge', status: bridgeStatus, prog: bridgeStatus === 'Native' ? 100 : 45, color: bridgeStatus === 'Native' ? 'emerald' : 'purple' },
-                { name: 'CPU Usage', status: `${telemetry.cpu_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.cpu_usage), color: telemetry.cpu_usage > 80 ? 'red' : 'indigo' },
-                { name: 'Memory Load', status: `${telemetry.ram_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.ram_usage), color: telemetry.ram_usage > 85 ? 'red' : 'purple' },
-                { name: 'Disk Space', status: `${telemetry.disk_usage.toFixed(1)}%`, prog: Math.min(100, telemetry.disk_usage), color: telemetry.disk_usage > 90 ? 'red' : 'cyan' }
-              ].map((env) => (
-                <div key={env.name} className="space-y-3">
-                  <div className="flex justify-between text-[9px] font-bold uppercase text-slate-500">
-                    <span>{env.name}</span>
-                    <span>{env.status}</span>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div initial={{ width: 0 }} animate={{ width: `${env.prog}%` }} className={cn("h-full", env.color === 'emerald' ? "bg-emerald-500" : env.color === 'indigo' ? "bg-indigo-500" : env.color === 'cyan' ? "bg-cyan-500" : env.color === 'red' ? "bg-red-500" : "bg-purple-500")} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* DYNAMIC VIEWS */}
+          {activeView === 'processes' && (
+            <SystemPanel />
+          )}
 
-          {/* Context Crates */}
-          <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
+          {activeView === 'files' && (
+            <div className="w-full max-w-5xl h-[600px] mb-12">
+              <FileExplorerPanel />
+            </div>
+          )}
+
+          {activeView === 'storage' && (
+            <div className="w-full max-w-5xl h-[600px] mb-12">
+              <StoragePanel />
+            </div>
+          )}
+
+          {/* Context Crates - Dash View Only */}
+          {activeView === 'dash' && (
+            <>
+            <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
               <div className="flex items-center gap-4">
                 <FolderOpen className="w-6 h-6 text-indigo-400" />
                 <div>
@@ -402,6 +366,8 @@ export const MainCommandStage = (props: any) => {
               );
             })}
           </div>
+          </>
+          )}
         </div>
       </main>
 

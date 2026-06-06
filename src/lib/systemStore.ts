@@ -146,6 +146,8 @@ export interface SystemState {
   setAuraIp: (ip: string) => void;
   sensoryFeedbackEnabled: boolean;
   setSensoryFeedbackEnabled: (enabled: boolean) => void;
+  showPalette: boolean;
+  setShowPalette: (show: boolean) => void;
 }
 
 export type ChronosSnapshot = {
@@ -324,5 +326,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   setAuraIp: (ip: string) => set({ auraIp: ip }),
   sensoryFeedbackEnabled: true,
   setSensoryFeedbackEnabled: (enabled: boolean) => set({ sensoryFeedbackEnabled: enabled }),
+  showPalette: false,
+  setShowPalette: (show: boolean) => set({ showPalette: show }),
 }));
 

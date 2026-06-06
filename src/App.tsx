@@ -27,9 +27,9 @@ import { CommandTerminal } from "./components/panels/CommandTerminal";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
 import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { SentientVault } from "./components/panels/SentientVault";
-import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
-import { ExecutiveSidebar } from "./components/layout/ExecutiveSidebar";
+import LeftRail from "./components/layout/LeftRail";
+import { useSystemStore } from "./lib/systemStore";
 import { CognitiveTimeline } from "./components/panels/CognitiveTimeline";
 
 // Design Utility
@@ -78,6 +78,7 @@ type ContextCrate = {
 };
 
 export default function App() {
+  const { activeView, setActiveView } = useSystemStore();
 
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
@@ -969,7 +970,35 @@ export default function App() {
       </div>
 
       {/* Level 9 Executive Sidebar */}
-      <ExecutiveSidebar setShowGraph={setShowGraph} setShowVault={setShowVault} setShowLogs={setShowLogs} setSimMode={setSimMode} simMode={simMode} loadMemories={loadMemories} setShowTimeMachine={setShowTimeMachine} handleContextSwitch={handleContextSwitch} toggleWidgetMode={toggleWidgetMode} showSettings={showSettings} setShowSettings={setShowSettings} setShowWorkforce={setShowWorkforce} />
+      <LeftRail
+        presentationMode={false}
+        simMode={simMode}
+        performanceMode={false}
+        activeView={activeView}
+        onViewChange={setActiveView}
+        onDash={() => setActiveView("dash")}
+        onOpenGraph={() => setShowGraph(true)}
+        onOpenVault={() => setShowVault(true)}
+        onOpenLogs={() => setShowLogs(true)}
+        onOpenNexus={() => {}} // TODO
+        onActivateSim={() => setSimMode(true)}
+        onToggleSim={() => setSimMode(!simMode)}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenDocs={() => setActiveView("docs")}
+        onOpenBoardroom={() => setActiveView("boardroom")}
+        onOpenWorkforce={() => setShowWorkforce(true)}
+        onOpenMirror={() => {}}
+        onSnapshot={() => {}}
+        chronosIndex={0}
+        chronosCount={0}
+        onChronosChange={() => {}}
+        onJumpToPresent={() => {}}
+        pinnedContexts={[]}
+        onRestoreContext={() => {}}
+        onActivateZenith={() => {}}
+        playClick={() => {}}
+        proposalCount={0}
+      />
 
       {/* Main Command Stage */}
       <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />

@@ -1,3 +1,0 @@
-Playwright smoke runtime: 35.6s.
-Diagnostics refresh runtime: 8.5s.
-Frontend reconnect verification: HTTP 200 on localhost:1420.

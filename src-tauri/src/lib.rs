@@ -65,6 +65,33 @@ pub fn run() {
         [],
     )
     .expect("failed to create photographic memory table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS priority_audit (
+            id INTEGER PRIMARY KEY,
+            pid INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            source TEXT NOT NULL,
+            time INTEGER NOT NULL
+        )",
+        [],
+    )
+    .expect("failed to create priority audit table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS priority_cache (
+            name TEXT PRIMARY KEY,
+            priority TEXT NOT NULL,
+            source TEXT NOT NULL,
+            last_applied INTEGER NOT NULL,
+            ignore BOOLEAN NOT NULL DEFAULT 0,
+            ttl_days INTEGER NOT NULL DEFAULT 7
+        )",
+        [],
+    )
+    .expect("failed to create priority cache table");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(DbState(Mutex::new(conn)))
@@ -138,6 +165,17 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::widget::set_widget_mode,
             commands::telemetry::get_running_windows,
+            commands::telemetry::get_process_list,
+            commands::telemetry::log_priority_audit,
+            commands::telemetry::get_priority_audit,
+            commands::telemetry::get_priority_cache,
+            commands::telemetry::set_priority_cache_entry,
+            commands::telemetry::remove_priority_cache_entry,
+            commands::telemetry::clear_priority_cache,
+            commands::telemetry::kill_process,
+            commands::telemetry::suspend_process,
+            commands::telemetry::resume_process,
+            commands::telemetry::set_process_priority,
             commands::telemetry::get_hardware_telemetry,
             commands::telemetry::start_telemetry_server,
             commands::crates::sync_project,
@@ -182,7 +220,11 @@ pub fn run() {
             commands::golems::execute_golem_manifest,
             commands::golems::resolve_golem_proposal,
             commands::nexus::get_vault_nodes,
-            commands::nexus::get_market_intelligence
+            commands::nexus::get_market_intelligence,
+            commands::files::read_directory,
+            commands::files::launch_path,
+            commands::files::delete_path,
+            commands::files::rename_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,8 +1,10 @@
 import { Shield, Mic, MicOff, Eye, Terminal, LayoutDashboard, Globe, Camera, Search } from "lucide-react";
 import { OracleHub } from "../shared/OracleHub";
-
+import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
+import { useSystemStore } from '../../lib/systemStore';
+import { invokeSafe } from '../../lib/tauri';
 
 interface ContextItem {
   id: string;
@@ -23,69 +25,45 @@ interface GolemTask {
   aura: string;
 }
 
-interface TopBarProps {
-  activeVenture: string;
-  activeContext: string;
-  systemStats: any;
-  contexts: ContextItem[];
-  golems: GolemTask[];
-  zenMode: boolean;
-  voiceActive: boolean;
-  visionActive: boolean;
-  autoAura: boolean;
-  ventureIntegrity: number;
-  fiscalBurn: FiscalBurn;
-  hardwareStatus: any;
-  displayedMarket: any;
-  lastSync: string;
-  presentationMode: boolean;
-  performanceMode: boolean;
-  onOpenVault: () => void;
-  onVoiceIntent: () => void;
-  onToggleVision: () => void;
-  onToggleZen: () => void;
-  onToggleCLI: () => void;
-  onToggleCommandPalette: () => void;
-  onTogglePresentation: () => void;
-  onToggleNetwork: () => void;
-  onToggleAutoAura: () => void;
-  onAegisSync: () => void;
-  onOpenNexus: () => void;
-  onOpenSettings: () => void;
-  onDeepLink?: (target: string) => Promise<void>;
-}
+export default function TopBar() {
+  const { 
+    setShowVault, setShowPalette, shellMode, setShellMode, showNexus, setShowNexus,
+    showSettings, setShowSettings, setNotification 
+  } = useSystemStore();
 
-export default function TopBar({
-  activeVenture,
-  activeContext,
-  systemStats,
-  contexts,
-  golems,
-  zenMode,
-  voiceActive,
-  visionActive,
-  autoAura,
-  ventureIntegrity,
-  fiscalBurn,
-  hardwareStatus,
-  displayedMarket,
-  lastSync,
-  presentationMode,
-  performanceMode,
-  onOpenVault,
-  onVoiceIntent,
-  onToggleVision,
-  onToggleZen,
-  onToggleCLI,
-  onToggleCommandPalette,
-  onTogglePresentation,
-  onToggleNetwork,
-  onToggleAutoAura,
-  onAegisSync,
-  onOpenNexus,
-  onOpenSettings,
-  onDeepLink
-}: TopBarProps) {
+  const [systemStats, setSystemStats] = useState<any>(null);
+  const [golems, setGolems] = useState<GolemTask[]>([]);
+  const [zenMode, setZenMode] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [visionActive, setVisionActive] = useState(false);
+  const [autoAura, setAutoAura] = useState(true);
+
+  // Mock static values for now, can be hooked up to backend later
+  const activeVenture = "Oasis OS";
+  const ventureIntegrity = 100;
+  const fiscalBurn = { total_burn: 0, token_load: 0, status: "NOMINAL" };
+  const hardwareStatus: any = null;
+  const performanceMode = false;
+  const presentationMode = false;
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const stats = await invokeSafe("get_hardware_telemetry") as any;
+        setSystemStats({
+          cpu_load: stats?.cpu_usage || 0,
+          mem_used: stats?.ram_usage || 0,
+          battery_level: stats?.battery_percent || 100,
+          is_charging: true,
+          battery_health: 100
+        });
+      } catch (e) {}
+    };
+    fetchStats();
+    const int = setInterval(fetchStats, 3000);
+    return () => clearInterval(int);
+  }, []);
+
   return (
     <header className="h-20 w-full flex items-center justify-between px-12 border-b border-white/5 backdrop-blur-xl bg-white/[0.01]">
       <div className="flex items-center gap-12">
@@ -192,13 +170,13 @@ export default function TopBar({
 
 
             <button
-              onClick={onOpenVault}
+              onClick={() => setShowVault(true)}
               className={cn("ml-8 px-6 py-2 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-amber-600/40 transition-all flex items-center gap-3 duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}
             >
               <Shield className="w-4 h-4" /> Sentinel Archive
             </button>
             <button
-              onClick={onVoiceIntent}
+              onClick={() => setVoiceActive(!voiceActive)}
               className={cn(
                 "ml-8 p-2 glass rounded-lg transition-all",
                 voiceActive && "scale-125 shadow-[0_0_20px_var(--accent-primary)]"
@@ -208,7 +186,7 @@ export default function TopBar({
               {voiceActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
             </button>
             <button
-              onClick={onToggleVision}
+              onClick={() => setVisionActive(!visionActive)}
               className={cn(
                 "ml-4 p-2 glass rounded-lg transition-all",
                 visionActive
@@ -219,7 +197,7 @@ export default function TopBar({
               <Camera className="w-4 h-4" />
             </button>
             <button
-              onClick={onToggleZen}
+              onClick={() => setZenMode(!zenMode)}
               className={cn(
                 "ml-4 p-2 glass rounded-lg transition-all",
                 zenMode && "scale-125"
@@ -229,7 +207,7 @@ export default function TopBar({
               <Eye className="w-4 h-4" />
             </button>
             <button
-              onClick={onToggleCLI}
+              onClick={() => setShellMode(shellMode === 'command' ? 'ambient' : 'command')}
               aria-label="Open Oasis CLI"
               title="Open Oasis CLI"
               className={cn("ml-4 p-2 glass rounded-lg text-emerald-400 group relative", zenMode && "opacity-0 scale-90")}
@@ -240,7 +218,7 @@ export default function TopBar({
               </span>
             </button>
             <button
-              onClick={onToggleCommandPalette}
+              onClick={() => setShowPalette(true)}
               aria-label="Open Command Palette"
               title="Open Command Palette"
               className={cn("ml-4 p-2 glass rounded-lg text-cyan-400 group relative", zenMode && "opacity-0 scale-90")}
@@ -251,7 +229,6 @@ export default function TopBar({
               </span>
             </button>
             <button
-              onClick={onTogglePresentation}
               className={cn(
                 "ml-4 p-2 glass rounded-lg transition-all duration-700",
                 presentationMode ? "text-amber-400 scale-125 border-amber-500/50" : "text-slate-400",
@@ -261,7 +238,6 @@ export default function TopBar({
               <LayoutDashboard className="w-4 h-4" />
             </button>
             <button 
-              onClick={onToggleNetwork} 
               className={cn("ml-4 p-2 glass rounded-lg group relative transition-all duration-700", zenMode && "opacity-0 translate-y-[-10px] pointer-events-none")}
               style={{ color: 'var(--accent-primary)' }}
             >
@@ -278,7 +254,7 @@ export default function TopBar({
                 <div className="flex items-center gap-3 mb-1">
                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Aura Sync</span>
                   <div
-                    onClick={onToggleAutoAura}
+                    onClick={() => setAutoAura(!autoAura)}
                     className={cn(
                       "w-10 h-5 rounded-full p-1 cursor-pointer transition-all border shadow-inner",
                       autoAura ? "border-white/20" : "bg-white/5 border-white/10"
@@ -353,13 +329,13 @@ export default function TopBar({
 
       <div className="flex items-center gap-8">
         <button
-          onClick={onAegisSync}
+          onClick={() => setNotification("Aegis Sync Initialized")}
           className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2"
         >
           <Shield className="w-4 h-4" /> Aegis Sync
         </button>
         <button
-          onClick={onOpenNexus}
+          onClick={() => setShowNexus(true)}
           className="px-6 py-2.5 text-white text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg"
           style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 10px 20px -5px var(--accent-glow)' }}
         >

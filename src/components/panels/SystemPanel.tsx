@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Cpu, Activity, ShieldCheck, RotateCcw, HardDrive, Pause, Play, Skull, Usb, Filter, ArrowUpDown, History, Download, RefreshCcw, Trash2 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { invokeSafe } from "../../lib/tauri";
 
 import { 
   SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo 
@@ -9,39 +10,7 @@ import {
 
 export type { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo };
 
-interface SystemPanelProps {
-  stats: SystemStats | null;
-  windows: WindowInfo[];
-  processes: ProcessInfo[];
-  storage: StorageInfo[];
-  devices: DeviceInfo[];
-  processPriorities: Record<number, string>;
-  priorityCache: Record<string, { priority: string; lastApplied: number; source: "Manual" | "Auto-Applied"; ignore?: boolean; ttlDays?: number }>;
-  priorityAudit: { id: number; pid: number; name: string; priority: string; source: "Manual" | "Auto-Applied" | "Reset"; time: number }[];
-  batteryHealth: { health_percent: number; design_capacity: number; full_charge_capacity: number; cycle_count: number } | null;
-  defaultTtlDays: number;
-  autoApplyPriorities: boolean;
-  isScanning?: boolean;
-  sparklinesEnabled: boolean;
-  externalConfirmAction?: "reset" | "reset_clear" | null;
-  onClearExternalConfirm?: () => void;
-  lastSync: string;
-  windowSync?: string;
-  onRefresh: () => void;
-  onKillProcess: (pid: number) => void;
-  onSuspendProcess: (pid: number) => void;
-  onResumeProcess: (pid: number) => void;
-  onSetPriority: (pid: number, priority: string) => void;
-  onClearCacheReset: (pid: number, name: string) => void;
-  onToggleIgnoreProcess: (name: string, ignore: boolean) => void;
-  onExportAudit: (format: "json" | "csv", columns: string[], filter: string) => void;
-  onClearAllCache: () => void;
-  onReapplyAll: () => void;
-  onResetAllPriorities: () => void;
-  onResetAllPrioritiesAndClear: () => void;
-  onToggleIgnoreAll: (ignore: boolean) => void;
-  onSetProcessTtl: (name: string, ttlDays: number) => void;
-}
+import { useSystemStore } from "../../lib/systemStore";
 
 const formatBytes = (value: number) => {
   const gb = value / (1024 * 1024 * 1024);
@@ -89,39 +58,43 @@ const normalizePriority = (value: string) => {
 
 const DEFAULT_COLUMNS = ["time", "pid", "name", "priority", "source"]; // order matters
 
-export default function SystemPanel({
-  stats,
-  windows,
-  processes,
-  storage,
-  devices,
-  processPriorities,
-  priorityCache,
-  priorityAudit,
-  batteryHealth,
-  defaultTtlDays,
-  autoApplyPriorities,
-  isScanning = false,
-  sparklinesEnabled,
-  externalConfirmAction,
-  onClearExternalConfirm,
-  lastSync,
-  windowSync,
-  onRefresh,
-  onKillProcess,
-  onSuspendProcess,
-  onResumeProcess,
-  onSetPriority,
-  onClearCacheReset,
-  onToggleIgnoreProcess,
-  onExportAudit,
-  onClearAllCache,
-  onReapplyAll,
-  onResetAllPriorities,
-  onResetAllPrioritiesAndClear,
-  onToggleIgnoreAll,
-  onSetProcessTtl
-}: SystemPanelProps) {
+export default function SystemPanel() {
+  const { 
+    sparklinesEnabled, 
+    systemLastSync: lastSync 
+  } = useSystemStore();
+
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [windows, setWindows] = useState<WindowInfo[]>([]);
+  const [storage, setStorage] = useState<StorageInfo[]>([]);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+
+  const [processPriorities, setProcessPriorities] = useState<Record<number, string>>({});
+  const batteryHealth = null;
+  const defaultTtlDays = 7;
+  const autoApplyPriorities = true;
+  const isScanning = false;
+  const externalConfirmAction = null;
+  const onClearExternalConfirm = undefined;
+  const windowSync = undefined;
+
+  const onRefresh = () => {};
+  const onKillProcess = async (pid: number) => {
+    try { await invokeSafe("kill_process", { pid }); } catch(e) { console.error(e); }
+  };
+  const onSuspendProcess = async (pid: number) => {
+    try { await invokeSafe("suspend_process", { pid }); } catch(e) { console.error(e); }
+  };
+  const onResumeProcess = async (pid: number) => {
+    try { await invokeSafe("resume_process", { pid }); } catch(e) { console.error(e); }
+  };
+  const onSetPriority = async (pid: number, priority: string) => {
+    setProcessPriorities(p => ({ ...p, [pid]: priority }));
+    try { await invokeSafe("set_process_priority", { pid, priority }); } catch(e) { console.error(e); }
+  };
+  const onExportAudit = () => {};
+  const onReapplyAll = () => {};
+  const onResetAllPriorities = () => setProcessPriorities({});
   const [pidInput, setPidInput] = useState("");
   const [pidAction, setPidAction] = useState("pause");
   const [search, setSearch] = useState("");
@@ -141,6 +114,99 @@ export default function SystemPanel({
   const [processScrollTop, setProcessScrollTop] = useState(0);
   const [auditQuery, setAuditQuery] = useState("");
   const [hoverPid, setHoverPid] = useState<number | null>(null);
+  const [visibleProcesses, setVisibleProcesses] = useState<ProcessInfo[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditTotalPages, setAuditTotalPages] = useState(1);
+  const [priorityCache, setPriorityCache] = useState<Record<string, any>>({});
+
+  const fetchCache = async () => {
+    try {
+      const res = await invokeSafe("get_priority_cache") as Record<string, any>;
+      if (res) setPriorityCache(res);
+    } catch (e) {
+      console.error("Failed to fetch priority cache", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchCache();
+  }, []);
+
+  useEffect(() => {
+    const fetchAudit = async () => {
+      try {
+        const res = await invokeSafe("get_priority_audit", {
+          query: auditQuery || null,
+          filter: auditFilter || null,
+          startTime: auditFrom ? new Date(auditFrom).getTime() : null,
+          endTime: auditTo ? new Date(auditTo).getTime() : null,
+          page: auditPage,
+          pageSize: auditPageSize
+        }) as { logs: any[]; total_pages: number };
+        
+        if (res) {
+          setAuditLogs(res.logs || []);
+          setAuditTotalPages(res.total_pages || 1);
+        }
+      } catch (e) {
+        console.error("Failed to fetch audit log", e);
+      }
+    };
+    fetchAudit();
+  }, [auditQuery, auditFilter, auditFrom, auditTo, auditPage, auditPageSize]);
+
+  useEffect(() => {
+    const fetchProcesses = async () => {
+      try {
+        const result = await invokeSafe("get_process_list", {
+          search,
+          filter,
+          sortBy,
+          sortDir,
+          limit: 50
+        }) as ProcessInfo[];
+        setVisibleProcesses(result || []);
+      } catch (e) {
+        console.error("Failed to fetch processes", e);
+      }
+    };
+    
+    fetchProcesses();
+    const interval = setInterval(fetchProcesses, 1500);
+    return () => clearInterval(interval);
+  }, [search, filter, sortBy, sortDir]);
+
+  useEffect(() => {
+    const fetchHardware = async () => {
+      try {
+        const hardware = await invokeSafe("get_hardware_telemetry") as any;
+        if (hardware) {
+          setStats({
+            cpu_usage: hardware.cpu_usage || 0,
+            ram_usage: hardware.ram_usage || 0,
+            disk_usage: hardware.disk_usage || 0,
+            network_in: hardware.network_in || 0,
+            network_out: hardware.network_out || 0,
+            battery: hardware.battery_percent || 0,
+            uptime: hardware.system_uptime || 0
+          });
+          setStorage(hardware.disks?.map((d: any) => ({
+            name: d.name, mount_point: d.mount_point,
+            total_space: d.total_space, available_space: d.available_space,
+            is_removable: d.is_removable, file_system: d.file_system
+          })) || []);
+          setDevices([]);
+        }
+        
+        const winList = await invokeSafe("get_running_windows") as WindowInfo[];
+        if (winList) setWindows(winList);
+      } catch (e) {}
+    };
+
+    fetchHardware();
+    const int = setInterval(fetchHardware, 3000);
+    return () => clearInterval(int);
+  }, []);
 
   useEffect(() => {
     try {
@@ -241,13 +307,64 @@ export default function SystemPanel({
   }, []);
 
   useEffect(() => {
-    const anyIgnore = Object.values(priorityCache).some((c) => c.ignore);
-    setIgnoreAll(anyIgnore);
-  }, [priorityCache]);
-
-  useEffect(() => {
     if (externalConfirmAction) setConfirmAction(externalConfirmAction);
   }, [externalConfirmAction]);
+
+  const handleClearAllCache = async () => {
+    try {
+      await invokeSafe("clear_priority_cache");
+      await fetchCache();
+    } catch(e) { console.error(e); }
+  };
+
+  const handleResetAllPrioritiesAndClear = async () => {
+    onResetAllPriorities();
+    await handleClearAllCache();
+  };
+
+  const handleToggleIgnoreAll = async (ignore: boolean) => {
+    try {
+      for (const [name, entry] of Object.entries(priorityCache)) {
+        await invokeSafe("set_priority_cache_entry", { entry: { ...entry, ignore } });
+      }
+      await fetchCache();
+    } catch(e) {}
+  };
+
+  const handleToggleIgnoreProcess = async (name: string, ignore: boolean) => {
+    try {
+      const entry = priorityCache[name] || { name, priority: "NORMAL", source: "Manual", lastApplied: 0, ttlDays: defaultTtlDays };
+      await invokeSafe("set_priority_cache_entry", { entry: { ...entry, ignore } });
+      await fetchCache();
+    } catch(e) {}
+  };
+
+  const handleSetProcessTtl = async (name: string, ttlDays: number) => {
+    try {
+      const entry = priorityCache[name] || { name, priority: "NORMAL", source: "Manual", lastApplied: 0, ignore: false };
+      await invokeSafe("set_priority_cache_entry", { entry: { ...entry, ttlDays } });
+      await fetchCache();
+    } catch(e) {}
+  };
+
+  const handleClearCacheReset = async (pid: number, name: string) => {
+    try {
+      await invokeSafe("remove_priority_cache_entry", { name });
+      onSetPriority(pid, "normal");
+      await fetchCache();
+    } catch(e) {}
+  };
+
+  const updateCacheOnSetPriority = async (name: string, priority: string, source: string = "Manual") => {
+    try {
+      const current_time = Date.now();
+      const entry = priorityCache[name] || { name, ignore: false, ttlDays: defaultTtlDays };
+      await invokeSafe("set_priority_cache_entry", { 
+        entry: { ...entry, name, priority, source, lastApplied: current_time } 
+      });
+      await fetchCache();
+    } catch(e) {}
+  };
 
   useEffect(() => {
     if (!sparklinesEnabled) setHoverPid(null);
@@ -275,61 +392,30 @@ export default function SystemPanel({
     if (!Number.isFinite(pid)) return;
     if (pidAction === "pause") onSuspendProcess(pid);
     if (pidAction === "resume") onResumeProcess(pid);
-    if (pidAction === "low") onSetPriority(pid, "low");
-    if (pidAction === "high") onSetPriority(pid, "high");
-    if (pidAction === "normal") onSetPriority(pid, "normal");
+    if (pidAction === "low") handleSetPriority(pid, "Process " + pid, "low");
+    if (pidAction === "high") handleSetPriority(pid, "Process " + pid, "high");
+    if (pidAction === "normal") handleSetPriority(pid, "Process " + pid, "normal");
     if (pidAction === "kill") onKillProcess(pid);
   };
 
-  const matchesSearch = (p: ProcessInfo) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return p.name.toLowerCase().includes(q) || String(p.pid).includes(q);
+  const handleSetPriority = async (pid: number, name: string, priority: string, source: string = "Manual") => {
+    onSetPriority(pid, priority);
+    try {
+      await invokeSafe("log_priority_audit", { pid, name, priority, source });
+      await updateCacheOnSetPriority(name, priority, source);
+      setAuditLogs(prev => [...prev]); 
+    } catch (e) {
+      console.error("Failed to log priority", e);
+    }
   };
 
-  const matchesFilter = (p: ProcessInfo) => {
-    if (filter === "all") return true;
-    if (filter === "high_cpu") return p.cpu_usage >= 30;
-    if (filter === "high_mem") return p.mem_usage >= 600 * 1024 * 1024;
-    if (filter === "paused") return p.status.toLowerCase().includes("sleep") || p.status.toLowerCase().includes("idle");
-    return true;
-  };
-
-  const visibleProcesses = (Array.isArray(processes) ? processes : [])
-    .filter((p) => matchesSearch(p) && matchesFilter(p))
-    .sort((a, b) => {
-      let aVal = 0;
-      let bVal = 0;
-      if (sortBy === "cpu") {
-        aVal = a.cpu_usage;
-        bVal = b.cpu_usage;
-      } else if (sortBy === "mem") {
-        aVal = a.mem_usage;
-        bVal = b.mem_usage;
-      } else {
-        aVal = a.status.toLowerCase() < b.status.toLowerCase() ? -1 : 1;
-        bVal = 0;
-      }
-      const diff = sortBy === "status" ? aVal : aVal - bVal;
-      return sortDir === "asc" ? diff : -diff;
-    });
-
+  // Filtering and sorting is now securely handled by the native Rust Engine
   const toggleColumn = (col: string) => {
     setExportColumns((prev) => (prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]));
   };
 
-  const q = auditQuery.trim().toLowerCase();
-  const startMs = auditFrom ? new Date(auditFrom).setHours(0, 0, 0, 0) : null;
-  const endMs = auditTo ? new Date(auditTo).setHours(23, 59, 59, 999) : null;
-  const filteredAudit = (priorityAudit ?? []).filter((e) => {
-    if (auditFilter !== "all" && e.source.toLowerCase() !== auditFilter) return false;
-    if (q && !e.name.toLowerCase().includes(q) && !String(e.pid).includes(q)) return false;
-    if (startMs !== null && e.time < startMs) return false;
-    if (endMs !== null && e.time > endMs) return false;
-    return true;
-  });
-  const totalAuditPages = Math.max(1, Math.ceil(filteredAudit.length / auditPageSize));
-  const auditPageSafe = Math.min(auditPage, totalAuditPages - 1);
+  const totalAuditPages = auditTotalPages;
+  const auditPageSafe = Math.min(auditPage, Math.max(0, totalAuditPages - 1));
 
   useEffect(() => {
     if (auditPageSafe !== auditPage) setAuditPage(auditPageSafe);
@@ -337,7 +423,7 @@ export default function SystemPanel({
 
   useEffect(() => {
     setAuditPage(0);
-  }, [auditFilter, priorityAudit.length, auditPageSize, auditQuery, auditFrom, auditTo]);
+  }, [auditFilter, auditPageSize, auditQuery, auditFrom, auditTo]);
 
   return (
     <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12 relative overflow-hidden">
@@ -556,18 +642,17 @@ export default function SystemPanel({
             <button onClick={() => setConfirmAction("reset_clear")} className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 flex items-center gap-2 border border-rose-500/20">
               <RotateCcw className="w-3 h-3" /> Reset + Clear Cache
             </button>
-            <button onClick={onClearAllCache} className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 flex items-center gap-2">
-              <Trash2 className="w-3 h-3" /> Clear Cache
-            </button>
+            <div className="flex flex-col gap-2">
+              <button onClick={handleClearAllCache} className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 flex items-center gap-2">
+                <Trash2 className="w-3 h-3" /> Clear Cache
+              </button>
+            </div>
             <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
               <input
                 type="checkbox"
                 checked={ignoreAll}
-                onChange={(e) => {
-                  setIgnoreAll(e.target.checked);
-                  onToggleIgnoreAll(e.target.checked);
-                }}
-                className="accent-indigo-500"
+                onChange={(e) => handleToggleIgnoreAll(e.target.checked)}
+                className="rounded border-white/10 bg-white/5 accent-indigo-500"
               />
               Ignore All
             </label>
@@ -709,7 +794,7 @@ export default function SystemPanel({
                       <div className="mt-3 flex flex-wrap gap-2 items-center">
                         <select
                           value={normalizePriority(processPriorities[proc.pid] || "NORMAL")}
-                          onChange={(e) => onSetPriority(proc.pid, e.target.value)}
+                          onChange={(e) => handleSetPriority(proc.pid, proc.name, e.target.value)}
                           className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
                         >
                           <option value="normal">Priority Normal</option>
@@ -717,9 +802,9 @@ export default function SystemPanel({
                           <option value="high">Priority High</option>
                         </select>
                         <select
-                          value={(priorityCache[proc.name]?.ttlDays ?? defaultTtlDays).toString()}
-                          onChange={(e) => onSetProcessTtl(proc.name, parseInt(e.target.value, 10))}
-                          className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
+                          value={priorityCache[proc.name]?.ttlDays ?? defaultTtlDays}
+                          onChange={(e) => handleSetProcessTtl(proc.name, parseInt(e.target.value, 10))}
+                          className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
                         >
                           <option value="1">TTL 1d</option>
                           <option value="3">TTL 3d</option>
@@ -730,18 +815,20 @@ export default function SystemPanel({
                         <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
                           <input
                             type="checkbox"
-                            checked={!!priorityCache[proc.name]?.ignore}
-                            onChange={(e) => onToggleIgnoreProcess(proc.name, e.target.checked)}
-                            className="accent-indigo-500"
+                            checked={priorityCache[proc.name]?.ignore ?? false}
+                            onChange={(e) => handleToggleIgnoreProcess(proc.name, e.target.checked)}
+                            className="rounded border-white/10 bg-white/5 accent-indigo-500"
                           />
                           Ignore Auto
                         </label>
+                        {priorityCache[proc.name] && (
                         <button
-                          onClick={() => onClearCacheReset(proc.pid, proc.name)}
-                          className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300"
+                          onClick={() => handleClearCacheReset(proc.pid, proc.name)}
+                          className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 flex items-center justify-center border border-rose-500/20"
                         >
                           Clear Cache & Reset
                         </button>
+                        )}
                         <select
                           onChange={(e) => {
                             const val = e.target.value;
@@ -842,7 +929,7 @@ export default function SystemPanel({
                   type="checkbox"
                   checked={exportColumns.includes(col)}
                   onChange={() => toggleColumn(col)}
-                  className="accent-indigo-500"
+                  className="rounded border-white/10 bg-white/5 accent-indigo-500"
                 />
                 {col.toUpperCase()}
               </label>
@@ -866,11 +953,10 @@ export default function SystemPanel({
             </div>
           </div>
           <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-            {((filteredAudit ?? [])).length === 0 && (
+            {((auditLogs ?? [])).length === 0 && (
               <div className="text-[10px] text-slate-500">No priority changes yet.</div>
             )}
-            {(filteredAudit ?? [])
-              .slice(auditPageSafe * auditPageSize, auditPageSafe * auditPageSize + auditPageSize)
+            {(auditLogs ?? [])
               .map((entry, index) => (
                 <div key={`${entry.id ?? entry.pid ?? "audit"}-${index}`} className="flex items-center justify-between text-[10px] text-slate-400 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
                   <div className="truncate">
@@ -959,7 +1045,7 @@ export default function SystemPanel({
               <button
                 onClick={() => {
                   if (confirmAction === "reset") onResetAllPriorities();
-                  if (confirmAction === "reset_clear") onResetAllPrioritiesAndClear();
+                  if (confirmAction === "reset_clear") handleResetAllPrioritiesAndClear();
                   setConfirmAction(null);
                   onClearExternalConfirm?.();
                 }}

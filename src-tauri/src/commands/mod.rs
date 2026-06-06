@@ -6,3 +6,4 @@ pub mod vision;
 pub mod nexus;
 
 pub mod golems;
+pub mod files;
