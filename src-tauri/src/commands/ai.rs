@@ -368,18 +368,20 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
     }
 }
 
-#[derive(serde::Deserialize)]
-pub struct CliDirective {
-    pub cmd: String,
-    pub args: Vec<String>,
-}
+
 
 #[tauri::command]
-pub fn execute_cli_directive(directive: CliDirective, stress_color: Option<String>) -> Result<serde_json::Value, String> {
-    let mut command_str = directive.cmd.clone();
-    for arg in directive.args {
-        command_str.push_str(" ");
-        command_str.push_str(&arg);
+pub fn execute_cli_directive(directive: serde_json::Value, stress_color: Option<String>) -> Result<serde_json::Value, String> {
+    let cmd = directive["cmd"].as_str().unwrap_or("").to_string();
+    let mut command_str = cmd;
+    
+    if let Some(args_arr) = directive["args"].as_array() {
+        for arg in args_arr {
+            if let Some(arg_str) = arg.as_str() {
+                command_str.push_str(" ");
+                command_str.push_str(arg_str);
+            }
+        }
     }
 
     let output = std::process::Command::new("powershell")
