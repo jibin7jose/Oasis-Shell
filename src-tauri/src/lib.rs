@@ -267,6 +267,7 @@ pub fn run() {
             commands::telemetry::start_voice_engine,
             commands::telemetry::start_cron_scheduler,
             commands::telemetry::get_app_usage_analytics,
+            commands::telemetry::organize_workspace,
             commands::crates::sync_project,
             commands::crates::save_crate,
             commands::crates::update_crate,

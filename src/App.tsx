@@ -430,6 +430,10 @@ export default function App() {
         setShowTimeMachine(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Opening Photographic Memory Archive..." }]);
         logEvent("Time Machine Initiated", "system");
+      } else if (q.includes("arrange") || q.includes("organize") || q.includes("snap") || q.includes("split")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Initiating AI Window Telekinesis. Organizing workspace..." }]);
+        logEvent("AI Window Telekinesis Triggered", "system", true);
+        invoke("organize_workspace", { layoutMode: "code_split" }).catch(e => console.error(e));
       }
       // 3. Workspace Creation / Scanning
       else if (q.includes("crate") || q.includes("workspace")) {

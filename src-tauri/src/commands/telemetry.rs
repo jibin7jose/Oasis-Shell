@@ -882,3 +882,54 @@ pub fn start_cron_scheduler(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN, SetWindowPos, ShowWindow, HWND_TOP, SW_RESTORE, SWP_SHOWWINDOW,
+        EnumWindows, GetWindowTextW, IsWindowVisible
+    };
+    use windows::Win32::Foundation::{HWND, LPARAM, BOOL};
+
+    struct SnapTarget {
+        windows: Vec<HWND>,
+    }
+
+    unsafe extern "system" fn snap_enum(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let targets = &mut *(lparam.0 as *mut SnapTarget);
+        if IsWindowVisible(hwnd).as_bool() {
+            let mut buffer = [0u16; 512];
+            let length = GetWindowTextW(hwnd, &mut buffer);
+            let title = String::from_utf16_lossy(&buffer[..length as usize]);
+            
+            // Ignore tiny windows, invisible windows, or Settings
+            if !title.is_empty() && title != "Program Manager" && title != "Settings" && !title.contains("Oasis") {
+                targets.windows.push(hwnd);
+            }
+        }
+        BOOL(1)
+    }
+
+    unsafe {
+        let mut targets = SnapTarget { windows: Vec::new() };
+        let _ = EnumWindows(Some(snap_enum), LPARAM(&mut targets as *mut SnapTarget as isize));
+
+        let width = GetSystemMetrics(SM_CXSCREEN);
+        let height = GetSystemMetrics(SM_CYSCREEN);
+        println!("Snapping Code and Browser. Monitor size: {}x{}", width, height);
+
+        if targets.windows.len() >= 2 {
+            // First window snapped left
+            let left_hwnd = targets.windows[0];
+            let _ = ShowWindow(left_hwnd, SW_RESTORE);
+            let _ = SetWindowPos(left_hwnd, HWND_TOP, 0, 0, width / 2, height, SWP_SHOWWINDOW);
+
+            // Second window snapped right
+            let right_hwnd = targets.windows[1];
+            let _ = ShowWindow(right_hwnd, SW_RESTORE);
+            let _ = SetWindowPos(right_hwnd, HWND_TOP, width / 2, 0, width / 2, height, SWP_SHOWWINDOW);
+        }
+    }
+    
+    Ok(format!("Workspace organized to {}", layout_mode))
+}
