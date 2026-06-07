@@ -25,12 +25,19 @@ import { PremiumToast } from "./components/overlays/PremiumToast";
 import { HolographicAssistant } from "./components/overlays/HolographicAssistant";
 import { CommandTerminal } from "./components/panels/CommandTerminal";
 import { TerminalPanel } from "./components/panels/TerminalPanel";
+import { ClipboardPanel } from "./components/panels/ClipboardPanel";
 import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { SentientVault } from "./components/panels/SentientVault";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
+import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
 import LeftRail from "./components/layout/LeftRail";
 import { useSystemStore } from "./lib/systemStore";
 import { CognitiveTimeline } from "./components/panels/CognitiveTimeline";
+import SynthesisPanel from "./components/panels/SynthesisPanel";
+import { AegisNexus } from "./components/panels/AegisNexus";
+import { OverlayManager } from "./components/overlays/OverlayManager";
+import { useVoiceEngine } from "./hooks/useVoiceEngine";
+import { useMemoryEngine } from "./hooks/useMemoryEngine";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -78,7 +85,15 @@ type ContextCrate = {
 };
 
 export default function App() {
-  const { activeView, setActiveView } = useSystemStore();
+  const { 
+    activeView, setActiveView,
+    showTerminal, setShowTerminal,
+    showClipboard, setShowClipboard,
+    showGraph, setShowGraph,
+    showVault, setShowVault,
+    showSettings, setShowSettings,
+    showLogs, setShowLogs,
+  } = useSystemStore();
 
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
@@ -150,12 +165,7 @@ export default function App() {
   // --- FEATURE STATE ---
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandInput, setCommandInput] = useState("");
-  const [showGraph, setShowGraph] = useState(false);
-  const [showVault, setShowVault] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
-  const [showRealTerminal, setShowRealTerminal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+
   const [showWorkforce, setShowWorkforce] = useState(false);
   const [showTimeMachine, setShowTimeMachine] = useState(false);
   const [autostart, setAutostart] = useState(false);
@@ -203,33 +213,56 @@ export default function App() {
       }
       try {
         await invoke("start_photographic_memory");
+        await invoke("start_cron_scheduler");
       } catch (e) {
-        console.error("Failed to start memory agent:", e);
+        console.error("Failed to start background agents:", e);
       }
     })();
 
+    const unlistenCron = listen('oasis-cron-snapshot', (e: any) => {
+      notifyUser("Context Crate Secured", `Automated snapshot taken: ${e.payload}`);
+      // If the dashboard is open, we can optionally refresh crates.
+      // Easiest is to just log it for now.
+      logEvent(`Auto-Snapshot Created: ${e.payload}`, 'system');
+    });
+
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K — focus neural intent bar
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         document.getElementById('neural-input')?.focus();
       }
+      // Ctrl+` — toggle streaming terminal
       if (e.key === '`' && e.ctrlKey) {
         e.preventDefault();
-        setShowTerminal(prev => !prev);
+        setShowTerminal(!showTerminal);
       }
+      // Ctrl+Shift+T — also toggle terminal (VSCode muscle memory)
       if (e.key === 't' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowRealTerminal(prev => !prev);
+        setShowTerminal(!showTerminal);
+      }
+      // Ctrl+G — open Strategic Cortex graph
+      if (e.key === 'g' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowGraph(!showGraph);
+      }
+      // Ctrl+Shift+V — open Clipboard History
+      if (e.key === 'V' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowClipboard(!showClipboard);
       }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
+        setShowTerminal(false);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     
     // Listen for global shortcuts from Rust backend
     const unlistenTerminal = listen('toggle-sentient-terminal', () => {
-      setShowTerminal(prev => !prev);
+      setShowTerminal(!showTerminal);
     });
     
     const unlistenPalette = listen('toggle-command-palette', () => {
@@ -240,6 +273,7 @@ export default function App() {
       window.removeEventListener('keydown', handleGlobalKeyDown);
       unlistenTerminal.then(f => f());
       unlistenPalette.then(f => f());
+      unlistenCron.then(f => f());
     };
   }, []);
 
@@ -441,6 +475,51 @@ export default function App() {
       } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
         setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
         logEvent("Executive Metrics Audit Completed", "neural");
+      // 4. Semantic File Search — triggered by "find", "search files", "where is"
+      } else if (q.includes("find ") || q.includes("search files") || q.includes("where is") || q.includes("locate ") || q.includes("show me")) {
+        setMessages(prev => [...prev, { role: "assistant", content: `🔍 Semantic Search: Querying file index for "${query}"…` }]);
+        logEvent(`Semantic Search: ${query}`, "neural");
+        (async () => {
+          try {
+            const results = await invoke("semantic_search", { query }) as any;
+            if (results && results.length > 0) {
+              const formatted = results.slice(0, 8).map((r: any, i: number) =>
+                `${i + 1}. **${r.filename}**\n   📁 ${r.filepath}\n   ${r.preview?.substring(0, 120) || ''}`
+              ).join("\n\n");
+              setMessages(prev => [...prev, {
+                role: "assistant",
+                content: `Found ${results.length} semantic match${results.length > 1 ? 'es' : ''}:\n\n${formatted}`
+              }]);
+            } else {
+              setMessages(prev => [...prev, {
+                role: "assistant",
+                content: "No indexed files matched your query. Try indexing a folder first with: 'index [path]'"
+              }]);
+            }
+          } catch (e) {
+            // Semantic search offline — fallback to LLM
+            setMessages(prev => [...prev, {
+              role: "assistant",
+              content: "Semantic search unavailable (ensure Ollama + nomic-embed-text model is running). Falling back to AI…"
+            }]);
+            try {
+              const llmResponse = await invoke("rag_query", { query }) as string;
+              setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
+            } catch {}
+          }
+        })();
+      } else if (q.startsWith("index ")) {
+        const folderPath = query.substring(6).trim();
+        setMessages(prev => [...prev, { role: "assistant", content: `📂 Indexing folder: ${folderPath}…` }]);
+        (async () => {
+          try {
+            const count = await invoke("index_folder", { path: folderPath }) as number;
+            setMessages(prev => [...prev, { role: "assistant", content: `✅ Indexed ${count} files from ${folderPath}. Semantic search is now active.` }]);
+            logEvent(`Semantic Index: ${count} files from ${folderPath}`, "system");
+          } catch (e) {
+            setMessages(prev => [...prev, { role: "assistant", content: `Indexing failed: ${e}` }]);
+          }
+        })();
       } else {
         // True LLM Intent Parsing & Action Execution
         setMessages(prev => [...prev, { role: "assistant", content: "" }]);
@@ -757,23 +836,19 @@ export default function App() {
 
   // --- SYNC: BRIDGE ---
   useEffect(() => {
-    const syncFoundryData = async () => {
+    const initSync = async () => {
       try { await invoke('start_proactive_sentience'); await invoke('start_photographic_memory'); } catch(e) {}
       try {
         const metrics = await invoke("get_venture_metrics") as any;
         const intel = await invoke("get_market_intelligence") as any;
         const vault = await invoke("get_vault_nodes") as VaultNode[];
-        const windows = await invoke("get_running_windows") as WindowInfo[];
         const logs = await invoke("get_logs") as NeuralLog[];
         const crates = await invoke("get_crates") as ContextCrate[];
-        const hardware = await invoke("get_hardware_telemetry") as any;
         
         if (!simMode) setFounderMetrics(metrics);
         setMarketIntel(intel);
         setVaultNodes(vault);
-        setActiveWindows(windows);
         setContextCrates(crates);
-        setTelemetry(hardware);
         if (logs.length > 0) {
           setTimeline(logs.map((entry) => ({
             id: entry.id || Date.parse(entry.timestamp) || Date.now(),
@@ -794,9 +869,23 @@ export default function App() {
         setBridgeStatus("Simulated");
       }
     };
-    syncFoundryData();
-    const interval = setInterval(syncFoundryData, 2000); // Poll every 2s for lively telemetry!
-    return () => clearInterval(interval);
+    initSync();
+
+    const unlistens: any[] = [];
+    
+    listen("oasis-hardware-telemetry", (event: any) => {
+      setTelemetry(event.payload);
+      setLastSync(new Date().toLocaleTimeString());
+      setBridgeStatus("Native");
+    }).then(unlisten => unlistens.push(unlisten));
+
+    listen("oasis-windows-telemetry", (event: any) => {
+      setActiveWindows(event.payload);
+    }).then(unlisten => unlistens.push(unlisten));
+
+    return () => {
+      unlistens.forEach(u => u());
+    };
   }, [simMode]);
 
   // --- CRON AGENTS ENGINE ---
@@ -970,123 +1059,35 @@ export default function App() {
       </div>
 
       {/* Level 9 Executive Sidebar */}
-      <LeftRail
-        presentationMode={false}
-        simMode={simMode}
-        performanceMode={false}
-        activeView={activeView}
-        onViewChange={setActiveView}
-        onDash={() => setActiveView("dash")}
-        onOpenGraph={() => setShowGraph(true)}
-        onOpenVault={() => setShowVault(true)}
-        onOpenLogs={() => setShowLogs(true)}
-        onOpenNexus={() => {}} // TODO
-        onActivateSim={() => setSimMode(true)}
-        onToggleSim={() => setSimMode(!simMode)}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenDocs={() => setActiveView("docs")}
-        onOpenBoardroom={() => setActiveView("boardroom")}
-        onOpenWorkforce={() => setShowWorkforce(true)}
-        onOpenMirror={() => {}}
-        onSnapshot={() => {}}
-        chronosIndex={0}
-        chronosCount={0}
-        onChronosChange={() => {}}
-        onJumpToPresent={() => {}}
-        pinnedContexts={[]}
-        onRestoreContext={() => {}}
-        onActivateZenith={() => {}}
-        playClick={() => {}}
-        proposalCount={0}
-      />
+      <LeftRail />
+
 
       {/* Main Command Stage */}
       <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />
 
       {/* OVERLAYS */}
-      <AnimatePresence>
-        {showGraph && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-3xl overflow-hidden">
-            {/* Ambient Nebula Glows */}
-            <div className="absolute top-1/3 left-1/4 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
-            <div className="absolute bottom-1/3 right-1/4 w-[800px] h-[800px] bg-cyan-600/10 rounded-full blur-[150px] pointer-events-none mix-blend-screen" />
-            
-            {/* Control Panel Overlay */}
-            <div className="absolute top-10 left-10 z-[210] p-8 glass-bright border border-white/10 rounded-[2.5rem] w-80 shadow-[0_0_50px_rgba(99,102,241,0.15)] backdrop-blur-xl pointer-events-auto">
-               <div className="flex items-center gap-3 mb-6">
-                 <div className="p-3 bg-indigo-500/20 rounded-xl border border-indigo-500/30">
-                   <BrainCircuit className="w-6 h-6 text-indigo-400" />
-                 </div>
-                 <h2 className="text-xl font-bold text-white tracking-wide">Strategic Cortex</h2>
-               </div>
-               <p className="text-xs text-indigo-200/60 leading-relaxed mb-8">
-                 Real-time visualization of your neural contexts, workspace dependencies, and knowledge architecture.
-               </p>
-               <div className="space-y-4">
-                 <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Nodes</span>
-                   <span className="text-sm font-mono text-indigo-400">{graphData.nodes.length}</span>
-                 </div>
-                 <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Neural Links</span>
-                   <span className="text-sm font-mono text-cyan-400">{graphData.links.length}</span>
-                 </div>
-               </div>
-               
-               <div className="mt-8 pt-6 border-t border-white/5">
-                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Telemetry Online
-                 </span>
-               </div>
-            </div>
-
-            <button onClick={() => setShowGraph(false)} className="absolute top-10 right-10 z-[210] group flex items-center gap-3 px-6 py-3 glass rounded-2xl text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] pointer-events-auto">
-               <span className="text-xs font-bold uppercase tracking-widest opacity-70 group-hover:opacity-100">Exit Cortex</span>
-               <Plus className="w-6 h-6 rotate-45 opacity-70 group-hover:opacity-100 transition-transform group-hover:rotate-90" />
-            </button>
-
-            <div className="w-full h-full relative z-[205] cursor-move">
-              {mounted && (
-                <ForceGraph3D
-                  graphData={graphData}
-                  backgroundColor="#00000000"
-                  nodeRelSize={simMode ? 12 : 12}
-                  nodeColor={getNodeColor}
-                  nodeLabel="id"
-                  onNodeClick={(node: any) => {
-                    if (node.group === 'crate') {
-                      const crate = contextCrates.find(c => c.name === node.id);
-                      if (crate) launchContextCrate(crate);
-                    } else if (node.group === 'vault') {
-                      setShowVault(true);
-                      setRagQuery('Summarize ' + node.id);
-                    }
-                  }}
-                  linkColor={() => simMode ? "rgba(245, 158, 11, 0.4)" : "rgba(99, 102, 241, 0.4)"}
-                  linkWidth={2}
-                  nodeOpacity={0.9}
-                  linkOpacity={0.4}
-                />
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        <SentientVault show={showVault} onClose={() => setShowVault(false)} vaultNodes={vaultNodes} ragQuery={ragQuery} setRagQuery={setRagQuery} ragAnswer={ragAnswer} setRagAnswer={setRagAnswer} isRagging={isRagging} setIsRagging={setIsRagging} />
-        {/* Quake-style Sentient Terminal */}
-        <CommandTerminal show={showTerminal} onClose={() => setShowTerminal(false)} analyzeScreen={analyzeScreen} isThinking={isThinking} messages={messages} searchQuery={searchQuery} setSearchQuery={setSearchQuery} resolveNeuralIntent={resolveNeuralIntent} />
-        <CognitiveTimeline show={showLogs} onClose={() => setShowLogs(false)} timeline={timeline} />
-
-        <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} vaultNodesCount={vaultNodes.length} autostart={autostart} setAutostart={setAutostart} />
-        <WorkforcePanel isOpen={showWorkforce} onClose={() => setShowWorkforce(false)} />
-        <VentureSimulationPortal show={simMode} onClose={() => setSimMode(false)} metrics={simMetrics} setMetrics={setSimMetrics} />
-      </AnimatePresence>
+      <OverlayManager 
+        vaultNodes={vaultNodes} setVaultNodes={setVaultNodes}
+        ragQuery={ragQuery} setRagQuery={setRagQuery}
+        ragAnswer={ragAnswer} setRagAnswer={setRagAnswer}
+        isRagging={isRagging} setIsRagging={setIsRagging}
+        autostart={autostart} setAutostart={setAutostart}
+        simMode={simMode} setSimMode={setSimMode}
+        simMetrics={simMetrics} setSimMetrics={setSimMetrics}
+        graphData={graphData} mounted={mounted} getNodeColor={getNodeColor}
+        contextCrates={contextCrates} launchContextCrate={launchContextCrate}
+        setShowVault={setShowVault} analyzeScreen={analyzeScreen}
+        isThinking={isThinking} messages={messages} searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery} resolveNeuralIntent={resolveNeuralIntent}
+        timeline={timeline}
+      />
 
       {/* Floating Holographic Assistant */}
       <HolographicAssistant showAI={showAI} setShowAI={setShowAI} messages={messages} isThinking={isThinking} assistantInput={assistantInput} setAssistantInput={setAssistantInput} handleNeuralSend={handleNeuralSend} />
       
-      {/* Real Terminal Sandbox */}
-      <TerminalPanel isOpen={showRealTerminal} onClose={() => setShowRealTerminal(false)} />
+      {/* Real Terminal Sandbox — controlled by Zustand + sidebar icon */}
+      <TerminalPanel isOpen={showTerminal} onClose={() => setShowTerminal(false)} />
+      <ClipboardPanel isOpen={showClipboard} onClose={() => setShowClipboard(false)} />
 
       {/* Guardian Notification HUD */}
       <GuardianHUD proactiveAlert={proactiveAlert} setProactiveAlert={setProactiveAlert} logEvent={logEvent} />

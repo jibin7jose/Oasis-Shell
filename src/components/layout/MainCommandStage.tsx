@@ -4,13 +4,16 @@ import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefca
 import SystemPanel from '../panels/SystemPanel';
 import { FileExplorerPanel } from '../panels/FileExplorerPanel';
 import { StoragePanel } from '../panels/StoragePanel';
-import TopBar from './TopBar';
+import BoardroomPanel from '../panels/BoardroomPanel';
+import DocumentationPanel from '../panels/DocumentationPanel';
+import { CognitiveTimeline } from '../panels/CognitiveTimeline';
+
 import { useSystemStore } from '../../lib/systemStore';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
 export const MainCommandStage = (props: any) => {
-  const { activeView } = useSystemStore();
+  const { activeView, setActiveView } = useSystemStore();
   const {
     contexts, activeContext, lastSync, marketIntel, resolveNeuralIntent, isListening,
     voiceTranscript, searchQuery, setSearchQuery, handleSearchIntent, isThinking,
@@ -24,9 +27,8 @@ export const MainCommandStage = (props: any) => {
 
   return (
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
-        <TopBar />
 
-        <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto no-scrollbar">
           {/* Neural Intent Bar */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -57,6 +59,7 @@ export const MainCommandStage = (props: any) => {
               )}
               
               <input
+                id="neural-input"
                 value={isListening ? voiceTranscript : searchQuery}
                 onChange={(e) => !isListening && setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchIntent}
@@ -99,23 +102,10 @@ export const MainCommandStage = (props: any) => {
             </div>
           </motion.div>
 
-          {/* Metrics Ribbon */}
-          <div className="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-            {[
-              { label: 'Target ARR', val: simMode ? `$${simMetrics.arr}M` : founderMetrics.arr, icon: Activity },
-              { label: 'Burn Rate', val: simMode ? `$${simMetrics.burn}K` : founderMetrics.burn, icon: Zap },
-              { label: 'Projected Runway', val: founderMetrics.runway, icon: Shield },
-              { label: 'Growth Momentum', val: simMode ? `${simMetrics.momentum}%` : founderMetrics.momentum, icon: PulseIcon }
-            ].map((m, i) => (
-              <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex flex-col gap-3">
-                <m.icon className="w-5 h-5 text-indigo-400" />
-                <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                  <div className="text-xl font-bold text-white">{m.val}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* DYNAMIC VIEWS */}
+          {activeView === 'dash' && (
+            <>
+
 
           {/* Proactive AI Cron Agents */}
           <div className="w-full max-w-5xl mb-12">
@@ -198,6 +188,8 @@ export const MainCommandStage = (props: any) => {
               ))}
             </div>
           </div>
+            </>
+          )}
 
           {/* DYNAMIC VIEWS */}
           {activeView === 'processes' && (
@@ -205,20 +197,37 @@ export const MainCommandStage = (props: any) => {
           )}
 
           {activeView === 'files' && (
-            <div className="w-full max-w-5xl h-[600px] mb-12">
+            <div className="w-full max-w-5xl flex-1 min-h-[400px] mb-12">
               <FileExplorerPanel />
             </div>
           )}
 
           {activeView === 'storage' && (
-            <div className="w-full max-w-5xl h-[600px] mb-12">
+            <div className="w-full max-w-5xl flex-1 min-h-[400px] mb-12">
               <StoragePanel />
+            </div>
+          )}
+
+          {activeView === 'boardroom' && (
+            <div className="w-full max-w-6xl flex-1 min-h-[500px] mb-12 relative z-[60]">
+              <BoardroomPanel isOpen={true} onClose={() => setActiveView('dash')} metrics={{ revenue: 0, burnRate: 0, runway: 12, userGrowth: 0, activeUsers: 0 }} />
+            </div>
+          )}
+
+          {activeView === 'docs' && (
+            <div className="w-full max-w-6xl flex-1 min-h-[500px] mb-12 relative z-[60]">
+              <DocumentationPanel isOpen={true} onClose={() => setActiveView('dash')} />
+            </div>
+          )}
+
+          {activeView === 'timeline' && (
+            <div className="w-full max-w-6xl flex-1 min-h-[500px] mb-12 relative z-[60]">
+              <CognitiveTimeline show={true} onClose={() => setActiveView('dash')} timeline={[]} />
             </div>
           )}
 
           {/* Context Crates - Dash View Only */}
           {activeView === 'dash' && (
-            <>
             <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
               <div className="flex items-center gap-4">
@@ -345,7 +354,8 @@ export const MainCommandStage = (props: any) => {
                 )}
               </div>
             </div>
-          </div>
+            </div>
+          )}
 
           <div className="flex gap-8 pb-12">
             {contexts.map((ctx: any) => {
@@ -366,8 +376,6 @@ export const MainCommandStage = (props: any) => {
               );
             })}
           </div>
-          </>
-          )}
         </div>
       </main>
 

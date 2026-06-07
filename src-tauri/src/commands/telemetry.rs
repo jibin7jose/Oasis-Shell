@@ -6,6 +6,7 @@ use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, IsZoomed,
 };
+use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 
 #[tauri::command]
 pub fn get_running_windows() -> Vec<WindowInfo> {
@@ -124,6 +125,19 @@ pub fn get_hardware_telemetry(
         .and_then(|out| String::from_utf8_lossy(&out.stdout).trim().parse::<f32>().ok())
         .unwrap_or(0.0);
 
+    let mut battery_percent: u8 = 100;
+    let mut is_charging: bool = true;
+
+    unsafe {
+        let mut power_status = SYSTEM_POWER_STATUS::default();
+        if GetSystemPowerStatus(&mut power_status).is_ok() {
+            if power_status.BatteryLifePercent != 255 {
+                battery_percent = power_status.BatteryLifePercent;
+            }
+            is_charging = power_status.ACLineStatus == 1;
+        }
+    }
+
     Ok(HardwareTelemetry {
         cpu_usage,
         ram_usage,
@@ -131,7 +145,66 @@ pub fn get_hardware_telemetry(
         network_up,
         network_down,
         gpu_usage,
+        battery_percent,
+        is_charging,
+        system_uptime: sysinfo::System::uptime(),
     })
+}
+
+static PROCESS_CACHE: std::sync::RwLock<Vec<ProcessInfo>> = std::sync::RwLock::new(Vec::new());
+
+pub fn start_telemetry_stream(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        use tauri::Manager;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            // Hardware telemetry (uses TelemetryState)
+            if let Some(state) = app.try_state::<TelemetryState>() {
+                if let Ok(hardware) = get_hardware_telemetry(state.clone()) {
+                    // Compute health score: 100 - weighted penalties
+                    let cpu_penalty  = (hardware.cpu_usage  / 100.0) * 35.0;
+                    let ram_penalty  = (hardware.ram_usage  / 100.0) * 30.0;
+                    let disk_penalty = (hardware.disk_usage / 100.0) * 20.0;
+                    let bat_penalty  = if hardware.battery_percent < 15 { 15.0 } else { 0.0 };
+                    let health_score = (100.0 - cpu_penalty - ram_penalty - disk_penalty - bat_penalty)
+                        .clamp(0.0, 100.0) as u8;
+
+                    let _ = app.emit("oasis-hardware-telemetry", &hardware);
+                    let _ = app.emit("oasis-health-score", health_score);
+                }
+
+                // Update Process Cache in the background
+                let mut sys = state.0.lock().unwrap();
+                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                let procs: Vec<ProcessInfo> = sys.processes().values().map(|p| {
+                    ProcessInfo {
+                        pid: p.pid().as_u32(),
+                        name: p.name().to_string_lossy().into(),
+                        cpu_usage: p.cpu_usage(),
+                        mem_usage: p.memory(),
+                        status: format!("{:?}", p.status()),
+                    }
+                }).collect();
+                if let Ok(mut cache) = PROCESS_CACHE.write() {
+                    *cache = procs;
+                }
+            }
+
+            // Running windows — no DbState needed, pure Win32 call
+            let windows = get_running_windows_impl();
+            let _ = app.emit("oasis-windows-telemetry", windows);
+
+            // Golem workforce state
+            if let Ok(golems) = crate::commands::golems::get_active_golems_native() {
+                let _ = app.emit("oasis-golem-telemetry", golems);
+            }
+        }
+    });
+}
+
+fn get_running_windows_impl() -> Vec<WindowInfo> {
+    get_running_windows()
 }
 
 #[tauri::command]
@@ -195,25 +268,16 @@ pub fn start_telemetry_server(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_process_list(
-    state: tauri::State<TelemetryState>,
+    _state: tauri::State<TelemetryState>,
     search: Option<String>,
     filter: Option<String>,
     sort_by: Option<String>,
     sort_dir: Option<String>,
     limit: Option<usize>,
 ) -> Result<Vec<ProcessInfo>, String> {
-    let mut sys = state.0.lock().unwrap();
-    sys.refresh_processes();
-
-    let mut procs: Vec<ProcessInfo> = sys.processes().values().map(|p| {
-        ProcessInfo {
-            pid: p.pid().as_u32(),
-            name: p.name().to_string_lossy().into(),
-            cpu_usage: p.cpu_usage(),
-            mem_usage: p.memory(),
-            status: format!("{:?}", p.status()),
-        }
-    }).collect();
+    // Read instantly from the background-updated RwLock cache (zero-latency)
+    let cache = PROCESS_CACHE.read().unwrap();
+    let mut procs = cache.clone();
 
     if let Some(query) = search {
         if !query.trim().is_empty() {
@@ -256,7 +320,7 @@ pub fn log_priority_audit(
     priority: String,
     source: String,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
     
     let current_time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -265,7 +329,7 @@ pub fn log_priority_audit(
 
     conn.execute(
         "INSERT INTO priority_audit (pid, name, priority, source, time) VALUES (?1, ?2, ?3, ?4, ?5)",
-        rusqlite::params![pid, name, priority, source, current_time],
+        rusqlite::params![pid as i64, name, priority, source, current_time as i64],
     ).map_err(|e| e.to_string())?;
 
     Ok(())
@@ -287,7 +351,7 @@ pub fn get_priority_audit(
     page: u32,
     page_size: u32,
 ) -> Result<AuditLogResponse, String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
 
     let mut sql = "SELECT id, pid, name, priority, source, time FROM priority_audit WHERE 1=1".to_string();
     let mut count_sql = "SELECT COUNT(*) FROM priority_audit WHERE 1=1".to_string();
@@ -319,22 +383,22 @@ pub fn get_priority_audit(
     if let Some(start) = start_time {
         sql.push_str(" AND time >= ?");
         count_sql.push_str(" AND time >= ?");
-        params.push(Box::new(start));
-        count_params.push(Box::new(start));
+        params.push(Box::new(start as i64));
+        count_params.push(Box::new(start as i64));
     }
 
     if let Some(end) = end_time {
         sql.push_str(" AND time <= ?");
         count_sql.push_str(" AND time <= ?");
-        params.push(Box::new(end));
-        count_params.push(Box::new(end));
+        params.push(Box::new(end as i64));
+        count_params.push(Box::new(end as i64));
     }
 
     sql.push_str(" ORDER BY time DESC LIMIT ? OFFSET ?");
     
     // Add pagination params
-    let limit = page_size;
-    let offset = page * page_size;
+    let limit = page_size as i64;
+    let offset = (page * page_size) as i64;
     params.push(Box::new(limit));
     params.push(Box::new(offset));
 
@@ -351,11 +415,11 @@ pub fn get_priority_audit(
     let log_iter = stmt.query_map(rusqlite::params_from_iter(borrowed_params), |row| {
         Ok(PriorityAuditLog {
             id: row.get(0)?,
-            pid: row.get(1)?,
+            pid: row.get::<_, i64>(1)? as u32,
             name: row.get(2)?,
             priority: row.get(3)?,
             source: row.get(4)?,
-            time: row.get(5)?,
+            time: row.get::<_, i64>(5)? as u64,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -374,7 +438,7 @@ pub fn get_priority_audit(
 
 #[tauri::command]
 pub fn get_priority_cache(state: tauri::State<DbState>) -> Result<std::collections::HashMap<String, PriorityCacheEntry>, String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
     
     let mut stmt = conn.prepare("SELECT name, priority, source, last_applied, ignore, ttl_days FROM priority_cache").map_err(|e| e.to_string())?;
     
@@ -383,9 +447,9 @@ pub fn get_priority_cache(state: tauri::State<DbState>) -> Result<std::collectio
             name: row.get(0)?,
             priority: row.get(1)?,
             source: row.get(2)?,
-            lastApplied: row.get(3)?,
+            last_applied: row.get::<_, i64>(3)? as u64,
             ignore: row.get(4)?,
-            ttlDays: row.get(5)?,
+            ttl_days: row.get::<_, i64>(5)? as u32,
         })
     }).map_err(|e| e.to_string())?;
 
@@ -404,7 +468,7 @@ pub fn set_priority_cache_entry(
     state: tauri::State<DbState>,
     entry: PriorityCacheEntry,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
     
     conn.execute(
         "INSERT INTO priority_cache (name, priority, source, last_applied, ignore, ttl_days) 
@@ -415,7 +479,7 @@ pub fn set_priority_cache_entry(
             last_applied=excluded.last_applied, 
             ignore=excluded.ignore, 
             ttl_days=excluded.ttl_days",
-        rusqlite::params![entry.name, entry.priority, entry.source, entry.lastApplied, entry.ignore, entry.ttlDays],
+        rusqlite::params![entry.name, entry.priority, entry.source, entry.last_applied as i64, entry.ignore, entry.ttl_days as i64],
     ).map_err(|e| e.to_string())?;
 
     Ok(())
@@ -426,7 +490,7 @@ pub fn remove_priority_cache_entry(
     state: tauri::State<DbState>,
     name: String,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
     conn.execute("DELETE FROM priority_cache WHERE name = ?1", rusqlite::params![name]).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -435,7 +499,7 @@ pub fn remove_priority_cache_entry(
 pub fn clear_priority_cache(
     state: tauri::State<DbState>,
 ) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|_| "Failed to lock database".to_string())?;
+    let conn = state.0.get().map_err(|_| "Failed to lock database".to_string())?;
     conn.execute("DELETE FROM priority_cache", []).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -452,26 +516,204 @@ pub fn kill_process(pid: u32) -> Result<(), String> {
     }
 }
 
+#[link(name = "ntdll")]
+extern "system" {
+    fn NtSuspendProcess(ProcessHandle: windows::Win32::Foundation::HANDLE) -> i32;
+    fn NtResumeProcess(ProcessHandle: windows::Win32::Foundation::HANDLE) -> i32;
+}
+
 #[tauri::command]
 pub fn suspend_process(pid: u32) -> Result<(), String> {
-    // Stub implementation. For Windows, requires NtSuspendProcess or PowerShell.
-    println!("Suspending process: {}", pid);
-    Ok(())
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SUSPEND_RESUME};
+    use windows::Win32::Foundation::CloseHandle;
+    
+    unsafe {
+        if let Ok(handle) = OpenProcess(PROCESS_SUSPEND_RESUME, false, pid) {
+            let status = NtSuspendProcess(handle);
+            let _ = CloseHandle(handle);
+            if status == 0 {
+                return Ok(());
+            }
+        }
+    }
+    Err("Failed to suspend process".to_string())
 }
 
 #[tauri::command]
 pub fn resume_process(pid: u32) -> Result<(), String> {
-    // Stub implementation.
-    println!("Resuming process: {}", pid);
-    Ok(())
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SUSPEND_RESUME};
+    use windows::Win32::Foundation::CloseHandle;
+    
+    unsafe {
+        if let Ok(handle) = OpenProcess(PROCESS_SUSPEND_RESUME, false, pid) {
+            let status = NtResumeProcess(handle);
+            let _ = CloseHandle(handle);
+            if status == 0 {
+                return Ok(());
+            }
+        }
+    }
+    Err("Failed to resume process".to_string())
 }
 
 #[tauri::command]
 pub fn set_process_priority(pid: u32, priority: String) -> Result<(), String> {
-    // Stub implementation. For Windows requires wmic or windows API SetPriorityClass
-    println!("Setting priority of {} to {}", pid, priority);
-    Ok(())
+    use windows::Win32::System::Threading::{
+        OpenProcess, SetPriorityClass, PROCESS_SET_INFORMATION,
+        IDLE_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS
+    };
+    use windows::Win32::Foundation::CloseHandle;
+    
+    let prio_class = match priority.to_lowercase().as_str() {
+        "low" | "idle" => IDLE_PRIORITY_CLASS,
+        "high" => HIGH_PRIORITY_CLASS,
+        "realtime" => REALTIME_PRIORITY_CLASS,
+        _ => NORMAL_PRIORITY_CLASS,
+    };
+
+    unsafe {
+        if let Ok(handle) = OpenProcess(PROCESS_SET_INFORMATION, false, pid) {
+            let result = SetPriorityClass(handle, prio_class);
+            let _ = CloseHandle(handle);
+            if result.is_ok() {
+                return Ok(());
+            }
+        }
+    }
+    Err("Failed to set process priority".to_string())
 }
 
 
 
+#[derive(serde::Serialize)]
+pub struct ClipboardItem {
+    pub id: i32,
+    pub content: String,
+    pub item_type: String,
+    pub timestamp: i64,
+}
+
+#[tauri::command]
+pub fn get_clipboard_history(state: tauri::State<DbState>, query: Option<String>) -> Result<Vec<ClipboardItem>, String> {
+    let conn = state.0.get().map_err(|_| "Failed to get db connection")?;
+    let mut sql = "SELECT id, content, type, timestamp FROM clipboard_history".to_string();
+    let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(q) = query {
+        if !q.trim().is_empty() {
+            sql.push_str(" WHERE content LIKE ?");
+            params.push(Box::new(format!("%{}%", q)));
+        }
+    }
+    sql.push_str(" ORDER BY timestamp DESC LIMIT 50");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let borrowed_params: Vec<&dyn rusqlite::ToSql> = params.iter().map(|b| b.as_ref()).collect();
+    
+    let iter = stmt.query_map(rusqlite::params_from_iter(borrowed_params), |row| {
+        Ok(ClipboardItem {
+            id: row.get(0)?,
+            content: row.get(1)?,
+            item_type: row.get(2)?,
+            timestamp: row.get(3)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut items = Vec::new();
+    for item in iter.flatten() {
+        items.push(item);
+    }
+    Ok(items)
+}
+
+#[tauri::command]
+pub fn write_to_clipboard(content: String) -> Result<(), String> {
+    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+        clipboard.set_text(content).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_voice_engine(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    std::thread::spawn(move || {
+        let mut child = match std::process::Command::new("whisper-stream.exe")
+            .arg("-m").arg("ggml-base.en.bin")
+            .arg("--step").arg("4000")
+            .arg("--length").arg("8000")
+            .arg("-c").arg("0")
+            .arg("-t").arg("4")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn() {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = app.emit("voice-engine-error", format!("Whisper.cpp offline: Could not find whisper-stream.exe or model in path. Error: {}", e));
+                    return;
+                }
+            };
+
+        let stdout = child.stdout.take().unwrap();
+        let reader = std::io::BufReader::new(stdout);
+        use std::io::BufRead;
+        for line in reader.lines() {
+            if let Ok(l) = line {
+                let trimmed = l.trim();
+                let mut text = trimmed.to_string();
+                if trimmed.starts_with('[') {
+                    if let Some(idx) = trimmed.find(']') {
+                        text = trimmed[idx + 1..].trim().to_string();
+                    }
+                }
+                if !text.is_empty() && !text.starts_with("[_TT") {
+                    let _ = app.emit("voice-transcript", text);
+                }
+            }
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_cron_scheduler(app: tauri::AppHandle, state: tauri::State<DbState>) -> Result<(), String> {
+    let pool = state.0.clone();
+    
+    std::thread::spawn(move || {
+        loop {
+            // Sleep for 30 minutes (1800 seconds)
+            std::thread::sleep(std::time::Duration::from_secs(1800));
+
+            // Capture workspace state natively
+            let windows = get_running_windows_impl();
+            if windows.is_empty() {
+                continue;
+            }
+
+            let timestamp_now = chrono::Local::now().format("%I:%M %p").to_string();
+            let name = format!("Auto-Snapshot {}", timestamp_now);
+            let apps_json = serde_json::to_string(&windows).unwrap_or_else(|_| "[]".to_string());
+            let timestamp_db = chrono::Local::now().to_rfc3339();
+
+            if let Ok(conn) = pool.get() {
+                let _ = conn.execute(
+                    "INSERT INTO context_crates (name, apps, timestamp) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![name, apps_json, timestamp_db],
+                );
+                
+                // Keep only the 10 most recent Auto-Snapshots
+                let _ = conn.execute(
+                    "DELETE FROM context_crates WHERE name LIKE 'Auto-Snapshot %' AND id NOT IN (
+                        SELECT id FROM context_crates WHERE name LIKE 'Auto-Snapshot %' ORDER BY timestamp DESC LIMIT 10
+                    )",
+                    [],
+                );
+            }
+
+            use tauri::Emitter;
+            let _ = app.emit("oasis-cron-snapshot", name);
+        }
+    });
+    
+    Ok(())
+}

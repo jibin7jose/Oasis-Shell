@@ -92,14 +92,14 @@ pub fn delete_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn rename_path(path: String, newName: String) -> Result<(), String> {
+pub fn rename_path(path: String, new_name: String) -> Result<(), String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err("Path does not exist".to_string());
     }
 
     let parent = p.parent().unwrap_or(Path::new(""));
-    let new_path = parent.join(newName);
+    let new_path = parent.join(new_name);
 
     fs::rename(p, new_path).map_err(|e| e.to_string())?;
 

@@ -26,7 +26,7 @@ export const CognitiveTimeline: React.FC<CognitiveTimelineProps> = ({ show, onCl
       animate={{ opacity: 1, x: 0 }} 
       exit={{ opacity: 0, x: 500 }} 
       transition={{ type: "spring", damping: 30, stiffness: 300 }} 
-      className="fixed inset-y-0 right-0 z-[400] w-[450px] bg-black/80 border-l border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.6)]"
+      className="fixed inset-y-0 right-0 z-[1000] w-[450px] bg-black/80 border-l border-white/5 p-12 backdrop-blur-3xl flex flex-col shadow-[-30px_0_60px_rgba(0,0,0,0.6)]"
     >
       {/* Ambient Background */}
       <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />

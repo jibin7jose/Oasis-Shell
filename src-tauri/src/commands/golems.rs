@@ -60,6 +60,14 @@ pub async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
     Ok(tasks)
 }
 
+pub fn get_active_golems_native() -> Result<Vec<GolemTask>, String> {
+    let tasks = {
+        let registry = GOLEM_REGISTRY.lock().unwrap();
+        registry.values().cloned().collect::<Vec<GolemTask>>()
+    };
+    Ok(tasks)
+}
+
 #[tauri::command]
 pub async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
     let mut props = {
@@ -105,4 +113,51 @@ pub async fn resolve_golem_proposal(proposal_id: String, action: String) -> Resu
         prop.status = action;
     }
     Ok("Resolved".into())
+}
+
+#[tauri::command]
+pub async fn hatch_autonomous_golem(new_agent: GolemTask) -> Result<(), String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    registry.insert(new_agent.id.clone(), new_agent);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn decommission_golem(id: String) -> Result<(), String> {
+    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+    registry.remove(&id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn invoke_golem_debate(task: GolemTask) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    
+    let prompt = format!(
+        "You are an autonomous AI 'Golem' with the aura of {}. Your mission is: {}. Briefly detail your plan to accomplish this task and any sub-steps involved.", 
+        task.aura, 
+        task.mission.unwrap_or_else(|| "General exploration".to_string())
+    );
+
+    let chat_body = serde_json::json!({ 
+        "model": "gemma4:latest", 
+        "prompt": prompt, 
+        "stream": false 
+    });
+
+    let res = client
+        .post("http://localhost:11434/api/generate")
+        .json(&chat_body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let response_text = json["response"].as_str().unwrap_or("No response generated.").to_string();
+
+    Ok(serde_json::json!({
+        "status": "Resolved",
+        "logs": ["Initiating Neural Sync...", "Debate parameters initialized.", "Response generated."],
+        "thought_trace": response_text,
+    }))
 }

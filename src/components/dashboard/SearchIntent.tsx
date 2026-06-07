@@ -36,7 +36,7 @@ export const SearchIntent: React.FC<SearchIntentProps> = ({
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={handleSearchIntent}
           placeholder={isRecording ? "Listening to Neural Intent..." : "Detecting Neural Intent..."}
-          className="bg-transparent border-none outline-none text-2xl w-full text-white placeholder:text-slate-700 font-light"
+          className="bg-transparent border-none outline-none text-xl md:text-2xl flex-1 min-w-0 text-white placeholder:text-slate-700 font-light"
         />
         <button
           onClick={toggleVoiceRecording}

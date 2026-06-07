@@ -72,10 +72,11 @@ export const FileExplorerPanel: React.FC = () => {
     setLoading(true);
     try {
       const res = await invokeSafe('read_directory', { path: path || null }) as FileInfo[];
-      setFiles(res);
+      const safeRes = res || [];
+      setFiles(safeRes);
       // Auto-update path if backend resolved empty to home dir
-      if (!path && res.length > 0) {
-        const firstPath = res[0].path;
+      if (!path && safeRes.length > 0) {
+        const firstPath = safeRes[0].path;
         const separator = firstPath.includes('\\') ? '\\' : '/';
         const parentPath = firstPath.substring(0, firstPath.lastIndexOf(separator));
         setCurrentPath(parentPath);
@@ -85,7 +86,17 @@ export const FileExplorerPanel: React.FC = () => {
         setInputPath(path);
       }
     } catch (e: any) {
-      setNotification(`Filesystem Error: ${e}`);
+      console.error("Directory fetch failed:", e);
+      setNotification(`Path not found: ${path}`);
+      // Revert input path to current path
+      setInputPath(currentPath);
+      // Ensure we still show the current directory's files
+      if (currentPath && currentPath !== path) {
+        const fallback = await invokeSafe('read_directory', { path: currentPath || null }).catch(() => []) as FileInfo[];
+        setFiles(fallback || []);
+      } else {
+        setFiles([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -231,7 +242,7 @@ export const FileExplorerPanel: React.FC = () => {
               <div className="text-xs text-indigo-400 uppercase tracking-widest font-black">Reading Host Disk...</div>
             </div>
           </div>
-        ) : files.length === 0 ? (
+        ) : (files || []).length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm italic">Empty Directory</div>
         ) : (
           <AnimatePresence>
@@ -324,7 +335,7 @@ export const FileExplorerPanel: React.FC = () => {
           Native Filesystem Link Active
         </div>
         <div className="text-[10px] font-bold text-slate-400">
-          {files.length} Item{files.length !== 1 && 's'}
+          {(files || []).length} Item{(files || []).length !== 1 && 's'}
         </div>
       </div>
     </div>

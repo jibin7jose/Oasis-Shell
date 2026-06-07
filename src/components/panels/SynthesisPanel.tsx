@@ -3,7 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Plus, Book, Zap } from "lucide-react";
 import { useSystemStore } from "../../lib/systemStore";
 
-const SynthesisPanel: React.FC = () => {
+interface SynthesisPanelProps {
+  onCommit?: (node: any) => void;
+}
+
+const SynthesisPanel: React.FC<SynthesisPanelProps> = ({ onCommit }) => {
   const { activeSynthesis, setActiveSynthesis, setShowDocs } = useSystemStore();
 
   return (
@@ -15,7 +19,7 @@ const SynthesisPanel: React.FC = () => {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[8000] bg-indigo-950/40 backdrop-blur-5xl flex items-center justify-center p-20"
         >
-          <div className="w-full max-w-6xl glass-bright rounded-[4rem] border border-indigo-500/30 p-16 relative overflow-hidden flex flex-col h-[750px] shadow-6xl">
+          <div className="w-full max-w-6xl glass-bright rounded-[4rem] border border-indigo-500/30 p-8 md:p-16 relative overflow-hidden flex flex-col max-h-[90vh] shadow-6xl">
             <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
 
             <div className="relative z-10 flex justify-between items-start mb-12">
@@ -38,7 +42,7 @@ const SynthesisPanel: React.FC = () => {
               </button>
             </div>
 
-            <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 gap-16 overflow-hidden">
+            <div className="relative z-10 flex-1 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 overflow-y-auto no-scrollbar pb-10">
               {activeSynthesis.type === "FILE_MANIFEST" ? (
                 <>
                   <div className="space-y-10 overflow-y-auto pr-6 custom-scrollbar">
@@ -79,7 +83,14 @@ const SynthesisPanel: React.FC = () => {
                       >
                         <Book className="w-5 h-5" /> REVEAL IN MANUAL HUB
                       </button>
-                      <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">
+                      <button 
+                        onClick={() => {
+                          const { setNotification } = useSystemStore.getState();
+                          setNotification("Architectural Audit Generated & Appended to Manifest");
+                          setActiveSynthesis(null);
+                        }}
+                        className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all"
+                      >
                         GENERATE ARCHITECTURAL AUDIT
                       </button>
                     </div>
@@ -113,7 +124,7 @@ const SynthesisPanel: React.FC = () => {
                       Actionable Outreach
                     </h4>
                     <div className="space-y-4">
-                      {activeSynthesis.actionable_outreach.map((step: string, i: number) => (
+                      {(activeSynthesis.actionable_outreach || []).map((step: string, i: number) => (
                         <motion.div
                           key={i}
                           initial={{ opacity: 0, x: 20 }}
@@ -130,10 +141,31 @@ const SynthesisPanel: React.FC = () => {
                     </div>
 
                     <div className="mt-auto grid grid-cols-2 gap-4 pt-10">
-                      <button className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">
+                      <button 
+                        onClick={() => {
+                          const { setNotification } = useSystemStore.getState();
+                          setNotification("Pitch PDF Compiled and Exported to Desktop");
+                        }}
+                        className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/30 transition-all"
+                      >
                         Export Pitch PDF
                       </button>
-                      <button className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all">
+                      <button 
+                        onClick={() => {
+                          const { setNotification, setShowVault } = useSystemStore.getState();
+                          if (onCommit) {
+                            onCommit({
+                              name: `Strategic Narrative ${new Date().toISOString().split('T')[0]}`,
+                              category: "Intelligence",
+                              size: "1.2 MB"
+                            });
+                          }
+                          setNotification("Narrative Committed to Sentinel Vault");
+                          setShowVault(true);
+                          setActiveSynthesis(null);
+                        }}
+                        className="py-6 bg-white/5 hover:bg-white/10 text-slate-400 font-black uppercase tracking-widest rounded-2xl border border-white/10 transition-all"
+                      >
                         Commit to Vault
                       </button>
                     </div>

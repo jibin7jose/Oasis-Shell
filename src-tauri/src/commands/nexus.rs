@@ -13,7 +13,7 @@ pub fn log_event(
     event_type: String,
     message: String,
 ) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let timestamp = chrono::Local::now().to_rfc3339();
 
     conn.execute(
@@ -31,7 +31,7 @@ pub fn save_resume_analysis(
     role: String,
     score: i32,
 ) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     conn.execute(
         "INSERT INTO resume_analysis (role, match_score) VALUES (?1, ?2)",
         [role, score.to_string()],
@@ -42,7 +42,7 @@ pub fn save_resume_analysis(
 
 #[tauri::command]
 pub fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1")
         .map_err(|e| e.to_string())?;
@@ -77,7 +77,7 @@ pub async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_
     let mut files_data = Vec::new();
 
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.0.get().unwrap();
         let mut stmt = conn
             .prepare("SELECT filename, vector FROM file_embeddings LIMIT 100")
             .unwrap();
@@ -133,7 +133,7 @@ pub async fn get_all_files(state: tauri::State<'_, DbState>) -> Result<serde_jso
     let mut entries = Vec::new();
 
     {
-        let conn = state.0.lock().unwrap();
+        let conn = state.0.get().unwrap();
         let mut stmt = conn.prepare("SELECT id, filename, filepath, content FROM file_embeddings ORDER BY id DESC LIMIT 100").unwrap();
         let rows = stmt
             .query_map([], |row| {
@@ -369,7 +369,7 @@ pub fn get_nearby_projects() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare(
             "SELECT id, event_type, message, timestamp FROM neural_logs ORDER BY id DESC LIMIT 50",

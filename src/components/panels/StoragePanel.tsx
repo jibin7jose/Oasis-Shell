@@ -1,11 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { HardDrive, Activity, ShieldCheck, AlertCircle, Database, Server } from 'lucide-react';
-import { useSystemStore } from '../../lib/systemStore';
+import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
 
 export const StoragePanel: React.FC = () => {
-  const storage = useSystemStore((state) => state.storage);
+  const [storage, setStorage] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchStorage = async () => {
+      try {
+        const hardware = await invokeSafe("get_hardware_telemetry") as any;
+        if (hardware && hardware.disks) {
+          setStorage(hardware.disks.map((d: any) => ({
+            name: d.name || 'Local Disk',
+            mount: d.mount_point,
+            total: d.total_space,
+            available: d.available_space,
+            health_score: 100 // Mock health score for UI
+          })));
+        }
+      } catch (e) {
+        console.error("Storage telemetry error:", e);
+      }
+    };
+    
+    fetchStorage();
+    const interval = setInterval(fetchStorage, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatBytes = (bytes: number) => {
     const gb = bytes / (1024 * 1024 * 1024);

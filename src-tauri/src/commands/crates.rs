@@ -127,7 +127,7 @@ pub fn save_crate(
     name: String,
     apps: Vec<WindowInfo>,
 ) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
     let timestamp = chrono::Local::now().to_rfc3339();
 
@@ -147,7 +147,7 @@ pub fn update_crate(
     name: String,
     apps: Vec<WindowInfo>,
 ) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let apps_json = serde_json::to_string(&apps).map_err(|e| e.to_string())?;
 
     conn.execute(
@@ -162,7 +162,7 @@ pub fn update_crate(
 
 #[tauri::command]
 pub fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare("SELECT id, name, apps, timestamp FROM context_crates")
         .map_err(|e| e.to_string())?;
@@ -188,7 +188,7 @@ pub fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, Str
 
 #[tauri::command]
 pub fn delete_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     conn.execute("DELETE FROM context_crates WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -219,7 +219,7 @@ pub async fn generate_crate_name(apps: Vec<WindowInfo>) -> Result<String, String
 
 #[tauri::command]
 pub fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String> {
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare("SELECT apps FROM context_crates WHERE id = ?1")
         .map_err(|e| e.to_string())?;
@@ -229,9 +229,29 @@ pub fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String>
         .map_err(|e| e.to_string())?;
     let apps: Vec<WindowInfo> = serde_json::from_str(&apps_json).map_err(|e| e.to_string())?;
 
+    let mut launched_count = 0;
+    let mut failed_apps = Vec::new();
+
     for app in &apps {
-        if !app.exe_path.is_empty() {
-            let _ = std::process::Command::new(&app.exe_path).spawn();
+        if app.exe_path.is_empty() {
+            continue;
+        }
+
+        let exe_lower = app.exe_path.to_lowercase();
+        // Ignore core OS processes that shouldn't be spawned as standalone windows
+        if exe_lower.contains("applicationframehost.exe")
+            || exe_lower.contains("explorer.exe")
+            || exe_lower.contains("searchhost.exe")
+            || exe_lower.contains("startmenuexperiencehost.exe")
+            || exe_lower.contains("textinputhost.exe")
+            || exe_lower.contains("shellexperiencehost.exe")
+        {
+            continue;
+        }
+
+        match std::process::Command::new(&app.exe_path).spawn() {
+            Ok(_) => launched_count += 1,
+            Err(_) => failed_apps.push(app.title.clone()),
         }
     }
 
@@ -289,6 +309,14 @@ pub fn launch_crate(state: tauri::State<DbState>, id: i32) -> Result<(), String>
             );
         }
     });
+
+    if !failed_apps.is_empty() {
+        return Err(format!(
+            "Launched {} apps, but failed to launch: {}",
+            launched_count,
+            failed_apps.join(", ")
+        ));
+    }
 
     Ok(())
 }

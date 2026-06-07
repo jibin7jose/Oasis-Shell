@@ -1,8 +1,7 @@
 use std::sync::Mutex;
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-pub struct DbState(pub Mutex<Connection>);
+pub struct DbState(pub r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>);
 pub struct TelemetryState(pub Mutex<sysinfo::System>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -50,6 +49,9 @@ pub struct HardwareTelemetry {
     pub network_up: f32,
     pub network_down: f32,
     pub gpu_usage: f32,
+    pub battery_percent: u8,
+    pub is_charging: bool,
+    pub system_uptime: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -74,9 +76,11 @@ pub struct PriorityCacheEntry {
     pub name: String,
     pub priority: String,
     pub source: String,
-    pub lastApplied: u64,
+    #[serde(rename = "lastApplied")]
+    pub last_applied: u64,
     pub ignore: bool,
-    pub ttlDays: u32,
+    #[serde(rename = "ttlDays")]
+    pub ttl_days: u32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

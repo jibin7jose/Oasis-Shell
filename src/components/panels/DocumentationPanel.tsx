@@ -56,7 +56,7 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
                 try {
                     const content = isTauri 
                         ? await invokeSafe<string>("get_documentation_chapter", { id: selectedChapter })
-                        : `<h1>${selectedChapter}</h1><p>This is a simulated manual entry for the ${selectedChapter} module.</p>`;
+                        : `<div class="space-y-6"><h1 class="text-3xl font-black text-white capitalize border-b border-white/10 pb-4">${selectedChapter} Architecture</h1><p class="text-lg text-slate-300 leading-relaxed">This is the official simulated manual entry for the ${selectedChapter} module. Our intelligent systems have successfully integrated this component into the main kernel.</p><ul class="list-disc pl-6 space-y-2 text-indigo-300"><li>Automated node synchronization</li><li>Real-time telemetry and heuristic monitoring</li><li>Secure enclave access policies</li></ul></div>`;
                     setHtmlContent(content);
                 } catch (e) {
                     setHtmlContent(`<div class="p-12 glass border border-rose-500/20 text-rose-400 rounded-[2.5rem] bg-rose-500/5 font-bold uppercase tracking-widest text-xs text-center flex flex-col gap-4 items-center justify-center">
@@ -161,7 +161,7 @@ export default function DocumentationPanel({ isOpen, onClose }: DocumentationPan
                            <span className="uppercase tracking-widest font-black">Registry Check // Channel: {selectedChapter}</span>
                         </div>
                         <div className="text-emerald-500 opacity-80 flex items-center gap-4">
-                           <span className="animate-pulse">ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒâ€šÃ‚Â</span>
+                           <span className="animate-pulse">&gt;_</span>
                            oasisshell.exe -load --chapter {selectedChapter.toLowerCase()} --source blog/docs/
                         </div>
                         <div className="text-white opacity-40">

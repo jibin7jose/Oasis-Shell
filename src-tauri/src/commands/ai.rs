@@ -77,7 +77,7 @@ pub async fn index_folder(state: tauri::State<'_, DbState>, path: String) -> Res
 
         if let Some(embedding) = json["embedding"].as_array() {
             let vector_str = serde_json::to_string(embedding).unwrap();
-            let conn = state.0.lock().unwrap();
+            let conn = state.0.get().unwrap();
             let _ = conn.execute(
                 "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![name, fp, content, vector_str],
@@ -114,7 +114,7 @@ pub async fn semantic_search(
         return Err("Failed to generate embedding".into());
     }
 
-    let conn = state.0.lock().unwrap();
+    let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare("SELECT filename, filepath, content, vector FROM file_embeddings")
         .unwrap();
@@ -217,7 +217,7 @@ pub async fn rag_query(
         let mut results: Vec<Match> = Vec::new();
 
         {
-            let conn = state.0.lock().unwrap();
+            let conn = state.0.get().unwrap();
             let mut stmt = conn
                 .prepare("SELECT filepath, content, vector FROM file_embeddings")
                 .unwrap();
@@ -371,29 +371,131 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
 
 
 #[tauri::command]
-pub fn execute_cli_directive(cmd: String, args: Vec<String>) -> Result<String, String> {
-    let mut command_str = cmd;
-    
-    for arg in args {
-        command_str.push_str(" ");
-        command_str.push_str(&arg);
+pub async fn execute_cli_directive(
+    app: tauri::AppHandle,
+    cmd: String,
+    args: Vec<String>,
+) -> Result<String, String> {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+
+    let mut full_cmd = cmd.clone();
+    for arg in &args {
+        full_cmd.push(' ');
+        full_cmd.push_str(arg);
     }
 
-    let output = std::process::Command::new("powershell")
-        .args(["-Command", &command_str])
-        .output()
+    let session_id = format!("term-{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+
+    // Emit session start
+    let _ = app.emit("terminal-stdout", serde_json::json!({
+        "session": session_id,
+        "line": format!("$ {}", full_cmd),
+        "kind": "input"
+    }));
+
+    let child = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| e.to_string())?;
 
-    let res_text = if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        if stdout.trim().is_empty() {
-            "Command executed successfully (no output).".into()
-        } else {
-            stdout
-        }
-    } else {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    };
+    let app_stdout = app.clone();
+    let app_stderr = app.clone();
+    let sid_out = session_id.clone();
+    let sid_err = session_id.clone();
 
-    Ok(res_text)
+    let stdout = child.stdout.ok_or("No stdout")?;
+    let stderr = child.stderr.ok_or("No stderr")?;
+
+    // Stream stdout in background thread
+    let t1 = std::thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines().filter_map(|l| l.ok()) {
+            let _ = app_stdout.emit("terminal-stdout", serde_json::json!({
+                "session": sid_out,
+                "line": line,
+                "kind": "output"
+            }));
+        }
+    });
+
+    // Stream stderr in background thread
+    let t2 = std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines().filter_map(|l| l.ok()) {
+            if !line.trim().is_empty() {
+                let _ = app_stderr.emit("terminal-stdout", serde_json::json!({
+                    "session": sid_err,
+                    "line": line,
+                    "kind": "error"
+                }));
+            }
+        }
+    });
+
+    let app_done = app.clone();
+    let sid_done = session_id.clone();
+    
+    // Wait for both streams to finish in a background thread
+    std::thread::spawn(move || {
+        let _ = t1.join();
+        let _ = t2.join();
+        
+        // Emit completion signal
+        let _ = app_done.emit("terminal-stdout", serde_json::json!({
+            "session": sid_done,
+            "line": "",
+            "kind": "done"
+        }));
+    });
+
+    Ok(session_id)
+}
+
+#[derive(serde::Serialize)]
+pub struct IntentResponse {
+    pub intent_type: String,
+    pub message: String,
+    pub payload: Option<String>,
+}
+
+#[tauri::command]
+pub fn parse_neural_intent(query: String) -> IntentResponse {
+    let q = query.to_lowercase();
+    if (q.contains("launch") || q.contains("open")) && (q.contains("crate") || q.contains("workspace")) {
+        return IntentResponse { intent_type: "launch_crate".into(), message: "Neural Intent: Auto-launching your most recent workspace...".into(), payload: None };
+    } else if q.contains("deploy") || (q.contains("launch") && !q.contains("workspace") && !q.contains("crate")) {
+        return IntentResponse { intent_type: "deploy".into(), message: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster...".into(), payload: None };
+    } else if q.contains("git") || q.contains("commit") || q.contains("push") || q.contains("review code") || (q.contains("review") && q.contains("push")) || q.contains("review and push") || q.contains("code and push") {
+        return IntentResponse { intent_type: "git".into(), message: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status...".into(), payload: None };
+    } else if q.contains("vision") || q.contains("look") || q.contains("see") || q.contains("screen") {
+        return IntentResponse { intent_type: "vision".into(), message: "Analyzing screen...".into(), payload: None };
+    } else if q.contains("create") || q.contains("architect") || q.contains("build module") {
+        let title = query.to_lowercase().replace("create", "").replace("architect", "").replace("build module", "").trim().to_string();
+        let final_title = if title.is_empty() { "New Dynamic Module".into() } else { title };
+        return IntentResponse { intent_type: "architect".into(), message: format!("Architect: Manifesting '{}' strategic module...", final_title), payload: Some(final_title) };
+    } else if q.contains("sim") || q.contains("sandbox") || q.contains("project") {
+        return IntentResponse { intent_type: "sim".into(), message: "Neural Intent: Initiating Strategic Venture Sandbox...".into(), payload: None };
+    } else if q.contains("vault") || q.contains("files") || q.contains("open vault") {
+        return IntentResponse { intent_type: "vault".into(), message: "Neural Intent: Accessing Sentient Vault Nodes...".into(), payload: None };
+    } else if q.contains("crate") || q.contains("workspace") {
+        if q.contains("save") || q.contains("create") || q.contains("new") || q.contains("scan") {
+            return IntentResponse { intent_type: "crate_save".into(), message: "Neural Intent: Auto-saving current workspace layout...".into(), payload: None };
+        } else {
+            return IntentResponse { intent_type: "crate_scan".into(), message: "Neural Intent: Scanning active workspace for Context Crate...".into(), payload: None };
+        }
+    } else if q.contains("photographic memory") || q.contains("recall") || q.contains("remember") {
+        return IntentResponse { intent_type: "memory".into(), message: "Neural Intent: Querying Photographic Memory Engine...".into(), payload: None };
+    } else if (q.contains("graph") || q.contains("cortex") || q.contains("3d")) && !q.contains("photograph") {
+        return IntentResponse { intent_type: "graph".into(), message: "Neural Intent: Initiating 3D Strategic Cortex...".into(), payload: None };
+    } else if q.contains("intel") || q.contains("market") || q.contains("competitors") {
+        return IntentResponse { intent_type: "intel".into(), message: "Neural Intent: Retrieving Global Market Intelligence...".into(), payload: None };
+    } else if q.contains("arr") || q.contains("runway") || q.contains("metrics") {
+        return IntentResponse { intent_type: "metrics".into(), message: "Neural Audit: Metrics request...".into(), payload: None };
+    }
+    
+    IntentResponse { intent_type: "llm".into(), message: "".into(), payload: None }
 }

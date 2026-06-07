@@ -2,14 +2,18 @@ pub mod models;
 use models::*;
 mod commands;
 
-use rusqlite::Connection;
 use std::sync::Mutex;
 use tauri::Emitter;
 use tauri::Manager;
 
+use r2d2_sqlite::SqliteConnectionManager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let conn = Connection::open("oasis_crates.db").expect("failed to open database");
+    let manager = SqliteConnectionManager::file("oasis_crates.db");
+    let pool = r2d2::Pool::new(manager).expect("Failed to create r2d2 pool");
+
+    let conn = pool.get().expect("failed to get connection from pool");
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS context_crates (
@@ -92,9 +96,48 @@ pub fn run() {
     )
     .expect("failed to create priority cache table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS clipboard_history (
+            id INTEGER PRIMARY KEY,
+            content TEXT NOT NULL,
+            type TEXT NOT NULL,
+            timestamp INTEGER NOT NULL
+        )",
+        [],
+    )
+    .expect("failed to create clipboard history table");
+
+    let pool_for_clipboard = pool.clone();
+    std::thread::spawn(move || {
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            let mut last_content = String::new();
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                if let Ok(content) = clipboard.get_text() {
+                    let trimmed = content.trim();
+                    if !trimmed.is_empty() && content != last_content {
+                        last_content = content.clone();
+                        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+                        if let Ok(conn_clip) = pool_for_clipboard.get() {
+                            // Keep only last 100 items
+                            let _ = conn_clip.execute(
+                                "INSERT INTO clipboard_history (content, type, timestamp) VALUES (?1, 'text', ?2)",
+                                rusqlite::params![content, ts],
+                            );
+                            let _ = conn_clip.execute(
+                                "DELETE FROM clipboard_history WHERE id NOT IN (SELECT id FROM clipboard_history ORDER BY timestamp DESC LIMIT 100)",
+                                [],
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
-        .manage(DbState(Mutex::new(conn)))
+        .manage(DbState(pool))
         .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
         .setup(|app| {
             tauri::tray::TrayIconBuilder::new()
@@ -114,6 +157,9 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+                
+            crate::commands::telemetry::start_telemetry_stream(app.handle().clone());
+            
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
@@ -178,6 +224,10 @@ pub fn run() {
             commands::telemetry::set_process_priority,
             commands::telemetry::get_hardware_telemetry,
             commands::telemetry::start_telemetry_server,
+            commands::telemetry::get_clipboard_history,
+            commands::telemetry::write_to_clipboard,
+            commands::telemetry::start_voice_engine,
+            commands::telemetry::start_cron_scheduler,
             commands::crates::sync_project,
             commands::crates::save_crate,
             commands::crates::update_crate,
@@ -204,6 +254,7 @@ pub fn run() {
             commands::ai::execute_cli_directive,
             commands::ai::generate_commit_message,
             commands::ai::check_ai_status,
+            commands::ai::parse_neural_intent,
             commands::nexus::start_proactive_sentience,
             commands::vision::start_photographic_memory,
             commands::vision::query_photographic_memory,
@@ -219,6 +270,9 @@ pub fn run() {
             commands::golems::get_neural_workforce,
             commands::golems::execute_golem_manifest,
             commands::golems::resolve_golem_proposal,
+            commands::golems::hatch_autonomous_golem,
+            commands::golems::decommission_golem,
+            commands::golems::invoke_golem_debate,
             commands::nexus::get_vault_nodes,
             commands::nexus::get_market_intelligence,
             commands::files::read_directory,

@@ -17,6 +17,11 @@ export interface SystemState {
   showCortex: boolean;
   showDocs: boolean;
   showGraph: boolean;
+  showWorkforce: boolean;
+  showLogs: boolean;
+  showClipboard: boolean;
+  showTerminal: boolean;
+  showRealTerminal: boolean;
   travelIndex: number;
   isTimeTraveling: boolean;
   chronosHistory: any[];
@@ -108,6 +113,11 @@ export interface SystemState {
   setShowCortex: (show: boolean) => void;
   setShowDocs: (show: boolean) => void;
   setShowGraph: (show: boolean) => void;
+  setShowWorkforce: (show: boolean) => void;
+  setShowLogs: (show: boolean) => void;
+  setShowClipboard: (show: boolean) => void;
+  setShowTerminal: (show: boolean) => void;
+  setShowRealTerminal: (show: boolean) => void;
   setTravelIndex: (index: number) => void;
   setIsTimeTraveling: (is: boolean) => void;
   setChronosHistory: (history: any[]) => void;
@@ -180,6 +190,11 @@ export const useSystemStore = create<SystemState>((set) => ({
   showCortex: false,
   showDocs: false,
   showGraph: false,
+  showWorkforce: false,
+  showLogs: false,
+  showClipboard: false,
+  showTerminal: false,
+  showRealTerminal: false,
   travelIndex: -1,
   isTimeTraveling: false,
   chronosHistory: [],
@@ -288,6 +303,11 @@ export const useSystemStore = create<SystemState>((set) => ({
   setShowCortex: (show: boolean) => set({ showCortex: show }),
   setShowDocs: (show: boolean) => set({ showDocs: show }),
   setShowGraph: (show: boolean) => set({ showGraph: show }),
+  setShowWorkforce: (show: boolean) => set({ showWorkforce: show }),
+  setShowLogs: (show: boolean) => set({ showLogs: show }),
+  setShowClipboard: (show: boolean) => set({ showClipboard: show }),
+  setShowTerminal: (show: boolean) => set({ showTerminal: show }),
+  setShowRealTerminal: (show: boolean) => set({ showRealTerminal: show }),
   setTravelIndex: (index: number) => set({ travelIndex: index }),
   setIsTimeTraveling: (is: boolean) => set({ isTimeTraveling: is }),
   setChronosHistory: (history: any[]) => set({ chronosHistory: history }),

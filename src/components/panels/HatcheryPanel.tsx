@@ -19,10 +19,17 @@ export const HatcheryPanel: React.FC<{ isOpen: boolean; onClose: () => void }> =
     };
 
     useEffect(() => {
+        let unlisten: (() => void) | undefined;
         if (isOpen) {
             fetchGolems();
-            const interval = setInterval(fetchGolems, 5000);
-            return () => clearInterval(interval);
+            import("@tauri-apps/api/event").then(({ listen }) => {
+                listen("oasis-golem-telemetry", (event: any) => {
+                    setActiveGolems(event.payload);
+                }).then(u => { unlisten = u; });
+            });
+            return () => {
+                if (unlisten) unlisten();
+            };
         }
     }, [isOpen]);
 
