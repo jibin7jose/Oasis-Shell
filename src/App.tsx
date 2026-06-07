@@ -39,6 +39,7 @@ import { OverlayManager } from "./components/overlays/OverlayManager";
 import { NeuralMesh } from "./components/shared/NeuralMesh";
 import { useVoiceEngine } from "./hooks/useVoiceEngine";
 import { useMemoryEngine } from "./hooks/useMemoryEngine";
+import { JarvisOverlay } from "./components/overlays/JarvisOverlay";
 
 // Design Utility
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
@@ -169,6 +170,7 @@ export default function App() {
 
   const [showWorkforce, setShowWorkforce] = useState(false);
   const [showTimeMachine, setShowTimeMachine] = useState(false);
+  const [showJarvis, setShowJarvis] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [simMode, setSimMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -258,9 +260,15 @@ export default function App() {
         e.preventDefault();
         setShowClipboard(!showClipboard);
       }
+      // Ctrl+Shift+J — open JARVIS Voice Assistant
+      if (e.key.toLowerCase() === 'j' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowJarvis(!showJarvis);
+      }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowTerminal(false);
+        setShowJarvis(false);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -1146,6 +1154,12 @@ export default function App() {
       {/* Premium In-App Toast Notification */}
       <PremiumToast toast={toast} setToast={setToast} />
       <VisionScannerOverlay isScanning={isScanningScreen} />
+      
+      <JarvisOverlay 
+        show={showJarvis} 
+        onClose={() => setShowJarvis(false)} 
+        resolveNeuralIntent={resolveNeuralIntent} 
+      />
     </div>
   );
 }
