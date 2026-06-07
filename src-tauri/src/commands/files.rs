@@ -27,7 +27,7 @@ pub fn read_directory(path: Option<String>) -> Result<Vec<FileInfo>, String> {
         let meta = entry.metadata().ok();
         let name = entry.file_name().to_string_lossy().into_owned();
         let full_path = entry.path().to_string_lossy().into_owned();
-        
+
         let is_dir = meta.as_ref().map(|m| m.is_dir()).unwrap_or(false);
         let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
         let last_modified = meta

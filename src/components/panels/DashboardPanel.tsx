@@ -9,6 +9,7 @@ import { GolemMatrix } from '../dashboard/GolemMatrix';
 import { ForgePanel } from './ForgePanel';
 import { VentureHealthRadar } from '../dashboard/VentureHealthRadar';
 import { NeuralWisdomFeed } from '../dashboard/NeuralWisdomFeed';
+import { ProductivityHeatmap } from '../dashboard/ProductivityHeatmap';
 import { GolemTask, StrategicMacro, FounderMetrics } from '../../lib/contracts';
 
 interface DashboardPanelProps {
@@ -135,6 +136,10 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
           onSynthesize={onSynthesize}
           isSynthesizing={isSynthesizing}
         />
+      </div>
+
+      <div className="w-full max-w-5xl grid grid-cols-1 gap-8 mb-12">
+        <ProductivityHeatmap />
       </div>
 
       <div className="w-full max-w-5xl mb-12">

@@ -92,17 +92,37 @@ pub async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
 
 #[tauri::command]
 pub async fn get_neural_workforce() -> Result<Vec<String>, String> {
-    Ok(vec!["Kernel-Architect-Gemma3".into(), "Security-Golem".into()])
+    Ok(vec![
+        "Kernel-Architect-Gemma3".into(),
+        "Security-Golem".into(),
+    ])
 }
 
 #[tauri::command]
-pub async fn execute_golem_manifest(_id: String, title: String, code: String) -> Result<String, String> {
+pub async fn execute_golem_manifest(
+    _id: String,
+    title: String,
+    code: String,
+) -> Result<String, String> {
     let file_basename = title.replace(" ", "_").to_lowercase();
     let path = format!("../src/{}.ts", file_basename);
     std::fs::write(&path, &code).unwrap_or_default();
-    std::process::Command::new("git").args(["add", &path]).output().ok();
-    std::process::Command::new("git").args(["commit", "-m", &format!("feat(golem): auto-manifested {}", title)]).output().ok();
-    std::process::Command::new("git").args(["push"]).output().ok();
+    std::process::Command::new("git")
+        .args(["add", &path])
+        .output()
+        .ok();
+    std::process::Command::new("git")
+        .args([
+            "commit",
+            "-m",
+            &format!("feat(golem): auto-manifested {}", title),
+        ])
+        .output()
+        .ok();
+    std::process::Command::new("git")
+        .args(["push"])
+        .output()
+        .ok();
     Ok("Merged successfully".into())
 }
 
@@ -130,34 +150,73 @@ pub async fn decommission_golem(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn invoke_golem_debate(task: GolemTask) -> Result<serde_json::Value, String> {
+pub async fn invoke_golem_debate(app: tauri::AppHandle, task: GolemTask) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
+    use tauri::Emitter;
     
-    let prompt = format!(
-        "You are an autonomous AI 'Golem' with the aura of {}. Your mission is: {}. Briefly detail your plan to accomplish this task and any sub-steps involved.", 
+    let mut conversation_history = format!(
+        "You are an autonomous AI 'Golem' with the aura of {}. Your mission is: {}. You have the ability to execute powershell commands on the user's system to accomplish this mission. To execute a command, output it strictly in this format: [CMD] your command [/CMD]. I will execute it and return the terminal output to you. Do this step-by-step. When you have completely finished the mission, end your response with [DONE]. Start by detailing your plan.", 
         task.aura, 
-        task.mission.unwrap_or_else(|| "General exploration".to_string())
+        task.mission.clone().unwrap_or_else(|| "General exploration".to_string())
     );
 
-    let chat_body = serde_json::json!({ 
-        "model": "gemma4:latest", 
-        "prompt": prompt, 
-        "stream": false 
-    });
+    let mut logs = vec!["Initiating Autonomous Loop...".to_string()];
+    let mut final_response = String::new();
 
-    let res = client
-        .post("http://localhost:11434/api/generate")
-        .json(&chat_body)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    for iteration in 0..5 {
+        let chat_body = serde_json::json!({ 
+            "model": "gemma4:latest", 
+            "prompt": conversation_history, 
+            "stream": false 
+        });
 
-    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    let response_text = json["response"].as_str().unwrap_or("No response generated.").to_string();
+        let res = match client.post("http://localhost:11434/api/generate").json(&chat_body).send().await {
+            Ok(r) => r,
+            Err(e) => return Err(e.to_string()),
+        };
+
+        let json: serde_json::Value = match res.json().await {
+            Ok(j) => j,
+            Err(e) => return Err(e.to_string()),
+        };
+        
+        let response_text = json["response"].as_str().unwrap_or("No response generated.").to_string();
+        final_response.push_str(&format!("\n\n--- Iteration {} ---\n{}", iteration + 1, response_text));
+
+        if let Some(start_idx) = response_text.find("[CMD]") {
+            if let Some(end_idx) = response_text.find("[/CMD]") {
+                if end_idx > start_idx + 5 {
+                    let cmd_str = response_text[start_idx + 5..end_idx].trim();
+                    logs.push(format!("Executing: {}", cmd_str));
+                    let _ = app.emit("golem-thought", format!("Executing: {}", cmd_str));
+                    
+                    let output = std::process::Command::new("powershell")
+                        .args(["-NoProfile", "-NonInteractive", "-Command", cmd_str])
+                        .output()
+                        .map_err(|e| e.to_string())?;
+                    
+                    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    let combined = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
+                    
+                    conversation_history.push_str(&format!("\n\nYou generated: {}\nI executed your command. The terminal output was:\n{}\nWhat is your next step? Output [CMD] to run another command, or [DONE] if finished.", response_text, combined));
+                    continue;
+                }
+            }
+        }
+
+        if response_text.contains("[DONE]") {
+            logs.push("Mission Accomplished.".to_string());
+            break;
+        }
+
+        // If no command and no [DONE], the LLM just answered or got confused.
+        break;
+    }
 
     Ok(serde_json::json!({
         "status": "Resolved",
-        "logs": ["Initiating Neural Sync...", "Debate parameters initialized.", "Response generated."],
-        "thought_trace": response_text,
+        "logs": logs,
+        "thought_trace": final_response.trim(),
     }))
 }

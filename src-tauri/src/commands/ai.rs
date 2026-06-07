@@ -150,7 +150,7 @@ pub async fn semantic_search(
                 if score > 0.3 {
                     let mut size = 0;
                     let mut last_modified = String::from("Unknown");
-                    
+
                     if let Ok(meta) = std::fs::metadata(&filepath) {
                         size = meta.len();
                         if let Ok(modified) = meta.modified() {
@@ -158,7 +158,7 @@ pub async fn semantic_search(
                             last_modified = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
                         }
                     }
-                    
+
                     let preview = if content.len() > 150 {
                         format!("{}...", &content[..150])
                     } else {
@@ -368,8 +368,6 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
     }
 }
 
-
-
 #[tauri::command]
 pub async fn execute_cli_directive(
     app: tauri::AppHandle,
@@ -385,15 +383,23 @@ pub async fn execute_cli_directive(
         full_cmd.push_str(arg);
     }
 
-    let session_id = format!("term-{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+    let session_id = format!(
+        "term-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
 
     // Emit session start
-    let _ = app.emit("terminal-stdout", serde_json::json!({
-        "session": session_id,
-        "line": format!("$ {}", full_cmd),
-        "kind": "input"
-    }));
+    let _ = app.emit(
+        "terminal-stdout",
+        serde_json::json!({
+            "session": session_id,
+            "line": format!("$ {}", full_cmd),
+            "kind": "input"
+        }),
+    );
 
     let child = Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])
@@ -414,11 +420,14 @@ pub async fn execute_cli_directive(
     let t1 = std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines().filter_map(|l| l.ok()) {
-            let _ = app_stdout.emit("terminal-stdout", serde_json::json!({
-                "session": sid_out,
-                "line": line,
-                "kind": "output"
-            }));
+            let _ = app_stdout.emit(
+                "terminal-stdout",
+                serde_json::json!({
+                    "session": sid_out,
+                    "line": line,
+                    "kind": "output"
+                }),
+            );
         }
     });
 
@@ -427,29 +436,35 @@ pub async fn execute_cli_directive(
         let reader = BufReader::new(stderr);
         for line in reader.lines().filter_map(|l| l.ok()) {
             if !line.trim().is_empty() {
-                let _ = app_stderr.emit("terminal-stdout", serde_json::json!({
-                    "session": sid_err,
-                    "line": line,
-                    "kind": "error"
-                }));
+                let _ = app_stderr.emit(
+                    "terminal-stdout",
+                    serde_json::json!({
+                        "session": sid_err,
+                        "line": line,
+                        "kind": "error"
+                    }),
+                );
             }
         }
     });
 
     let app_done = app.clone();
     let sid_done = session_id.clone();
-    
+
     // Wait for both streams to finish in a background thread
     std::thread::spawn(move || {
         let _ = t1.join();
         let _ = t2.join();
-        
+
         // Emit completion signal
-        let _ = app_done.emit("terminal-stdout", serde_json::json!({
-            "session": sid_done,
-            "line": "",
-            "kind": "done"
-        }));
+        let _ = app_done.emit(
+            "terminal-stdout",
+            serde_json::json!({
+                "session": sid_done,
+                "line": "",
+                "kind": "done"
+            }),
+        );
     });
 
     Ok(session_id)
@@ -465,37 +480,123 @@ pub struct IntentResponse {
 #[tauri::command]
 pub fn parse_neural_intent(query: String) -> IntentResponse {
     let q = query.to_lowercase();
-    if (q.contains("launch") || q.contains("open")) && (q.contains("crate") || q.contains("workspace")) {
-        return IntentResponse { intent_type: "launch_crate".into(), message: "Neural Intent: Auto-launching your most recent workspace...".into(), payload: None };
-    } else if q.contains("deploy") || (q.contains("launch") && !q.contains("workspace") && !q.contains("crate")) {
-        return IntentResponse { intent_type: "deploy".into(), message: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster...".into(), payload: None };
-    } else if q.contains("git") || q.contains("commit") || q.contains("push") || q.contains("review code") || (q.contains("review") && q.contains("push")) || q.contains("review and push") || q.contains("code and push") {
-        return IntentResponse { intent_type: "git".into(), message: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status...".into(), payload: None };
-    } else if q.contains("vision") || q.contains("look") || q.contains("see") || q.contains("screen") {
-        return IntentResponse { intent_type: "vision".into(), message: "Analyzing screen...".into(), payload: None };
+    if (q.contains("launch") || q.contains("open"))
+        && (q.contains("crate") || q.contains("workspace"))
+    {
+        return IntentResponse {
+            intent_type: "launch_crate".into(),
+            message: "Neural Intent: Auto-launching your most recent workspace...".into(),
+            payload: None,
+        };
+    } else if q.contains("deploy")
+        || (q.contains("launch") && !q.contains("workspace") && !q.contains("crate"))
+    {
+        return IntentResponse {
+            intent_type: "deploy".into(),
+            message: "Neural Intent: Deployment Sentinel Triggered. Syncing Edge Cluster...".into(),
+            payload: None,
+        };
+    } else if q.contains("git")
+        || q.contains("commit")
+        || q.contains("push")
+        || q.contains("review code")
+        || (q.contains("review") && q.contains("push"))
+        || q.contains("review and push")
+        || q.contains("code and push")
+    {
+        return IntentResponse {
+            intent_type: "git".into(),
+            message: "Neural Intent: Code-Aware Sentinel activated. Analyzing Git status...".into(),
+            payload: None,
+        };
+    } else if q.contains("vision")
+        || q.contains("look")
+        || q.contains("see")
+        || q.contains("screen")
+    {
+        return IntentResponse {
+            intent_type: "vision".into(),
+            message: "Analyzing screen...".into(),
+            payload: None,
+        };
     } else if q.contains("create") || q.contains("architect") || q.contains("build module") {
-        let title = query.to_lowercase().replace("create", "").replace("architect", "").replace("build module", "").trim().to_string();
-        let final_title = if title.is_empty() { "New Dynamic Module".into() } else { title };
-        return IntentResponse { intent_type: "architect".into(), message: format!("Architect: Manifesting '{}' strategic module...", final_title), payload: Some(final_title) };
+        let title = query
+            .to_lowercase()
+            .replace("create", "")
+            .replace("architect", "")
+            .replace("build module", "")
+            .trim()
+            .to_string();
+        let final_title = if title.is_empty() {
+            "New Dynamic Module".into()
+        } else {
+            title
+        };
+        return IntentResponse {
+            intent_type: "architect".into(),
+            message: format!(
+                "Architect: Manifesting '{}' strategic module...",
+                final_title
+            ),
+            payload: Some(final_title),
+        };
     } else if q.contains("sim") || q.contains("sandbox") || q.contains("project") {
-        return IntentResponse { intent_type: "sim".into(), message: "Neural Intent: Initiating Strategic Venture Sandbox...".into(), payload: None };
+        return IntentResponse {
+            intent_type: "sim".into(),
+            message: "Neural Intent: Initiating Strategic Venture Sandbox...".into(),
+            payload: None,
+        };
     } else if q.contains("vault") || q.contains("files") || q.contains("open vault") {
-        return IntentResponse { intent_type: "vault".into(), message: "Neural Intent: Accessing Sentient Vault Nodes...".into(), payload: None };
+        return IntentResponse {
+            intent_type: "vault".into(),
+            message: "Neural Intent: Accessing Sentient Vault Nodes...".into(),
+            payload: None,
+        };
     } else if q.contains("crate") || q.contains("workspace") {
         if q.contains("save") || q.contains("create") || q.contains("new") || q.contains("scan") {
-            return IntentResponse { intent_type: "crate_save".into(), message: "Neural Intent: Auto-saving current workspace layout...".into(), payload: None };
+            return IntentResponse {
+                intent_type: "crate_save".into(),
+                message: "Neural Intent: Auto-saving current workspace layout...".into(),
+                payload: None,
+            };
         } else {
-            return IntentResponse { intent_type: "crate_scan".into(), message: "Neural Intent: Scanning active workspace for Context Crate...".into(), payload: None };
+            return IntentResponse {
+                intent_type: "crate_scan".into(),
+                message: "Neural Intent: Scanning active workspace for Context Crate...".into(),
+                payload: None,
+            };
         }
     } else if q.contains("photographic memory") || q.contains("recall") || q.contains("remember") {
-        return IntentResponse { intent_type: "memory".into(), message: "Neural Intent: Querying Photographic Memory Engine...".into(), payload: None };
-    } else if (q.contains("graph") || q.contains("cortex") || q.contains("3d")) && !q.contains("photograph") {
-        return IntentResponse { intent_type: "graph".into(), message: "Neural Intent: Initiating 3D Strategic Cortex...".into(), payload: None };
+        return IntentResponse {
+            intent_type: "memory".into(),
+            message: "Neural Intent: Querying Photographic Memory Engine...".into(),
+            payload: None,
+        };
+    } else if (q.contains("graph") || q.contains("cortex") || q.contains("3d"))
+        && !q.contains("photograph")
+    {
+        return IntentResponse {
+            intent_type: "graph".into(),
+            message: "Neural Intent: Initiating 3D Strategic Cortex...".into(),
+            payload: None,
+        };
     } else if q.contains("intel") || q.contains("market") || q.contains("competitors") {
-        return IntentResponse { intent_type: "intel".into(), message: "Neural Intent: Retrieving Global Market Intelligence...".into(), payload: None };
+        return IntentResponse {
+            intent_type: "intel".into(),
+            message: "Neural Intent: Retrieving Global Market Intelligence...".into(),
+            payload: None,
+        };
     } else if q.contains("arr") || q.contains("runway") || q.contains("metrics") {
-        return IntentResponse { intent_type: "metrics".into(), message: "Neural Audit: Metrics request...".into(), payload: None };
+        return IntentResponse {
+            intent_type: "metrics".into(),
+            message: "Neural Audit: Metrics request...".into(),
+            payload: None,
+        };
     }
-    
-    IntentResponse { intent_type: "llm".into(), message: "".into(), payload: None }
+
+    IntentResponse {
+        intent_type: "llm".into(),
+        message: "".into(),
+        payload: None,
+    }
 }

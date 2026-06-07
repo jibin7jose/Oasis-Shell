@@ -32,6 +32,7 @@ export const SearchIntent: React.FC<SearchIntentProps> = ({
           style={{ color: isThinking ? 'var(--accent-primary)' : '#475569' }}
         />
         <input
+          id="neural-input"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={handleSearchIntent}

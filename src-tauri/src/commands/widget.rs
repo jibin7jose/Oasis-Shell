@@ -1,7 +1,7 @@
 #[tauri::command]
 pub fn set_widget_mode(app: tauri::AppHandle, enable: bool) -> Result<(), String> {
-    use tauri::Manager;
     use tauri::LogicalSize;
+    use tauri::Manager;
     if let Some(window) = app.get_webview_window("main") {
         if enable {
             let _ = window.set_size(LogicalSize::new(350.0, 700.0));

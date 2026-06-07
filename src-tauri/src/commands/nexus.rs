@@ -1,11 +1,11 @@
-use crate::models::{DbState, NeuralLog};
-use sysinfo::{Disks, System};
-use std::time::Duration;
-use std::process::Command;
 use crate::commands::ai::cosine_similarity;
-use rusqlite::params;
-use tauri::Emitter;
+use crate::models::{DbState, NeuralLog};
 use chrono::Timelike;
+use rusqlite::params;
+use std::process::Command;
+use std::time::Duration;
+use sysinfo::{Disks, System};
+use tauri::Emitter;
 
 #[tauri::command]
 pub fn log_event(
@@ -41,7 +41,9 @@ pub fn save_resume_analysis(
 }
 
 #[tauri::command]
-pub fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_json::Value, String> {
+pub fn get_latest_resume_analysis(
+    state: tauri::State<DbState>,
+) -> Result<serde_json::Value, String> {
     let conn = state.0.get().unwrap();
     let mut stmt = conn
         .prepare("SELECT role, match_score FROM resume_analysis ORDER BY id DESC LIMIT 1")
@@ -57,9 +59,10 @@ pub fn get_latest_resume_analysis(state: tauri::State<DbState>) -> Result<serde_
     }
 }
 
-
 #[tauri::command]
-pub async fn get_neural_graph(state: tauri::State<'_, DbState>) -> Result<serde_json::Value, String> {
+pub async fn get_neural_graph(
+    state: tauri::State<'_, DbState>,
+) -> Result<serde_json::Value, String> {
     #[derive(serde::Serialize)]
     struct Node {
         id: String,

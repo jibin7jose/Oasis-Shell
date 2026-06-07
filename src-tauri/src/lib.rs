@@ -107,6 +107,19 @@ pub fn run() {
     )
     .expect("failed to create clipboard history table");
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_usage_analytics (
+            id INTEGER PRIMARY KEY,
+            exe_name TEXT NOT NULL,
+            window_title TEXT NOT NULL,
+            focus_time_seconds INTEGER NOT NULL DEFAULT 0,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(exe_name)
+        )",
+        [],
+    )
+    .expect("failed to create app usage table");
+
     let pool_for_clipboard = pool.clone();
     std::thread::spawn(move || {
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
@@ -117,7 +130,10 @@ pub fn run() {
                     let trimmed = content.trim();
                     if !trimmed.is_empty() && content != last_content {
                         last_content = content.clone();
-                        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+                        let ts = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64;
                         if let Ok(conn_clip) = pool_for_clipboard.get() {
                             // Keep only last 100 items
                             let _ = conn_clip.execute(
@@ -136,6 +152,28 @@ pub fn run() {
     });
 
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcuts(["ctrl+space"])
+                .unwrap()
+                .with_handler(|app, shortcut, event| {
+                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        if shortcut.matches(tauri_plugin_global_shortcut::Modifiers::CONTROL, tauri_plugin_global_shortcut::Code::Space) {
+                            if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                    use tauri::Emitter;
+                                    let _ = window.emit("omnibar-focus", ());
+                                }
+                            }
+                        }
+                    }
+                })
+                .build()
+        )
         .plugin(tauri_plugin_notification::init())
         .manage(DbState(pool))
         .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
@@ -157,9 +195,9 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
-                
+
             crate::commands::telemetry::start_telemetry_stream(app.handle().clone());
-            
+
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
@@ -228,11 +266,11 @@ pub fn run() {
             commands::telemetry::write_to_clipboard,
             commands::telemetry::start_voice_engine,
             commands::telemetry::start_cron_scheduler,
+            commands::telemetry::get_app_usage_analytics,
             commands::crates::sync_project,
             commands::crates::save_crate,
             commands::crates::update_crate,
             commands::crates::get_crates,
-
             commands::crates::delete_crate,
             commands::crates::start_watcher,
             commands::crates::launch_crate,
@@ -248,7 +286,6 @@ pub fn run() {
             commands::ai::rag_query,
             commands::nexus::get_neural_graph,
             commands::nexus::get_all_files,
-
             commands::crates::generate_crate_name,
             commands::ai::execute_neural_command,
             commands::ai::execute_cli_directive,

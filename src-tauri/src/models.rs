@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 
 pub struct DbState(pub r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>);
 pub struct TelemetryState(pub Mutex<sysinfo::System>);
@@ -59,6 +59,7 @@ pub struct MemoryEntry {
     pub id: i32,
     pub timestamp: String,
     pub description: String,
+    pub image_base64: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

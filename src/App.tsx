@@ -36,6 +36,7 @@ import { CognitiveTimeline } from "./components/panels/CognitiveTimeline";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
 import { AegisNexus } from "./components/panels/AegisNexus";
 import { OverlayManager } from "./components/overlays/OverlayManager";
+import { NeuralMesh } from "./components/shared/NeuralMesh";
 import { useVoiceEngine } from "./hooks/useVoiceEngine";
 import { useMemoryEngine } from "./hooks/useMemoryEngine";
 
@@ -226,6 +227,10 @@ export default function App() {
       logEvent(`Auto-Snapshot Created: ${e.payload}`, 'system');
     });
 
+    let unlistenOmnibar: () => void;
+    listen('omnibar-focus', () => {
+      setTimeout(() => document.getElementById('neural-input')?.focus(), 50);
+    }).then(f => unlistenOmnibar = f);
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Ctrl+K — focus neural intent bar
@@ -274,6 +279,7 @@ export default function App() {
       unlistenTerminal.then(f => f());
       unlistenPalette.then(f => f());
       unlistenCron.then(f => f());
+      if (unlistenOmnibar) unlistenOmnibar();
     };
   }, []);
 
@@ -419,6 +425,11 @@ export default function App() {
         setShowVault(true);
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Accessing Sentient Vault Nodes..." }]);
         logEvent("Sentient Vault Portal Opened", "system");
+      } else if (q.includes("rewind") || q.includes("time machine") || q.includes("past") || q.includes("memory")) {
+        loadMemories();
+        setShowTimeMachine(true);
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Opening Photographic Memory Archive..." }]);
+        logEvent("Time Machine Initiated", "system");
       }
       // 3. Workspace Creation / Scanning
       else if (q.includes("crate") || q.includes("workspace")) {
@@ -1041,6 +1052,7 @@ export default function App() {
           className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
         />
         <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+        <NeuralMesh />
       </div>
 
       {/* 3D Nebula Layer */}

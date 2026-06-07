@@ -1,8 +1,10 @@
 use crate::models::{ContextCrate, DbState, WindowInfo};
-use rusqlite::params;
 use notify::Watcher;
+use rusqlite::params;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId, IsWindowVisible};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindowThreadProcessId, IsWindowVisible,
+};
 
 #[tauri::command]
 pub fn sync_project(message: Option<String>) -> Result<(), String> {
@@ -158,7 +160,6 @@ pub fn update_crate(
 
     Ok(())
 }
-
 
 #[tauri::command]
 pub fn get_crates(state: tauri::State<DbState>) -> Result<Vec<ContextCrate>, String> {

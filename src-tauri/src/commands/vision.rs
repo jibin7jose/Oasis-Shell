@@ -1,10 +1,10 @@
 use crate::models::{DbState, MemoryEntry};
 use base64::{engine::general_purpose, Engine as _};
+use rusqlite::params;
+use rusqlite::Connection;
 use screenshots::image::ImageFormat;
 use screenshots::Screen;
 use std::io::Cursor;
-use rusqlite::Connection;
-use rusqlite::params;
 
 #[tauri::command]
 pub async fn capture_screenshot() -> Result<String, String> {
@@ -62,39 +62,46 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
                             let base64_img = general_purpose::STANDARD.encode(buffer.get_ref());
                             let timestamp = chrono::Local::now().to_rfc3339();
 
-                            // Use LLaVA to summarize the screen
+                            let mut desc = String::from("[Omniscient Vision Engine Offline] Visual Context Snapshot Saved. Install Ollama + LLaVA to enable intelligent image indexing.");
+                            
                             let client = reqwest::blocking::Client::new();
                             let body = serde_json::json!({
                                 "model": "llava:latest",
                                 "prompt": "Briefly describe what the user is doing on their screen right now in 1 sentence. Focus on apps, code, or context.",
-                                "images": [base64_img],
+                                "images": [base64_img.clone()],
                                 "stream": false
                             });
 
                             if let Ok(res) = client
                                 .post("http://localhost:11434/api/generate")
                                 .json(&body)
+                                .timeout(std::time::Duration::from_secs(15))
                                 .send()
                             {
                                 if let Ok(json) = res.json::<serde_json::Value>() {
-                                    if let Some(desc) = json["response"].as_str() {
-                                        // Save to vector database (for simple history MVP, we just use sqlite)
-                                        if let Ok(conn) = Connection::open("oasis_crates.db") {
-                                            let _ = conn.execute(
-                                                "CREATE TABLE IF NOT EXISTS photographic_memory (
-                                                    id INTEGER PRIMARY KEY,
-                                                    timestamp TEXT NOT NULL,
-                                                    description TEXT NOT NULL
-                                                )",
-                                                [],
-                                            );
-                                            let _ = conn.execute(
-                                                "INSERT INTO photographic_memory (timestamp, description) VALUES (?1, ?2)",
-                                                params![timestamp, desc],
-                                            );
-                                        }
+                                    if let Some(res_str) = json["response"].as_str() {
+                                        desc = res_str.to_string();
                                     }
                                 }
+                            }
+                            
+                            // Save to vector database (for simple history MVP, we just use sqlite)
+                            if let Ok(conn) = Connection::open("oasis_crates.db") {
+                                let _ = conn.execute(
+                                    "CREATE TABLE IF NOT EXISTS photographic_memory (
+                                        id INTEGER PRIMARY KEY,
+                                        timestamp TEXT NOT NULL,
+                                        description TEXT NOT NULL
+                                    )",
+                                    [],
+                                );
+                                // Safe migration: add column if it doesn't exist
+                                let _ = conn.execute("ALTER TABLE photographic_memory ADD COLUMN image_base64 TEXT NOT NULL DEFAULT ''", []);
+                                
+                                let _ = conn.execute(
+                                    "INSERT INTO photographic_memory (timestamp, description, image_base64) VALUES (?1, ?2, ?3)",
+                                    params![timestamp, desc, base64_img],
+                                );
                             }
                         }
                     }
@@ -158,13 +165,14 @@ pub async fn get_all_photographic_memories() -> Result<Vec<MemoryEntry>, String>
     let mut memories = Vec::new();
     if let Ok(conn) = Connection::open("oasis_crates.db") {
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT id, timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 50",
+            "SELECT id, timestamp, description, image_base64 FROM photographic_memory ORDER BY id DESC LIMIT 50",
         ) {
             if let Ok(rows) = stmt.query_map([], |row| {
                 Ok(MemoryEntry {
                     id: row.get(0)?,
                     timestamp: row.get(1)?,
                     description: row.get(2)?,
+                    image_base64: row.get(3)?,
                 })
             }) {
                 for row in rows.flatten() {
