@@ -107,9 +107,9 @@ export const SentientVault: React.FC<SentientVaultProps> = ({
                 initial={{ opacity: 0, height: 0, y: -20 }}
                 animate={{ opacity: 1, height: 'auto', y: 0 }}
                 exit={{ opacity: 0, height: 0, y: -20 }}
-                className="w-full max-w-5xl mx-auto mb-12 relative z-10 overflow-hidden"
+                className="w-full max-w-5xl mx-auto mb-12 relative z-10"
               >
-                 <div className="p-8 bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-3xl backdrop-blur-2xl shadow-[0_0_30px_rgba(99,102,241,0.15)] relative mt-4">
+                 <div className="p-8 bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-3xl backdrop-blur-2xl shadow-[0_0_30px_rgba(99,102,241,0.15)] relative mt-4 max-h-[45vh] overflow-y-auto custom-scrollbar">
                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-50" />
                    <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-3">
                      <div className="p-1.5 bg-indigo-500/20 rounded-lg border border-indigo-500/30 text-indigo-400"><BrainCircuit className="w-4 h-4" /></div> AI Synthesis

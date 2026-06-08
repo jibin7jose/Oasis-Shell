@@ -1,5 +1,93 @@
 use crate::models::DbState;
 use tauri::Emitter;
+use notify::{Watcher, RecursiveMode, EventKind, event::ModifyKind};
+use std::sync::mpsc::channel;
+use tauri::Manager;
+
+pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'_, DbState>) {
+    let pool = state.0.clone();
+    
+    std::thread::spawn(move || {
+        let (tx, rx) = channel();
+        let mut watcher = notify::recommended_watcher(tx).unwrap();
+        
+        let dirs_to_watch = [
+            dirs::document_dir().unwrap_or_default(),
+            dirs::download_dir().unwrap_or_default(),
+            dirs::desktop_dir().unwrap_or_default(),
+        ];
+
+        for dir in &dirs_to_watch {
+            if dir.exists() {
+                let _ = watcher.watch(dir, RecursiveMode::Recursive);
+            }
+        }
+
+        for res in rx {
+            if let Ok(event) = res {
+                match event.kind {
+                    EventKind::Create(_) | EventKind::Modify(_) => {
+                        for path in event.paths {
+                            if !path.is_file() { continue; }
+                            
+                            let ext = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
+                            if ext != "txt" && ext != "md" && ext != "rs" && ext != "ts" && ext != "tsx" && ext != "js" && ext != "csv" && ext != "json" {
+                                continue;
+                            }
+
+                            // Wait a moment for the OS file lock to release after save
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+
+                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                if content.trim().is_empty() { continue; }
+                                
+                                let safe_content = if content.len() > 2000 { content[..2000].to_string() } else { content.clone() };
+                                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                                let filepath = path.to_string_lossy().to_string();
+
+                                // Skip if already exists or was recently modified (to prevent loop)
+                                let pool_clone = pool.clone();
+                                let name_clone = filename.clone();
+                                let path_clone = filepath.clone();
+                                let app_clone = app.clone();
+
+                                tauri::async_runtime::spawn(async move {
+                                    let client = reqwest::Client::new();
+                                    let req_body = serde_json::json!({
+                                        "model": "nomic-embed-text",
+                                        "prompt": safe_content
+                                    });
+
+                                    if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await {
+                                        if let Ok(json) = res.json::<serde_json::Value>().await {
+                                            if let Some(embedding) = json["embedding"].as_array() {
+                                                if let Ok(conn) = pool_clone.get() {
+                                                    let vector_str = serde_json::to_string(embedding).unwrap();
+                                                    
+                                                    // Delete old embedding if modifying
+                                                    let _ = conn.execute("DELETE FROM file_embeddings WHERE filepath = ?1", rusqlite::params![&path_clone]);
+                                                    
+                                                    // Insert new
+                                                    let _ = conn.execute(
+                                                        "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
+                                                        rusqlite::params![name_clone, path_clone, safe_content, vector_str],
+                                                    );
+                                                    
+                                                    let _ = app_clone.emit("vault-indexed", serde_json::json!({ "file": name_clone }));
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+    });
+}
 
 pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
@@ -147,7 +235,7 @@ pub async fn semantic_search(
         if let Ok((filename, filepath, content, vec_str)) = row {
             if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
                 let score = cosine_similarity(&query_vector, &file_vec);
-                if score > 0.3 {
+                if score > 0.01 {
                     let mut size = 0;
                     let mut last_modified = String::from("Unknown");
 
@@ -235,13 +323,11 @@ pub async fn rag_query(
                 if let Ok((filepath, content, vec_str)) = row {
                     if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
                         let score = cosine_similarity(&query_vector, &file_vec);
-                        if score > 0.3 {
-                            results.push(Match {
-                                score,
-                                filepath,
-                                content,
-                            });
-                        }
+                        results.push(Match {
+                            score,
+                            filepath,
+                            content,
+                        });
                     }
                 }
             }

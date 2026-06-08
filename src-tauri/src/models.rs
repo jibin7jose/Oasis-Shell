@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
+#[derive(Clone)]
 pub struct DbState(pub r2d2::Pool<r2d2_sqlite::SqliteConnectionManager>);
 pub struct TelemetryState(pub Mutex<sysinfo::System>);
 

@@ -197,6 +197,7 @@ pub fn run() {
                 .build(app)?;
 
             crate::commands::telemetry::start_telemetry_stream(app.handle().clone());
+            crate::commands::ai::start_semantic_vault_watcher(app.handle().clone(), app.state::<DbState>().clone());
 
             Ok(())
         })
@@ -269,6 +270,7 @@ pub fn run() {
             commands::telemetry::get_app_usage_analytics,
             commands::telemetry::organize_workspace,
             commands::telemetry::execute_neural_macro,
+            commands::telemetry::capture_screen,
             commands::crates::sync_project,
             commands::crates::save_crate,
             commands::crates::update_crate,

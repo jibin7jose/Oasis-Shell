@@ -28,6 +28,7 @@ import { TerminalPanel } from "./components/panels/TerminalPanel";
 import { ClipboardPanel } from "./components/panels/ClipboardPanel";
 import WorkforcePanel from "./components/panels/WorkforcePanel";
 import { SentientVault } from "./components/panels/SentientVault";
+import { ClickableReality } from "./components/panels/ClickableReality";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
 import LeftRail from "./components/layout/LeftRail";
@@ -104,6 +105,7 @@ export default function App() {
   const [isScanningScreen, setIsScanningScreen] = useState(false);
   const [lastSync, setLastSync] = useState("Never");
   const [showAI, setShowAI] = useState(false);
+  const [showClickableReality, setShowClickableReality] = useState(false);
   const [isWidgetMode, setIsWidgetMode] = useState(false);
   
   const toggleWidgetMode = async () => {
@@ -224,9 +226,12 @@ export default function App() {
 
     const unlistenCron = listen('oasis-cron-snapshot', (e: any) => {
       notifyUser("Context Crate Secured", `Automated snapshot taken: ${e.payload}`);
-      // If the dashboard is open, we can optionally refresh crates.
-      // Easiest is to just log it for now.
       logEvent(`Auto-Snapshot Created: ${e.payload}`, 'system');
+    });
+
+    const unlistenVault = listen('vault-indexed', (e: any) => {
+      notifyUser("Semantic Vault", `Indexed new file: ${e.payload.file}`);
+      logEvent(`Autonomous Vault Indexed: ${e.payload.file}`, 'neural');
     });
 
     let unlistenOmnibar: () => void;
@@ -256,9 +261,14 @@ export default function App() {
         setShowGraph(!showGraph);
       }
       // Ctrl+Shift+V — open Clipboard History
-      if (e.key === 'V' && e.ctrlKey && e.shiftKey) {
+      if (e.key.toLowerCase() === 'v' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
         setShowClipboard(!showClipboard);
+      }
+      // Ctrl+Shift+F — open Clickable Reality (Global OCR)
+      if (e.key.toLowerCase() === 'f' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowClickableReality(prev => !prev);
       }
       // Ctrl+Shift+J — open JARVIS Voice Assistant
       if (e.key.toLowerCase() === 'j' && e.ctrlKey && e.shiftKey) {
@@ -1182,6 +1192,10 @@ export default function App() {
         onClose={() => setShowJarvis(false)} 
         resolveNeuralIntent={resolveNeuralIntent} 
       />
+
+      {showClickableReality && (
+        <ClickableReality onClose={() => setShowClickableReality(false)} />
+      )}
     </div>
   );
 }

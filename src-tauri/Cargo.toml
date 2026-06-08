@@ -41,6 +41,8 @@ r2d2 = "0.8.10"
 r2d2_sqlite = "0.34.0"
 arboard = "3.6.1"
 enigo = "0.6.1"
+uni-ocr = "0.1.5"
+anyhow = "1.0.102"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

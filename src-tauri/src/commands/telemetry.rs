@@ -4,6 +4,23 @@ use crate::models::{
 };
 use tauri::Emitter;
 use tiny_http::Response;
+use screenshots::Screen;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+#[tauri::command]
+pub async fn capture_screen() -> Result<String, String> {
+    let screens = Screen::all().map_err(|e| e.to_string())?;
+    if let Some(screen) = screens.first() {
+        let image = screen.capture().map_err(|e| e.to_string())?;
+        let mut buffer = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut buffer);
+        image.write_to(&mut cursor, screenshots::image::ImageFormat::Png).map_err(|e| e.to_string())?;
+        let base64_str = STANDARD.encode(&buffer);
+        Ok(format!("data:image/png;base64,{}", base64_str))
+    } else {
+        Err("No screens found".into())
+    }
+}
 
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
