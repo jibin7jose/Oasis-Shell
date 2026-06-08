@@ -495,6 +495,28 @@ export default function App() {
       } else if (q.includes("intel") || q.includes("market") || q.includes("competitors")) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Retrieving Global Market Intelligence..." }]);
         logEvent("Market Intelligence Bridge Synced", "system");
+      } else if (q.includes("type ") || q.includes("press ") || q.includes("macro") || q.includes("start menu") || q.includes("ghost") || q.includes("book")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: 'Ghost in the Machine' macro sequence initialized..." }]);
+        logEvent("Neural Macro Injection Triggered", "deploy", true);
+        
+        let sequence = "";
+        if (q.includes("book") && q.includes("flight")) {
+           // Breathtaking automation demonstration bypassing Chrome profiles
+           sequence = "key:win|sleep:500|text:flights to new york|sleep:800|key:enter";
+        } else if (q.includes("type ")) {
+           const textToType = q.split("type ")[1].trim();
+           sequence = `text:${textToType}`;
+        } else if (q.includes("press ")) {
+           const keyToPress = q.split("press ")[1].trim();
+           sequence = `key:${keyToPress}`;
+        } else if (q.includes("start menu")) {
+           sequence = "key:win";
+        } else {
+           // Default autonomous test sequence
+           sequence = "key:win|sleep:500|text:notepad|sleep:500|key:enter|sleep:1000|text:Hello from Oasis Sentient OS! I am piloting your computer.";
+        }
+        
+        invoke("execute_neural_macro", { macroSequence: sequence }).catch(e => console.error(e));
       } else if (q.includes("arr") || q.includes("runway") || q.includes("metrics")) {
         setMessages(prev => [...prev, { role: "assistant", content: `Neural Audit: Current ARR is ${founderMetrics.arr} with ${founderMetrics.runway} runway.` }]);
         logEvent("Executive Metrics Audit Completed", "neural");

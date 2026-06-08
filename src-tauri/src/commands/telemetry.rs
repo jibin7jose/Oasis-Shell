@@ -933,3 +933,60 @@ pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
     
     Ok(format!("Workspace organized to {}", layout_mode))
 }
+
+#[tauri::command]
+pub fn execute_neural_macro(macro_sequence: String) -> Result<String, String> {
+    std::thread::spawn(move || {
+        use enigo::*;
+        let mut enigo = Enigo::new(&Settings::default()).unwrap_or_else(|_| Enigo::new(&Settings::default()).unwrap());
+        
+        let steps = macro_sequence.split('|');
+        for step in steps {
+            let parts: Vec<&str> = step.splitn(2, ':').collect();
+            if parts.len() < 2 { continue; }
+            let cmd = parts[0];
+            let val = parts[1];
+            
+            match cmd {
+                "text" => {
+                    let _ = enigo.text(val);
+                },
+                "key" => {
+                    let key = match val {
+                        "enter" | "return" => Key::Return,
+                        "tab" => Key::Tab,
+                        "space" => Key::Space,
+                        "escape" => Key::Escape,
+                        "up" => Key::UpArrow,
+                        "down" => Key::DownArrow,
+                        "left" => Key::LeftArrow,
+                        "right" => Key::RightArrow,
+                        "meta" | "win" => Key::Meta,
+                        _ => continue,
+                    };
+                    let _ = enigo.key(key, Direction::Click);
+                },
+                "mouse_move" => {
+                    let coords: Vec<&str> = val.split(',').collect();
+                    if coords.len() == 2 {
+                        if let (Ok(x), Ok(y)) = (coords[0].parse::<i32>(), coords[1].parse::<i32>()) {
+                            let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                        }
+                    }
+                },
+                "mouse_click" => {
+                    let _ = enigo.button(Button::Left, Direction::Click);
+                },
+                "sleep" => {
+                    if let Ok(ms) = val.parse::<u64>() {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                    }
+                }
+                _ => {}
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100)); // Delay between inputs
+        }
+    });
+    Ok("Macro executed".to_string())
+}
+

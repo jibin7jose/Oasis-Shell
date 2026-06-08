@@ -268,6 +268,7 @@ pub fn run() {
             commands::telemetry::start_cron_scheduler,
             commands::telemetry::get_app_usage_analytics,
             commands::telemetry::organize_workspace,
+            commands::telemetry::execute_neural_macro,
             commands::crates::sync_project,
             commands::crates::save_crate,
             commands::crates::update_crate,
