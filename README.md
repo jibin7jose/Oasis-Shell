@@ -110,4 +110,4 @@ Contributions, issues, and feature requests are welcome!
 Feel free to check [issues page](https://github.com/jibin7jose/Oasis-Shell/issues). 
 
 ## 📝 License
-This project is [MIT](https://choosealicense.com/licenses/mit/) licensed.
+This project is [MIT](https://choosealicense.com/licenses/mit/) licensed
