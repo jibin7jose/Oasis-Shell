@@ -2,10 +2,10 @@ use crate::models::{
     DbState, HardwareTelemetry, PriorityAuditLog, PriorityCacheEntry, ProcessInfo, TelemetryState,
     WindowInfo,
 };
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use screenshots::Screen;
 use tauri::Emitter;
 use tiny_http::Response;
-use screenshots::Screen;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 #[tauri::command]
 pub async fn capture_screen() -> Result<String, String> {
@@ -14,7 +14,9 @@ pub async fn capture_screen() -> Result<String, String> {
         let image = screen.capture().map_err(|e| e.to_string())?;
         let mut buffer = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut buffer);
-        image.write_to(&mut cursor, screenshots::image::ImageFormat::Png).map_err(|e| e.to_string())?;
+        image
+            .write_to(&mut cursor, screenshots::image::ImageFormat::Png)
+            .map_err(|e| e.to_string())?;
         let base64_str = STANDARD.encode(&buffer);
         Ok(format!("data:image/png;base64,{}", base64_str))
     } else {
@@ -164,6 +166,18 @@ pub fn get_hardware_telemetry(
         }
     }
 
+    let mut disk_telemetry = Vec::new();
+    for disk in &disks {
+        disk_telemetry.push(crate::models::DiskTelemetry {
+            name: disk.name().to_string_lossy().into_owned(),
+            mount_point: disk.mount_point().to_string_lossy().into_owned(),
+            total_space: disk.total_space(),
+            available_space: disk.available_space(),
+            is_removable: disk.is_removable(),
+            file_system: disk.file_system().to_string_lossy().into_owned(),
+        });
+    }
+
     Ok(HardwareTelemetry {
         cpu_usage,
         ram_usage,
@@ -174,6 +188,7 @@ pub fn get_hardware_telemetry(
         battery_percent,
         is_charging,
         system_uptime: sysinfo::System::uptime(),
+        disks: disk_telemetry,
     })
 }
 
@@ -230,21 +245,27 @@ pub fn start_telemetry_stream(app: tauri::AppHandle) {
 
             // Productivity Analytics (Track Active Foreground Window)
             unsafe {
-                use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId, GetWindowTextW};
                 use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
-                use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
-                
+                use windows::Win32::System::Threading::{
+                    OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+                };
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId,
+                };
+
                 let hwnd = GetForegroundWindow();
                 if !hwnd.is_invalid() {
                     let mut buffer = [0u16; 512];
                     let length = GetWindowTextW(hwnd, &mut buffer);
                     let title = String::from_utf16_lossy(&buffer[..length as usize]);
-                    
+
                     let mut pid = 0u32;
                     GetWindowThreadProcessId(hwnd, Some(&mut pid));
-                    
+
                     let mut exe_path = String::new();
-                    if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                    if let Ok(handle) =
+                        OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
+                    {
                         let mut path_buffer = [0u16; 1024];
                         let path_len = GetModuleFileNameExW(handle, None, &mut path_buffer);
                         if path_len > 0 {
@@ -252,13 +273,13 @@ pub fn start_telemetry_stream(app: tauri::AppHandle) {
                         }
                         let _ = windows::Win32::Foundation::CloseHandle(handle);
                     }
-                    
+
                     if !exe_path.is_empty() {
                         let exe_name = std::path::Path::new(&exe_path)
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
                             .unwrap_or(exe_path);
-                            
+
                         if let Some(db_state) = app.try_state::<crate::models::DbState>() {
                             if let Ok(conn) = db_state.0.get() {
                                 let _ = conn.execute(
@@ -297,26 +318,30 @@ pub struct AppUsage {
 }
 
 #[tauri::command]
-pub fn get_app_usage_analytics(state: tauri::State<'_, crate::models::DbState>) -> Result<Vec<AppUsage>, String> {
+pub fn get_app_usage_analytics(
+    state: tauri::State<'_, crate::models::DbState>,
+) -> Result<Vec<AppUsage>, String> {
     let conn = state.0.get().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare("SELECT exe_name, window_title, focus_time_seconds, last_seen FROM app_usage_analytics ORDER BY focus_time_seconds DESC LIMIT 20").map_err(|e| e.to_string())?;
-    
-    let rows = stmt.query_map([], |row| {
-        Ok(AppUsage {
-            exe_name: row.get(0)?,
-            window_title: row.get(1)?,
-            focus_time_seconds: row.get(2)?,
-            last_seen: row.get(3)?,
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(AppUsage {
+                exe_name: row.get(0)?,
+                window_title: row.get(1)?,
+                focus_time_seconds: row.get(2)?,
+                last_seen: row.get(3)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
-    
+        .map_err(|e| e.to_string())?;
+
     let mut usages = Vec::new();
     for row in rows {
         if let Ok(usage) = row {
             usages.push(usage);
         }
     }
-    
+
     Ok(usages)
 }
 
@@ -902,11 +927,11 @@ pub fn start_cron_scheduler(
 
 #[tauri::command]
 pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
+    use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN, SetWindowPos, ShowWindow, HWND_TOP, SW_RESTORE, SWP_SHOWWINDOW,
-        EnumWindows, GetWindowTextW, IsWindowVisible
+        EnumWindows, GetSystemMetrics, GetWindowTextW, IsWindowVisible, SetWindowPos, ShowWindow,
+        HWND_TOP, SM_CXSCREEN, SM_CYSCREEN, SWP_SHOWWINDOW, SW_RESTORE,
     };
-    use windows::Win32::Foundation::{HWND, LPARAM, BOOL};
 
     struct SnapTarget {
         windows: Vec<HWND>,
@@ -918,9 +943,13 @@ pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
             let mut buffer = [0u16; 512];
             let length = GetWindowTextW(hwnd, &mut buffer);
             let title = String::from_utf16_lossy(&buffer[..length as usize]);
-            
+
             // Ignore tiny windows, invisible windows, or Settings
-            if !title.is_empty() && title != "Program Manager" && title != "Settings" && !title.contains("Oasis") {
+            if !title.is_empty()
+                && title != "Program Manager"
+                && title != "Settings"
+                && !title.contains("Oasis")
+            {
                 targets.windows.push(hwnd);
             }
         }
@@ -928,12 +957,20 @@ pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
     }
 
     unsafe {
-        let mut targets = SnapTarget { windows: Vec::new() };
-        let _ = EnumWindows(Some(snap_enum), LPARAM(&mut targets as *mut SnapTarget as isize));
+        let mut targets = SnapTarget {
+            windows: Vec::new(),
+        };
+        let _ = EnumWindows(
+            Some(snap_enum),
+            LPARAM(&mut targets as *mut SnapTarget as isize),
+        );
 
         let width = GetSystemMetrics(SM_CXSCREEN);
         let height = GetSystemMetrics(SM_CYSCREEN);
-        println!("Snapping Code and Browser. Monitor size: {}x{}", width, height);
+        println!(
+            "Snapping Code and Browser. Monitor size: {}x{}",
+            width, height
+        );
 
         if targets.windows.len() >= 2 {
             // First window snapped left
@@ -944,10 +981,18 @@ pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
             // Second window snapped right
             let right_hwnd = targets.windows[1];
             let _ = ShowWindow(right_hwnd, SW_RESTORE);
-            let _ = SetWindowPos(right_hwnd, HWND_TOP, width / 2, 0, width / 2, height, SWP_SHOWWINDOW);
+            let _ = SetWindowPos(
+                right_hwnd,
+                HWND_TOP,
+                width / 2,
+                0,
+                width / 2,
+                height,
+                SWP_SHOWWINDOW,
+            );
         }
     }
-    
+
     Ok(format!("Workspace organized to {}", layout_mode))
 }
 
@@ -955,19 +1000,22 @@ pub fn organize_workspace(layout_mode: String) -> Result<String, String> {
 pub fn execute_neural_macro(macro_sequence: String) -> Result<String, String> {
     std::thread::spawn(move || {
         use enigo::*;
-        let mut enigo = Enigo::new(&Settings::default()).unwrap_or_else(|_| Enigo::new(&Settings::default()).unwrap());
-        
+        let mut enigo = Enigo::new(&Settings::default())
+            .unwrap_or_else(|_| Enigo::new(&Settings::default()).unwrap());
+
         let steps = macro_sequence.split('|');
         for step in steps {
             let parts: Vec<&str> = step.splitn(2, ':').collect();
-            if parts.len() < 2 { continue; }
+            if parts.len() < 2 {
+                continue;
+            }
             let cmd = parts[0];
             let val = parts[1];
-            
+
             match cmd {
                 "text" => {
                     let _ = enigo.text(val);
-                },
+                }
                 "key" => {
                     let key = match val {
                         "enter" | "return" => Key::Return,
@@ -982,18 +1030,19 @@ pub fn execute_neural_macro(macro_sequence: String) -> Result<String, String> {
                         _ => continue,
                     };
                     let _ = enigo.key(key, Direction::Click);
-                },
+                }
                 "mouse_move" => {
                     let coords: Vec<&str> = val.split(',').collect();
                     if coords.len() == 2 {
-                        if let (Ok(x), Ok(y)) = (coords[0].parse::<i32>(), coords[1].parse::<i32>()) {
+                        if let (Ok(x), Ok(y)) = (coords[0].parse::<i32>(), coords[1].parse::<i32>())
+                        {
                             let _ = enigo.move_mouse(x, y, Coordinate::Abs);
                         }
                     }
-                },
+                }
                 "mouse_click" => {
                     let _ = enigo.button(Button::Left, Direction::Click);
-                },
+                }
                 "sleep" => {
                     if let Ok(ms) = val.parse::<u64>() {
                         std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -1006,4 +1055,3 @@ pub fn execute_neural_macro(macro_sequence: String) -> Result<String, String> {
     });
     Ok("Macro executed".to_string())
 }
-

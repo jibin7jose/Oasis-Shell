@@ -45,6 +45,7 @@ enigo = "0.6.1"
 uni-ocr = "0.1.5"
 anyhow = "1.0.102"
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread", "time"] }
+tauri-plugin-dialog = "2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

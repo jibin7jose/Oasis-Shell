@@ -145,8 +145,14 @@ pub async fn hatch_autonomous_golem(
     use tauri::Emitter;
 
     use std::time::{SystemTime, UNIX_EPOCH};
-    let agent_id = format!("GOLEM-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis());
-    
+    let agent_id = format!(
+        "GOLEM-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
     let new_agent = GolemTask {
         id: agent_id.clone(),
         name: name.clone(),
@@ -164,9 +170,12 @@ pub async fn hatch_autonomous_golem(
         let mut registry = GOLEM_REGISTRY.lock().unwrap();
         registry.insert(agent_id.clone(), new_agent);
     }
-    
+
     // Broadcast immediately so UI updates
-    let _ = app.emit("oasis-golem-telemetry", get_active_golems_native().unwrap_or_default());
+    let _ = app.emit(
+        "oasis-golem-telemetry",
+        get_active_golems_native().unwrap_or_default(),
+    );
 
     tauri::async_runtime::spawn(async move {
         let client = reqwest::Client::new();
@@ -174,11 +183,11 @@ pub async fn hatch_autonomous_golem(
             "You are an autonomous AI Agent named {}. Your aura is {}. Your mission is: {}. You have full access to execute powershell commands on the user's system to accomplish this mission. To execute a command, output it strictly in this format: [CMD] your command [/CMD]. I will execute it and return the terminal output. Operate silently and efficiently. Output your thought process, then exactly one [CMD] block if an action is needed.", 
             name, aura, mission
         );
-        
+
         let mut history = system_prompt.clone();
-        
+
         let mut first_run = true;
-        
+
         loop {
             // Check if golem was decommissioned
             {
@@ -187,11 +196,11 @@ pub async fn hatch_autonomous_golem(
                     break;
                 }
             }
-            
-            let chat_body = serde_json::json!({ 
-                "model": "gemma4:latest", 
-                "prompt": history, 
-                "stream": false 
+
+            let chat_body = serde_json::json!({
+                "model": "gemma4:latest",
+                "prompt": history,
+                "stream": false
             });
 
             // Update UI to show thinking immediately on first run
@@ -199,17 +208,31 @@ pub async fn hatch_autonomous_golem(
                 {
                     let mut registry = GOLEM_REGISTRY.lock().unwrap();
                     if let Some(agent) = registry.get_mut(&agent_id) {
-                        agent.thought_trace = Some("Initializing neural pathways... Analyzing mission parameters...".into());
+                        agent.thought_trace = Some(
+                            "Initializing neural pathways... Analyzing mission parameters..."
+                                .into(),
+                        );
                     }
                 }
-                let _ = app.emit("oasis-golem-telemetry", get_active_golems_native().unwrap_or_default());
+                let _ = app.emit(
+                    "oasis-golem-telemetry",
+                    get_active_golems_native().unwrap_or_default(),
+                );
                 first_run = false;
             }
 
-            if let Ok(res) = client.post("http://localhost:11434/api/generate").json(&chat_body).send().await {
+            if let Ok(res) = client
+                .post("http://localhost:11434/api/generate")
+                .json(&chat_body)
+                .send()
+                .await
+            {
                 if let Ok(json) = res.json::<serde_json::Value>().await {
-                    let response_text = json["response"].as_str().unwrap_or("Thinking...").to_string();
-                    
+                    let response_text = json["response"]
+                        .as_str()
+                        .unwrap_or("Thinking...")
+                        .to_string();
+
                     // Update state
                     {
                         let mut registry = GOLEM_REGISTRY.lock().unwrap();
@@ -218,9 +241,12 @@ pub async fn hatch_autonomous_golem(
                             agent.evolution_count += 1;
                         }
                     }
-                    
-                    let _ = app.emit("oasis-golem-telemetry", get_active_golems_native().unwrap_or_default());
-                    
+
+                    let _ = app.emit(
+                        "oasis-golem-telemetry",
+                        get_active_golems_native().unwrap_or_default(),
+                    );
+
                     if let Some(start_idx) = response_text.find("[CMD]") {
                         if let Some(end_idx) = response_text.find("[/CMD]") {
                             if end_idx > start_idx + 5 {
@@ -228,11 +254,14 @@ pub async fn hatch_autonomous_golem(
                                 let output = std::process::Command::new("powershell")
                                     .args(["-NoProfile", "-NonInteractive", "-Command", cmd_str])
                                     .output();
-                                
+
                                 if let Ok(out) = output {
                                     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                                    history.push_str(&format!("\n\nAction Executed: {}\nResult:\n{}", cmd_str, stdout));
-                                    
+                                    history.push_str(&format!(
+                                        "\n\nAction Executed: {}\nResult:\n{}",
+                                        cmd_str, stdout
+                                    ));
+
                                     // Update state with result
                                     {
                                         let mut registry = GOLEM_REGISTRY.lock().unwrap();
@@ -247,7 +276,7 @@ pub async fn hatch_autonomous_golem(
                     } else {
                         history.push_str(&format!("\n\nThought logged: {}", response_text));
                     }
-                    
+
                     // Prevent context window explosion
                     if history.len() > 8000 {
                         history = system_prompt.clone();
@@ -271,10 +300,13 @@ pub async fn decommission_golem(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn invoke_golem_debate(app: tauri::AppHandle, task: GolemTask) -> Result<serde_json::Value, String> {
+pub async fn invoke_golem_debate(
+    app: tauri::AppHandle,
+    task: GolemTask,
+) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     use tauri::Emitter;
-    
+
     let mut conversation_history = format!(
         "You are an autonomous AI 'Golem' with the aura of {}. Your mission is: {}. You have the ability to execute powershell commands on the user's system to accomplish this mission. To execute a command, output it strictly in this format: [CMD] your command [/CMD]. I will execute it and return the terminal output to you. Do this step-by-step. When you have completely finished the mission, end your response with [DONE]. Start by detailing your plan.", 
         task.aura, 
@@ -285,13 +317,18 @@ pub async fn invoke_golem_debate(app: tauri::AppHandle, task: GolemTask) -> Resu
     let mut final_response = String::new();
 
     for iteration in 0..5 {
-        let chat_body = serde_json::json!({ 
-            "model": "gemma4:latest", 
-            "prompt": conversation_history, 
-            "stream": false 
+        let chat_body = serde_json::json!({
+            "model": "gemma4:latest",
+            "prompt": conversation_history,
+            "stream": false
         });
 
-        let res = match client.post("http://localhost:11434/api/generate").json(&chat_body).send().await {
+        let res = match client
+            .post("http://localhost:11434/api/generate")
+            .json(&chat_body)
+            .send()
+            .await
+        {
             Ok(r) => r,
             Err(e) => return Err(e.to_string()),
         };
@@ -300,9 +337,16 @@ pub async fn invoke_golem_debate(app: tauri::AppHandle, task: GolemTask) -> Resu
             Ok(j) => j,
             Err(e) => return Err(e.to_string()),
         };
-        
-        let response_text = json["response"].as_str().unwrap_or("No response generated.").to_string();
-        final_response.push_str(&format!("\n\n--- Iteration {} ---\n{}", iteration + 1, response_text));
+
+        let response_text = json["response"]
+            .as_str()
+            .unwrap_or("No response generated.")
+            .to_string();
+        final_response.push_str(&format!(
+            "\n\n--- Iteration {} ---\n{}",
+            iteration + 1,
+            response_text
+        ));
 
         if let Some(start_idx) = response_text.find("[CMD]") {
             if let Some(end_idx) = response_text.find("[/CMD]") {
@@ -310,16 +354,16 @@ pub async fn invoke_golem_debate(app: tauri::AppHandle, task: GolemTask) -> Resu
                     let cmd_str = response_text[start_idx + 5..end_idx].trim();
                     logs.push(format!("Executing: {}", cmd_str));
                     let _ = app.emit("golem-thought", format!("Executing: {}", cmd_str));
-                    
+
                     let output = std::process::Command::new("powershell")
                         .args(["-NoProfile", "-NonInteractive", "-Command", cmd_str])
                         .output()
                         .map_err(|e| e.to_string())?;
-                    
+
                     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
                     let combined = format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr);
-                    
+
                     conversation_history.push_str(&format!("\n\nYou generated: {}\nI executed your command. The terminal output was:\n{}\nWhat is your next step? Output [CMD] to run another command, or [DONE] if finished.", response_text, combined));
                     continue;
                 }

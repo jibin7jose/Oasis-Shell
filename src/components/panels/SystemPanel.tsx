@@ -13,6 +13,7 @@ export type { SystemStats, WindowInfo, ProcessInfo, StorageInfo, DeviceInfo };
 import { useSystemStore } from "../../lib/systemStore";
 
 const formatBytes = (value: number) => {
+  if (isNaN(value) || value === undefined || value === null) return "0.0 GB";
   const gb = value / (1024 * 1024 * 1024);
   return `${gb.toFixed(1)} GB`;
 };
@@ -191,11 +192,17 @@ export default function SystemPanel() {
             is_charging: hardware.is_charging ?? true,
             uptime: hardware.system_uptime || 0
           });
-          setStorage(hardware.disks?.map((d: any) => ({
-            name: d.name, mount_point: d.mount_point,
-            total_space: d.total_space, available_space: d.available_space,
-            is_removable: d.is_removable, file_system: d.file_system
-          })) || []);
+          setStorage(hardware.disks?.map((d: any) => {
+            const total = d.total_space ?? d.totalSpace ?? d.total ?? 0;
+            const available = d.available_space ?? d.availableSpace ?? d.available ?? 0;
+            return {
+              name: d.name || "Unknown", 
+              mount: d.mount_point ?? d.mountPoint ?? d.mount ?? "Unknown",
+              total, 
+              available,
+              health_score: total > 0 ? (available / total) * 100 : 0
+            };
+          }) || []);
           setDevices([]);
         }
       });
@@ -217,11 +224,17 @@ export default function SystemPanel() {
             is_charging: hardware.is_charging ?? true,
             uptime: hardware.system_uptime || 0
           });
-          setStorage(hardware.disks?.map((d: any) => ({
-            name: d.name, mount_point: d.mount_point,
-            total_space: d.total_space, available_space: d.available_space,
-            is_removable: d.is_removable, file_system: d.file_system
-          })) || []);
+          setStorage(hardware.disks?.map((d: any) => {
+            const total = d.total_space ?? d.totalSpace ?? d.total ?? 0;
+            const available = d.available_space ?? d.availableSpace ?? d.available ?? 0;
+            return {
+              name: d.name || "Unknown", 
+              mount: d.mount_point ?? d.mountPoint ?? d.mount ?? "Unknown",
+              total, 
+              available,
+              health_score: total > 0 ? (available / total) * 100 : 0
+            };
+          }) || []);
           setDevices([]);
         }).then(u => unlistens.push(u));
 
@@ -453,7 +466,7 @@ export default function SystemPanel() {
   }, [auditFilter, auditPageSize, auditQuery, auditFrom, auditTo]);
 
   return (
-    <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12 relative overflow-hidden">
+    <div className="w-full max-w-5xl glass p-8 rounded-[2rem] border border-white/5 mb-12 relative overflow-hidden flex-shrink-0">
       {/* Phase 7.3: Scanning Sweep Manifestation */}
       <AnimatePresence>
         {isScanning && (
@@ -494,11 +507,11 @@ export default function SystemPanel() {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">CPU Load</span>
             <Activity className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-2xl font-black text-white">{stats ? `${(stats.cpu_load ?? 0).toFixed(1)}%` : "--"}</div>
+          <div className="text-2xl font-black text-white">{stats ? `${(stats.cpu_usage ?? 0).toFixed(1)}%` : "--"}</div>
           <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
-              className={cn("h-full rounded-full", stats && stats.cpu_load > 80 ? "bg-rose-500" : "bg-amber-400")}
-              style={{ width: `${Math.min(100, stats?.cpu_load ?? 0)}%` }}
+              className={cn("h-full rounded-full", stats && stats.cpu_usage > 80 ? "bg-rose-500" : "bg-amber-400")}
+              style={{ width: `${Math.min(100, stats?.cpu_usage ?? 0)}%` }}
             />
           </div>
         </div>
@@ -508,11 +521,11 @@ export default function SystemPanel() {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Memory Used</span>
             <Activity className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-2xl font-black text-white">{stats ? formatBytes(stats.mem_used ?? 0) : "--"}</div>
+          <div className="text-2xl font-black text-white">{stats ? `${(stats.ram_usage ?? 0).toFixed(1)}%` : "--"}</div>
           <div className="mt-3 h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div
-              className={cn("h-full rounded-full", stats && stats.mem_used > 85 ? "bg-rose-500" : "bg-emerald-400")}
-              style={{ width: `${Math.min(100, stats?.mem_used ?? 0)}%` }}
+              className={cn("h-full rounded-full", stats && stats.ram_usage > 85 ? "bg-rose-500" : "bg-emerald-400")}
+              style={{ width: `${Math.min(100, stats?.ram_usage ?? 0)}%` }}
             />
           </div>
         </div>
@@ -595,8 +608,10 @@ export default function SystemPanel() {
               </div>
             )}
             {(storage ?? []).map((disk) => {
-              const used = disk.total - disk.available;
-              const usedPct = disk.total > 0 ? (used / disk.total) * 100 : 0;
+              const diskTotal = disk.total ?? disk.total_space ?? 0;
+              const diskAvail = disk.available ?? disk.available_space ?? 0;
+              const used = diskTotal - diskAvail;
+              const usedPct = diskTotal > 0 ? (used / diskTotal) * 100 : 0;
               return (
                 <div key={`${disk.name}-${disk.mount}`} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                   <div className="flex items-center justify-between mb-2">
@@ -605,7 +620,7 @@ export default function SystemPanel() {
                       <div className="text-[9px] font-mono text-slate-500">{disk.mount}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] font-black text-slate-300">{formatBytes(used)} / {formatBytes(disk.total)}</div>
+                      <div className="text-[10px] font-black text-slate-300">{formatBytes(used)} / {formatBytes(diskTotal)}</div>
                       <div className={cn("text-[9px] font-black", disk.health_score < 10 ? "text-rose-500" : disk.health_score < 25 ? "text-amber-400" : "text-emerald-400")}>
                         {(disk.health_score ?? 0).toFixed(0)}% free
                       </div>
@@ -690,10 +705,10 @@ export default function SystemPanel() {
                 onChange={(e) => setFilter(e.target.value)}
                 className="bg-transparent border-none outline-none text-[10px] text-slate-200"
               >
-                <option value="all">All</option>
-                <option value="high_cpu">High CPU</option>
-                <option value="high_mem">High Mem</option>
-                <option value="paused">Paused</option>
+                <option className="bg-slate-900"  value="all">All</option>
+                <option className="bg-slate-900"  value="high_cpu">High CPU</option>
+                <option className="bg-slate-900"  value="high_mem">High Mem</option>
+                <option className="bg-slate-900"  value="paused">Paused</option>
               </select>
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-2 py-1">
@@ -703,9 +718,9 @@ export default function SystemPanel() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="bg-transparent border-none outline-none text-[10px] text-slate-200"
               >
-                <option value="cpu">CPU</option>
-                <option value="mem">RAM</option>
-                <option value="status">Status</option>
+                <option className="bg-slate-900"  value="cpu">CPU</option>
+                <option className="bg-slate-900"  value="mem">RAM</option>
+                <option className="bg-slate-900"  value="status">Status</option>
               </select>
               <button
                 onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
@@ -731,12 +746,12 @@ export default function SystemPanel() {
               onChange={(e) => setPidAction(e.target.value)}
               className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] text-slate-200"
             >
-              <option value="pause">Pause</option>
-              <option value="resume">Resume</option>
-              <option value="low">Priority Low</option>
-              <option value="high">Priority High</option>
-              <option value="normal">Priority Normal</option>
-              <option value="kill">Kill</option>
+              <option className="bg-slate-900"  value="pause">Pause</option>
+              <option className="bg-slate-900"  value="resume">Resume</option>
+              <option className="bg-slate-900"  value="low">Priority Low</option>
+              <option className="bg-slate-900"  value="high">Priority High</option>
+              <option className="bg-slate-900"  value="normal">Priority Normal</option>
+              <option className="bg-slate-900"  value="kill">Kill</option>
             </select>
             <button
               onClick={runPidAction}
@@ -824,20 +839,20 @@ export default function SystemPanel() {
                           onChange={(e) => handleSetPriority(proc.pid, proc.name, e.target.value)}
                           className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
                         >
-                          <option value="normal">Priority Normal</option>
-                          <option value="low">Priority Low</option>
-                          <option value="high">Priority High</option>
+                          <option className="bg-slate-900"  value="normal">Priority Normal</option>
+                          <option className="bg-slate-900"  value="low">Priority Low</option>
+                          <option className="bg-slate-900"  value="high">Priority High</option>
                         </select>
                         <select
                           value={priorityCache[proc.name]?.ttlDays ?? defaultTtlDays}
                           onChange={(e) => handleSetProcessTtl(proc.name, parseInt(e.target.value, 10))}
                           className="px-2 py-1 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
                         >
-                          <option value="1">TTL 1d</option>
-                          <option value="3">TTL 3d</option>
-                          <option value="7">TTL 7d</option>
-                          <option value="14">TTL 14d</option>
-                          <option value="30">TTL 30d</option>
+                          <option className="bg-slate-900"  value="1">TTL 1d</option>
+                          <option className="bg-slate-900"  value="3">TTL 3d</option>
+                          <option className="bg-slate-900"  value="7">TTL 7d</option>
+                          <option className="bg-slate-900"  value="14">TTL 14d</option>
+                          <option className="bg-slate-900"  value="30">TTL 30d</option>
                         </select>
                         <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-400 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
                           <input
@@ -868,10 +883,10 @@ export default function SystemPanel() {
                           defaultValue=""
                           className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
                         >
-                          <option value="">Quick Action</option>
-                          <option value="pause">Pause</option>
-                          <option value="resume">Resume</option>
-                          <option value="kill">Kill</option>
+                          <option className="bg-slate-900"  value="">Quick Action</option>
+                          <option className="bg-slate-900"  value="pause">Pause</option>
+                          <option className="bg-slate-900"  value="resume">Resume</option>
+                          <option className="bg-slate-900"  value="kill">Kill</option>
                         </select>
                         <button onClick={() => onSuspendProcess(proc.pid)} className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 flex items-center gap-2">
                           <Pause className="w-3 h-3" /> Pause
@@ -921,19 +936,19 @@ export default function SystemPanel() {
                 onChange={(e) => setAuditPageSize(parseInt(e.target.value, 10))}
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[9px] text-slate-200"
               >
-                <option value="8">8 / page</option>
-                <option value="16">16 / page</option>
-                <option value="32">32 / page</option>
+                <option className="bg-slate-900"  value="8">8 / page</option>
+                <option className="bg-slate-900"  value="16">16 / page</option>
+                <option className="bg-slate-900"  value="32">32 / page</option>
               </select>
               <select
                 value={auditFilter}
                 onChange={(e) => setAuditFilter(e.target.value)}
                 className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[9px] text-slate-200"
               >
-                <option value="all">All</option>
-                <option value="manual">Manual</option>
-                <option value="auto-applied">Auto-Applied</option>
-                <option value="reset">Reset</option>
+                <option className="bg-slate-900"  value="all">All</option>
+                <option className="bg-slate-900"  value="manual">Manual</option>
+                <option className="bg-slate-900"  value="auto-applied">Auto-Applied</option>
+                <option className="bg-slate-900"  value="reset">Reset</option>
               </select>
               <button
                 onClick={() => onExportAudit()}

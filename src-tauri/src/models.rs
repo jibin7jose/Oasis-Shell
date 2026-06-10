@@ -53,6 +53,18 @@ pub struct HardwareTelemetry {
     pub battery_percent: u8,
     pub is_charging: bool,
     pub system_uptime: u64,
+    #[serde(default)]
+    pub disks: Vec<DiskTelemetry>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DiskTelemetry {
+    pub name: String,
+    pub mount_point: String,
+    pub total_space: u64,
+    pub available_space: u64,
+    pub is_removable: bool,
+    pub file_system: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

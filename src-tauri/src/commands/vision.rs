@@ -63,7 +63,7 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
                             let timestamp = chrono::Local::now().to_rfc3339();
 
                             let mut desc = String::from("[Omniscient Vision Engine Offline] Visual Context Snapshot Saved. Install Ollama + LLaVA to enable intelligent image indexing.");
-                            
+
                             let client = reqwest::blocking::Client::new();
                             let body = serde_json::json!({
                                 "model": "llava:latest",
@@ -84,7 +84,7 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
                                     }
                                 }
                             }
-                            
+
                             // Save to vector database (for simple history MVP, we just use sqlite)
                             if let Ok(conn) = Connection::open("oasis_crates.db") {
                                 let _ = conn.execute(
@@ -100,17 +100,22 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
                                 // Safe migration: add columns if they don't exist
                                 let _ = conn.execute("ALTER TABLE photographic_memory ADD COLUMN image_base64 TEXT NOT NULL DEFAULT ''", []);
                                 let _ = conn.execute("ALTER TABLE photographic_memory ADD COLUMN vector TEXT NOT NULL DEFAULT '[]'", []);
-                                
+
                                 // Vectorize the description
                                 let mut vector_str = String::from("[]");
                                 let embed_body = serde_json::json!({
                                     "model": "nomic-embed-text",
                                     "prompt": desc
                                 });
-                                if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send() {
+                                if let Ok(res) = client
+                                    .post("http://localhost:11434/api/embeddings")
+                                    .json(&embed_body)
+                                    .send()
+                                {
                                     if let Ok(json) = res.json::<serde_json::Value>() {
                                         if let Some(embedding) = json["embedding"].as_array() {
-                                            vector_str = serde_json::to_string(embedding).unwrap_or_else(|_| "[]".into());
+                                            vector_str = serde_json::to_string(embedding)
+                                                .unwrap_or_else(|_| "[]".into());
                                         }
                                     }
                                 }
@@ -136,11 +141,20 @@ pub async fn query_photographic_memory(query: String) -> Result<String, String> 
 
     // 1. Embed query
     let embed_body = serde_json::json!({ "model": "nomic-embed-text", "prompt": &query });
-    let query_vector: Vec<f32> = if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send().await {
+    let query_vector: Vec<f32> = if let Ok(res) = client
+        .post("http://localhost:11434/api/embeddings")
+        .json(&embed_body)
+        .send()
+        .await
+    {
         if let Ok(json) = res.json::<serde_json::Value>().await {
             serde_json::from_value(json["embedding"].clone()).unwrap_or_default()
-        } else { vec![] }
-    } else { vec![] };
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
 
     if !query_vector.is_empty() {
         struct MemMatch {
@@ -151,7 +165,9 @@ pub async fn query_photographic_memory(query: String) -> Result<String, String> 
         let mut results: Vec<MemMatch> = Vec::new();
 
         if let Ok(conn) = Connection::open("oasis_crates.db") {
-            if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description, vector FROM photographic_memory") {
+            if let Ok(mut stmt) =
+                conn.prepare("SELECT timestamp, description, vector FROM photographic_memory")
+            {
                 if let Ok(rows) = stmt.query_map([], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
@@ -162,7 +178,8 @@ pub async fn query_photographic_memory(query: String) -> Result<String, String> 
                     for row in rows.flatten() {
                         let (ts, desc, vec_str) = row;
                         if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
-                            let score = crate::commands::ai::cosine_similarity(&query_vector, &file_vec);
+                            let score =
+                                crate::commands::ai::cosine_similarity(&query_vector, &file_vec);
                             results.push(MemMatch { ts, desc, score });
                         }
                     }
@@ -176,7 +193,9 @@ pub async fn query_photographic_memory(query: String) -> Result<String, String> 
     } else {
         // Fallback to latest 20
         if let Ok(conn) = Connection::open("oasis_crates.db") {
-            if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20") {
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20",
+            ) {
                 if let Ok(rows) = stmt.query_map([], |row| {
                     let ts: String = row.get(0)?;
                     let desc: String = row.get(1)?;

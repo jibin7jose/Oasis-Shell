@@ -13,7 +13,7 @@ import { useSystemStore } from '../../lib/systemStore';
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
 export const MainCommandStage = (props: any) => {
-  const { activeView, setActiveView } = useSystemStore();
+  const { activeView, setActiveView, activeGolems } = useSystemStore();
   const {
     contexts, activeContext, lastSync, marketIntel, resolveNeuralIntent, isListening,
     voiceTranscript, searchQuery, setSearchQuery, handleSearchIntent, isThinking,
@@ -171,7 +171,7 @@ export const MainCommandStage = (props: any) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {useSystemStore().activeGolems.map((agent: any) => (
+              {activeGolems.map((agent: any) => (
                 <motion.div
                   key={agent.id}
                   className={cn(

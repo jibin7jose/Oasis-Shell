@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "dialog:default",
     "global-shortcut:default",
     "autostart:default",
     "notification:default"

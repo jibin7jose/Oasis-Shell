@@ -152,31 +152,17 @@ pub fn run() {
     });
 
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["ctrl+space"])
-                .unwrap()
-                .with_handler(|app, shortcut, event| {
-                    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                        if shortcut.matches(tauri_plugin_global_shortcut::Modifiers::CONTROL, tauri_plugin_global_shortcut::Code::Space) {
-                            if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
-                                if window.is_visible().unwrap_or(false) {
-                                    let _ = window.hide();
-                                } else {
-                                    let _ = window.show();
-                                    let _ = window.set_focus();
-                                    use tauri::Emitter;
-                                    let _ = window.emit("omnibar-focus", ());
-                                }
-                            }
-                        }
-                    }
-                })
-                .build()
-        )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(DbState(pool))
         .manage(TelemetryState(Mutex::new(sysinfo::System::new_all())))
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                let _ = window.hide();
+                api.prevent_close();
+            }
+            _ => {}
+        })
         .setup(|app| {
             tauri::tray::TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -189,15 +175,29 @@ pub fn run() {
                     } => {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show().and_then(|_| window.set_focus());
+                            let _ = if window.is_visible().unwrap_or(false) {
+                                window.hide()
+                            } else {
+                                window.show().and_then(|_| window.set_focus())
+                            };
                         }
+                    }
+                    tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Right,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } => {
+                        tray.app_handle().exit(0);
                     }
                     _ => {}
                 })
                 .build(app)?;
 
             crate::commands::telemetry::start_telemetry_stream(app.handle().clone());
-            crate::commands::ai::start_semantic_vault_watcher(app.handle().clone(), app.state::<DbState>().clone());
+            crate::commands::ai::start_semantic_vault_watcher(
+                app.handle().clone(),
+                app.state::<DbState>().clone(),
+            );
 
             Ok(())
         })
@@ -234,9 +234,12 @@ pub fn run() {
                                     | tauri_plugin_global_shortcut::Modifiers::META,
                                 tauri_plugin_global_shortcut::Code::Space,
                             ) {
-                                // Command Palette shortcut
-                                let _ = window.show().and_then(|_| window.set_focus());
-                                let _ = window.emit("toggle-command-palette", ());
+                                // Toggle shortcut
+                                let _ = if window.is_visible().unwrap_or(false) {
+                                    window.hide()
+                                } else {
+                                    window.show().and_then(|_| window.set_focus())
+                                };
                             } else {
                                 // Terminal shortcut
                                 let _ = window.show().and_then(|_| window.set_focus());
@@ -315,6 +318,10 @@ pub fn run() {
             commands::golems::decommission_golem,
             commands::golems::invoke_golem_debate,
             commands::nexus::get_vault_nodes,
+            commands::nexus::import_strategic_asset,
+            commands::nexus::delete_strategic_asset,
+            commands::nexus::access_strategic_asset,
+            commands::nexus::recover_strategic_asset,
             commands::nexus::get_market_intelligence,
             commands::files::read_directory,
             commands::files::launch_path,

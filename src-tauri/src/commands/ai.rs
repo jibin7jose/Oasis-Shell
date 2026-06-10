@@ -1,16 +1,16 @@
 use crate::models::DbState;
-use tauri::Emitter;
-use notify::{Watcher, RecursiveMode, EventKind, event::ModifyKind};
+use notify::{event::ModifyKind, EventKind, RecursiveMode, Watcher};
 use std::sync::mpsc::channel;
+use tauri::Emitter;
 use tauri::Manager;
 
 pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'_, DbState>) {
     let pool = state.0.clone();
-    
+
     std::thread::spawn(move || {
         let (tx, rx) = channel();
         let mut watcher = notify::recommended_watcher(tx).unwrap();
-        
+
         let dirs_to_watch = [
             dirs::document_dir().unwrap_or_default(),
             dirs::download_dir().unwrap_or_default(),
@@ -28,10 +28,24 @@ pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'
                 match event.kind {
                     EventKind::Create(_) | EventKind::Modify(_) => {
                         for path in event.paths {
-                            if !path.is_file() { continue; }
-                            
-                            let ext = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
-                            if ext != "txt" && ext != "md" && ext != "rs" && ext != "ts" && ext != "tsx" && ext != "js" && ext != "csv" && ext != "json" {
+                            if !path.is_file() {
+                                continue;
+                            }
+
+                            let ext = path
+                                .extension()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_lowercase();
+                            if ext != "txt"
+                                && ext != "md"
+                                && ext != "rs"
+                                && ext != "ts"
+                                && ext != "tsx"
+                                && ext != "js"
+                                && ext != "csv"
+                                && ext != "json"
+                            {
                                 continue;
                             }
 
@@ -39,10 +53,20 @@ pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'
                             std::thread::sleep(std::time::Duration::from_millis(500));
 
                             if let Ok(content) = std::fs::read_to_string(&path) {
-                                if content.trim().is_empty() { continue; }
-                                
-                                let safe_content = if content.len() > 2000 { content[..2000].to_string() } else { content.clone() };
-                                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                                if content.trim().is_empty() {
+                                    continue;
+                                }
+
+                                let safe_content = if content.len() > 2000 {
+                                    content[..2000].to_string()
+                                } else {
+                                    content.clone()
+                                };
+                                let filename = path
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string();
                                 let filepath = path.to_string_lossy().to_string();
 
                                 // Skip if already exists or was recently modified (to prevent loop)
@@ -58,22 +82,31 @@ pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'
                                         "prompt": safe_content
                                     });
 
-                                    if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&req_body).send().await {
+                                    if let Ok(res) = client
+                                        .post("http://localhost:11434/api/embeddings")
+                                        .json(&req_body)
+                                        .send()
+                                        .await
+                                    {
                                         if let Ok(json) = res.json::<serde_json::Value>().await {
                                             if let Some(embedding) = json["embedding"].as_array() {
                                                 if let Ok(conn) = pool_clone.get() {
-                                                    let vector_str = serde_json::to_string(embedding).unwrap();
-                                                    
+                                                    let vector_str =
+                                                        serde_json::to_string(embedding).unwrap();
+
                                                     // Delete old embedding if modifying
                                                     let _ = conn.execute("DELETE FROM file_embeddings WHERE filepath = ?1", rusqlite::params![&path_clone]);
-                                                    
+
                                                     // Insert new
                                                     let _ = conn.execute(
                                                         "INSERT INTO file_embeddings (filename, filepath, content, vector) VALUES (?1, ?2, ?3, ?4)",
                                                         rusqlite::params![name_clone, path_clone, safe_content, vector_str],
                                                     );
-                                                    
-                                                    let _ = app_clone.emit("vault-indexed", serde_json::json!({ "file": name_clone }));
+
+                                                    let _ = app_clone.emit(
+                                                        "vault-indexed",
+                                                        serde_json::json!({ "file": name_clone }),
+                                                    );
                                                 }
                                             }
                                         }
@@ -81,7 +114,7 @@ pub fn start_semantic_vault_watcher(app: tauri::AppHandle, state: tauri::State<'
                                 });
                             }
                         }
-                    },
+                    }
                     _ => {}
                 }
             }

@@ -1,0 +1,8 @@
+=== Daemon Hotkey Injection Test ===
+Timestamp: SystemTime { intervals: 134255494645650802 }
+
+Action: Injecting Global Shortcut [Ctrl + Space]
+Status: Oasis Daemon is actively running in background memory.
+Result: Hotkey signal broadcast successful.
+
+Test Execution Complete. The application should have toggled visibility.

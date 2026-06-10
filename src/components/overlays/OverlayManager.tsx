@@ -68,7 +68,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
         />
       )}
 
-      <SentientVault show={showVault} onClose={() => setShowVault(false)} vaultNodes={vaultNodes} ragQuery={ragQuery} setRagQuery={setRagQuery} ragAnswer={ragAnswer} setRagAnswer={setRagAnswer} isRagging={isRagging} setIsRagging={setIsRagging} />
+      <SentientVault show={showVault} onClose={() => setShowVault(false)} vaultNodes={vaultNodes} setVaultNodes={setVaultNodes} ragQuery={ragQuery} setRagQuery={setRagQuery} ragAnswer={ragAnswer} setRagAnswer={setRagAnswer} isRagging={isRagging} setIsRagging={setIsRagging} />
       <CommandTerminal show={showTerminal} onClose={() => setShowTerminal(false)} analyzeScreen={analyzeScreen} isThinking={isThinking} messages={messages} searchQuery={searchQuery} setSearchQuery={setSearchQuery} resolveNeuralIntent={resolveNeuralIntent} />
       <CognitiveTimeline show={showLogs} onClose={() => setShowLogs(false)} timeline={timeline} />
       <SettingsPanel show={showSettings} onClose={() => setShowSettings(false)} vaultNodesCount={vaultNodes.length} autostart={autostart} setAutostart={setAutostart} />

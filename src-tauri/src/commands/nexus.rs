@@ -397,3 +397,90 @@ pub fn get_logs(state: tauri::State<DbState>) -> Result<Vec<NeuralLog>, String> 
 
     Ok(logs)
 }
+
+#[tauri::command]
+pub async fn import_strategic_asset(file_path: String) -> Result<serde_json::Value, String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err("File does not exist".into());
+    }
+
+    let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    
+    // Create a secure vault directory in AppData or LocalAppData
+    let vault_dir = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("OasisVault");
+        
+    std::fs::create_dir_all(&vault_dir).map_err(|e| e.to_string())?;
+    
+    let dest_path = vault_dir.join(&file_name);
+    
+    // Move the file by copying and then removing original (to handle cross-drive moves)
+    std::fs::copy(&path, &dest_path).map_err(|e| e.to_string())?;
+    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    
+    let size_mb = meta.len() as f64 / 1_048_576.0;
+    let size_str = if size_mb < 1.0 {
+        format!("{}KB", (meta.len() as f64 / 1024.0).round())
+    } else {
+        format!("{:.1}MB", size_mb)
+    };
+    
+    Ok(serde_json::json!({
+        "name": file_name,
+        "category": "Strategic",
+        "size": size_str,
+        "path": dest_path.to_string_lossy().to_string()
+    }))
+}
+
+#[tauri::command]
+pub async fn access_strategic_asset(file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if path.exists() {
+        #[cfg(target_os = "windows")]
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+            
+        #[cfg(not(target_os = "windows"))]
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    } else {
+        return Err("File not found in vault".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn recover_strategic_asset(file_path: String) -> Result<String, String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err("File not found in vault".into());
+    }
+    
+    // Recover to Desktop
+    let desktop = dirs::desktop_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let file_name = path.file_name().unwrap_or_default();
+    let dest_path = desktop.join(file_name);
+    
+    std::fs::copy(&path, &dest_path).map_err(|e| format!("Copy failed: {}", e))?;
+    std::fs::remove_file(&path).map_err(|e| format!("Remove failed: {}", e))?;
+    
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn delete_strategic_asset(file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
