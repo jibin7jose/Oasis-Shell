@@ -25,6 +25,23 @@ export const MainCommandStage = (props: any) => {
     getCrateAppCount, handleContextSwitch, scanActiveWindows, suggestCrateName, importCrate
   } = props;
 
+  React.useEffect(() => {
+    let unlisten: any;
+    const setup = async () => {
+        try {
+            const { invokeSafe } = await import('../../lib/tauri');
+            const golems = await invokeSafe("get_active_golems");
+            useSystemStore.getState().setActiveGolems(golems as any[]);
+            const { listen } = await import('@tauri-apps/api/event');
+            unlisten = await listen("oasis-golem-telemetry", (event: any) => {
+                useSystemStore.getState().setActiveGolems(event.payload);
+            });
+        } catch (e) { console.error("Telemetry bridge failed", e); }
+    };
+    setup();
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
   return (
       <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
 
@@ -117,11 +134,20 @@ export const MainCommandStage = (props: any) => {
                 </h3>
               </div>
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if(newAgentTitle && newAgentPrompt) {
-                    setCronAgents((prev: any) => [...prev, { id: Date.now().toString(), title: newAgentTitle, prompt: newAgentPrompt, interval: 60000, active: true }]);
-                    setNewAgentTitle("");
-                    setNewAgentPrompt("");
+                    try {
+                      const { invokeSafe } = await import('../../lib/tauri');
+                      await invokeSafe("hatch_autonomous_golem", { 
+                          name: newAgentTitle, 
+                          mission: newAgentPrompt, 
+                          aura: "indigo" 
+                      });
+                      setNewAgentTitle("");
+                      setNewAgentPrompt("");
+                    } catch (e) {
+                      console.error("Failed to hatch golem", e);
+                    }
                   }
                 }}
                 className="px-6 py-3 glass bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all"
@@ -145,31 +171,34 @@ export const MainCommandStage = (props: any) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {cronAgents.map((agent: any) => (
+              {useSystemStore().activeGolems.map((agent: any) => (
                 <motion.div
                   key={agent.id}
                   className={cn(
                     "glass rounded-[2rem] p-8 border relative overflow-hidden group min-h-[280px] flex flex-col justify-between transition-all duration-500",
-                    agent.active ? "border-purple-500/40 shadow-[0_0_30px_-10px_rgba(168,85,247,0.3)]" : "border-white/5 opacity-60"
+                    "border-purple-500/40 shadow-[0_0_30px_-10px_rgba(168,85,247,0.3)]"
                   )}
                 >
                   <div className={cn(
                     "absolute top-0 right-0 w-32 h-32 blur-[50px] transition-all",
-                    agent.active ? "bg-purple-500/20" : "bg-transparent"
+                    "bg-purple-500/20"
                   )} />
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4 relative z-10">
-                      <div className={cn("w-3 h-3 rounded-full animate-pulse", agent.active ? "bg-purple-400" : "bg-slate-600")} />
-                      <h3 className="text-lg font-bold tracking-tight text-white">{agent.title}</h3>
+                      <div className={cn("w-3 h-3 rounded-full animate-pulse", "bg-purple-400")} />
+                      <h3 className="text-lg font-bold tracking-tight text-white">{agent.name}</h3>
                     </div>
                     <button 
-                      onClick={() => setCronAgents((prev: any) => prev.map((a: any) => a.id === agent.id ? { ...a, active: !a.active } : a))}
+                      onClick={async () => {
+                        const { invokeSafe } = await import('../../lib/tauri');
+                        await invokeSafe("decommission_golem", { id: agent.id });
+                      }}
                       className={cn(
                         "text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl transition-all border",
-                        agent.active ? "text-red-400 bg-red-400/10 border-red-500/20 hover:bg-red-400/20" : "text-emerald-400 bg-emerald-400/10 border-emerald-500/20 hover:bg-emerald-400/20"
+                        "text-red-400 bg-red-400/10 border-red-500/20 hover:bg-red-400/20"
                       )}
                     >
-                      {agent.active ? "Halt" : "Activate"}
+                      Halt
                     </button>
                   </div>
 
@@ -177,12 +206,18 @@ export const MainCommandStage = (props: any) => {
                     <div className="p-5 rounded-2xl bg-black/40 border border-white/5">
                       <p className="text-sm text-slate-300 leading-relaxed font-mono">
                         <span className="text-purple-400 font-bold block mb-2 text-[10px] uppercase tracking-widest">Directive:</span> 
-                        {agent.prompt}
+                        {agent.mission}
                       </p>
                     </div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      Interval: {agent.interval / 1000} Seconds
-                    </div>
+                    
+                    {agent.thought_trace && (
+                      <div className="p-5 rounded-2xl bg-black/40 border border-purple-500/10">
+                        <p className="text-xs text-slate-400 font-mono whitespace-pre-wrap max-h-32 overflow-y-auto custom-scrollbar">
+                          <span className="text-emerald-400 font-bold block mb-2 text-[10px] uppercase tracking-widest">Thought Trace:</span> 
+                          {agent.thought_trace}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
