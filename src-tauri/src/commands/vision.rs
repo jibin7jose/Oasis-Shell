@@ -91,16 +91,33 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
                                     "CREATE TABLE IF NOT EXISTS photographic_memory (
                                         id INTEGER PRIMARY KEY,
                                         timestamp TEXT NOT NULL,
-                                        description TEXT NOT NULL
+                                        description TEXT NOT NULL,
+                                        image_base64 TEXT NOT NULL DEFAULT '',
+                                        vector TEXT NOT NULL DEFAULT '[]'
                                     )",
                                     [],
                                 );
-                                // Safe migration: add column if it doesn't exist
+                                // Safe migration: add columns if they don't exist
                                 let _ = conn.execute("ALTER TABLE photographic_memory ADD COLUMN image_base64 TEXT NOT NULL DEFAULT ''", []);
+                                let _ = conn.execute("ALTER TABLE photographic_memory ADD COLUMN vector TEXT NOT NULL DEFAULT '[]'", []);
                                 
+                                // Vectorize the description
+                                let mut vector_str = String::from("[]");
+                                let embed_body = serde_json::json!({
+                                    "model": "nomic-embed-text",
+                                    "prompt": desc
+                                });
+                                if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send() {
+                                    if let Ok(json) = res.json::<serde_json::Value>() {
+                                        if let Some(embedding) = json["embedding"].as_array() {
+                                            vector_str = serde_json::to_string(embedding).unwrap_or_else(|_| "[]".into());
+                                        }
+                                    }
+                                }
+
                                 let _ = conn.execute(
-                                    "INSERT INTO photographic_memory (timestamp, description, image_base64) VALUES (?1, ?2, ?3)",
-                                    params![timestamp, desc, base64_img],
+                                    "INSERT INTO photographic_memory (timestamp, description, image_base64, vector) VALUES (?1, ?2, ?3, ?4)",
+                                    params![timestamp, desc, base64_img, vector_str],
                                 );
                             }
                         }
@@ -114,19 +131,61 @@ pub fn start_photographic_memory(_state: tauri::State<'_, DbState>) -> Result<()
 
 #[tauri::command]
 pub async fn query_photographic_memory(query: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
     let mut context_block = String::new();
-    if let Ok(conn) = Connection::open("oasis_crates.db") {
-        if let Ok(mut stmt) = conn.prepare(
-            "SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20",
-        ) {
-            if let Ok(rows) = stmt.query_map([], |row| {
-                let ts: String = row.get(0)?;
-                let desc: String = row.get(1)?;
-                Ok(format!("[{}]: {}", ts, desc))
-            }) {
-                for row in rows.flatten() {
-                    context_block.push_str(&row);
-                    context_block.push('\n');
+
+    // 1. Embed query
+    let embed_body = serde_json::json!({ "model": "nomic-embed-text", "prompt": &query });
+    let query_vector: Vec<f32> = if let Ok(res) = client.post("http://localhost:11434/api/embeddings").json(&embed_body).send().await {
+        if let Ok(json) = res.json::<serde_json::Value>().await {
+            serde_json::from_value(json["embedding"].clone()).unwrap_or_default()
+        } else { vec![] }
+    } else { vec![] };
+
+    if !query_vector.is_empty() {
+        struct MemMatch {
+            ts: String,
+            desc: String,
+            score: f32,
+        }
+        let mut results: Vec<MemMatch> = Vec::new();
+
+        if let Ok(conn) = Connection::open("oasis_crates.db") {
+            if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description, vector FROM photographic_memory") {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                }) {
+                    for row in rows.flatten() {
+                        let (ts, desc, vec_str) = row;
+                        if let Ok(file_vec) = serde_json::from_str::<Vec<f32>>(&vec_str) {
+                            let score = crate::commands::ai::cosine_similarity(&query_vector, &file_vec);
+                            results.push(MemMatch { ts, desc, score });
+                        }
+                    }
+                }
+            }
+        }
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        for mem in results.iter().take(20) {
+            context_block.push_str(&format!("[{}]: {}\n", mem.ts, mem.desc));
+        }
+    } else {
+        // Fallback to latest 20
+        if let Ok(conn) = Connection::open("oasis_crates.db") {
+            if let Ok(mut stmt) = conn.prepare("SELECT timestamp, description FROM photographic_memory ORDER BY id DESC LIMIT 20") {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    let ts: String = row.get(0)?;
+                    let desc: String = row.get(1)?;
+                    Ok(format!("[{}]: {}", ts, desc))
+                }) {
+                    for row in rows.flatten() {
+                        context_block.push_str(&row);
+                        context_block.push('\n');
+                    }
                 }
             }
         }
@@ -136,9 +195,8 @@ pub async fn query_photographic_memory(query: String) -> Result<String, String> 
         return Ok("No photographic memory context available yet.".into());
     }
 
-    let prompt = format!("You are Oasis Sentient OS. You have photographic memory of what the user has been doing on their screen over the last few hours.\n\nMemory Log:\n{}\n\nUser Question: {}\n\nAnswer the user based strictly on the memory log provided.", context_block, query);
+    let prompt = format!("You are Oasis Sentient OS. You have a semantic retrieval of the user's photographic memory over time.\n\nMemory Log:\n{}\n\nUser Question: {}\n\nAnswer the user based strictly on the memory log provided. If the memory log is empty or irrelevant, say so.", context_block, query);
 
-    let client = reqwest::Client::new();
     let body = serde_json::json!({
         "model": "gemma4:latest",
         "prompt": prompt,

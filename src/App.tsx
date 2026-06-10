@@ -382,8 +382,21 @@ export default function App() {
     setTimeout(() => {
       setIsThinking(false);
       
+      // 0. Semantic Memory check (Highest Priority)
+      if (q.includes("recall ") || q.includes("do you remember") || q.includes("what was i looking at") || q.includes("what did i see")) {
+        setMessages(prev => [...prev, { role: "assistant", content: "🔍 Memory Search: Accessing Sentient Vault..." }]);
+        logEvent(`Memory Query: ${query}`, "neural");
+        (async () => {
+          try {
+            const llmResponse = await invoke("query_photographic_memory", { query }) as string;
+            setMessages(prev => [...prev, { role: "assistant", content: llmResponse }]);
+          } catch (e) {
+            setMessages(prev => [...prev, { role: "assistant", content: `Memory retrieval failed: ${e}` }]);
+          }
+        })();
+      }
       // 1. Check for Launching a Crate specifically first
-      if ((q.includes("launch") || q.includes("open")) && (q.includes("crate") || q.includes("workspace"))) {
+      else if ((q.includes("launch") || q.includes("open")) && (q.includes("crate") || q.includes("workspace"))) {
         setMessages(prev => [...prev, { role: "assistant", content: "Neural Intent: Auto-launching your most recent workspace..." }]);
         if (contextCrates.length > 0) {
           launchContextCrate(contextCrates[0]);
