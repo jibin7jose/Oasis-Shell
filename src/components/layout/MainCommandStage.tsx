@@ -321,14 +321,14 @@ export const MainCommandStage = (props: any) => {
                   return (
                     <motion.div 
                       key={crate.id || crate.timestamp} 
-                      className="relative w-full"
+                      className={cn("relative w-full transition-[min-height] duration-500 ease-in-out", isEditing ? "min-h-[220px]" : "min-h-[76px]")}
                       animate={{ rotateX: isEditing ? 180 : 0 }}
                       transition={{ duration: 0.6, type: "spring" }}
                       style={{ transformStyle: "preserve-3d" }}
                     >
                       {/* FRONT OF CARD */}
                       <div 
-                        className="glass-bright border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4"
+                        className="glass-bright border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4 w-full h-full"
                         style={{ backfaceVisibility: "hidden" }}
                       >
                         <div className="min-w-0">
