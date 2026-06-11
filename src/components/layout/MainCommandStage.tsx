@@ -51,6 +51,7 @@ export const MainCommandStage = (props: any) => {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className={cn(
+              "hidden", // Disabled per user request
               "w-full max-w-2xl rounded-[2.5rem] p-6 shadow-3xl transition-all duration-500 mb-12 relative overflow-hidden",
               isListening ? "glass bg-cyan-900/30 border border-cyan-500/40 shadow-[0_0_50px_rgba(34,211,238,0.15)]" : "glass-bright border border-white/5 hover:border-white/10"
             )}
@@ -392,7 +393,7 @@ export const MainCommandStage = (props: any) => {
             </div>
           )}
 
-          <div className="flex gap-8 pb-12">
+          <div className="hidden flex gap-8 pb-12">
             {contexts.map((ctx: any) => {
               const Icon = ctx.icon;
               const isActive = activeContext === ctx.id;
