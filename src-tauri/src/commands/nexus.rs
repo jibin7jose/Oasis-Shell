@@ -198,11 +198,44 @@ pub fn get_market_intelligence() -> serde_json::Value {
 
 #[tauri::command]
 pub fn get_vault_nodes() -> serde_json::Value {
-    serde_json::json!([
-        { "name": "Oasis_Whitepaper.pdf", "category": "Strategic", "size": "1.2MB" },
-        { "name": "Foundry_Kernel.rs", "category": "Technical", "size": "45KB" },
-        { "name": "Executive_Brand_Guide.fig", "category": "Creative", "size": "8.4MB" }
-    ])
+    let vault_dir = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("OasisVault");
+
+    let mut nodes = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(vault_dir) {
+        for entry in entries.flatten() {
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    let size_mb = meta.len() as f64 / 1_048_576.0;
+                    let size_str = if size_mb < 1.0 {
+                        format!("{}KB", (meta.len() as f64 / 1024.0).round())
+                    } else {
+                        format!("{:.1}MB", size_mb)
+                    };
+
+                    let category = if file_name.ends_with(".rs") || file_name.ends_with(".ts") || file_name.ends_with(".js") {
+                        "Technical"
+                    } else if file_name.ends_with(".png") || file_name.ends_with(".jpg") || file_name.ends_with(".fig") || file_name.ends_with(".svg") {
+                        "Creative"
+                    } else {
+                        "Strategic"
+                    };
+
+                    nodes.push(serde_json::json!({
+                        "name": file_name,
+                        "category": category,
+                        "size": size_str,
+                        "path": entry.path().to_string_lossy().to_string()
+                    }));
+                }
+            }
+        }
+    }
+
+    serde_json::Value::Array(nodes)
 }
 
 #[tauri::command]

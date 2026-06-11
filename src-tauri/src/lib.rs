@@ -194,6 +194,7 @@ pub fn run() {
                 .build(app)?;
 
             crate::commands::telemetry::start_telemetry_stream(app.handle().clone());
+            let _ = crate::commands::golems::start_swarm_daemon(app.handle().clone());
             crate::commands::ai::start_semantic_vault_watcher(
                 app.handle().clone(),
                 app.state::<DbState>().clone(),
@@ -317,6 +318,8 @@ pub fn run() {
             commands::golems::hatch_autonomous_golem,
             commands::golems::decommission_golem,
             commands::golems::invoke_golem_debate,
+            commands::golems::spawn_anomaly,
+            commands::golems::start_swarm_daemon,
             commands::nexus::get_vault_nodes,
             commands::nexus::import_strategic_asset,
             commands::nexus::delete_strategic_asset,

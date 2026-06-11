@@ -85,7 +85,8 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
         await invokeSafe('execute_golem_manifest', { 
             id: currentProposal.id, 
             title: currentProposal.title, 
-            code: currentProposal.proposed_content 
+            code: currentProposal.proposed_content,
+            filePath: currentProposal.file_path
         });
         // Also cleanup the proposal registry
         await invokeSafe('resolve_golem_proposal', { proposalId: id, action: 'merge' });
@@ -139,7 +140,16 @@ export default function WorkforcePanel({ isOpen, onClose, onPlayNotification, on
               <section className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Active Neural Pulses</h2>
-                  <span className="px-2 py-0.5 bg-indigo-500/10 rounded-full text-[8px] font-black text-indigo-400 border border-indigo-500/20 uppercase tracking-widest">{activeGolems.length} Golems</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => invokeSafe('spawn_anomaly')}
+                      className="px-2 py-0.5 bg-rose-500/10 hover:bg-rose-500/20 rounded-full text-[8px] font-black text-rose-400 border border-rose-500/20 uppercase tracking-widest transition-all"
+                      title="Simulate a ghost node process for Swarm Daemon to autonomously detect and heal"
+                    >
+                      SIMULATE ANOMALY
+                    </button>
+                    <span className="px-2 py-0.5 bg-indigo-500/10 rounded-full text-[8px] font-black text-indigo-400 border border-indigo-500/20 uppercase tracking-widest">{activeGolems.length} Golems</span>
+                  </div>
                 </div>
                 
                 {activeGolems.length === 0 ? (

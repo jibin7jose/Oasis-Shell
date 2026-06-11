@@ -1,0 +1,8 @@
+=== Autonomous Swarm Healing Test Report ===
+Timestamp: SystemTime { intervals: 134256274410820204 }
+
+Action: Spawning OasisAnomaly powershell process.
+Result: Anomaly successfully spawned with PID 10080.
+Action: Waiting for background Oasis-Shell daemon to detect and kill the anomaly.
+Result: FAILURE. Anomaly remained active. The Swarm Daemon may not be running or failed to detect it.
+Action: Manually killed anomaly process to prevent leak.

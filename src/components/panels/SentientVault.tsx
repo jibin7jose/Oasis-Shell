@@ -88,22 +88,22 @@ export const SentientVault: React.FC<SentientVaultProps> = ({
 
   const handleAccess = async (node: VaultNode) => {
     if (!node.path) {
-      setNotification(`Cannot access ${node.name}: File path is unknown (Mock asset).`);
+      setNotification(`Cannot access ${node.name}: File path is unknown.`);
       return;
     }
     
     try {
       setNotification(`Decrypting and launching ${node.name}...`);
       await invoke("access_strategic_asset", { filePath: node.path });
-    } catch (e) {
-      setNotification(`Failed to open asset: ${e}`);
+    } catch (e: any) {
+      setNotification(`Access denied: ${e.toString()}`);
     }
   };
 
   const handleRecover = async (e: React.MouseEvent, node: VaultNode) => {
     e.stopPropagation();
     if (!node.path) {
-      setNotification(`Cannot recover ${node.name}: File is a mock asset or missing path.`);
+      setNotification(`Cannot recover ${node.name}: File is missing path.`);
       return;
     }
     
@@ -111,7 +111,7 @@ export const SentientVault: React.FC<SentientVaultProps> = ({
       const recoveredPath = await invoke("recover_strategic_asset", { filePath: node.path });
       setVaultNodes(prev => prev.filter(n => n.name !== node.name));
       setNotification(`Recovered to: ${recoveredPath}`);
-    } catch (e) {
+    } catch (e: any) {
       setNotification(`Failed to recover asset: ${e}`);
     }
   };

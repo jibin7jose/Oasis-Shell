@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
+use tauri::Emitter;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GolemTask {
@@ -38,25 +39,10 @@ pub static PROPOSAL_REGISTRY: LazyLock<Mutex<HashMap<String, GolemProposal>>> =
 #[tauri::command]
 pub async fn get_active_golems() -> Result<Vec<GolemTask>, String> {
     println!("get_active_golems CALLED");
-    let mut tasks = {
+    let tasks = {
         let registry = GOLEM_REGISTRY.lock().unwrap();
         registry.values().cloned().collect::<Vec<GolemTask>>()
     };
-    // Default mock data if empty
-    if tasks.is_empty() {
-        tasks.push(GolemTask {
-            id: "TASK-1".into(),
-            name: "Kernel-Architect-Gemma3".into(),
-            status: "Manifesting Solutions...".into(),
-            progress: 0.6,
-            aura: "emerald".into(),
-            mission: Some("Refactor telemetry stream".into()),
-            thought_trace: None,
-            is_autonomous: true,
-            evolution_history: vec![],
-            evolution_count: 0,
-        });
-    }
     Ok(tasks)
 }
 
@@ -70,23 +56,10 @@ pub fn get_active_golems_native() -> Result<Vec<GolemTask>, String> {
 
 #[tauri::command]
 pub async fn get_golem_proposals() -> Result<Vec<GolemProposal>, String> {
-    let mut props = {
+    let props = {
         let registry = PROPOSAL_REGISTRY.lock().unwrap();
         registry.values().cloned().collect::<Vec<GolemProposal>>()
     };
-    if props.is_empty() {
-        props.push(GolemProposal {
-            id: "PR-8483".into(),
-            task_id: "TASK-1".into(),
-            agent_name: "Kernel-Architect-Gemma3".into(),
-            file_path: "src-tauri/src/commands/telemetry.rs".into(),
-            title: "Optimize Telemetry Vector".into(),
-            original_content: "pub fn get_hardware_telemetry...".into(),
-            proposed_content: "pub fn get_hardware_telemetry(state: tauri::State<TelemetryState>) -> Result<HardwareTelemetry, String> {\n  // Optimized memory sync\n}".into(),
-            rationale: "Detected inefficient lock holding time in get_hardware_telemetry.".into(),
-            status: "pending".into(),
-        });
-    }
     Ok(props)
 }
 
@@ -103,12 +76,28 @@ pub async fn execute_golem_manifest(
     _id: String,
     title: String,
     code: String,
+    file_path: Option<String>,
 ) -> Result<String, String> {
-    let file_basename = title.replace(" ", "_").to_lowercase();
-    let path = format!("../src/{}.ts", file_basename);
-    std::fs::write(&path, &code).unwrap_or_default();
+    let path = file_path.unwrap_or_else(|| {
+        let file_basename = title.replace(" ", "_").to_lowercase();
+        format!("../src/{}.ts", file_basename)
+    });
+    
+    // Convert to absolute or appropriate relative path based on CWD
+    // Assuming CWD is src-tauri
+    let actual_path = if path.starts_with("src-tauri/") {
+        path.replace("src-tauri/", "")
+    } else if !path.starts_with("../") && !path.starts_with("C:") && !path.starts_with("D:") {
+        format!("../{}", path)
+    } else {
+        path.clone()
+    };
+
+    std::fs::write(&actual_path, &code)
+        .map_err(|e| format!("Failed to write to {}: {}", actual_path, e))?;
+        
     std::process::Command::new("git")
-        .args(["add", &path])
+        .args(["add", &actual_path])
         .output()
         .ok();
     std::process::Command::new("git")
@@ -385,3 +374,104 @@ pub async fn invoke_golem_debate(
         "thought_trace": final_response.trim(),
     }))
 }
+
+#[tauri::command]
+pub async fn spawn_anomaly() -> Result<(), String> {
+    // Spawns a dummy process that acts as an anomaly.
+    // We use a continuous ping to localhost which burns a tiny bit of CPU and runs forever.
+    std::process::Command::new("ping")
+        .args(["-t", "localhost"])
+        .spawn()
+        .map_err(|e| format!("Failed to spawn anomaly (ping): {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_swarm_daemon(app: tauri::AppHandle) -> Result<(), String> {
+    // This is the background Swarm Daemon that actively heals the OS
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            
+            let mut system = sysinfo::System::new_all();
+            system.refresh_all();
+            
+            let mut target_pid = None;
+            for (pid, process) in system.processes() {
+                // Look for the ping.exe we spawned
+                let name = process.name().to_string_lossy().to_lowercase();
+                if name == "ping.exe" || name == "ping" {
+                    target_pid = Some(*pid);
+                    break;
+                }
+            }
+            
+            if let Some(pid) = target_pid {
+                // Anomaly detected!
+                let anomaly_id = format!("ANOMALY-{}", pid.as_u32());
+                
+                // 1. Register a Golem to handle it
+                {
+                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                    registry.insert(anomaly_id.clone(), GolemTask {
+                        id: anomaly_id.clone(),
+                        name: "Swarm-Sentinel-Alpha".into(),
+                        status: "Detecting System Anomaly...".into(),
+                        progress: 0.1,
+                        aura: "amber".into(),
+                        mission: Some(format!("Neutralize ghost process PID {}", pid.as_u32())),
+                        thought_trace: Some("Anomaly detected on main execution thread.".into()),
+                        is_autonomous: true,
+                        evolution_history: vec![],
+                        evolution_count: 0,
+                    });
+                }
+                let _ = app.emit("golem-event", ());
+                
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                
+                // 2. Update status to analyzing
+                {
+                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                    if let Some(task) = registry.get_mut(&anomaly_id) {
+                        task.status = "Analyzing process tree...".into();
+                        task.progress = 0.5;
+                        task.thought_trace = Some("Process identified as OasisAnomaly memory leak. Preparing termination vector.".into());
+                    }
+                }
+                let _ = app.emit("golem-event", ());
+                
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                
+                // 3. Kill the anomaly
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/PID", &pid.to_string()])
+                    .output();
+                
+                // 4. Resolve the Golem
+                {
+                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                    if let Some(task) = registry.get_mut(&anomaly_id) {
+                        task.status = "Neutralized".into();
+                        task.progress = 1.0;
+                        task.aura = "emerald".into();
+                        task.thought_trace = Some("System healed. Process terminated successfully.".into());
+                    }
+                }
+                let _ = app.emit("golem-event", ());
+                
+                // 5. Automatically dismiss the golem after a delay
+                let id_to_remove = anomaly_id.clone();
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                {
+                    let mut registry = GOLEM_REGISTRY.lock().unwrap();
+                    registry.remove(&id_to_remove);
+                }
+                let _ = app.emit("golem-event", ());
+            }
+        }
+    });
+    Ok(())
+}
+
