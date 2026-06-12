@@ -272,8 +272,8 @@ export default function App() {
         e.preventDefault();
         setShowClickableReality(!useSystemStore.getState().showClickableReality);
       }
-      // Ctrl+Alt+D — toggle Bottom Dock (Taskbar)
-      if (e.key.toLowerCase() === 'd' && e.ctrlKey && e.altKey) {
+      // Ctrl+Alt+D or F4 — toggle Bottom Dock (Taskbar)
+      if ((e.key.toLowerCase() === 'd' && e.ctrlKey && e.altKey) || e.key === 'F4') {
         e.preventDefault();
         setShowDock(!useSystemStore.getState().showDock);
       }

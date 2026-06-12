@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch, Monitor, ChevronDown } from "lucide-react";
+import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, Network, ScanSearch, Monitor, PanelBottomClose } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useSystemStore } from "../../lib/systemStore";
@@ -37,7 +37,7 @@ export default function BottomDock({ className }: { className?: string }) {
   const navItems = [
     { id: "desktop",   icon: Monitor,          label: "Desktop",        action: () => setActiveView("desktop") },
     { id: "dash",      icon: LayoutDashboard,  label: "Workspaces",     action: () => setActiveView("dash") },
-    { id: "workforce", icon: BrainCircuit,     label: "Neural Workforce",action: () => setShowWorkforce(true) },
+    { id: "workforce", icon: Network,          label: "Neural Workforce",action: () => setShowWorkforce(true) },
     { id: "processes", icon: Cpu,               label: "System Core",      action: () => setActiveView("processes") },
     { id: "files",     icon: HardDrive,         label: "File Explorer",   action: () => setActiveView("files") },
     { id: "clickable", icon: ScanSearch,        label: "Oasis Lens",      action: () => setShowClickableReality(!showClickableReality) },
@@ -54,8 +54,7 @@ export default function BottomDock({ className }: { className?: string }) {
         className
       )}
     >
-      {/* System Health Score Ring */}
-      <div className="relative flex items-center justify-center mr-6 group cursor-pointer" title={`System Health: ${healthScore}%`}>
+      <div className="relative flex items-center justify-center mr-2 group cursor-pointer" title={`System Health: ${healthScore}%`}>
         <svg width="48" height="48" viewBox="0 0 32 32" className="-rotate-90 transition-all duration-1000">
           {/* Track */}
           <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
@@ -80,6 +79,17 @@ export default function BottomDock({ className }: { className?: string }) {
           Health {healthScore}%
         </span>
       </div>
+
+      <div className="w-[1px] h-8 bg-white/10 mx-2"></div>
+
+      {/* Hide Dock Button (Moved to left) */}
+      <button
+        onClick={() => setShowDock(false)}
+        aria-label="Hide Taskbar"
+        className="w-10 h-10 rounded-xl flex items-center justify-center transition-all text-slate-400 hover:bg-red-500/20 hover:text-red-400 mr-4 group"
+      >
+        <PanelBottomClose className="w-5 h-5 group-hover:scale-90 transition-transform" />
+      </button>
 
       {/* Nav icons - Centered */}
       <nav className="flex-1 flex flex-row gap-2 md:gap-4 justify-center items-center h-full">
@@ -138,17 +148,6 @@ export default function BottomDock({ className }: { className?: string }) {
         >
           <Camera className="w-4 h-4 group-hover:scale-125 transition-transform" />
           <span className="hidden lg:inline">LOGS</span>
-        </button>
-
-        <div className="w-[1px] h-8 bg-white/10 mx-1"></div>
-
-        {/* Hide Dock Button */}
-        <button
-          onClick={() => setShowDock(false)}
-          aria-label="Hide Taskbar"
-          className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all bg-white/5 border border-white/10 text-slate-400 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 hover:-translate-y-1"
-        >
-          <ChevronDown className="w-5 h-5 md:w-6 md:h-6" />
         </button>
       </div>
     </motion.footer>
