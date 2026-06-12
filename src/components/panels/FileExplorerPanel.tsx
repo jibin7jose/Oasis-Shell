@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive, FolderOpen, Activity, Skull } from 'lucide-react';
+import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive, FolderOpen, Activity, Skull, Trash2 } from 'lucide-react';
 import { invokeSafe } from '../../lib/tauri';
 import { FileInfo } from '../../lib/contracts';
 import { useSystemStore } from '../../lib/systemStore';
@@ -329,7 +329,7 @@ export const FileExplorerPanel: React.FC = () => {
                 onClick={() => handleDelete(contextMenu.file)}
                 className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-all"
               >
-                <Skull className="w-3 h-3" /> Purge Asset
+                <Trash2 className="w-3 h-3" /> Delete
               </button>
             </motion.div>
           </>
