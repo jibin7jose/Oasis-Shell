@@ -43,7 +43,7 @@ export const MainCommandStage = (props: any) => {
   }, []);
 
   return (
-      <main className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden">
+      <main className="relative z-10 flex-1 flex flex-col h-full overflow-hidden pb-4">
 
         <div className="flex-1 flex flex-col items-center justify-start pt-12 p-12 overflow-y-auto no-scrollbar">
           {/* Neural Intent Bar */}

@@ -320,7 +320,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   showVault: false,
   setShowVault: (show: boolean) => set({ showVault: show }),
-  activeView: 'dash',
+  activeView: 'desktop',
   setActiveView: (view: string) => set({ activeView: view }),
   showLibrary: false,
   setShowLibrary: (show: boolean) => set({ showLibrary: show }),

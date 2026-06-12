@@ -31,7 +31,7 @@ import { SentientVault } from "./components/panels/SentientVault";
 import { ClickableReality } from "./components/panels/ClickableReality";
 import { SettingsPanel } from "./components/panels/SettingsPanel";
 import { VentureSimulationPortal } from "./components/panels/VentureSimulationPortal";
-import LeftRail from "./components/layout/LeftRail";
+import BottomDock from "./components/layout/BottomDock";
 import { useSystemStore } from "./lib/systemStore";
 import { CognitiveTimeline } from "./components/panels/CognitiveTimeline";
 import SynthesisPanel from "./components/panels/SynthesisPanel";
@@ -1153,7 +1153,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex selection:bg-indigo-500/30"
+      className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex flex-col selection:bg-indigo-500/30"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => e.preventDefault()}
     >
@@ -1201,12 +1201,11 @@ export default function App() {
         )}
       </div>
 
-      {/* Level 9 Executive Sidebar */}
-      <LeftRail />
-
-
       {/* Main Command Stage */}
       <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />
+      
+      {/* OS Taskbar (Bottom Dock) */}
+      <BottomDock />
 
       {/* OVERLAYS */}
       <OverlayManager 

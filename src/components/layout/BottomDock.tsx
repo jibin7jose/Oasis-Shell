@@ -1,10 +1,10 @@
-import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch } from "lucide-react";
+import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch, Monitor } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useSystemStore } from "../../lib/systemStore";
 import { useState, useEffect } from "react";
 
-export default function LeftRail({ className }: { className?: string }) {
+export default function BottomDock({ className }: { className?: string }) {
   const {
     activeView, setActiveView,
     showVault, setShowVault,
@@ -35,7 +35,8 @@ export default function LeftRail({ className }: { className?: string }) {
   const circumference = 2 * Math.PI * 14; // r=14
 
   const navItems = [
-    { id: "dash",      icon: LayoutDashboard,  label: "Dashboard",      action: () => setActiveView("dash") },
+    { id: "desktop",   icon: Monitor,          label: "Desktop",        action: () => setActiveView("desktop") },
+    { id: "dash",      icon: LayoutDashboard,  label: "Workspaces",     action: () => setActiveView("dash") },
     { id: "workforce", icon: BrainCircuit,     label: "Neural Workforce",action: () => setShowWorkforce(true) },
     { id: "processes", icon: Cpu,               label: "System Core",      action: () => setActiveView("processes") },
     { id: "files",     icon: HardDrive,         label: "File Explorer",   action: () => setActiveView("files") },
@@ -47,16 +48,16 @@ export default function LeftRail({ className }: { className?: string }) {
   ];
 
   return (
-    <motion.aside
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
+    <motion.footer
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       className={cn(
-        "relative z-50 w-16 md:w-24 h-screen glass border-r border-white/5 flex flex-col items-center py-6 md:py-10 transition-all duration-700",
+        "relative z-50 w-full h-16 md:h-20 glass border-t border-white/5 flex flex-row items-center px-6 md:px-10 transition-all duration-700 bg-black/40 backdrop-blur-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]",
         className
       )}
     >
       {/* System Health Score Ring */}
-      <div className="relative flex items-center justify-center mb-3 group cursor-pointer" title={`System Health: ${healthScore}%`}>
+      <div className="relative flex items-center justify-center mr-6 group cursor-pointer" title={`System Health: ${healthScore}%`}>
         <svg width="48" height="48" viewBox="0 0 32 32" className="-rotate-90 transition-all duration-1000">
           {/* Track */}
           <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
@@ -76,14 +77,14 @@ export default function LeftRail({ className }: { className?: string }) {
           <Bot className="w-4 h-4" style={{ color: healthColor }} />
         </div>
         {/* Tooltip */}
-        <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]"
+        <span className="absolute bottom-full mb-4 px-3 py-1 glass rounded-lg text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]"
           style={{ color: healthColor }}>
           Health {healthScore}%
         </span>
       </div>
 
-      {/* Nav icons */}
-      <nav className="flex-1 flex flex-col gap-6 items-center w-full py-2">
+      {/* Nav icons - Centered */}
+      <nav className="flex-1 flex flex-row gap-2 md:gap-4 justify-center items-center h-full">
         {navItems.map((item) => {
           const isActive = activeView === item.id;
           return (
@@ -92,10 +93,10 @@ export default function LeftRail({ className }: { className?: string }) {
               onClick={item.action}
               aria-label={item.label}
               className={cn(
-                "p-4 rounded-2xl transition-all group relative",
+                "p-3 md:p-4 rounded-2xl transition-all group relative hover:-translate-y-2",
                 isActive
                   ? "text-white"
-                  : "text-slate-500 hover:text-white hover:bg-white/5"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
               )}
               style={{
                 backgroundColor: isActive ? "rgba(var(--accent-primary-rgb), 0.2)" : "transparent",
@@ -104,40 +105,43 @@ export default function LeftRail({ className }: { className?: string }) {
               }}
             >
               <item.icon className="w-5 h-5 md:w-6 md:h-6" />
-              <span className="absolute left-full ml-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 px-3 py-1 glass rounded-lg text-[10px] uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]">
                 {item.label}
               </span>
+              {isActive && (
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-2 h-1 rounded-full bg-indigo-500 shadow-[0_0_10px_#6366f1]" />
+              )}
             </button>
           );
         })}
       </nav>
 
-      {/* Bottom actions */}
-      <div className="flex flex-col gap-4 items-center mt-auto">
+      {/* Bottom actions (now right side actions) */}
+      <div className="flex flex-row gap-4 items-center ml-6">
         {/* Graph toggle */}
         <button
           onClick={() => setShowGraph(!showGraph)}
           aria-label="Strategic Cortex Graph"
           className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center transition-all border",
+            "w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all border hover:-translate-y-1",
             showGraph
               ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.3)]"
-              : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-300"
+              : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
           )}
         >
-          <Zap className={cn("w-6 h-6", showGraph && "animate-pulse")} />
+          <Zap className={cn("w-5 h-5 md:w-6 md:h-6", showGraph && "animate-pulse")} />
         </button>
 
         {/* Neural Logs button */}
         <button
           onClick={() => setShowLogs(true)}
           aria-label="View Neural Logs"
-          className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group"
+          className="px-3 py-2 md:px-4 md:py-3 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] md:text-xs font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group hover:-translate-y-1 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
         >
-          <Camera className="w-3 h-3 group-hover:scale-125 transition-transform" />
-          <span className="hidden md:inline">LOGS</span>
+          <Camera className="w-4 h-4 group-hover:scale-125 transition-transform" />
+          <span className="hidden lg:inline">LOGS</span>
         </button>
       </div>
-    </motion.aside>
+    </motion.footer>
   );
 }
