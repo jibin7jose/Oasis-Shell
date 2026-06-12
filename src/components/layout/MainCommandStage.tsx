@@ -126,9 +126,7 @@ export const MainCommandStage = (props: any) => {
               {[
                 { id: 'dash', label: 'Workspaces', icon: LayoutDashboard, action: () => setActiveView('dash') },
                 { id: 'files', label: 'File Explorer', icon: HardDrive, action: () => setActiveView('files') },
-                { id: 'processes', label: 'System Core', icon: Cpu, action: () => setActiveView('processes') },
-                { id: 'workforce', label: 'Neural Workforce', icon: Network, action: () => setShowWorkforce(true) },
-                { id: 'clickable', label: 'Oasis Lens', icon: ScanSearch, action: () => setShowClickableReality(true) }
+                { id: 'processes', label: 'System Core', icon: Cpu, action: () => setActiveView('processes') }
               ].map(app => (
                 <button
                   key={app.id}
