@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch, Monitor } from "lucide-react";
+import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch, Monitor, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useSystemStore } from "../../lib/systemStore";
@@ -13,8 +13,8 @@ export default function BottomDock({ className }: { className?: string }) {
     showGraph, setShowGraph,
     showLogs, setShowLogs,
     showTerminal, setShowTerminal,
-    showWorkforce, setShowWorkforce,
-    showClickableReality, setShowClickableReality
+    showClickableReality, setShowClickableReality,
+    setShowDock
   } = useSystemStore();
 
   const [healthScore, setHealthScore] = useState<number>(100);
@@ -49,8 +49,6 @@ export default function BottomDock({ className }: { className?: string }) {
 
   return (
     <motion.footer
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
       className={cn(
         "relative z-50 w-full h-16 md:h-20 glass border-t border-white/5 flex flex-row items-center px-6 md:px-10 transition-all duration-700 bg-black/40 backdrop-blur-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]",
         className
@@ -136,10 +134,21 @@ export default function BottomDock({ className }: { className?: string }) {
         <button
           onClick={() => setShowLogs(true)}
           aria-label="View Neural Logs"
-          className="px-3 py-2 md:px-4 md:py-3 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] md:text-xs font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group hover:-translate-y-1 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+          className="px-3 py-2 md:px-4 md:py-3 bg-emerald-600/20 hover:bg-emerald-600 text-[10px] md:text-xs font-black text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2 group hover:-translate-y-1 shadow-[0_0_15px_rgba(16,185,129,0.1)] mr-2"
         >
           <Camera className="w-4 h-4 group-hover:scale-125 transition-transform" />
           <span className="hidden lg:inline">LOGS</span>
+        </button>
+
+        <div className="w-[1px] h-8 bg-white/10 mx-1"></div>
+
+        {/* Hide Dock Button */}
+        <button
+          onClick={() => setShowDock(false)}
+          aria-label="Hide Taskbar"
+          className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center transition-all bg-white/5 border border-white/10 text-slate-400 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 hover:-translate-y-1"
+        >
+          <ChevronDown className="w-5 h-5 md:w-6 md:h-6" />
         </button>
       </div>
     </motion.footer>

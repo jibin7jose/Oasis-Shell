@@ -8,7 +8,7 @@ import {
   Bot, Search, LayoutDashboard, FolderOpen, Activity,
   Settings, Zap, BrainCircuit, Shield, Terminal,
   Plus, Activity as PulseIcon, UploadCloud, Eye, Mic, MicOff, Clock, Image as ImageIcon,
-  Minimize2, Maximize2
+  Minimize2, Maximize2, ChevronUp
 } from "lucide-react";
 import ForceGraph3D from "react-force-graph-3d";
 import { useHeuristicGuardian } from "./hooks/useHeuristicGuardian";
@@ -1219,12 +1219,21 @@ export default function App() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="w-full"
+            className="w-full relative z-50"
           >
             <BottomDock />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Show Dock Trigger */}
+      {!showDock && (
+        <div className="fixed bottom-0 left-0 w-full h-8 flex justify-center items-end group z-[9999] cursor-pointer" onClick={() => setShowDock(true)}>
+          <div className="w-32 h-6 glass bg-white/5 border border-white/10 rounded-t-xl flex justify-center items-center translate-y-3 group-hover:translate-y-0 transition-transform duration-300">
+            <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-white" />
+          </div>
+        </div>
+      )}
 
       {/* OVERLAYS */}
       <OverlayManager 
