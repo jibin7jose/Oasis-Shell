@@ -13,6 +13,7 @@ export default function BottomDock({ className }: { className?: string }) {
     showGraph, setShowGraph,
     showLogs, setShowLogs,
     showTerminal, setShowTerminal,
+    showWorkforce, setShowWorkforce,
     showClickableReality, setShowClickableReality,
     setShowDock
   } = useSystemStore();
