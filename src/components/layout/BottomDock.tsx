@@ -1,4 +1,5 @@
-import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, Network, ScanSearch, Monitor, PanelBottomClose } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, Network, ScanSearch, Monitor, PanelBottomClose } from "lucide-react";
+import { FalconIcon } from "../icons/FalconIcon";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useSystemStore } from "../../lib/systemStore";
@@ -72,7 +73,7 @@ export default function BottomDock({ className }: { className?: string }) {
         </svg>
         {/* Center icon */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <Bot className="w-4 h-4" style={{ color: healthColor }} />
+          <FalconIcon className="w-4 h-4" style={{ color: healthColor }} />
         </div>
         {/* Tooltip */}
         <span className="absolute bottom-full mb-4 px-3 py-1 glass rounded-lg text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 transition-all border border-white/10 whitespace-nowrap z-[100]"
