@@ -12,6 +12,8 @@
     <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
     <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
   </p>
+  <br />
+  <img src="public/image.png" alt="Oasis-Shell Preview" width="100%" style="max-width: 800px; border-radius: 12px; box-shadow: 0 0 20px rgba(99,102,241,0.4);" />
 </div>
 
 ## 📖 Overview
