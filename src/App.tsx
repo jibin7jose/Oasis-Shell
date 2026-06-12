@@ -100,6 +100,7 @@ export default function App() {
 
   // --- CORE STATE ---
   const [activeContext, setActiveContext] = useState('dev');
+  const [lockedApp, setLockedApp] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [isScanningScreen, setIsScanningScreen] = useState(false);
@@ -939,20 +940,74 @@ export default function App() {
     };
     initSync();
 
-    const unlistens: any[] = [];
-    
-    listen("oasis-hardware-telemetry", (event: any) => {
-      setTelemetry(event.payload);
-      setLastSync(new Date().toLocaleTimeString());
-      setBridgeStatus("Native");
-    }).then(unlisten => unlistens.push(unlisten));
+    let isMounted = true;
+    let unlistenHardware: any;
+    let unlistenWindows: any;
+    let unlistenAura: any;
 
-    listen("oasis-windows-telemetry", (event: any) => {
-      setActiveWindows(event.payload);
-    }).then(unlisten => unlistens.push(unlisten));
+    const setupListeners = async () => {
+      unlistenHardware = await listen("oasis-hardware-telemetry", (event: any) => {
+        if (!isMounted) return;
+        setTelemetry(event.payload);
+        setLastSync(new Date().toLocaleTimeString());
+        setBridgeStatus("Native");
+      });
+
+      unlistenWindows = await listen("oasis-windows-telemetry", (event: any) => {
+        if (!isMounted) return;
+        setActiveWindows(event.payload);
+      });
+
+      let lastSeenExe = "";
+      unlistenAura = await listen("oasis-active-window", (event: any) => {
+        if (!isMounted) return;
+        const payload = event.payload as { exe: string, title: string };
+        if (!payload || !payload.exe) return;
+        const exe = payload.exe.toLowerCase();
+        const title = payload.title ? payload.title.toLowerCase() : "";
+        
+        if (exe !== lastSeenExe && !exe.includes("oasis-shell")) {
+          logEvent(`[Aura Debug] Focus shifted to: ${exe} (Title: ${title})`, 'system');
+          lastSeenExe = exe;
+        }
+
+        let nextContext = null;
+        let matchedAppName = null;
+        
+        if (exe.includes("code") || exe.includes("cursor") || exe.includes("idea") || exe.includes("devenv") || exe.includes("notepad") || title.includes("notepad")) {
+          nextContext = "dev";
+          matchedAppName = (exe.includes("notepad") || title.includes("notepad")) ? "Notepad" : "Code Editor";
+        } else if (exe.includes("chrome") || exe.includes("msedge") || exe.includes("brave") || exe.includes("firefox")) {
+          nextContext = "growth";
+          matchedAppName = exe.includes("chrome") ? "Google Chrome" : "Browser";
+        } else if (exe.includes("figma") || exe.includes("photoshop") || exe.includes("illustrator")) {
+          nextContext = "design";
+          matchedAppName = "Design Suite";
+        }
+
+        if (nextContext) {
+          setLockedApp(matchedAppName);
+          setActiveContext(prev => {
+            if (prev !== nextContext) {
+              logEvent(`Aura Shift: ${payload.exe} triggered ${nextContext.toUpperCase()}`, 'system');
+              return nextContext as string;
+            }
+            return prev;
+          });
+        } else {
+          // If the app is not a "locked" app, hide the banner so it doesn't get stuck
+          setLockedApp(null);
+        }
+      });
+    };
+
+    setupListeners();
 
     return () => {
-      unlistens.forEach(u => u());
+      isMounted = false;
+      if (unlistenHardware) unlistenHardware();
+      if (unlistenWindows) unlistenWindows();
+      if (unlistenAura) unlistenAura();
     };
   }, [simMode]);
 
@@ -1105,12 +1160,31 @@ export default function App() {
       {/* Background Substrate */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div
-          animate={{ background: simMode ? '#f59e0b' : currentAura, opacity: (isThinking || simMode) ? 0.15 : 0.08 }}
-          className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[250px] transition-all duration-1000"
+          animate={{ background: simMode ? '#f59e0b' : currentAura, opacity: (isThinking || simMode) ? 0.45 : 0.25 }}
+          className="absolute top-[-20%] left-0 w-full h-[70%] rounded-[100%] blur-[200px] transition-all duration-1000"
         />
         <div className="absolute inset-0 opacity-[0.03] grayscale invert mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
         <NeuralMesh />
       </div>
+
+      {/* Aura Shift Indicator Banner */}
+      <AnimatePresence>
+        {lockedApp && (
+          <motion.div
+            key={activeContext}
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-2.5 rounded-full border border-white/10 backdrop-blur-xl shadow-2xl flex items-center gap-3 pointer-events-none transition-all duration-500"
+            style={{ backgroundColor: currentAura.replace('0.4', '0.15') }}
+          >
+             <div className="w-2 h-2 rounded-full animate-pulse shadow-[0_0_10px_currentColor]" style={{ backgroundColor: currentAura.replace('0.4', '1'), color: currentAura.replace('0.4', '1') }} />
+             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90">
+                Aura Lock: {contexts.find(c => c.id === activeContext)?.name} <span className="opacity-50 ml-1">({lockedApp})</span>
+             </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 3D Nebula Layer */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">

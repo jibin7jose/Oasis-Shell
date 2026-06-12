@@ -274,13 +274,21 @@ pub fn start_telemetry_stream(app: tauri::AppHandle) {
                         let _ = windows::Win32::Foundation::CloseHandle(handle);
                     }
 
-                    if !exe_path.is_empty() {
-                        let exe_name = std::path::Path::new(&exe_path)
+                    let exe_name = if !exe_path.is_empty() {
+                        std::path::Path::new(&exe_path)
                             .file_name()
                             .map(|s| s.to_string_lossy().to_string())
-                            .unwrap_or(exe_path);
+                            .unwrap_or(exe_path)
+                    } else {
+                        "unknown_app.exe".to_string()
+                    };
 
-                        if let Some(db_state) = app.try_state::<crate::models::DbState>() {
+                    let _ = app.emit("oasis-active-window", serde_json::json!({
+                        "exe": exe_name,
+                        "title": title
+                    }));
+
+                    if let Some(db_state) = app.try_state::<crate::models::DbState>() {
                             if let Ok(conn) = db_state.0.get() {
                                 let _ = conn.execute(
                                     "INSERT INTO app_usage_analytics (exe_name, window_title, focus_time_seconds, last_seen) 
@@ -293,7 +301,6 @@ pub fn start_telemetry_stream(app: tauri::AppHandle) {
                                 );
                             }
                         }
-                    }
                 }
             }
 
