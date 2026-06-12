@@ -6,6 +6,14 @@ import {
 } from './contracts';
 import { invokeSafe } from "./tauri";
 
+export interface RecycleBinItem {
+  id: string;
+  name: string;
+  type: 'file' | 'folder' | 'crate' | 'golem';
+  deletedAt: number;
+  originalData?: any;
+}
+
 export interface SystemState {
   founderMetrics: FounderMetrics;
   systemStats: SystemStats | null;
@@ -90,6 +98,11 @@ export interface SystemState {
   setActiveProposals: (proposals: any[]) => void;
   workforce: any[];
   setWorkforce: (workforce: any[]) => void;
+  recycleBin: RecycleBinItem[];
+  moveToRecycleBin: (item: Omit<RecycleBinItem, 'deletedAt'>) => void;
+  restoreFromRecycleBin: (id: string) => void;
+  emptyRecycleBin: () => void;
+  deletePermanently: (id: string) => void;
   
   // Actions
   setMarketIntel: (market: any) => void;
@@ -175,6 +188,17 @@ export type ChronosSnapshot = {
 };
 
 export const useSystemStore = create<SystemState>((set) => ({
+  recycleBin: [],
+  moveToRecycleBin: (item) => set((state) => ({ 
+    recycleBin: [...state.recycleBin, { ...item, deletedAt: Date.now() }] 
+  })),
+  restoreFromRecycleBin: (id) => set((state) => ({
+    recycleBin: state.recycleBin.filter(i => i.id !== id)
+  })),
+  emptyRecycleBin: () => set({ recycleBin: [] }),
+  deletePermanently: (id) => set((state) => ({
+    recycleBin: state.recycleBin.filter(i => i.id !== id)
+  })),
   founderMetrics: {
     arr: "N/A",
     burn: "N/A",

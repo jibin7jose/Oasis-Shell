@@ -7,6 +7,7 @@ import { StoragePanel } from '../panels/StoragePanel';
 import BoardroomPanel from '../panels/BoardroomPanel';
 import DocumentationPanel from '../panels/DocumentationPanel';
 import { CognitiveTimeline } from '../panels/CognitiveTimeline';
+import { RecycleBinPanel } from '../panels/RecycleBinPanel';
 
 import { useSystemStore } from '../../lib/systemStore';
 
@@ -125,7 +126,7 @@ export const MainCommandStage = (props: any) => {
             <div className="absolute top-24 left-8 grid grid-cols-1 gap-6 w-32">
               {[
                 { id: 'files', label: 'File Explorer', icon: HardDrive, action: () => setActiveView('files') },
-                { id: 'recycle', label: 'Recycle Bin', icon: Trash2, action: () => console.log('Recycle Bin clicked') }
+                { id: 'recycle', label: 'Recycle Bin', icon: Trash2, action: () => setActiveView('recycle_bin') }
               ].map(app => (
                 <button
                   key={app.id}
@@ -252,6 +253,12 @@ export const MainCommandStage = (props: any) => {
           {/* DYNAMIC VIEWS */}
           {activeView === 'processes' && (
             <SystemPanel />
+          )}
+
+          {activeView === 'recycle_bin' && (
+            <div className="w-full max-w-5xl flex-1 min-h-[400px] mb-12">
+              <RecycleBinPanel />
+            </div>
           )}
 
           {activeView === 'files' && (

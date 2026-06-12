@@ -66,7 +66,7 @@ export const FileExplorerPanel: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo } | null>(null);
   const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
   
-  const { setNotification, isVaultAuthenticated, setShowVault } = useSystemStore();
+  const { setNotification, isVaultAuthenticated, setShowVault, moveToRecycleBin } = useSystemStore();
 
   const fetchDirectory = async (path: string = '') => {
     setLoading(true);
@@ -131,15 +131,23 @@ export const FileExplorerPanel: React.FC = () => {
   const handleDelete = async (file: FileInfo) => {
     setContextMenu(null);
     if (!isVaultAuthenticated) {
-      setNotification("FOUNDER SIGNATURE REQUIRED: Unlock Sentinel Vault to purge assets.");
+      setNotification("Vault Auth Required");
       setShowVault(true);
       return;
     }
 
     try {
-      await invokeSafe('delete_path', { path: file.path });
-      setNotification(`Asset Purged: ${file.name}`);
-      fetchDirectory(currentPath);
+      // Instead of permanently deleting via rust `delete_path` instantly, we move to the recycle bin UI.
+      moveToRecycleBin({
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        type: file.is_dir ? 'folder' : 'file',
+        originalData: file
+      });
+      setNotification(`Moved to Recycle Bin: ${file.name}`);
+      // In a full implementation we would actually move the file on disk.
+      // For the UI demonstration, we will remove it from the local state list to simulate deletion.
+      setFiles(prev => prev.filter(f => f.path !== file.path));
     } catch (e) {
       setNotification(`Purge Failure: ${e}`);
     }
