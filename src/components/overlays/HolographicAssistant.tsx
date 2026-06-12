@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrainCircuit, Activity, Zap } from 'lucide-react';
+import { Sparkles, Activity, Zap } from 'lucide-react';
 
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
@@ -42,7 +42,7 @@ export const HolographicAssistant: React.FC<HolographicAssistantProps> = ({
             <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
             <header className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20 relative z-10 backdrop-blur-md">
               <div className="flex items-center gap-3">
-                <BrainCircuit className="w-5 h-5 text-indigo-400 animate-pulse" />
+                <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
                 <span className="text-xs font-black uppercase tracking-widest text-indigo-300">Sentient Link Stable</span>
               </div>
               <div className="flex gap-1.5 p-2 bg-indigo-500/10 rounded-full border border-indigo-500/20">
@@ -89,7 +89,7 @@ export const HolographicAssistant: React.FC<HolographicAssistantProps> = ({
         onClick={() => setShowAI(!showAI)} 
         className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105 transition-all border border-indigo-400/30", showAI ? "bg-indigo-600" : "bg-gradient-to-br from-indigo-500 to-purple-600")}
       >
-        <BrainCircuit className={cn("w-9 h-9", showAI ? "animate-pulse" : "")} />
+        <Sparkles className={cn("w-9 h-9", showAI ? "animate-pulse" : "")} />
       </button>
     </div>
   );
