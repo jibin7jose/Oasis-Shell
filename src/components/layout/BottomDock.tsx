@@ -41,7 +41,6 @@ export default function BottomDock({ className }: { className?: string }) {
     { id: "dash",      icon: LayoutDashboard,  label: "Workspaces",     action: () => setActiveView("dash") },
     { id: "workforce", icon: Network,          label: "Neural Workforce",action: () => setShowWorkforce(true) },
     { id: "processes", icon: Cpu,               label: "System Core",      action: () => setActiveView("processes") },
-    { id: "files",     icon: HardDrive,         label: "File Explorer",   action: () => setActiveView("files") },
     { id: "clickable", icon: ScanSearch,        label: "Oasis Lens",      action: () => setShowClickableReality(!showClickableReality) },
     { id: "vault",     icon: FolderOpen,        label: "Sentinel Vault",  action: () => setShowVault(true) },
     { id: "terminal",  icon: TerminalSquare,    label: "Terminal",        action: () => setShowTerminal(!showTerminal) },

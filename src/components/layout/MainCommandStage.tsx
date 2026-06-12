@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud, HardDrive, Cpu, ScanSearch, Network, LayoutDashboard } from 'lucide-react';
+import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud, HardDrive, Cpu, ScanSearch, Network, LayoutDashboard, Trash2 } from 'lucide-react';
 import SystemPanel from '../panels/SystemPanel';
 import { FileExplorerPanel } from '../panels/FileExplorerPanel';
 import { StoragePanel } from '../panels/StoragePanel';
@@ -124,9 +124,8 @@ export const MainCommandStage = (props: any) => {
           {activeView === 'desktop' && (
             <div className="absolute top-24 left-8 grid grid-cols-1 gap-6 w-32">
               {[
-                { id: 'dash', label: 'Workspaces', icon: LayoutDashboard, action: () => setActiveView('dash') },
                 { id: 'files', label: 'File Explorer', icon: HardDrive, action: () => setActiveView('files') },
-                { id: 'processes', label: 'System Core', icon: Cpu, action: () => setActiveView('processes') }
+                { id: 'recycle', label: 'Recycle Bin', icon: Trash2, action: () => console.log('Recycle Bin clicked') }
               ].map(app => (
                 <button
                   key={app.id}
