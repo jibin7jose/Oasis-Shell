@@ -97,6 +97,7 @@ export default function App() {
     showSettings, setShowSettings,
     showLogs, setShowLogs,
     showClickableReality, setShowClickableReality,
+    showDock, setShowDock,
   } = useSystemStore();
 
   // --- CORE STATE ---
@@ -249,32 +250,37 @@ export default function App() {
       // Ctrl+` — toggle streaming terminal
       if (e.key === '`' && e.ctrlKey) {
         e.preventDefault();
-        setShowTerminal(!showTerminal);
+        setShowTerminal(!useSystemStore.getState().showTerminal);
       }
       // Ctrl+Shift+T — also toggle terminal (VSCode muscle memory)
       if (e.key === 't' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowTerminal(!showTerminal);
+        setShowTerminal(!useSystemStore.getState().showTerminal);
       }
       // Ctrl+G — open Strategic Cortex graph
       if (e.key === 'g' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowGraph(!showGraph);
+        setShowGraph(!useSystemStore.getState().showGraph);
       }
       // Ctrl+Shift+V — open Clipboard History
       if (e.key.toLowerCase() === 'v' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowClipboard(!showClipboard);
+        setShowClipboard(!useSystemStore.getState().showClipboard);
       }
       // Ctrl+Shift+F — open Clickable Reality (Global OCR)
       if (e.key.toLowerCase() === 'f' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowClickableReality(!showClickableReality);
+        setShowClickableReality(!useSystemStore.getState().showClickableReality);
+      }
+      // Ctrl+Shift+D — toggle Bottom Dock (Taskbar)
+      if (e.key.toLowerCase() === 'd' && e.ctrlKey && e.shiftKey) {
+        e.preventDefault();
+        setShowDock(!useSystemStore.getState().showDock);
       }
       // Ctrl+Shift+J — open JARVIS Voice Assistant
       if (e.key.toLowerCase() === 'j' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowJarvis(!showJarvis);
+        setShowJarvis(prev => !prev);
       }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
@@ -286,7 +292,7 @@ export default function App() {
     
     // Listen for global shortcuts from Rust backend
     const unlistenTerminal = listen('toggle-sentient-terminal', () => {
-      setShowTerminal(!showTerminal);
+      setShowTerminal(!useSystemStore.getState().showTerminal);
     });
     
     const unlistenPalette = listen('toggle-command-palette', () => {
@@ -1153,7 +1159,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex flex-col selection:bg-indigo-500/30"
+      className="h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex flex-col selection:bg-indigo-500/30"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => e.preventDefault()}
     >
@@ -1205,7 +1211,19 @@ export default function App() {
       <MainCommandStage contexts={contexts} activeContext={activeContext} lastSync={lastSync} marketIntel={marketIntel} resolveNeuralIntent={resolveNeuralIntent} isListening={isListening} voiceTranscript={voiceTranscript} searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearchIntent={handleSearchIntent} isThinking={isThinking} startVoiceCapture={startVoiceCapture} simMode={simMode} simMetrics={simMetrics} founderMetrics={founderMetrics} cronAgents={cronAgents} setCronAgents={setCronAgents} newAgentTitle={newAgentTitle} setNewAgentTitle={setNewAgentTitle} newAgentPrompt={newAgentPrompt} setNewAgentPrompt={setNewAgentPrompt} bridgeStatus={bridgeStatus} telemetry={telemetry} crateError={crateError} crateName={crateName} setCrateName={setCrateName} saveActiveCrate={saveActiveCrate} scanActiveWindows={scanActiveWindows} suggestCrateName={suggestCrateName} importCrate={importCrate} crateBusy={crateBusy} activeWindows={activeWindows} contextCrates={contextCrates} editingCrate={editingCrate} setEditingCrate={setEditingCrate} exportCrate={exportCrate} deleteContextCrate={deleteContextCrate} launchContextCrate={launchContextCrate} handleUpdateCrate={handleUpdateCrate} removeAppFromEditingCrate={removeAppFromEditingCrate} getCrateAppCount={getCrateAppCount} handleContextSwitch={handleContextSwitch} />
       
       {/* OS Taskbar (Bottom Dock) */}
-      <BottomDock />
+      <AnimatePresence>
+        {showDock && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
+            className="w-full"
+          >
+            <BottomDock />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* OVERLAYS */}
       <OverlayManager 

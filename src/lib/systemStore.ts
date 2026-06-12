@@ -160,6 +160,8 @@ export interface SystemState {
   setShowPalette: (show: boolean) => void;
   showClickableReality: boolean;
   setShowClickableReality: (show: boolean) => void;
+  showDock: boolean;
+  setShowDock: (show: boolean) => void;
 }
 
 export type ChronosSnapshot = {
@@ -352,5 +354,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   setShowPalette: (show: boolean) => set({ showPalette: show }),
   showClickableReality: false,
   setShowClickableReality: (show: boolean) => set({ showClickableReality: show }),
+  showDock: true,
+  setShowDock: (show: boolean) => set({ showDock: show }),
 }));
 
