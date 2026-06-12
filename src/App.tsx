@@ -96,6 +96,7 @@ export default function App() {
     showVault, setShowVault,
     showSettings, setShowSettings,
     showLogs, setShowLogs,
+    showClickableReality, setShowClickableReality,
   } = useSystemStore();
 
   // --- CORE STATE ---
@@ -106,7 +107,6 @@ export default function App() {
   const [isScanningScreen, setIsScanningScreen] = useState(false);
   const [lastSync, setLastSync] = useState("Never");
   const [showAI, setShowAI] = useState(false);
-  const [showClickableReality, setShowClickableReality] = useState(false);
   const [isWidgetMode, setIsWidgetMode] = useState(false);
   
   const toggleWidgetMode = async () => {
@@ -269,7 +269,7 @@ export default function App() {
       // Ctrl+Shift+F — open Clickable Reality (Global OCR)
       if (e.key.toLowerCase() === 'f' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
-        setShowClickableReality(prev => !prev);
+        setShowClickableReality(!showClickableReality);
       }
       // Ctrl+Shift+J — open JARVIS Voice Assistant
       if (e.key.toLowerCase() === 'j' && e.ctrlKey && e.shiftKey) {

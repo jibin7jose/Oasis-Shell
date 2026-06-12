@@ -158,6 +158,8 @@ export interface SystemState {
   setSensoryFeedbackEnabled: (enabled: boolean) => void;
   showPalette: boolean;
   setShowPalette: (show: boolean) => void;
+  showClickableReality: boolean;
+  setShowClickableReality: (show: boolean) => void;
 }
 
 export type ChronosSnapshot = {
@@ -348,5 +350,7 @@ export const useSystemStore = create<SystemState>((set) => ({
   setSensoryFeedbackEnabled: (enabled: boolean) => set({ sensoryFeedbackEnabled: enabled }),
   showPalette: false,
   setShowPalette: (show: boolean) => set({ showPalette: show }),
+  showClickableReality: false,
+  setShowClickableReality: (show: boolean) => set({ showClickableReality: show }),
 }));
 

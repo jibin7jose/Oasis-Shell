@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit } from "lucide-react";
+import { Bot, LayoutDashboard, FolderOpen, Zap, Settings, Cpu, ShieldCheck, HardDrive, Camera, TerminalSquare, BrainCircuit, ScanSearch } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useSystemStore } from "../../lib/systemStore";
@@ -13,7 +13,8 @@ export default function LeftRail({ className }: { className?: string }) {
     showGraph, setShowGraph,
     showLogs, setShowLogs,
     showTerminal, setShowTerminal,
-    showWorkforce, setShowWorkforce
+    showWorkforce, setShowWorkforce,
+    showClickableReality, setShowClickableReality
   } = useSystemStore();
 
   const [healthScore, setHealthScore] = useState<number>(100);
@@ -38,6 +39,7 @@ export default function LeftRail({ className }: { className?: string }) {
     { id: "workforce", icon: BrainCircuit,     label: "Neural Workforce",action: () => setShowWorkforce(true) },
     { id: "processes", icon: Cpu,               label: "System Core",      action: () => setActiveView("processes") },
     { id: "files",     icon: HardDrive,         label: "File Explorer",   action: () => setActiveView("files") },
+    { id: "clickable", icon: ScanSearch,        label: "Oasis Lens",      action: () => setShowClickableReality(!showClickableReality) },
     { id: "vault",     icon: FolderOpen,        label: "Sentinel Vault",  action: () => setShowVault(true) },
     { id: "terminal",  icon: TerminalSquare,    label: "Terminal",        action: () => setShowTerminal(!showTerminal) },
     { id: "nexus",     icon: ShieldCheck,       label: "Aegis Nexus",     action: () => setShowNexus(true) },
