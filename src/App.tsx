@@ -272,8 +272,8 @@ export default function App() {
         e.preventDefault();
         setShowClickableReality(!useSystemStore.getState().showClickableReality);
       }
-      // Ctrl+Shift+D — toggle Bottom Dock (Taskbar)
-      if (e.key.toLowerCase() === 'd' && e.ctrlKey && e.shiftKey) {
+      // Ctrl+Alt+D — toggle Bottom Dock (Taskbar)
+      if (e.key.toLowerCase() === 'd' && e.ctrlKey && e.altKey) {
         e.preventDefault();
         setShowDock(!useSystemStore.getState().showDock);
       }
@@ -1214,6 +1214,7 @@ export default function App() {
       <AnimatePresence>
         {showDock && (
           <motion.div
+            key="bottom-dock"
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
