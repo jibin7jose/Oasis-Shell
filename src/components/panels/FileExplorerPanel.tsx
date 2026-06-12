@@ -130,11 +130,6 @@ export const FileExplorerPanel: React.FC = () => {
 
   const handleDelete = async (file: FileInfo) => {
     setContextMenu(null);
-    if (!isVaultAuthenticated) {
-      setNotification("Vault Auth Required");
-      setShowVault(true);
-      return;
-    }
 
     try {
       // Instead of permanently deleting via rust `delete_path` instantly, we move to the recycle bin UI.
@@ -155,11 +150,6 @@ export const FileExplorerPanel: React.FC = () => {
 
   const startRename = (file: FileInfo) => {
     setContextMenu(null);
-    if (!isVaultAuthenticated) {
-      setNotification("FOUNDER SIGNATURE REQUIRED: Unlock Sentinel Vault to re-designate assets.");
-      setShowVault(true);
-      return;
-    }
     setIsRenaming({ path: file.path, name: file.name });
   };
 
