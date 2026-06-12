@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud } from 'lucide-react';
+import { Activity, Zap, Shield, Activity as PulseIcon, Mic, Search, Bot, Briefcase, Plus, FolderOpen, Save, Settings, UploadCloud, HardDrive, Cpu, ScanSearch, Network, LayoutDashboard } from 'lucide-react';
 import SystemPanel from '../panels/SystemPanel';
 import { FileExplorerPanel } from '../panels/FileExplorerPanel';
 import { StoragePanel } from '../panels/StoragePanel';
@@ -13,7 +13,7 @@ import { useSystemStore } from '../../lib/systemStore';
 const cn = (...classes: any[]) => classes.filter(Boolean).join(" ");
 
 export const MainCommandStage = (props: any) => {
-  const { activeView, setActiveView, activeGolems } = useSystemStore();
+  const { activeView, setActiveView, activeGolems, setShowWorkforce, setShowClickableReality } = useSystemStore();
   const {
     contexts, activeContext, lastSync, marketIntel, resolveNeuralIntent, isListening,
     voiceTranscript, searchQuery, setSearchQuery, handleSearchIntent, isThinking,
@@ -121,6 +121,31 @@ export const MainCommandStage = (props: any) => {
           </motion.div>
 
           {/* DYNAMIC VIEWS */}
+          {activeView === 'desktop' && (
+            <div className="absolute top-24 left-8 grid grid-cols-1 gap-6 w-32">
+              {[
+                { id: 'dash', label: 'Workspaces', icon: LayoutDashboard, action: () => setActiveView('dash') },
+                { id: 'files', label: 'File Explorer', icon: HardDrive, action: () => setActiveView('files') },
+                { id: 'processes', label: 'System Core', icon: Cpu, action: () => setActiveView('processes') },
+                { id: 'workforce', label: 'Neural Workforce', icon: Network, action: () => setShowWorkforce(true) },
+                { id: 'clickable', label: 'Oasis Lens', icon: ScanSearch, action: () => setShowClickableReality(true) }
+              ].map(app => (
+                <button
+                  key={app.id}
+                  onClick={app.action}
+                  className="flex flex-col items-center gap-2 group outline-none"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-center glass group-hover:scale-105 group-hover:bg-indigo-500/20 group-hover:border-indigo-500/40 transition-all shadow-lg backdrop-blur-md">
+                    <app.icon className="w-6 h-6 text-indigo-300 group-hover:text-white transition-colors drop-shadow-[0_0_5px_rgba(165,180,252,0.8)]" />
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-300 group-hover:text-white text-center drop-shadow-md">
+                    {app.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {activeView === 'dash' && (
             <>
 
