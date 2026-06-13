@@ -517,6 +517,7 @@ pub async fn generate_commit_message(diff: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn execute_cli_directive(
     app: tauri::AppHandle,
+    session_id: String,
     cmd: String,
     args: Vec<String>,
     cwd: Option<String>,
@@ -529,14 +530,6 @@ pub async fn execute_cli_directive(
         full_cmd.push(' ');
         full_cmd.push_str(arg);
     }
-
-    let session_id = format!(
-        "term-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-    );
 
     let mut command = Command::new("powershell");
     command.args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])

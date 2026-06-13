@@ -200,11 +200,15 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
       return;
     }
 
+    // Generate session ID upfront to prevent race conditions with fast commands
+    const sessionId = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setCurrentSession(sessionId);
+
     // The Rust command now streams via events — it returns a session ID
-    const sessionId = await invokeSafe('execute_cli_directive', { cmd, args, cwd }) as string | null;
-    if (sessionId) setCurrentSession(sessionId);
+    const returnedSessionId = await invokeSafe('execute_cli_directive', { sessionId, cmd, args, cwd }) as string | null;
+    
     // If invokeSafe returns null (error), reset executing state
-    else {
+    if (!returnedSessionId) {
       setIsExecuting(false);
       setLines(prev => [...prev, {
         id: Date.now().toString(),
