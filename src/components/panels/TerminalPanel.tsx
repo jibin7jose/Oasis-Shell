@@ -18,6 +18,15 @@ interface TerminalPanelProps {
   stressColor?: string;
 }
 
+const formatBytes = (bytes: number, decimals = 2) => {
+  if (!+bytes) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
+
 export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActive: boolean; stressColor?: string }) {
   const [input, setInput] = useState('');
   const [lines, setLines] = useState<TerminalLine[]>([
@@ -141,9 +150,55 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
       return;
     }
 
-    if (cmd === 'scan') cmd = 'ls';
-    if (cmd === 'view') cmd = 'cat';
-    if (cmd === 'purge') cmd = 'rm';
+    if (cmd === 'scan') {
+      try {
+        const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : cwd;
+        const files = await invokeSafe('read_directory', { path: targetPath }) as any[];
+        if (!files) throw new Error('Directory not found or access denied.');
+        const output = files.map(f => `${f.is_dir ? '📁' : '📄'} ${f.name}   ${f.is_dir ? '' : '(' + formatBytes(f.size || 0) + ')'}`).join('\n');
+        setLines(prev => [...prev, 
+          { id: Date.now() + 'out', type: 'output', content: output || 'Directory is empty.', timestamp: '' },
+          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
+        ]);
+      } catch (err: any) {
+        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+      }
+      setIsExecuting(false);
+      return;
+    }
+
+    if (cmd === 'view') {
+      try {
+        const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
+        if (!targetPath) throw new Error('Please specify a file to view.');
+        const text = await invokeSafe('read_file_text', { path: targetPath }) as string;
+        if (text === null) throw new Error('File not found or access denied.');
+        setLines(prev => [...prev, 
+          { id: Date.now() + 'out', type: 'output', content: text, timestamp: '' },
+          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
+        ]);
+      } catch (err: any) {
+        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+      }
+      setIsExecuting(false);
+      return;
+    }
+
+    if (cmd === 'purge') {
+      try {
+        const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
+        if (!targetPath) throw new Error('Please specify a file to purge.');
+        await invokeSafe('delete_path', { path: targetPath });
+        setLines(prev => [...prev, 
+          { id: Date.now() + 'out', type: 'output', content: `[Vault] Purged ${targetPath}`, timestamp: '' },
+          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
+        ]);
+      } catch (err: any) {
+        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+      }
+      setIsExecuting(false);
+      return;
+    }
 
     // The Rust command now streams via events — it returns a session ID
     const sessionId = await invokeSafe('execute_cli_directive', { cmd, args, cwd }) as string | null;

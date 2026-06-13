@@ -105,3 +105,8 @@ pub fn rename_path(path: String, new_name: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn read_file_text(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
