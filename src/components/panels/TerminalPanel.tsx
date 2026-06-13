@@ -190,18 +190,47 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       args = [`"${targetPath}"`];
     }
 
-    if (cmd === 'find') {
-      const query = args.join(' ');
-      cmd = 'Get-ChildItem';
-      args = ['-Recurse', '-Filter', `*${query}*`, '|', 'Select-Object', 'FullName'];
+    if (cmd === 'clear' || cmd === 'cls') {
+      useTerminalStore.getState().clearTabLines(tabId);
+      setIsExecuting(false);
+      return;
     }
 
-    if (cmd === 'details') {
-      const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
-      if (targetPath) {
-        cmd = 'Get-ItemProperty';
-        args = [`"${targetPath}"`, '|', 'Format-List', '*'];
-      }
+    if (cmd === 'history') {
+      const hist = useTerminalStore.getState().tabs.find(t => t.id === tabId)?.history || [];
+      const out = hist.map((h, i) => `${i + 1}  ${h}`).join('\n');
+      setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'out', type: 'output', content: out || 'No history.', timestamp: '' }, { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }]);
+      setIsExecuting(false);
+      return;
+    }
+
+    const rawArgs = args.join(' ');
+    switch (cmd) {
+      case 'find': cmd = 'Get-ChildItem'; args = ['-Recurse', '-Filter', `*${rawArgs}*`, '|', 'Select-Object', 'FullName']; break;
+      case 'details': cmd = 'Get-ItemProperty'; args = [rawArgs ? `"${rawArgs}"` : '.', '|', 'Format-List', '*']; break;
+      case 'mkdir': case 'md': cmd = 'New-Item'; args = ['-ItemType', 'Directory', '-Force', '-Path', `"${rawArgs}"`]; break;
+      case 'touch': cmd = 'New-Item'; args = ['-ItemType', 'File', '-Force', '-Path', `"${rawArgs}"`]; break;
+      case 'cat': cmd = 'Get-Content'; args = [`"${rawArgs}"`]; break;
+      case 'rm': case 'del': case 'delete': case 'remove': cmd = 'Remove-Item'; args = ['-Force', '-Recurse', `"${rawArgs}"`]; break;
+      case 'cp': case 'copy': cmd = 'Copy-Item'; args = [rawArgs]; break;
+      case 'mv': case 'rename': case 'move': cmd = 'Move-Item'; args = [rawArgs]; break;
+      case 'ps': case 'top': case 'processes': cmd = 'Get-Process'; args = ['|', 'Sort-Object', 'CPU', '-Descending', '|', 'Select-Object', '-First', '20']; break;
+      case 'kill': cmd = 'Stop-Process'; args = ['-Force', '-Id', rawArgs]; break;
+      case 'sysinfo': case 'neofetch': cmd = 'Get-ComputerInfo'; args = ['|', 'Select-Object', 'OsName,OsArchitecture,WindowsVersion,CsProcessors,CsTotalPhysicalMemory']; break;
+      case 'whoami': cmd = 'whoami'; args = []; break;
+      case 'time': case 'date': cmd = 'Get-Date'; args = []; break;
+      case 'ip': case 'ipconfig': cmd = 'Get-NetIPAddress'; args = ['|', 'Format-Table']; break;
+      case 'ping': cmd = 'ping'; args = [rawArgs]; break;
+      case 'tree': cmd = 'tree'; args = ['/F', rawArgs ? `"${rawArgs}"` : `"${cwd}"`]; break;
+      case 'hash': case 'checksum': cmd = 'Get-FileHash'; args = [`"${rawArgs}"`]; break;
+      case 'uptime': cmd = '(Get-Date)'; args = ['-', '(Get-CimInstance', 'Win32_OperatingSystem).LastBootUpTime']; break;
+      case 'ports': case 'netstat': cmd = 'Get-NetTCPConnection'; args = ['|', 'Where-Object', 'State', '-eq', '"Listen"']; break;
+      case 'env': cmd = 'Get-ChildItem'; args = ['Env:']; break;
+      case 'wifi': cmd = 'netsh'; args = ['wlan', 'show', 'interfaces']; break;
+      case 'download': case 'wget': case 'curl': 
+        const dParts = rawArgs.split(' ');
+        cmd = 'Invoke-WebRequest'; args = ['-Uri', dParts[0], '-OutFile', dParts[1] || 'downloaded_file']; 
+        break;
     }
 
     if (cmd === 'view') {

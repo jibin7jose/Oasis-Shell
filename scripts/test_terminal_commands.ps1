@@ -15,10 +15,20 @@ $reportContent += "Time: $(Get-Date)"
 $reportContent += ""
 
 # 1. SETUP
+$reportContent += "[TEST] TOUCH  -> Executing touch command equivalent"
+New-Item -ItemType File -Force -Path "$testDir\source.txt" | Out-Null
 "Hello Oasis" | Out-File "$testDir\source.txt"
 $reportContent += "[SETUP] Created source.txt"
 
-# 2. COPY
+# 2. MKDIR / MD
+New-Item -ItemType Directory -Force -Path "$testDir\newfolder" | Out-Null
+if (Test-Path "$testDir\newfolder") {
+    $reportContent += "[TEST] MKDIR  -> SUCCESS (newfolder created)"
+} else {
+    $reportContent += "[TEST] MKDIR  -> FAILED"
+}
+
+# 3. COPY
 Copy-Item "$testDir\source.txt" "$testDir\copy.txt"
 if (Test-Path "$testDir\copy.txt") { 
     $reportContent += "[TEST] COPY   -> SUCCESS (copy.txt created)" 
@@ -26,7 +36,7 @@ if (Test-Path "$testDir\copy.txt") {
     $reportContent += "[TEST] COPY   -> FAILED" 
 }
 
-# 3. RENAME
+# 4. RENAME
 Rename-Item "$testDir\copy.txt" "renamed.txt"
 if (Test-Path "$testDir\renamed.txt") { 
     $reportContent += "[TEST] RENAME -> SUCCESS (renamed.txt verified)" 
@@ -34,7 +44,7 @@ if (Test-Path "$testDir\renamed.txt") {
     $reportContent += "[TEST] RENAME -> FAILED" 
 }
 
-# 4. FIND
+# 5. FIND
 $find = Get-ChildItem -Path $testDir -Recurse -Filter "*renamed*" | Select-Object -ExpandProperty Name
 if ($find -eq "renamed.txt") {
     $reportContent += "[TEST] FIND   -> SUCCESS (Found $find)"
@@ -42,7 +52,7 @@ if ($find -eq "renamed.txt") {
     $reportContent += "[TEST] FIND   -> FAILED"
 }
 
-# 5. DETAILS
+# 6. DETAILS
 $details = Get-ItemProperty "$testDir\renamed.txt"
 if ($null -ne $details.Length) {
     $reportContent += "[TEST] DETAILS-> SUCCESS (File length: $($details.Length) bytes)"
@@ -50,9 +60,26 @@ if ($null -ne $details.Length) {
     $reportContent += "[TEST] DETAILS-> FAILED"
 }
 
-# 6. DELETE / REMOVE
+# 7. SYSINFO
+$sysinfo = Get-ComputerInfo | Select-Object OsName,OsArchitecture | Out-String
+if ($sysinfo -match "OsName") {
+    $reportContent += "[TEST] SYSINFO-> SUCCESS (OS Name retrieved)"
+} else {
+    $reportContent += "[TEST] SYSINFO-> FAILED"
+}
+
+# 8. IPCONFIG
+$ip = Get-NetIPAddress | Select-Object -First 1
+if ($null -ne $ip) {
+    $reportContent += "[TEST] IP     -> SUCCESS (IP properties accessed)"
+} else {
+    $reportContent += "[TEST] IP     -> FAILED"
+}
+
+# 9. DELETE / REMOVE
 Remove-Item "$testDir\source.txt" -Force
 Remove-Item "$testDir\renamed.txt" -Force
+Remove-Item "$testDir\newfolder" -Force
 if (-Not (Test-Path "$testDir\source.txt")) {
     $reportContent += "[TEST] DELETE -> SUCCESS (Files permanently purged)"
 } else {
