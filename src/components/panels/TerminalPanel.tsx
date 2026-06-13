@@ -36,7 +36,8 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
 
   const setLines = (updater: any) => {
     if (typeof updater === 'function') {
-      setTabLines(tabId, updater(lines));
+      const currentLines = useTerminalStore.getState().tabs.find(t => t.id === tabId)?.lines || [];
+      setTabLines(tabId, updater(currentLines));
     } else {
       setTabLines(tabId, updater);
     }
@@ -47,7 +48,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isHealing, setIsHealing] = useState(false);
-  const [currentSession, setCurrentSession] = useState<string | null>(null);
+  const currentSessionRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -84,9 +85,11 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
         (event) => {
           if (!isMounted) return;
           const { session, line, kind } = event.payload;
+          if (session !== currentSessionRef.current) return;
+
           if (kind === 'done') {
             setIsExecuting(false);
-            setCurrentSession(null);
+            currentSessionRef.current = null;
             setLines((prev: TerminalLine[]) => [...prev, {
               id: `${session}-done`,
               type: 'meta',
@@ -209,7 +212,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     }
 
     const sessionId = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    setCurrentSession(sessionId);
+    currentSessionRef.current = sessionId;
 
     try {
       const returnedSessionId = await invokeSafe('execute_cli_directive', { sessionId, cmd, args, cwd }) as string | null;
