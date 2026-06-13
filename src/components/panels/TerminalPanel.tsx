@@ -5,12 +5,7 @@ import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
 import { FalconIcon } from '../icons/FalconIcon';
 
-interface TerminalLine {
-  id: string;
-  type: 'input' | 'output' | 'error' | 'meta' | 'done';
-  content: string;
-  timestamp: string;
-}
+import { useTerminalStore, TerminalLine } from '../../lib/terminalStore';
 
 interface TerminalPanelProps {
   isOpen: boolean;
@@ -27,20 +22,32 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
-export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActive: boolean; stressColor?: string }) {
+export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: { tabId: string; isActive: boolean; stressColor?: string }) {
   const [input, setInput] = useState('');
-  const [lines, setLines] = useState<TerminalLine[]>([
-    { id: '0a', type: 'meta', content: '╔══════════════════════════════════════╗', timestamp: '' },
-    { id: '0b', type: 'meta', content: '║  OASIS KERNEL v4.5 — SENTINEL LINK   ║', timestamp: '' },
-    { id: '0c', type: 'meta', content: '╚══════════════════════════════════════╝', timestamp: '' },
-    { id: '0d', type: 'meta', content: 'Real-time streaming terminal active.', timestamp: new Date().toLocaleTimeString() },
-  ]);
-  const [history, setHistory] = useState<string[]>([]);
+  
+  const tab = useTerminalStore(state => state.tabs.find(t => t.id === tabId));
+  const setTabLines = useTerminalStore(state => state.setTabLines);
+  const setTabCwd = useTerminalStore(state => state.updateTabCwd);
+  const addTabHistory = useTerminalStore(state => state.addTabHistory);
+  
+  const lines = tab?.lines || [];
+  const history = tab?.history || [];
+  const cwd = tab?.cwd || 'C:\\';
+
+  const setLines = (updater: any) => {
+    if (typeof updater === 'function') {
+      setTabLines(tabId, updater(lines));
+    } else {
+      setTabLines(tabId, updater);
+    }
+  };
+
+  const setCwd = (newCwd: string) => setTabCwd(tabId, newCwd);
+
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isHealing, setIsHealing] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
-  const [cwd, setCwd] = useState<string>(''); // Track native working directory
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -58,9 +65,11 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
 
   // Fetch initial directory
   useEffect(() => {
-    import('@tauri-apps/api/path').then(({ appDir }) => {
-      appDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
-    });
+    if (cwd === 'C:\\') {
+      import('@tauri-apps/api/path').then(({ appDir }) => {
+        appDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
+      });
+    }
   }, []);
 
   // Listen for streaming terminal output from Rust
@@ -78,7 +87,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
           if (kind === 'done') {
             setIsExecuting(false);
             setCurrentSession(null);
-            setLines(prev => [...prev, {
+            setLines((prev: TerminalLine[]) => [...prev, {
               id: `${session}-done`,
               type: 'meta',
               content: '─── Command complete ─────────────────────',
@@ -95,7 +104,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
           const isError = kind === 'error' || 
             (kind === 'output' && /error|failed|exception|unknown command|not found|is not recognized/i.test(cleanLine));
 
-          setLines(prev => [...prev, {
+          setLines((prev: TerminalLine[]) => [...prev, {
             id: `${session}-${Date.now()}-${Math.random()}`,
             type: isError ? 'error' : kind === 'input' ? 'input' : 'output',
             content: line,
@@ -122,29 +131,28 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
     let cmd = parts[0];
     let args = parts.slice(1);
 
-    setHistory(prev => [cmdText, ...prev]);
+    addTabHistory(tabId, cmdText);
     setHistoryIndex(-1);
     setInput('');
     setIsExecuting(true);
 
     // Immediately print what the user actually typed
-    setLines(prev => [...prev, { id: Date.now() + 'in', type: 'input', content: `$ ${cmdText}`, timestamp: '' }]);
+    setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'in', type: 'input', content: `$ ${cmdText}`, timestamp: '' }]);
 
     // Native Oasis Commands Interceptor
     if (cmd === 'warp' || cmd === 'cd') {
       const targetDir = args.join(' ');
       if (targetDir) {
-        // Very basic mock relative navigation for now (ideally resolved via Rust)
         const newCwd = targetDir === '..' 
           ? cwd.substring(0, cwd.lastIndexOf('\\')) || 'C:\\'
           : targetDir.includes('\\') || targetDir.includes('/') ? targetDir : `${cwd}\\${targetDir}`;
         setCwd(newCwd);
-        setLines(prev => [...prev, 
+        setLines((prev: TerminalLine[]) => [...prev, 
           { id: Date.now() + 'out', type: 'output', content: `Warped to ${newCwd}`, timestamp: '' },
           { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
         ]);
       } else {
-        setLines(prev => [...prev, { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }]);
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }]);
       }
       setIsExecuting(false);
       return;
@@ -156,12 +164,12 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
         const files = await invokeSafe('read_directory', { path: targetPath }) as any[];
         if (!files) throw new Error('Directory not found or access denied.');
         const output = files.map(f => `${f.is_dir ? '📁' : '📄'} ${f.name}   ${f.is_dir ? '' : '(' + formatBytes(f.size || 0) + ')'}`).join('\n');
-        setLines(prev => [...prev, 
+        setLines((prev: TerminalLine[]) => [...prev, 
           { id: Date.now() + 'out', type: 'output', content: output || 'Directory is empty.', timestamp: '' },
           { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
         ]);
       } catch (err: any) {
-        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
       }
       setIsExecuting(false);
       return;
@@ -173,12 +181,12 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
         if (!targetPath) throw new Error('Please specify a file to view.');
         const text = await invokeSafe('read_file_text', { path: targetPath }) as string;
         if (text === null) throw new Error('File not found or access denied.');
-        setLines(prev => [...prev, 
+        setLines((prev: TerminalLine[]) => [...prev, 
           { id: Date.now() + 'out', type: 'output', content: text, timestamp: '' },
           { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
         ]);
       } catch (err: any) {
-        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
       }
       setIsExecuting(false);
       return;
@@ -189,28 +197,26 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
         const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
         if (!targetPath) throw new Error('Please specify a file to purge.');
         await invokeSafe('delete_path', { path: targetPath });
-        setLines(prev => [...prev, 
+        setLines((prev: TerminalLine[]) => [...prev, 
           { id: Date.now() + 'out', type: 'output', content: `[Vault] Purged ${targetPath}`, timestamp: '' },
           { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
         ]);
       } catch (err: any) {
-        setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
       }
       setIsExecuting(false);
       return;
     }
 
-    // Generate session ID upfront to prevent race conditions with fast commands
     const sessionId = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     setCurrentSession(sessionId);
 
     try {
       const returnedSessionId = await invokeSafe('execute_cli_directive', { sessionId, cmd, args, cwd }) as string | null;
       
-      // If invokeSafe returns null (error), reset executing state
       if (!returnedSessionId) {
         setIsExecuting(false);
-        setLines(prev => [...prev, {
+        setLines((prev: TerminalLine[]) => [...prev, {
           id: Date.now().toString(),
           type: 'error',
           content: 'Failed to spawn command.',
@@ -219,7 +225,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
       }
     } catch (err: any) {
       setIsExecuting(false);
-      setLines(prev => [...prev, {
+      setLines((prev: TerminalLine[]) => [...prev, {
         id: Date.now().toString(),
         type: 'error',
         content: `Backend Error: ${err.toString()}\n(If you just updated the code, please restart your Tauri dev server!)`,
@@ -230,7 +236,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
 
   const handleStopCommand = () => {
     setIsExecuting(false);
-    setLines(prev => [...prev, {
+    setLines((prev: TerminalLine[]) => [...prev, {
       id: Date.now() + 'kill',
       type: 'error',
       content: '^C (Process Detached)',
@@ -243,12 +249,12 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
       e.preventDefault();
       const newIdx = Math.min(historyIndex + 1, history.length - 1);
       setHistoryIndex(newIdx);
-      setInput(history[newIdx] ?? '');
+      setInput(history[history.length - 1 - newIdx] ?? '');
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const newIdx = Math.max(historyIndex - 1, -1);
       setHistoryIndex(newIdx);
-      setInput(newIdx === -1 ? '' : history[newIdx] ?? '');
+      setInput(newIdx === -1 ? '' : history[history.length - 1 - newIdx] ?? '');
     }
   };
 
@@ -256,7 +262,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
     if (isHealing) return;
     setIsHealing(true);
     const healId1 = Date.now() + 'h1';
-    setLines(prev => [...prev, { id: healId1, type: 'meta', content: '[AURA-HEAL] Analyzing stack trace via Neural Engine...', timestamp: '' }]);
+    setLines((prev: TerminalLine[]) => [...prev, { id: healId1, type: 'meta', content: '[AURA-HEAL] Analyzing stack trace via Neural Engine...', timestamp: '' }]);
     
     try {
       const response = await invokeSafe('analyze_terminal_error', { errorText: errorContent }) as string;
@@ -264,19 +270,17 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
       const responseText = response.trim();
       let cleanResponse = responseText;
       
-      // Extract the command from <command> tags
       const commandMatch = responseText.match(/<command>([\s\S]*?)<\/command>/);
       if (commandMatch && commandMatch[1]) {
         setInput(commandMatch[1].trim());
-        // Clean the tags out of the UI text
         cleanResponse = responseText.replace(/<\/?command>/g, '`');
       }
 
       const healId2 = Date.now() + 'h2';
-      setLines(prev => [...prev, { id: healId2, type: 'output', content: `✓ AI Analysis: ${cleanResponse}`, timestamp: '' }]);
+      setLines((prev: TerminalLine[]) => [...prev, { id: healId2, type: 'output', content: `✓ AI Analysis: ${cleanResponse}`, timestamp: '' }]);
 
     } catch (e) {
-      setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: '[AURA-HEAL] Neural Engine offline or failed.', timestamp: '' }]);
+      setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: '[AURA-HEAL] Neural Engine offline or failed.', timestamp: '' }]);
     } finally {
       setIsHealing(false);
     }
@@ -311,7 +315,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setLines(lines.slice(0, 4))}
+            onClick={() => useTerminalStore.getState().clearTabLines(tabId)}
             className="p-1.5 text-slate-600 hover:text-slate-300 transition-colors"
             title="Clear terminal"
           >
@@ -320,8 +324,6 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
         </div>
       </div>
 
-
-          {/* Output */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-6 py-4 font-mono text-[12px] leading-relaxed space-y-0.5 no-scrollbar"
@@ -376,7 +378,6 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
             )}
           </div>
 
-          {/* Input */}
           <form
             onSubmit={handleCommand}
             className="flex items-center gap-3 px-6 py-3 border-t border-white/5 flex-shrink-0"
@@ -408,23 +409,15 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
 }
 
 export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: TerminalPanelProps) {
-  const [tabs, setTabs] = useState([{ id: '1', name: 'oasis' }]);
-  const [activeTab, setActiveTab] = useState('1');
-
-  const addTab = () => {
-    const newId = Date.now().toString();
-    setTabs([...tabs, { id: newId, name: 'oasis' }]);
-    setActiveTab(newId);
-  };
+  const tabs = useTerminalStore(state => state.tabs);
+  const activeTabId = useTerminalStore(state => state.activeTabId);
+  const addTab = useTerminalStore(state => state.addTab);
+  const removeTabAction = useTerminalStore(state => state.removeTab);
+  const setActiveTab = useTerminalStore(state => state.setActiveTab);
 
   const removeTab = (e: React.MouseEvent, idToRemove: string) => {
     e.stopPropagation();
-    if (tabs.length === 1) return; // Don't close the last tab
-    const newTabs = tabs.filter(t => t.id !== idToRemove);
-    setTabs(newTabs);
-    if (activeTab === idToRemove) {
-      setActiveTab(newTabs[newTabs.length - 1].id);
-    }
+    removeTabAction(idToRemove);
   };
 
   return (
@@ -442,7 +435,6 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
             boxShadow: `0 -20px 60px rgba(0,0,0,0.8), 0 -4px 20px ${stressColor}20`,
           }}
         >
-          {/* Header & Tabs */}
           <div className="flex justify-between items-center bg-black/40 border-b border-white/5 pl-2 pr-4 flex-shrink-0 pt-1">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-2">
               {tabs.map((tab) => (
@@ -450,48 +442,51 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-t-lg text-[11px] font-mono cursor-pointer transition-all border-t border-l border-r",
-                    activeTab === tab.id 
-                      ? "bg-[#0a0a0f] text-white border-white/10" 
-                      : "bg-transparent text-slate-500 border-transparent hover:bg-white/5"
+                    "flex items-center gap-2 px-3 py-1.5 rounded-t-md text-xs cursor-pointer border-t border-l border-r transition-all group",
+                    activeTabId === tab.id
+                      ? "bg-[#0a0a0f] border-white/10 text-white"
+                      : "bg-transparent border-transparent text-slate-500 hover:text-slate-300"
                   )}
                 >
-                  <TerminalIcon className="w-3 h-3" style={{ color: activeTab === tab.id ? stressColor : undefined }} />
-                  {tab.name}
-                  {tabs.length > 1 && (
-                    <button 
-                      onClick={(e) => removeTab(e, tab.id)}
-                      className="p-0.5 ml-1 rounded hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+                  <TerminalIcon className="w-3 h-3" />
+                  <span>{tab.name}</span>
+                  <button
+                    onClick={(e) => removeTab(e, tab.id)}
+                    className="p-0.5 rounded hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
-              <button 
-                onClick={addTab}
-                className="p-1.5 ml-1 mb-1 rounded hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
-                title="New Terminal"
+              <button
+                onClick={() => addTab()}
+                className="p-1.5 ml-1 text-slate-500 hover:text-white rounded transition-colors"
+                title="New Terminal Instance"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Close Panel">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-500 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Instances */}
           <div className="flex-1 relative overflow-hidden bg-[#0a0a0f]">
             {tabs.map((tab) => (
-              <TerminalInstance 
-                key={tab.id} 
-                isActive={activeTab === tab.id} 
-                stressColor={stressColor} 
-              />
+              <div
+                key={tab.id}
+                className={cn(
+                  "absolute inset-0 h-full",
+                  activeTabId === tab.id ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none"
+                )}
+              >
+                <TerminalInstance tabId={tab.id} isActive={activeTabId === tab.id} stressColor={stressColor} />
+              </div>
             ))}
           </div>
         </motion.div>
