@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal as TerminalIcon, X, ChevronRight, Zap, Trash2, Sparkles } from 'lucide-react';
+import { Terminal as TerminalIcon, X, ChevronRight, Zap, Trash2, Sparkles, Plus } from 'lucide-react';
 import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
 
@@ -17,7 +17,7 @@ interface TerminalPanelProps {
   stressColor?: string;
 }
 
-export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: TerminalPanelProps) {
+export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActive: boolean; stressColor?: string }) {
   const [input, setInput] = useState('');
   const [lines, setLines] = useState<TerminalLine[]>([
     { id: '0a', type: 'meta', content: '╔══════════════════════════════════════╗', timestamp: '' },
@@ -41,10 +41,10 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
     }
   }, [lines]);
 
-  // Focus input when opened
+  // Focus input when opened or active
   useEffect(() => {
-    if (isOpen && inputRef.current) inputRef.current.focus();
-  }, [isOpen]);
+    if (isActive && inputRef.current) inputRef.current.focus();
+  }, [isActive]);
 
   // Fetch initial directory
   useEffect(() => {
@@ -216,55 +216,31 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ y: '100%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          className="fixed bottom-0 left-20 md:left-24 right-0 h-[45vh] z-[300] flex flex-col"
-          style={{
-            background: 'linear-gradient(180deg, rgba(0,0,0,0.97) 0%, rgba(2,4,20,0.99) 100%)',
-            borderTop: `1px solid ${stressColor}40`,
-            boxShadow: `0 -20px 60px rgba(0,0,0,0.8), 0 -4px 20px ${stressColor}20`,
-          }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-                <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-              </div>
-              <TerminalIcon className="w-4 h-4 text-slate-500" />
-              <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                Oasis Shell
-              </span>
-              {isExecuting && (
-                <div className="flex items-center gap-1.5 ml-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest">Running</span>
-                </div>
-              )}
+    <div className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}>
+      <div className="flex items-center justify-between px-6 py-2 border-b border-white/5 bg-black/40 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <TerminalIcon className="w-4 h-4 text-slate-500" />
+          <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+            {cwd ? cwd : 'Oasis Shell'}
+          </span>
+          {isExecuting && (
+            <div className="flex items-center gap-1.5 ml-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest">Running</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setLines(lines.slice(0, 4))}
-                className="p-1.5 text-slate-600 hover:text-slate-300 transition-colors"
-                title="Clear terminal"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={onClose}
-                className="p-1.5 text-slate-600 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setLines(lines.slice(0, 4))}
+            className="p-1.5 text-slate-600 hover:text-slate-300 transition-colors"
+            title="Clear terminal"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
 
           {/* Output */}
           <div
@@ -347,6 +323,92 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
               <Zap className="w-4 h-4" />
             </button>
           </form>
+    </div>
+  );
+}
+
+export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: TerminalPanelProps) {
+  const [tabs, setTabs] = useState([{ id: '1', name: 'oasis' }]);
+  const [activeTab, setActiveTab] = useState('1');
+
+  const addTab = () => {
+    const newId = Date.now().toString();
+    setTabs([...tabs, { id: newId, name: 'oasis' }]);
+    setActiveTab(newId);
+  };
+
+  const removeTab = (e: React.MouseEvent, idToRemove: string) => {
+    e.stopPropagation();
+    if (tabs.length === 1) return; // Don't close the last tab
+    const newTabs = tabs.filter(t => t.id !== idToRemove);
+    setTabs(newTabs);
+    if (activeTab === idToRemove) {
+      setActiveTab(newTabs[newTabs.length - 1].id);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 100 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          className="fixed bottom-0 left-[10%] right-[10%] h-[400px] bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-l border-r border-white/10 rounded-t-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+        >
+          {/* Header & Tabs */}
+          <div className="flex justify-between items-center bg-black/40 border-b border-white/5 pl-2 pr-4 flex-shrink-0">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-2">
+              {tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-t-lg text-[11px] font-mono cursor-pointer transition-all border-t border-l border-r",
+                    activeTab === tab.id 
+                      ? "bg-[#0a0a0f] text-white border-white/10" 
+                      : "bg-transparent text-slate-500 border-transparent hover:bg-white/5"
+                  )}
+                >
+                  <TerminalIcon className="w-3 h-3" style={{ color: activeTab === tab.id ? stressColor : undefined }} />
+                  {tab.name}
+                  {tabs.length > 1 && (
+                    <button 
+                      onClick={(e) => removeTab(e, tab.id)}
+                      className="p-0.5 ml-1 rounded hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button 
+                onClick={addTab}
+                className="p-1.5 ml-1 mb-1 rounded hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
+                title="New Terminal"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Close Panel">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Instances */}
+          <div className="flex-1 relative overflow-hidden bg-[#0a0a0f]">
+            {tabs.map((tab) => (
+              <TerminalInstance 
+                key={tab.id} 
+                isActive={activeTab === tab.id} 
+                stressColor={stressColor} 
+              />
+            ))}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
