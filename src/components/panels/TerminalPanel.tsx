@@ -186,10 +186,22 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
         return;
       }
       
-      // Override to use PowerShell's native Start-Process to bypass Tauri scope restrictions entirely
       cmd = 'Start-Process';
       args = [`"${targetPath}"`];
-      // Do not return here. Let the execution fall through to the main directive handler.
+    }
+
+    if (cmd === 'find') {
+      const query = args.join(' ');
+      cmd = 'Get-ChildItem';
+      args = ['-Recurse', '-Filter', `*${query}*`, '|', 'Select-Object', 'FullName'];
+    }
+
+    if (cmd === 'details') {
+      const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
+      if (targetPath) {
+        cmd = 'Get-ItemProperty';
+        args = [`"${targetPath}"`, '|', 'Format-List', '*'];
+      }
     }
 
     if (cmd === 'view') {
