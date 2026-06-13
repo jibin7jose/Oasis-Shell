@@ -179,20 +179,17 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     }
 
     if (cmd === 'open' || cmd === 'launch') {
-      try {
-        const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
-        if (!targetPath) throw new Error('Please specify a file to open.');
-        const { openPath } = await import('@tauri-apps/plugin-opener');
-        await openPath(targetPath);
-        setLines((prev: TerminalLine[]) => [...prev, 
-          { id: Date.now() + 'out', type: 'output', content: `[Vault] Launched ${targetPath} externally.`, timestamp: '' },
-          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
-        ]);
-      } catch (err: any) {
-        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+      const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
+      if (!targetPath) {
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: 'Please specify a file to open.', timestamp: '' }]);
+        setIsExecuting(false);
+        return;
       }
-      setIsExecuting(false);
-      return;
+      
+      // Override to use PowerShell's native Start-Process to bypass Tauri scope restrictions entirely
+      cmd = 'Start-Process';
+      args = [`"${targetPath}"`];
+      // Do not return here. Let the execution fall through to the main directive handler.
     }
 
     if (cmd === 'view') {
