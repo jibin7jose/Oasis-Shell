@@ -147,14 +147,20 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
     try {
       const response = await invokeSafe('analyze_terminal_error', { errorText: errorContent }) as string;
       
-      const healId2 = Date.now() + 'h2';
-      setLines(prev => [...prev, { id: healId2, type: 'output', content: `✓ AI Analysis: ${response.trim()}`, timestamp: '' }]);
+      const responseText = response.trim();
+      let cleanResponse = responseText;
       
-      // Try to extract a command from backticks if the AI provided one
-      const commandMatch = response.match(/`([^`]+)`/);
+      // Extract the command from <command> tags
+      const commandMatch = responseText.match(/<command>([\s\S]*?)<\/command>/);
       if (commandMatch && commandMatch[1]) {
         setInput(commandMatch[1].trim());
+        // Clean the tags out of the UI text
+        cleanResponse = responseText.replace(/<\/?command>/g, '`');
       }
+
+      const healId2 = Date.now() + 'h2';
+      setLines(prev => [...prev, { id: healId2, type: 'output', content: `✓ AI Analysis: ${cleanResponse}`, timestamp: '' }]);
+
     } catch (e) {
       setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: '[AURA-HEAL] Neural Engine offline or failed.', timestamp: '' }]);
     } finally {

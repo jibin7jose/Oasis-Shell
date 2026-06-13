@@ -450,7 +450,7 @@ pub async fn check_ai_status() -> Result<serde_json::Value, String> {
 pub async fn analyze_terminal_error(error_text: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let prompt = format!(
-        "You are an expert developer. The user ran a command in their terminal and got this error:\n\n{}\n\nProvide the root cause and a brief suggested terminal command to fix it. Keep it very short.",
+        "You are an expert developer. The user ran a command in their terminal and got this error:\n\n{}\n\nProvide the root cause and a brief suggested terminal command to fix it. If you suggest a command to run, you MUST enclose the exact command in <command> tags, like <command>npm install</command>. Keep your explanation very short.",
         error_text
     );
     
