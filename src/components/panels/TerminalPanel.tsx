@@ -159,6 +159,16 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
     }
   };
 
+  const handleStopCommand = () => {
+    setIsExecuting(false);
+    setLines(prev => [...prev, {
+      id: Date.now() + 'kill',
+      type: 'error',
+      content: '^C (Process Detached)',
+      timestamp: ''
+    }]);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -315,12 +325,14 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
               spellCheck={false}
             />
             <button
-              type="submit"
-              disabled={isExecuting || !input.trim()}
-              className="p-1.5 rounded-lg transition-all disabled:opacity-30"
-              style={{ color: stressColor }}
+              type="button"
+              onClick={isExecuting ? handleStopCommand : (e) => { e.preventDefault(); handleCommand(e as any); }}
+              disabled={!isExecuting && !input.trim()}
+              className={cn("p-1.5 rounded-lg transition-all", (!isExecuting && !input.trim()) && "opacity-30")}
+              style={{ color: isExecuting ? '#ef4444' : stressColor }}
+              title={isExecuting ? 'Stop Command' : 'Run Command'}
             >
-              <Zap className="w-4 h-4" />
+              {isExecuting ? <div className="w-3.5 h-3.5 bg-red-500 rounded-sm" /> : <Zap className="w-4 h-4" />}
             </button>
           </form>
     </div>
@@ -351,14 +363,19 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, y: 100 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 100 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-0 left-[10%] right-[10%] h-[400px] bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-l border-r border-white/10 rounded-t-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+          className="fixed bottom-0 left-20 md:left-24 right-0 h-[45vh] z-[300] flex flex-col"
+          style={{
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.97) 0%, rgba(2,4,20,0.99) 100%)',
+            borderTop: `1px solid ${stressColor}40`,
+            boxShadow: `0 -20px 60px rgba(0,0,0,0.8), 0 -4px 20px ${stressColor}20`,
+          }}
         >
           {/* Header & Tabs */}
-          <div className="flex justify-between items-center bg-black/40 border-b border-white/5 pl-2 pr-4 flex-shrink-0">
+          <div className="flex justify-between items-center bg-black/40 border-b border-white/5 pl-2 pr-4 flex-shrink-0 pt-1">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-2">
               {tabs.map((tab) => (
                 <div
