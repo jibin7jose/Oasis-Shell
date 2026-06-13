@@ -65,9 +65,12 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
           }
           if (!line) return;
           
+          // Strip ANSI codes to ensure regex works even if terminal outputs colored text
+          const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').trim();
+
           // Smart error detection for stdout streams that print errors
           const isError = kind === 'error' || 
-            (kind === 'output' && /error|failed|exception|unknown command|not found/i.test(line));
+            (kind === 'output' && /error|failed|exception|unknown command|not found|is not recognized/i.test(cleanLine));
 
           setLines(prev => [...prev, {
             id: `${session}-${Date.now()}-${Math.random()}`,
