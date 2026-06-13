@@ -30,6 +30,7 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
   const [isExecuting, setIsExecuting] = useState(false);
   const [isHealing, setIsHealing] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
+  const [cwd, setCwd] = useState<string>(''); // Track native working directory
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,6 +45,13 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
   useEffect(() => {
     if (isOpen && inputRef.current) inputRef.current.focus();
   }, [isOpen]);
+
+  // Fetch initial directory
+  useEffect(() => {
+    import('@tauri-apps/api/path').then(({ appDir }) => {
+      appDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
+    });
+  }, []);
 
   // Listen for streaming terminal output from Rust
   useEffect(() => {
@@ -101,16 +109,39 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
 
     const cmdText = input.trim();
     const parts = cmdText.split(' ');
-    const cmd = parts[0];
-    const args = parts.slice(1);
+    let cmd = parts[0];
+    let args = parts.slice(1);
 
     setHistory(prev => [cmdText, ...prev]);
     setHistoryIndex(-1);
     setInput('');
     setIsExecuting(true);
 
+    // Native Oasis Commands Interceptor
+    if (cmd === 'warp' || cmd === 'cd') {
+      const targetDir = args.join(' ');
+      if (targetDir) {
+        // Very basic mock relative navigation for now (ideally resolved via Rust)
+        const newCwd = targetDir === '..' 
+          ? cwd.substring(0, cwd.lastIndexOf('\\')) || 'C:\\'
+          : targetDir.includes('\\') || targetDir.includes('/') ? targetDir : `${cwd}\\${targetDir}`;
+        setCwd(newCwd);
+        setLines(prev => [...prev, 
+          { id: Date.now() + 'in', type: 'input', content: `$ ${cmdText}`, timestamp: '' },
+          { id: Date.now() + 'out', type: 'output', content: `Warped to ${newCwd}`, timestamp: '' },
+          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
+        ]);
+      }
+      setIsExecuting(false);
+      return;
+    }
+
+    if (cmd === 'scan') cmd = 'ls';
+    if (cmd === 'view') cmd = 'cat';
+    if (cmd === 'purge') cmd = 'rm';
+
     // The Rust command now streams via events — it returns a session ID
-    const sessionId = await invokeSafe('execute_cli_directive', { cmd, args }) as string | null;
+    const sessionId = await invokeSafe('execute_cli_directive', { cmd, args, cwd }) as string | null;
     if (sessionId) setCurrentSession(sessionId);
     // If invokeSafe returns null (error), reset executing state
     else {

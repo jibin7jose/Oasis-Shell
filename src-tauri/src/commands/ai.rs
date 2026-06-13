@@ -519,6 +519,7 @@ pub async fn execute_cli_directive(
     app: tauri::AppHandle,
     cmd: String,
     args: Vec<String>,
+    cwd: Option<String>,
 ) -> Result<String, String> {
     use std::io::{BufRead, BufReader};
     use std::process::{Command, Stdio};
@@ -547,12 +548,16 @@ pub async fn execute_cli_directive(
         }),
     );
 
-    let child = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])
+    let mut command = Command::new("powershell");
+    command.args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| e.to_string())?;
+        .stderr(Stdio::piped());
+
+    if let Some(dir) = cwd {
+        command.current_dir(dir);
+    }
+
+    let child = command.spawn().map_err(|e| e.to_string())?;
 
     let app_stdout = app.clone();
     let app_stderr = app.clone();
