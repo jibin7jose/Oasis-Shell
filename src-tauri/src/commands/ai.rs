@@ -547,15 +547,15 @@ pub async fn execute_cli_directive(
         command.current_dir(dir);
     }
 
-    let child = command.spawn().map_err(|e| e.to_string())?;
+    let mut child = command.spawn().map_err(|e| e.to_string())?;
 
     let app_stdout = app.clone();
     let app_stderr = app.clone();
     let sid_out = session_id.clone();
     let sid_err = session_id.clone();
 
-    let stdout = child.stdout.ok_or("No stdout")?;
-    let stderr = child.stderr.ok_or("No stderr")?;
+    let stdout = child.stdout.take().ok_or("No stdout")?;
+    let stderr = child.stderr.take().ok_or("No stderr")?;
 
     // Stream stdout in background thread
     let t1 = std::thread::spawn(move || {
@@ -592,8 +592,9 @@ pub async fn execute_cli_directive(
     let app_done = app.clone();
     let sid_done = session_id.clone();
 
-    // Wait for both streams to finish in a background thread
+    // Wait for both streams to finish and reap child process in a background thread
     std::thread::spawn(move || {
+        let _ = child.wait();
         let _ = t1.join();
         let _ = t2.join();
 
