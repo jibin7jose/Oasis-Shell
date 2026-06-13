@@ -178,6 +178,23 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       return;
     }
 
+    if (cmd === 'open' || cmd === 'launch') {
+      try {
+        const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
+        if (!targetPath) throw new Error('Please specify a file to open.');
+        const { open } = await import('@tauri-apps/plugin-opener');
+        await open(targetPath);
+        setLines((prev: TerminalLine[]) => [...prev, 
+          { id: Date.now() + 'out', type: 'output', content: `[Vault] Launched ${targetPath} externally.`, timestamp: '' },
+          { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
+        ]);
+      } catch (err: any) {
+        setLines((prev: TerminalLine[]) => [...prev, { id: Date.now() + 'err', type: 'error', content: err.toString(), timestamp: '' }]);
+      }
+      setIsExecuting(false);
+      return;
+    }
+
     if (cmd === 'view') {
       try {
         const targetPath = args.length > 0 ? (args[0].includes('\\') || args[0].includes('/') ? args.join(' ') : `${cwd}\\${args.join(' ')}`) : null;
