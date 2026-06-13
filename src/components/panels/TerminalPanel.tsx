@@ -28,6 +28,7 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isHealing, setIsHealing] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -138,6 +139,8 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
   };
 
   const triggerHealProtocol = async (errorContent: string) => {
+    if (isHealing) return;
+    setIsHealing(true);
     const healId1 = Date.now() + 'h1';
     setLines(prev => [...prev, { id: healId1, type: 'meta', content: '[AURA-HEAL] Analyzing stack trace via Neural Engine...', timestamp: '' }]);
     
@@ -154,6 +157,8 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
       }
     } catch (e) {
       setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: '[AURA-HEAL] Neural Engine offline or failed.', timestamp: '' }]);
+    } finally {
+      setIsHealing(false);
     }
 
     if (inputRef.current) inputRef.current.focus();
@@ -256,10 +261,11 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
                     <div className="pl-6 py-1">
                       <button
                         onClick={() => triggerHealProtocol(getFullErrorContext())}
-                        className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/20 text-red-300 rounded text-[10px] uppercase font-bold tracking-widest transition-all shadow-[0_0_10px_rgba(239,68,68,0.1)]"
+                        disabled={isHealing}
+                        className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/20 text-red-300 rounded text-[10px] uppercase font-bold tracking-widest transition-all shadow-[0_0_10px_rgba(239,68,68,0.1)] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Sparkles className="w-3 h-3" />
-                        Diagnose & Fix
+                        <Sparkles className={cn("w-3 h-3", isHealing && "animate-pulse")} />
+                        {isHealing ? 'Healing...' : 'Diagnose & Fix'}
                       </button>
                     </div>
                   )}
