@@ -46,11 +46,15 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
 
   // Listen for streaming terminal output from Rust
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    import('@tauri-apps/api/event').then(({ listen }) => {
-      listen<{ session: string; line: string; kind: 'input' | 'output' | 'error' | 'done' }>(
+    let unlistenFn: (() => void) | undefined;
+    let isMounted = true;
+
+    const setupListener = async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      unlistenFn = await listen<{ session: string; line: string; kind: 'input' | 'output' | 'error' | 'done' }>(
         'terminal-stdout',
         (event) => {
+          if (!isMounted) return;
           const { session, line, kind } = event.payload;
           if (kind === 'done') {
             setIsExecuting(false);
@@ -59,7 +63,7 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
               id: `${session}-done`,
               type: 'meta',
               content: '─── Command complete ─────────────────────',
-              timestamp: new Date().toLocaleTimeString(),
+              timestamp: ''
             }]);
             return;
           }
@@ -79,9 +83,15 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
             timestamp: new Date().toLocaleTimeString(),
           }]);
         }
-      ).then(u => { unlisten = u; });
-    });
-    return () => { if (unlisten) unlisten(); };
+      );
+    };
+
+    setupListener();
+
+    return () => {
+      isMounted = false;
+      if (unlistenFn) unlistenFn();
+    };
   }, []);
 
   const handleCommand = async (e: React.FormEvent) => {
@@ -127,13 +137,25 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
     }
   };
 
-  const triggerHealProtocol = (errorContent: string) => {
-    const healLines: TerminalLine[] = [
-      { id: Date.now() + 'h1', type: 'meta', content: '[AURA-HEAL] Analyzing stack trace...', timestamp: '' },
-      { id: Date.now() + 'h2', type: 'output', content: '✓ Root cause identified: Resource lock conflict. Preparing resolution command.', timestamp: '' },
-    ];
-    setLines(prev => [...prev, ...healLines]);
-    setInput('kill -9 $(lsof -t -i:3000)'); // Pre-fill the fix
+  const triggerHealProtocol = async (errorContent: string) => {
+    const healId1 = Date.now() + 'h1';
+    setLines(prev => [...prev, { id: healId1, type: 'meta', content: '[AURA-HEAL] Analyzing stack trace via Neural Engine...', timestamp: '' }]);
+    
+    try {
+      const response = await invokeSafe('analyze_terminal_error', { errorText: errorContent }) as string;
+      
+      const healId2 = Date.now() + 'h2';
+      setLines(prev => [...prev, { id: healId2, type: 'output', content: `✓ AI Analysis: ${response.trim()}`, timestamp: '' }]);
+      
+      // Try to extract a command from backticks if the AI provided one
+      const commandMatch = response.match(/`([^`]+)`/);
+      if (commandMatch && commandMatch[1]) {
+        setInput(commandMatch[1].trim());
+      }
+    } catch (e) {
+      setLines(prev => [...prev, { id: Date.now() + 'err', type: 'error', content: '[AURA-HEAL] Neural Engine offline or failed.', timestamp: '' }]);
+    }
+
     if (inputRef.current) inputRef.current.focus();
   };
 

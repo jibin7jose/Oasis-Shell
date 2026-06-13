@@ -298,6 +298,7 @@ pub fn run() {
             commands::ai::execute_neural_command,
             commands::ai::execute_cli_directive,
             commands::ai::generate_commit_message,
+            commands::ai::analyze_terminal_error,
             commands::ai::check_ai_status,
             commands::ai::parse_neural_intent,
             commands::nexus::start_proactive_sentience,

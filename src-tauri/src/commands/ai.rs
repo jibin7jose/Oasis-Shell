@@ -447,6 +447,33 @@ pub async fn check_ai_status() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
+pub async fn analyze_terminal_error(error_text: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let prompt = format!(
+        "You are an expert developer. The user ran a command in their terminal and got this error:\n\n{}\n\nProvide the root cause and a brief suggested terminal command to fix it. Keep it very short.",
+        error_text
+    );
+    
+    let body = serde_json::json!({
+        "model": "gemma4:latest",
+        "prompt": prompt,
+        "stream": false
+    });
+
+    let res = client
+        .post("http://localhost:11434/api/generate")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let response = json["response"].as_str().unwrap_or("No response").to_string();
+
+    Ok(response)
+}
+
+#[tauri::command]
 pub fn execute_neural_command(command: String) -> Result<String, String> {
     let output = std::process::Command::new("powershell")
         .args(["-Command", &command])
