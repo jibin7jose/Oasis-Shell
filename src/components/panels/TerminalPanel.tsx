@@ -225,33 +225,47 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-6 py-4 font-mono text-[12px] leading-relaxed space-y-0.5 no-scrollbar"
           >
-            {lines.map((line) => (
-              <div key={line.id} className={cn('flex flex-col gap-1', lineColor(line.type))}>
-                <div className="flex gap-3 items-start">
-                  {line.type === 'input' && (
-                    <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-indigo-400" />
-                  )}
-                  {line.type === 'error' && (
-                    <span className="flex-shrink-0 text-red-500">!</span>
-                  )}
-                  {(line.type === 'output' || line.type === 'meta' || line.type === 'done') && (
-                    <span className="flex-shrink-0 w-3" />
-                  )}
-                  <span className="break-all">{line.content}</span>
-                </div>
-                {line.type === 'error' && (
-                  <div className="pl-6 py-1">
-                    <button
-                      onClick={() => triggerHealProtocol(line.content)}
-                      className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/20 text-red-300 rounded text-[10px] uppercase font-bold tracking-widest transition-all shadow-[0_0_10px_rgba(239,68,68,0.1)]"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      Diagnose & Fix
-                    </button>
+            {lines.map((line, index) => {
+              const isLastErrorInBlock = line.type === 'error' && lines[index + 1]?.type !== 'error';
+              
+              const getFullErrorContext = () => {
+                let context = '';
+                let i = index;
+                while (i >= 0 && lines[i].type === 'error') {
+                  context = lines[i].content + '\n' + context;
+                  i--;
+                }
+                return context.trim();
+              };
+
+              return (
+                <div key={line.id} className={cn('flex flex-col gap-1', lineColor(line.type))}>
+                  <div className="flex gap-3 items-start">
+                    {line.type === 'input' && (
+                      <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-indigo-400" />
+                    )}
+                    {line.type === 'error' && (
+                      <span className="flex-shrink-0 text-red-500">!</span>
+                    )}
+                    {(line.type === 'output' || line.type === 'meta' || line.type === 'done') && (
+                      <span className="flex-shrink-0 w-3" />
+                    )}
+                    <span className="break-all">{line.content}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {isLastErrorInBlock && (
+                    <div className="pl-6 py-1">
+                      <button
+                        onClick={() => triggerHealProtocol(getFullErrorContext())}
+                        className="flex items-center gap-2 px-2 py-1 bg-red-500/10 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/20 text-red-300 rounded text-[10px] uppercase font-bold tracking-widest transition-all shadow-[0_0_10px_rgba(239,68,68,0.1)]"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        Diagnose & Fix
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {isExecuting && (
               <div className="flex gap-2 items-center text-emerald-400/60 mt-1">
                 <span className="w-3" />
