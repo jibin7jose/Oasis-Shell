@@ -1,0 +1,6 @@
+--- DYNAMIC AURA ENGINE AUTOMATED TEST ---
+Timestamp: 11-06-2026 13:06:50
+
+Active PID: 19948
+Detected Executable: Antigravity.exe
+RESULT: SUCCESS (Engine is correctly identifying foreground context)
