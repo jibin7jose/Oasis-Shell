@@ -204,16 +204,25 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
     const sessionId = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     setCurrentSession(sessionId);
 
-    // The Rust command now streams via events — it returns a session ID
-    const returnedSessionId = await invokeSafe('execute_cli_directive', { sessionId, cmd, args, cwd }) as string | null;
-    
-    // If invokeSafe returns null (error), reset executing state
-    if (!returnedSessionId) {
+    try {
+      const returnedSessionId = await invokeSafe('execute_cli_directive', { sessionId, cmd, args, cwd }) as string | null;
+      
+      // If invokeSafe returns null (error), reset executing state
+      if (!returnedSessionId) {
+        setIsExecuting(false);
+        setLines(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'error',
+          content: 'Failed to spawn command.',
+          timestamp: new Date().toLocaleTimeString(),
+        }]);
+      }
+    } catch (err: any) {
       setIsExecuting(false);
       setLines(prev => [...prev, {
         id: Date.now().toString(),
         type: 'error',
-        content: 'Failed to spawn command.',
+        content: `Backend Error: ${err.toString()}\n(If you just updated the code, please restart your Tauri dev server!)`,
         timestamp: new Date().toLocaleTimeString(),
       }]);
     }
