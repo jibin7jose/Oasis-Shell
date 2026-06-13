@@ -253,6 +253,65 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       case 'route': case 'routes': cmd = 'route'; args = ['print']; break;
       case 'arp': cmd = 'arp'; args = ['-a']; break;
       case 'hosts': cmd = 'Get-Content'; args = ['C:\\Windows\\System32\\drivers\\etc\\hosts']; break;
+      
+      // --- THE 100+ COMMAND EXPANSION PACK ---
+      // File & Text Processing
+      case 'head': cmd = 'Get-Content'; args = [`"${rawArgs}"`, '-TotalCount', '10']; break;
+      case 'tail': cmd = 'Get-Content'; args = [`"${rawArgs}"`, '-Tail', '10']; break;
+      case 'grep': cmd = 'Select-String'; args = ['-Pattern', `"${args[0]}"`, '-Path', `"${args.slice(1).join(' ')}"`]; break;
+      case 'pwd': cmd = 'Get-Location'; args = []; break;
+      case 'ls': case 'dir': cmd = 'Get-ChildItem'; args = [rawArgs]; break;
+      case 'll': cmd = 'Get-ChildItem'; args = ['-Force', rawArgs]; break;
+      case 'la': cmd = 'Get-ChildItem'; args = ['-Force', '-Hidden', rawArgs]; break;
+      case 'sort': cmd = 'Get-Content'; args = [`"${rawArgs}"`, '|', 'Sort-Object']; break;
+      case 'uniq': cmd = 'Get-Content'; args = [`"${rawArgs}"`, '|', 'Sort-Object', '-Unique']; break;
+      case 'wc': cmd = 'Get-Content'; args = [`"${rawArgs}"`, '|', 'Measure-Object', '-Line', '-Word', '-Character']; break;
+      case 'diff': case 'compare': cmd = 'Compare-Object'; args = ['-ReferenceObject', `(Get-Content "${args[0]}")`, '-DifferenceObject', `(Get-Content "${args[1]}")`]; break;
+      case 'append': cmd = 'Add-Content'; args = ['-Path', `"${args[0]}"`, '-Value', `"${args.slice(1).join(' ')}"`]; break;
+      case 'read': cmd = 'Get-Content'; args = [`"${rawArgs}"`]; break;
+
+      // Hardware & System
+      case 'cpu': cmd = 'Get-CimInstance'; args = ['Win32_Processor', '|', 'Select-Object', 'Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed']; break;
+      case 'ram': case 'memory': cmd = 'Get-CimInstance'; args = ['Win32_PhysicalMemory', '|', 'Select-Object', 'Capacity,Speed,Manufacturer']; break;
+      case 'gpu': cmd = 'Get-CimInstance'; args = ['Win32_VideoController', '|', 'Select-Object', 'Name,AdapterRAM,DriverVersion']; break;
+      case 'motherboard': case 'board': cmd = 'Get-CimInstance'; args = ['Win32_BaseBoard', '|', 'Select-Object', 'Manufacturer,Product,SerialNumber']; break;
+      case 'bios': cmd = 'Get-CimInstance'; args = ['Win32_BIOS', '|', 'Select-Object', 'Manufacturer,Name,Version,ReleaseDate']; break;
+      case 'disk': case 'disks': cmd = 'Get-Disk'; args = []; break;
+      case 'partitions': cmd = 'Get-Partition'; args = []; break;
+      case 'usb': cmd = 'Get-PnpDevice'; args = ['-Class', 'USB']; break;
+      case 'printers': cmd = 'Get-Printer'; args = []; break;
+      case 'monitors': cmd = 'Get-CimInstance'; args = ['Win32_DesktopMonitor']; break;
+      case 'hostname': cmd = 'hostname'; args = []; break;
+      case 'os': cmd = 'Get-CimInstance'; args = ['Win32_OperatingSystem', '|', 'Select-Object', 'Caption,Version,OSArchitecture,InstallDate']; break;
+      case 'users': cmd = 'Get-LocalUser'; args = []; break;
+      case 'groups': cmd = 'Get-LocalGroup'; args = []; break;
+      
+      // Networking
+      case 'nslookup': cmd = 'nslookup'; args = [rawArgs]; break;
+      case 'tracert': case 'trace': cmd = 'tracert'; args = [rawArgs]; break;
+      case 'pathping': cmd = 'pathping'; args = [rawArgs]; break;
+      case 'nbtstat': cmd = 'nbtstat'; args = ['-n']; break;
+      case 'adapters': case 'nics': cmd = 'Get-NetAdapter'; args = []; break;
+      case 'firewall': cmd = 'Get-NetFirewallProfile'; args = []; break;
+      case 'connections': cmd = 'netstat'; args = ['-ano']; break;
+      case 'publicip': cmd = 'Invoke-RestMethod'; args = ['-Uri', 'https://api.ipify.org']; break;
+      
+      // Developer / Hash
+      case 'md5': cmd = 'Get-FileHash'; args = [`"${rawArgs}"`, '-Algorithm', 'MD5']; break;
+      case 'sha1': cmd = 'Get-FileHash'; args = [`"${rawArgs}"`, '-Algorithm', 'SHA1']; break;
+      case 'sha256': cmd = 'Get-FileHash'; args = [`"${rawArgs}"`, '-Algorithm', 'SHA256']; break;
+      case 'hex': cmd = 'Format-Hex'; args = [`"${rawArgs}"`]; break;
+      case 'random': cmd = 'Get-Random'; args = ['-Minimum', '1', '-Maximum', rawArgs || '100']; break;
+      case 'calc': cmd = 'Invoke-Expression'; args = [rawArgs]; break;
+      
+      // Admin / Event Logs / Tasks
+      case 'logs': case 'events': cmd = 'Get-EventLog'; args = ['-LogName', 'System', '-Newest', '20']; break;
+      case 'tasks': cmd = 'Get-ScheduledTask'; args = ['|', 'Where-Object', 'State', '-eq', '"Ready"']; break;
+      case 'killall': cmd = 'Stop-Process'; args = ['-Name', `"${rawArgs}"`, '-Force']; break;
+      case 'sleep': cmd = 'rundll32.exe'; args = ['powrprof.dll,SetSuspendState', '0,1,0']; break;
+      case 'logoff': cmd = 'logoff'; args = []; break;
+      case 'uac': cmd = 'UserAccountControlSettings'; args = []; break;
+      case 'reg': cmd = 'reg'; args = [rawArgs]; break;
     }
 
     if (cmd === 'view') {
