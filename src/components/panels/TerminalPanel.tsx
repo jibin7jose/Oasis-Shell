@@ -64,9 +64,14 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
             return;
           }
           if (!line) return;
+          
+          // Smart error detection for stdout streams that print errors
+          const isError = kind === 'error' || 
+            (kind === 'output' && /error|failed|exception|unknown command|not found/i.test(line));
+
           setLines(prev => [...prev, {
             id: `${session}-${Date.now()}-${Math.random()}`,
-            type: kind === 'error' ? 'error' : kind === 'input' ? 'input' : 'output',
+            type: isError ? 'error' : kind === 'input' ? 'input' : 'output',
             content: line,
             timestamp: new Date().toLocaleTimeString(),
           }]);
