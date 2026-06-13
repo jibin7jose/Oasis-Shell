@@ -117,6 +117,9 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
     setInput('');
     setIsExecuting(true);
 
+    // Immediately print what the user actually typed
+    setLines(prev => [...prev, { id: Date.now() + 'in', type: 'input', content: `$ ${cmdText}`, timestamp: '' }]);
+
     // Native Oasis Commands Interceptor
     if (cmd === 'warp' || cmd === 'cd') {
       const targetDir = args.join(' ');
@@ -127,10 +130,11 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
           : targetDir.includes('\\') || targetDir.includes('/') ? targetDir : `${cwd}\\${targetDir}`;
         setCwd(newCwd);
         setLines(prev => [...prev, 
-          { id: Date.now() + 'in', type: 'input', content: `$ ${cmdText}`, timestamp: '' },
           { id: Date.now() + 'out', type: 'output', content: `Warped to ${newCwd}`, timestamp: '' },
           { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }
         ]);
+      } else {
+        setLines(prev => [...prev, { id: Date.now() + 'done', type: 'meta', content: '─── Command complete ─────────────────────', timestamp: '' }]);
       }
       setIsExecuting(false);
       return;

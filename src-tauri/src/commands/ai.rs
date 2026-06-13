@@ -538,16 +538,6 @@ pub async fn execute_cli_directive(
             .as_millis()
     );
 
-    // Emit session start
-    let _ = app.emit(
-        "terminal-stdout",
-        serde_json::json!({
-            "session": session_id,
-            "line": format!("$ {}", full_cmd),
-            "kind": "input"
-        }),
-    );
-
     let mut command = Command::new("powershell");
     command.args(["-NoProfile", "-NonInteractive", "-Command", &full_cmd])
         .stdout(Stdio::piped())
