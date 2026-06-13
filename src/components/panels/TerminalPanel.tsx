@@ -231,6 +231,28 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
         const dParts = rawArgs.split(' ');
         cmd = 'Invoke-WebRequest'; args = ['-Uri', dParts[0], '-OutFile', dParts[1] || 'downloaded_file']; 
         break;
+      case 'zip': case 'compress': cmd = 'Compress-Archive'; args = ['-Path', rawArgs.split(' ')[0], '-DestinationPath', rawArgs.split(' ')[1] || 'archive.zip']; break;
+      case 'unzip': case 'extract': cmd = 'Expand-Archive'; args = ['-Path', rawArgs.split(' ')[0], '-DestinationPath', rawArgs.split(' ')[1] || '.']; break;
+      case 'base64': cmd = '[Convert]::ToBase64String([IO.File]::ReadAllBytes('; args = [`"${rawArgs}"))`]; break;
+      case 'guid': case 'uuid': cmd = '[guid]::NewGuid()'; args = []; break;
+      case 'df': case 'diskspace': cmd = 'Get-Volume'; args = []; break;
+      case 'mac': case 'getmac': cmd = 'getmac'; args = []; break;
+      case 'battery': cmd = 'Get-CimInstance'; args = ['-ClassName', 'Win32_Battery']; break;
+      case 'dns': cmd = 'ipconfig'; args = ['/displaydns']; break;
+      case 'flushdns': cmd = 'ipconfig'; args = ['/flushdns']; break;
+      case 'services': cmd = 'Get-Service'; args = ['|', 'Where-Object', 'Status', '-eq', '"Running"']; break;
+      case 'start-service': cmd = 'Start-Service'; args = ['-Name', rawArgs]; break;
+      case 'stop-service': cmd = 'Stop-Service'; args = ['-Name', rawArgs]; break;
+      case 'drivers': cmd = 'driverquery'; args = []; break;
+      case 'reboot': case 'restart': cmd = 'Restart-Computer'; args = []; break;
+      case 'shutdown': cmd = 'Stop-Computer'; args = []; break;
+      case 'lock': cmd = 'rundll32.exe'; args = ['user32.dll,LockWorkStation']; break;
+      case 'clip': cmd = 'Set-Clipboard'; args = ['-Value', `"${rawArgs}"`]; break;
+      case 'paste': cmd = 'Get-Clipboard'; args = []; break;
+      case 'admin': case 'elevate': cmd = 'Start-Process'; args = ['powershell', '-Verb', 'runAs']; break;
+      case 'route': case 'routes': cmd = 'route'; args = ['print']; break;
+      case 'arp': cmd = 'arp'; args = ['-a']; break;
+      case 'hosts': cmd = 'Get-Content'; args = ['C:\\Windows\\System32\\drivers\\etc\\hosts']; break;
     }
 
     if (cmd === 'view') {
