@@ -329,10 +329,9 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
               onClick={isExecuting ? handleStopCommand : (e) => { e.preventDefault(); handleCommand(e as any); }}
               disabled={!isExecuting && !input.trim()}
               className={cn("p-1.5 rounded-lg transition-all", (!isExecuting && !input.trim()) && "opacity-30")}
-              style={{ color: isExecuting ? '#ef4444' : stressColor }}
               title={isExecuting ? 'Stop Command' : 'Run Command'}
             >
-              {isExecuting ? <div className="w-3.5 h-3.5 bg-red-500 rounded-sm" /> : <Zap className="w-4 h-4" />}
+              <Zap className={cn("w-4 h-4 transition-all duration-300", isExecuting ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] scale-110" : "text-white hover:text-[#6366f1]")} />
             </button>
           </form>
     </div>
