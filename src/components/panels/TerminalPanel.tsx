@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal as TerminalIcon, X, ChevronRight, Zap, Trash2, Sparkles, Plus } from 'lucide-react';
 import { invokeSafe } from '../../lib/tauri';
 import { cn } from '../../lib/utils';
+import { FalconIcon } from '../icons/FalconIcon';
 
 interface TerminalLine {
   id: string;
@@ -331,7 +332,7 @@ export function TerminalInstance({ isActive, stressColor = '#6366f1' }: { isActi
               className={cn("p-1.5 rounded-lg transition-all", (!isExecuting && !input.trim()) && "opacity-30")}
               title={isExecuting ? 'Stop Command' : 'Run Command'}
             >
-              <Zap className={cn("w-4 h-4 transition-all duration-300", isExecuting ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] scale-110" : "text-white hover:text-[#6366f1]")} />
+              <FalconIcon className={cn("w-4 h-4 transition-all duration-300", isExecuting ? "text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] scale-110" : "text-white hover:text-[#6366f1]")} />
             </button>
           </form>
     </div>
