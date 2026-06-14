@@ -64,7 +64,7 @@ export const FileExplorerPanel: React.FC = () => {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [inputPath, setInputPath] = useState<string>('');
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo | null } | null>(null);
   const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
   
   const { setNotification, isVaultAuthenticated, setShowVault, moveToRecycleBin, clipboard, setClipboard } = useSystemStore();
@@ -126,7 +126,13 @@ export const FileExplorerPanel: React.FC = () => {
 
   const handleContextClick = (e: React.MouseEvent, file: FileInfo) => {
     e.preventDefault();
+    e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY, file });
+  };
+
+  const handleBackgroundContextClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, file: null });
   };
 
   const handleDelete = async (file: FileInfo) => {
@@ -259,7 +265,10 @@ export const FileExplorerPanel: React.FC = () => {
       </div>
 
       {/* File List */}
-      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar border border-white/5 rounded-xl bg-black/20">
+      <div 
+        className="flex-1 overflow-y-auto pr-2 custom-scrollbar border border-white/5 rounded-xl bg-black/20"
+        onContextMenu={handleBackgroundContextClick}
+      >
         <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky top-0 bg-slate-900/90 backdrop-blur z-10">
           <div className="w-6"></div>
           <div>Name</div>
@@ -384,61 +393,96 @@ export const FileExplorerPanel: React.FC = () => {
               style={{ top: contextMenu.y, left: contextMenu.x }}
               className="fixed z-[101] w-48 glass rounded-xl border border-white/10 shadow-2xl p-2 flex flex-col gap-1 overflow-hidden"
             >
-              <button 
-                onClick={() => {
-                  const targetPath = contextMenu.file.is_dir ? contextMenu.file.path : currentPath;
-                  const ts = useTerminalStore.getState();
-                  ts.updateTabCwd(ts.activeTabId, targetPath);
-                  useSystemStore.getState().setShowTerminal(true);
-                  setContextMenu(null);
-                }}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              >
-                <div className="w-3 h-3 flex items-center justify-center text-blue-400">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                </div>
-                Open in Terminal
-              </button>
-              <button 
-                onClick={() => { handleNavigate(contextMenu.file); setContextMenu(null); }}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              >
-                <FolderOpen className="w-3 h-3 text-indigo-400" /> Open / Launch
-              </button>
-              <div className="h-px bg-white/5 mx-2 my-1" />
-              <button 
-                onClick={() => startRename(contextMenu.file)}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              >
-                <Activity className="w-3 h-3 text-emerald-400" /> Re-designate
-              </button>
-              <button 
-                onClick={() => handleCopy(contextMenu.file)}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              >
-                <Copy className="w-3 h-3 text-slate-400" /> Copy
-              </button>
-              <button 
-                onClick={() => handleCut(contextMenu.file)}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-              >
-                <Scissors className="w-3 h-3 text-amber-400" /> Cut
-              </button>
-              {clipboard && (
-                <button 
-                  onClick={handlePaste}
-                  className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
-                >
-                  <ClipboardPaste className="w-3 h-3 text-blue-400" /> Paste
-                </button>
+              {contextMenu.file ? (
+                <>
+                  <button 
+                    onClick={() => {
+                      const targetPath = contextMenu.file!.is_dir ? contextMenu.file!.path : currentPath;
+                      const ts = useTerminalStore.getState();
+                      ts.updateTabCwd(ts.activeTabId, targetPath);
+                      useSystemStore.getState().setShowTerminal(true);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <div className="w-3 h-3 flex items-center justify-center text-blue-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    </div>
+                    Open in Terminal
+                  </button>
+                  <button 
+                    onClick={() => { handleNavigate(contextMenu.file!); setContextMenu(null); }}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <FolderOpen className="w-3 h-3 text-indigo-400" /> Open / Launch
+                  </button>
+                  <div className="h-px bg-white/5 mx-2 my-1" />
+                  <button 
+                    onClick={() => startRename(contextMenu.file!)}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <Activity className="w-3 h-3 text-emerald-400" /> Re-designate
+                  </button>
+                  <button 
+                    onClick={() => handleCopy(contextMenu.file!)}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <Copy className="w-3 h-3 text-slate-400" /> Copy
+                  </button>
+                  <button 
+                    onClick={() => handleCut(contextMenu.file!)}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <Scissors className="w-3 h-3 text-amber-400" /> Cut
+                  </button>
+                  {clipboard && (
+                    <button 
+                      onClick={handlePaste}
+                      className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                    >
+                      <ClipboardPaste className="w-3 h-3 text-blue-400" /> Paste
+                    </button>
+                  )}
+                  <div className="h-px bg-white/5 mx-2 my-1" />
+                  <button 
+                    onClick={() => handleDelete(contextMenu.file!)}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => {
+                      const ts = useTerminalStore.getState();
+                      ts.updateTabCwd(ts.activeTabId, currentPath);
+                      useSystemStore.getState().setShowTerminal(true);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <div className="w-3 h-3 flex items-center justify-center text-blue-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    </div>
+                    Open Terminal Here
+                  </button>
+                  {clipboard && (
+                    <button 
+                      onClick={handlePaste}
+                      className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                    >
+                      <ClipboardPaste className="w-3 h-3 text-blue-400" /> Paste
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => { fetchDirectory(currentPath); setContextMenu(null); }}
+                    className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  >
+                    <Activity className="w-3 h-3 text-slate-400" /> Refresh
+                  </button>
+                </>
               )}
-              <div className="h-px bg-white/5 mx-2 my-1" />
-              <button 
-                onClick={() => handleDelete(contextMenu.file)}
-                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-all"
-              >
-                <Trash2 className="w-3 h-3" /> Delete
-              </button>
             </motion.div>
           </>
         )}
