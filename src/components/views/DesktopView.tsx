@@ -31,15 +31,15 @@ export const DesktopView: React.FC<{ setActiveView: (v: string) => void }> = ({ 
   const [desktopPath, setDesktopPath] = useState<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo | null } | null>(null);
   const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
-  const [clipboard, setClipboard] = useState<{ type: 'copy'|'cut', file: FileInfo } | null>(null);
   
-  const { setNotification, moveToRecycleBin, setShowTerminal } = useSystemStore();
+  const { setNotification, moveToRecycleBin, setShowTerminal, clipboard, setClipboard } = useSystemStore();
 
   const fetchDesktop = async () => {
     try {
       const { homeDir } = await import('@tauri-apps/api/path');
       const home = await homeDir();
-      const path = `${home}Desktop`;
+      const separator = home.includes('\\') ? '\\' : '/';
+      const path = home.endsWith(separator) ? `${home}Desktop` : `${home}${separator}Desktop`;
       setDesktopPath(path);
       const res = await invokeSafe('read_directory', { path }) as FileInfo[];
       setFiles(res || []);
@@ -239,10 +239,15 @@ export const DesktopView: React.FC<{ setActiveView: (v: string) => void }> = ({ 
                   <Activity className="w-3 h-3 text-emerald-400" /> Rename
                 </button>
                 <button onClick={async () => {
-                  moveToRecycleBin({ id: Math.random().toString(), name: contextMenu.file!.name, type: 'file', originalData: contextMenu.file! });
-                  setNotification(`Moved to Recycle Bin: ${contextMenu.file!.name}`);
-                  setFiles(prev => prev.filter(f => f.path !== contextMenu.file!.path));
-                  setContextMenu(null);
+                  try {
+                    await invokeSafe('delete_path', { path: contextMenu.file!.path });
+                    moveToRecycleBin({ id: Math.random().toString(), name: contextMenu.file!.name, type: 'file', originalData: contextMenu.file! });
+                    setNotification(`Deleted ${contextMenu.file!.name}`);
+                    fetchDesktop();
+                    setContextMenu(null);
+                  } catch (err) {
+                    setNotification(`Delete Failed: ${err}`);
+                  }
                 }} className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg">
                   <Trash2 className="w-3 h-3" /> Delete
                 </button>

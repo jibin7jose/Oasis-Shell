@@ -66,9 +66,8 @@ export const FileExplorerPanel: React.FC = () => {
   const [inputPath, setInputPath] = useState<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo } | null>(null);
   const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
-  const [clipboard, setClipboard] = useState<{ type: 'copy'|'cut', file: FileInfo } | null>(null);
   
-  const { setNotification, isVaultAuthenticated, setShowVault, moveToRecycleBin } = useSystemStore();
+  const { setNotification, isVaultAuthenticated, setShowVault, moveToRecycleBin, clipboard, setClipboard } = useSystemStore();
 
   const fetchDirectory = async (path: string = '') => {
     setLoading(true);
@@ -134,17 +133,16 @@ export const FileExplorerPanel: React.FC = () => {
     setContextMenu(null);
 
     try {
-      // Instead of permanently deleting via rust `delete_path` instantly, we move to the recycle bin UI.
+      await invokeSafe('delete_path', { path: file.path });
       moveToRecycleBin({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         type: file.is_dir ? 'folder' : 'file',
         originalData: file
       });
-      setNotification(`Moved to Recycle Bin: ${file.name}`);
-      // In a full implementation we would actually move the file on disk.
-      // For the UI demonstration, we will remove it from the local state list to simulate deletion.
+      setNotification(`Deleted ${file.name}`);
       setFiles(prev => prev.filter(f => f.path !== file.path));
+      setContextMenu(null);
     } catch (e) {
       setNotification(`Purge Failure: ${e}`);
     }
@@ -195,6 +193,7 @@ export const FileExplorerPanel: React.FC = () => {
         setClipboard(null); // Clear cut clipboard
       }
       fetchDirectory(currentPath);
+      setContextMenu(null);
     } catch (e) {
       setNotification(`Transfer Failure: ${e}`);
     }

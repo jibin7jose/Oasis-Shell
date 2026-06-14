@@ -137,6 +137,8 @@ export interface SystemState {
   setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => void;
   setCortexResults: (results: any[]) => void;
   setCortexQuery: (query: string) => void;
+  clipboard: { type: 'copy'|'cut', file: any } | null;
+  setClipboard: (c: { type: 'copy'|'cut', file: any } | null) => void;
   isVaultAuthenticated: boolean;
   setIsVaultAuthenticated: (is: boolean) => void;
   showVault: boolean;
@@ -342,6 +344,8 @@ export const useSystemStore = create<SystemState>((set) => ({
   setDynamicGraph: (graph: { nodes: any[]; links: any[] }) => set({ dynamicGraph: graph }),
   setCortexResults: (results: any[]) => set({ cortexResults: results }),
   setCortexQuery: (query: string) => set({ cortexQuery: query }),
+  clipboard: null,
+  setClipboard: (c: { type: 'copy'|'cut', file: any } | null) => set({ clipboard: c }),
   isVaultAuthenticated: false,
   setIsVaultAuthenticated: (is: boolean) => set({ isVaultAuthenticated: is }),
   showVault: false,
