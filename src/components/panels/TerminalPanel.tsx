@@ -501,7 +501,20 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
   };
 
   return (
-    <div className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}>
+    <div 
+      className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const path = e.dataTransfer.getData('text/plain');
+        if (path) {
+          const formatted = path.includes(' ') ? `"${path}"` : path;
+          setInput(prev => prev ? `${prev} ${formatted} ` : `${formatted} `);
+          if (inputRef.current) inputRef.current.focus();
+        }
+      }}
+    >
       <div className="flex items-center justify-between px-6 py-2 border-b border-white/5 bg-black/40 flex-shrink-0">
         <div className="flex items-center gap-3">
           <TerminalIcon className="w-4 h-4 text-slate-500" />

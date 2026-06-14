@@ -251,6 +251,11 @@ export const FileExplorerPanel: React.FC = () => {
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.01, 0.5) }}
+                  draggable={true}
+                  onDragStart={(e: any) => {
+                    e.dataTransfer.setData('text/plain', file.path);
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
                   onDoubleClick={() => handleNavigate(file)}
                   onContextMenu={(e) => handleContextClick(e, file)}
                   className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors items-center group relative"
