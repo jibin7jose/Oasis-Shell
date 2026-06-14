@@ -515,8 +515,8 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
   return (
     <div 
       className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}
-      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onDragEnter={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
+      onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -657,8 +657,8 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
           className="fixed bottom-0 left-20 md:left-24 right-0 h-[45vh] z-[300] flex flex-col"
-          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDragEnter={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
+          onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
           onDrop={(e: any) => {
             e.preventDefault();
             e.stopPropagation();
