@@ -503,6 +503,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
   return (
     <div 
       className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
       onDrop={(e) => {
         e.preventDefault();
