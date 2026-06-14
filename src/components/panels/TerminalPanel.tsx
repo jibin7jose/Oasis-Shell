@@ -66,7 +66,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
 
   // Fetch initial directory
   useEffect(() => {
-    if (cwd === 'C:\\') {
+    if (cwd === 'C:\\' || cwd.toLowerCase().includes('appdata\\roaming')) {
       import('@tauri-apps/api/path').then(({ homeDir }) => {
         homeDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
       });
