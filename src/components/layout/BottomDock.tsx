@@ -100,6 +100,12 @@ export default function BottomDock({ className }: { className?: string }) {
             <button
               key={item.id}
               onClick={item.action}
+              onDragEnter={(e) => {
+                if (item.id === 'terminal' && !showTerminal) {
+                  item.action();
+                }
+              }}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               aria-label={item.label}
               className={cn(
                 "p-3 md:p-4 rounded-2xl transition-all group relative hover:-translate-y-2",
