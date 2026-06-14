@@ -299,6 +299,12 @@ export const FileExplorerPanel: React.FC = () => {
                       (window as any).__OASIS_DRAGGED_FILE__ = file.path;
                     }
                   }}
+                  onDragEnter={(e: any) => {
+                    if (file.is_dir) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
                   onDragOver={(e: any) => {
                     if (file.is_dir) {
                       e.preventDefault();
