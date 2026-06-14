@@ -145,9 +145,21 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
 
     setupDropListener();
 
+    const handleInternalDrop = (e: any) => {
+      if (!isActive) return;
+      const path = e.detail;
+      if (path) {
+        const formatted = path.includes(' ') ? `"${path}"` : path;
+        setInput(prev => prev ? `${prev} ${formatted} ` : `${formatted} `);
+        if (inputRef.current) inputRef.current.focus();
+      }
+    };
+    window.addEventListener('oasis-terminal-drop', handleInternalDrop);
+
     return () => {
       isMounted = false;
       if (unlistenDrop) unlistenDrop();
+      window.removeEventListener('oasis-terminal-drop', handleInternalDrop);
     };
   }, [isActive]);
 
@@ -645,6 +657,16 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
           className="fixed bottom-0 left-20 md:left-24 right-0 h-[45vh] z-[300] flex flex-col"
+          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={(e: any) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const path = e.dataTransfer.getData('text/plain');
+            if (path) {
+              window.dispatchEvent(new CustomEvent('oasis-terminal-drop', { detail: path }));
+            }
+          }}
           style={{
             background: 'linear-gradient(180deg, rgba(0,0,0,0.97) 0%, rgba(2,4,20,0.99) 100%)',
             borderTop: `1px solid ${stressColor}40`,
