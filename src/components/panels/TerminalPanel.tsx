@@ -132,11 +132,11 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
 
     const setupDropListener = async () => {
       const { listen } = await import('@tauri-apps/api/event');
-      unlistenDrop = await listen<{ paths: string[] }>('tauri://drop', (event) => {
+      unlistenDrop = await listen<{ paths: string[] }>('tauri://file-drop', (event: any) => {
         if (!isMounted || !isActive) return;
-        const paths = event.payload.paths;
+        const paths = event.payload as string[];
         if (paths && paths.length > 0) {
-          const formattedPaths = paths.map(p => p.includes(' ') ? `"${p}"` : p).join(' ');
+          const formattedPaths = paths.map((p: string) => p.includes(' ') ? `"${p}"` : p).join(' ');
           setInput(prev => prev ? `${prev} ${formattedPaths} ` : `${formattedPaths} `);
           if (inputRef.current) inputRef.current.focus();
         }
