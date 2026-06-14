@@ -520,12 +520,20 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       onDrop={(e: any) => {
         e.preventDefault();
         e.stopPropagation();
-        const path = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
+        
+        const plainData = e.dataTransfer.getData('text/plain');
+        const globalData = (window as any).__OASIS_DRAGGED_FILE__;
+        const path = plainData || globalData;
+        
+        setLines((prev: any[]) => [...prev, { id: Date.now() + 'd1', type: 'meta', content: `[DEBUG] Drop Event Fired. PlainData: '${plainData}', GlobalData: '${globalData}'`, timestamp: '' }]);
+
         if (path) {
           const formatted = path.includes(' ') ? `"${path}"` : path;
           setInput(prev => prev ? `${prev} ${formatted} ` : `${formatted} `);
           if (inputRef.current) inputRef.current.focus();
           (window as any).__OASIS_DRAGGED_FILE__ = null;
+        } else {
+          setLines((prev: any[]) => [...prev, { id: Date.now() + 'd2', type: 'error', content: `[DEBUG] Drag failed. No path found. DataTransfer types: ${e.dataTransfer.types.join(', ')}`, timestamp: '' }]);
         }
       }}
     >
