@@ -125,6 +125,32 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     };
   }, []);
 
+  // Listen for file drop
+  useEffect(() => {
+    let unlistenDrop: (() => void) | undefined;
+    let isMounted = true;
+
+    const setupDropListener = async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      unlistenDrop = await listen<{ paths: string[] }>('tauri://drop', (event) => {
+        if (!isMounted || !isActive) return;
+        const paths = event.payload.paths;
+        if (paths && paths.length > 0) {
+          const formattedPaths = paths.map(p => p.includes(' ') ? `"${p}"` : p).join(' ');
+          setInput(prev => prev ? `${prev} ${formattedPaths} ` : `${formattedPaths} `);
+          if (inputRef.current) inputRef.current.focus();
+        }
+      });
+    };
+
+    setupDropListener();
+
+    return () => {
+      isMounted = false;
+      if (unlistenDrop) unlistenDrop();
+    };
+  }, [isActive]);
+
   const handleCommand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isExecuting) return;
@@ -383,7 +409,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     }]);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       const newIdx = Math.min(historyIndex + 1, history.length - 1);
@@ -394,6 +420,39 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       const newIdx = Math.max(historyIndex - 1, -1);
       setHistoryIndex(newIdx);
       setInput(newIdx === -1 ? '' : history[history.length - 1 - newIdx] ?? '');
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      if (!input.trim()) return;
+      
+      const parts = input.split(' ');
+      const lastPart = parts[parts.length - 1];
+      if (!lastPart) return;
+      
+      const cleanPath = lastPart.replace(/"/g, '');
+      let searchDir = cwd;
+      let partial = cleanPath;
+      
+      if (cleanPath.includes('\\') || cleanPath.includes('/')) {
+         const lastSlash = Math.max(cleanPath.lastIndexOf('\\'), cleanPath.lastIndexOf('/'));
+         searchDir = cleanPath.substring(0, lastSlash);
+         partial = cleanPath.substring(lastSlash + 1);
+         if (searchDir === '') searchDir = cleanPath.includes('/') ? '/' : 'C:\\';
+      }
+      
+      try {
+        const files = await invokeSafe('read_directory', { path: searchDir }) as any[];
+        if (files) {
+          const match = files.find(f => f.name.toLowerCase().startsWith(partial.toLowerCase()));
+          if (match) {
+            const separator = searchDir.endsWith('\\') || searchDir.endsWith('/') ? '' : '\\';
+            let newLastPart = `${searchDir}${separator}${match.name}`;
+            if (newLastPart.includes(' ')) newLastPart = `"${newLastPart}"`;
+            
+            parts[parts.length - 1] = newLastPart;
+            setInput(parts.join(' ') + (match.is_dir ? '\\' : ' '));
+          }
+        }
+      } catch (err) {}
     }
   };
 
