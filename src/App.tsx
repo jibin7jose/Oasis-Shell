@@ -1160,7 +1160,8 @@ export default function App() {
   return (
     <div 
       className="h-screen w-full bg-[#020617] text-slate-200 font-sans overflow-hidden flex flex-col selection:bg-indigo-500/30"
-      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={(e: any) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+      onDragOver={(e: any) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDrop={(e) => e.preventDefault()}
     >
       {/* Background Substrate */}
