@@ -523,9 +523,19 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
         
         const plainData = e.dataTransfer.getData('text/plain');
         const globalData = (window as any).__OASIS_DRAGGED_FILE__;
-        const path = plainData || globalData;
         
-        setLines((prev: any[]) => [...prev, { id: Date.now() + 'd1', type: 'meta', content: `[DEBUG] Drop Event Fired. PlainData: '${plainData}', GlobalData: '${globalData}'`, timestamp: '' }]);
+        let filePaths = [];
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+           for (let i = 0; i < e.dataTransfer.files.length; i++) {
+               // In Tauri, native files have a .path property.
+               filePaths.push(e.dataTransfer.files[i].path || e.dataTransfer.files[i].name);
+           }
+        }
+        const filesData = filePaths.join(' ');
+        
+        const path = plainData || globalData || filesData;
+        
+        setLines((prev: any[]) => [...prev, { id: Date.now() + 'd1', type: 'meta', content: `[DEBUG] Drop Event Fired. Plain: '${plainData}', Global: '${globalData}', Files: '${filesData}'`, timestamp: '' }]);
 
         if (path) {
           const formatted = path.includes(' ') ? `"${path}"` : path;
