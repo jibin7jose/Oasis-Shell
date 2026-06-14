@@ -517,14 +517,15 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
       className={cn("flex flex-col h-full w-full absolute inset-0 z-10", !isActive && "hidden")}
       onDragEnter={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; }}
-      onDrop={(e) => {
+      onDrop={(e: any) => {
         e.preventDefault();
         e.stopPropagation();
-        const path = e.dataTransfer.getData('text/plain');
+        const path = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
         if (path) {
           const formatted = path.includes(' ') ? `"${path}"` : path;
           setInput(prev => prev ? `${prev} ${formatted} ` : `${formatted} `);
           if (inputRef.current) inputRef.current.focus();
+          (window as any).__OASIS_DRAGGED_FILE__ = null;
         }
       }}
     >
@@ -662,9 +663,10 @@ export function TerminalPanel({ isOpen, onClose, stressColor = '#6366f1' }: Term
           onDrop={(e: any) => {
             e.preventDefault();
             e.stopPropagation();
-            const path = e.dataTransfer.getData('text/plain');
+            const path = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
             if (path) {
               window.dispatchEvent(new CustomEvent('oasis-terminal-drop', { detail: path }));
+              (window as any).__OASIS_DRAGGED_FILE__ = null;
             }
           }}
           style={{

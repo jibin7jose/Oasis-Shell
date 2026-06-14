@@ -255,6 +255,7 @@ export const FileExplorerPanel: React.FC = () => {
                   onDragStart={(e: any) => {
                     e.dataTransfer.setData('text/plain', file.path);
                     e.dataTransfer.effectAllowed = 'copy';
+                    (window as any).__OASIS_DRAGGED_FILE__ = file.path;
                   }}
                   onDoubleClick={() => handleNavigate(file)}
                   onContextMenu={(e) => handleContextClick(e, file)}
