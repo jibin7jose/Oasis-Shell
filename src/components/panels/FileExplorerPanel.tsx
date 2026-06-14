@@ -309,6 +309,23 @@ export const FileExplorerPanel: React.FC = () => {
               className="fixed z-[101] w-48 glass rounded-xl border border-white/10 shadow-2xl p-2 flex flex-col gap-1 overflow-hidden"
             >
               <button 
+                onClick={() => {
+                  const targetPath = contextMenu.file.is_dir ? contextMenu.file.path : currentPath;
+                  const useTerminalStore = require('../../lib/terminalStore').useTerminalStore;
+                  const useSystemStore = require('../../lib/systemStore').useSystemStore;
+                  
+                  useTerminalStore.getState().updateTabCwd('default-1', targetPath);
+                  useSystemStore.getState().setShowTerminal(true);
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <div className="w-3 h-3 flex items-center justify-center text-blue-400">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                </div>
+                Open in Terminal
+              </button>
+              <button 
                 onClick={() => { handleNavigate(contextMenu.file); setContextMenu(null); }}
                 className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
               >
