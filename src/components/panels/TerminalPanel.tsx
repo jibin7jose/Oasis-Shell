@@ -67,8 +67,8 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
   // Fetch initial directory
   useEffect(() => {
     if (cwd === 'C:\\') {
-      import('@tauri-apps/api/path').then(({ appDir }) => {
-        appDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
+      import('@tauri-apps/api/path').then(({ appDataDir }) => {
+        appDataDir().then(dir => setCwd(dir)).catch(() => setCwd('C:\\'));
       });
     }
   }, []);
