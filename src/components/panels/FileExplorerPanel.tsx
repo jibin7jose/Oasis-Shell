@@ -4,6 +4,7 @@ import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText
 import { invokeSafe } from '../../lib/tauri';
 import { FileInfo } from '../../lib/contracts';
 import { useSystemStore } from '../../lib/systemStore';
+import { useTerminalStore } from '../../lib/terminalStore';
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return '0 Bytes';
@@ -311,9 +312,6 @@ export const FileExplorerPanel: React.FC = () => {
               <button 
                 onClick={() => {
                   const targetPath = contextMenu.file.is_dir ? contextMenu.file.path : currentPath;
-                  const useTerminalStore = require('../../lib/terminalStore').useTerminalStore;
-                  const useSystemStore = require('../../lib/systemStore').useSystemStore;
-                  
                   useTerminalStore.getState().updateTabCwd('default-1', targetPath);
                   useSystemStore.getState().setShowTerminal(true);
                   setContextMenu(null);
