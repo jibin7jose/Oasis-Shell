@@ -110,6 +110,47 @@ export const DesktopView: React.FC<{ setActiveView: (v: string) => void }> = ({ 
         {files.map(file => (
           <button
             key={file.path}
+            draggable
+            onDragStart={(e: any) => {
+              if (e.altKey) {
+                e.preventDefault();
+                import('@crabnebula/tauri-plugin-drag').then(({ startDrag }) => {
+                  startDrag({ item: [file.path], icon: file.path }).catch(() => {});
+                });
+              } else {
+                e.dataTransfer.setData('text/plain', file.path);
+                e.dataTransfer.effectAllowed = 'copyMove';
+                (window as any).__OASIS_DRAGGED_FILE__ = file.path;
+              }
+            }}
+            onDragOver={(e: any) => {
+              if (file.is_dir) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                e.currentTarget.classList.add('bg-indigo-500/30');
+              }
+            }}
+            onDragLeave={(e: any) => {
+              e.currentTarget.classList.remove('bg-indigo-500/30');
+            }}
+            onDrop={async (e: any) => {
+              e.currentTarget.classList.remove('bg-indigo-500/30');
+              if (!file.is_dir) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const draggedPath = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
+              if (draggedPath && draggedPath !== file.path) {
+                const targetName = draggedPath.split(/[\\/]/).pop();
+                const destPath = `${file.path}\\${targetName}`;
+                try {
+                  await invokeSafe('move_path', { source: draggedPath, destination: destPath });
+                  setNotification(`Moved ${targetName} into ${file.name}`);
+                  fetchDesktop();
+                } catch (err) {
+                  setNotification(`Move Failed: ${err}`);
+                }
+              }
+            }}
             onDoubleClick={() => handleLaunch(file.path)}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }}
             className="flex flex-col items-center gap-2 group outline-none w-24"

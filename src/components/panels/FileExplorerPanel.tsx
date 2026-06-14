@@ -288,9 +288,45 @@ export const FileExplorerPanel: React.FC = () => {
                   transition={{ delay: Math.min(idx * 0.01, 0.5) }}
                   draggable={true}
                   onDragStart={(e: any) => {
-                    e.dataTransfer.setData('text/plain', file.path);
-                    e.dataTransfer.effectAllowed = 'copy';
-                    (window as any).__OASIS_DRAGGED_FILE__ = file.path;
+                    if (e.altKey) {
+                      e.preventDefault();
+                      import('@crabnebula/tauri-plugin-drag').then(({ startDrag }) => {
+                        startDrag({ item: [file.path], icon: file.path }).catch(() => {});
+                      });
+                    } else {
+                      e.dataTransfer.setData('text/plain', file.path);
+                      e.dataTransfer.effectAllowed = 'copyMove';
+                      (window as any).__OASIS_DRAGGED_FILE__ = file.path;
+                    }
+                  }}
+                  onDragOver={(e: any) => {
+                    if (file.is_dir) {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      e.currentTarget.classList.add('bg-indigo-500/30', 'border-indigo-500/50');
+                    }
+                  }}
+                  onDragLeave={(e: any) => {
+                    e.currentTarget.classList.remove('bg-indigo-500/30', 'border-indigo-500/50');
+                  }}
+                  onDrop={async (e: any) => {
+                    e.currentTarget.classList.remove('bg-indigo-500/30', 'border-indigo-500/50');
+                    if (!file.is_dir) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const draggedPath = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
+                    if (draggedPath && draggedPath !== file.path) {
+                      const targetName = draggedPath.split(/[\\/]/).pop();
+                      const separator = file.path.includes('\\') ? '\\' : '/';
+                      const destPath = `${file.path}${separator}${targetName}`;
+                      try {
+                        await invokeSafe('move_path', { source: draggedPath, destination: destPath });
+                        setNotification(`Moved ${targetName} into ${file.name}`);
+                        fetchDirectory(currentPath);
+                      } catch (err) {
+                        setNotification(`Move Failed: ${err}`);
+                      }
+                    }
                   }}
                   onDoubleClick={() => handleNavigate(file)}
                   onContextMenu={(e) => handleContextClick(e, file)}
