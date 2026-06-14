@@ -331,7 +331,9 @@ pub fn run() {
             commands::files::launch_path,
             commands::files::delete_path,
             commands::files::rename_path,
-            commands::files::read_file_text
+            commands::files::read_file_text,
+            commands::files::copy_path,
+            commands::files::move_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

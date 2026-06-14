@@ -110,3 +110,43 @@ pub fn rename_path(path: String, new_name: String) -> Result<(), String> {
 pub fn read_file_text(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn copy_path(source: String, destination: String) -> Result<(), String> {
+    let src = Path::new(&source);
+    let dest = Path::new(&destination);
+
+    if !src.exists() {
+        return Err("Source path does not exist".to_string());
+    }
+
+    if src.is_dir() {
+        let mut options = fs_extra::dir::CopyOptions::new();
+        options.copy_inside = true;
+        fs_extra::dir::copy(src, dest, &options).map_err(|e| e.to_string())?;
+    } else {
+        fs::copy(src, dest).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn move_path(source: String, destination: String) -> Result<(), String> {
+    let src = Path::new(&source);
+    let dest = Path::new(&destination);
+
+    if !src.exists() {
+        return Err("Source path does not exist".to_string());
+    }
+
+    if src.is_dir() {
+        let mut options = fs_extra::dir::CopyOptions::new();
+        options.copy_inside = true;
+        fs_extra::dir::move_dir(src, dest, &options).map_err(|e| e.to_string())?;
+    } else {
+        fs::rename(src, dest).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}

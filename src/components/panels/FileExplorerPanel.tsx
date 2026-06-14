@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive, FolderOpen, Activity, Skull, Trash2 } from 'lucide-react';
+import { Folder, File, HardDrive, ChevronRight, CornerLeftUp, FileCode, FileText, Image as ImageIcon, Video, Archive, FolderOpen, Activity, Skull, Trash2, Copy, Scissors, ClipboardPaste } from 'lucide-react';
 import { invokeSafe } from '../../lib/tauri';
 import { FileInfo } from '../../lib/contracts';
 import { useSystemStore } from '../../lib/systemStore';
@@ -66,6 +66,7 @@ export const FileExplorerPanel: React.FC = () => {
   const [inputPath, setInputPath] = useState<string>('');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, file: FileInfo } | null>(null);
   const [isRenaming, setIsRenaming] = useState<{ path: string, name: string } | null>(null);
+  const [clipboard, setClipboard] = useState<{ type: 'copy'|'cut', file: FileInfo } | null>(null);
   
   const { setNotification, isVaultAuthenticated, setShowVault, moveToRecycleBin } = useSystemStore();
 
@@ -163,6 +164,39 @@ export const FileExplorerPanel: React.FC = () => {
       fetchDirectory(currentPath);
     } catch (e) {
       setNotification(`Re-designation Failure: ${e}`);
+    }
+  };
+
+  const handleCopy = (file: FileInfo) => {
+    setClipboard({ type: 'copy', file });
+    setContextMenu(null);
+    setNotification(`Copied to Clipboard: ${file.name}`);
+  };
+
+  const handleCut = (file: FileInfo) => {
+    setClipboard({ type: 'cut', file });
+    setContextMenu(null);
+    setNotification(`Cut to Clipboard: ${file.name}`);
+  };
+
+  const handlePaste = async () => {
+    if (!clipboard || !currentPath) return;
+    try {
+      const targetName = clipboard.file.name;
+      const separator = currentPath.includes('\\') ? '\\' : '/';
+      const destPath = `${currentPath}${separator}${targetName}`;
+
+      if (clipboard.type === 'copy') {
+        await invokeSafe('copy_path', { source: clipboard.file.path, destination: destPath });
+        setNotification(`Asset Duplicated: ${targetName}`);
+      } else {
+        await invokeSafe('move_path', { source: clipboard.file.path, destination: destPath });
+        setNotification(`Asset Moved: ${targetName}`);
+        setClipboard(null); // Clear cut clipboard
+      }
+      fetchDirectory(currentPath);
+    } catch (e) {
+      setNotification(`Transfer Failure: ${e}`);
     }
   };
 
@@ -312,7 +346,8 @@ export const FileExplorerPanel: React.FC = () => {
               <button 
                 onClick={() => {
                   const targetPath = contextMenu.file.is_dir ? contextMenu.file.path : currentPath;
-                  useTerminalStore.getState().updateTabCwd('default-1', targetPath);
+                  const ts = useTerminalStore.getState();
+                  ts.updateTabCwd(ts.activeTabId, targetPath);
                   useSystemStore.getState().setShowTerminal(true);
                   setContextMenu(null);
                 }}
@@ -336,6 +371,27 @@ export const FileExplorerPanel: React.FC = () => {
               >
                 <Activity className="w-3 h-3 text-emerald-400" /> Re-designate
               </button>
+              <button 
+                onClick={() => handleCopy(contextMenu.file)}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <Copy className="w-3 h-3 text-slate-400" /> Copy
+              </button>
+              <button 
+                onClick={() => handleCut(contextMenu.file)}
+                className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              >
+                <Scissors className="w-3 h-3 text-amber-400" /> Cut
+              </button>
+              {clipboard && (
+                <button 
+                  onClick={handlePaste}
+                  className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                >
+                  <ClipboardPaste className="w-3 h-3 text-blue-400" /> Paste
+                </button>
+              )}
+              <div className="h-px bg-white/5 mx-2 my-1" />
               <button 
                 onClick={() => handleDelete(contextMenu.file)}
                 className="flex items-center gap-3 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-all"
