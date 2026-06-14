@@ -83,6 +83,29 @@ export const DesktopView: React.FC<{ setActiveView: (v: string) => void }> = ({ 
   return (
     <div 
       className="absolute inset-0 z-0 p-8 pt-24"
+      onDragOver={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }
+      }}
+      onDrop={async (e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          const draggedPath = e.dataTransfer.getData('text/plain') || (window as any).__OASIS_DRAGGED_FILE__;
+          if (draggedPath) {
+            const targetName = draggedPath.split(/[\\/]/).pop();
+            const destPath = `${desktopPath}\\${targetName}`;
+            try {
+              await invokeSafe('move_path', { source: draggedPath, destination: destPath });
+              setNotification(`Moved ${targetName} to Desktop`);
+              fetchDesktop();
+            } catch (err) {
+              setNotification(`Move Failed: ${err}`);
+            }
+          }
+        }
+      }}
       onContextMenu={(e) => {
         if (e.target === e.currentTarget) {
           e.preventDefault();
