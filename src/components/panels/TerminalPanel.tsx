@@ -436,7 +436,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
          const lastSlash = Math.max(cleanPath.lastIndexOf('\\'), cleanPath.lastIndexOf('/'));
          searchDir = cleanPath.substring(0, lastSlash);
          partial = cleanPath.substring(lastSlash + 1);
-         if (searchDir === '') searchDir = cleanPath.includes('/') ? '/' : 'C:\\';
+         if (searchDir === '' || /^[a-zA-Z]:$/.test(searchDir)) searchDir += '\\';
       }
       
       try {
@@ -450,9 +450,13 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
             
             parts[parts.length - 1] = newLastPart;
             setInput(parts.join(' ') + (match.is_dir ? '\\' : ' '));
+          } else {
+            console.log(`Autocomplete: No match for "${partial}" in "${searchDir}"`);
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("Autocomplete error:", err);
+      }
     }
   };
 
