@@ -176,7 +176,7 @@ export const DesktopView: React.FC<{ setActiveView: (v: string) => void }> = ({ 
             }}
             onDoubleClick={() => handleLaunch(file.path)}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }}
-            className="flex flex-col items-center gap-2 group outline-none w-24"
+            className="flex flex-col items-center gap-2 group outline-none w-24 select-none"
           >
             <div className="w-14 h-14 rounded-2xl bg-black/20 border border-transparent hover:border-white/10 hover:bg-black/40 flex items-center justify-center transition-all">
               {getFileIcon(file.name, file.is_dir)}

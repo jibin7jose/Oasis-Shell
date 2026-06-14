@@ -336,7 +336,7 @@ export const FileExplorerPanel: React.FC = () => {
                   }}
                   onDoubleClick={() => handleNavigate(file)}
                   onContextMenu={(e) => handleContextClick(e, file)}
-                  className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors items-center group relative"
+                  className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors items-center group relative select-none"
                 >
                   <div className="w-6 flex items-center justify-center group-hover:scale-110 transition-transform">
                     {getFileIcon(file.name, file.is_dir)}
