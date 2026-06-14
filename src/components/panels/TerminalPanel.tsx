@@ -131,16 +131,27 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     let isMounted = true;
 
     const setupDropListener = async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      unlistenDrop = await listen<{ paths: string[] }>('tauri://file-drop', (event: any) => {
-        if (!isMounted || !isActive) return;
-        const paths = event.payload as string[];
-        if (paths && paths.length > 0) {
-          const formattedPaths = paths.map((p: string) => p.includes(' ') ? `"${p}"` : p).join(' ');
-          setInput(prev => prev ? `${prev} ${formattedPaths} ` : `${formattedPaths} `);
-          if (inputRef.current) inputRef.current.focus();
-        }
-      });
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        unlistenDrop = await getCurrentWebviewWindow().onDragDropEvent((event) => {
+          if (!isMounted || !isActive) return;
+          
+          setLines((prev: any[]) => [...prev, { id: Date.now() + 'd3', type: 'meta', content: `[DEBUG] Tauri DragDrop Fired: ${JSON.stringify(event)}`, timestamp: '' }]);
+          
+          let paths: string[] = [];
+          if (event.payload.type === 'drop') {
+            paths = event.payload.paths;
+          }
+          
+          if (paths && paths.length > 0) {
+            const formattedPaths = paths.map((p: string) => p.includes(' ') ? `"${p}"` : p).join(' ');
+            setInput(prev => prev ? `${prev} ${formattedPaths} ` : `${formattedPaths} `);
+            if (inputRef.current) inputRef.current.focus();
+          }
+        });
+      } catch (e) {
+        console.error("Failed to setup drag listener:", e);
+      }
     };
 
     setupDropListener();
@@ -148,6 +159,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
     const handleInternalDrop = (e: any) => {
       if (!isActive) return;
       const path = e.detail;
+      setLines((prev: any[]) => [...prev, { id: Date.now() + 'd4', type: 'meta', content: `[DEBUG] handleInternalDrop Fired: ${path}`, timestamp: '' }]);
       if (path) {
         const formatted = path.includes(' ') ? `"${path}"` : path;
         setInput(prev => prev ? `${prev} ${formatted} ` : `${formatted} `);
