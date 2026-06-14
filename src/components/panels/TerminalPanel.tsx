@@ -589,7 +589,7 @@ export function TerminalInstance({ tabId, isActive, stressColor = '#6366f1' }: {
               };
 
               return (
-                <div key={line.id} className={cn('flex flex-col gap-1', lineColor(line.type))}>
+                <div key={line.id || `line-${index}`} className={cn('flex flex-col gap-1', lineColor(line.type))}>
                   <div className="flex gap-3 items-start">
                     {line.type === 'input' && (
                       <ChevronRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-indigo-400" />
