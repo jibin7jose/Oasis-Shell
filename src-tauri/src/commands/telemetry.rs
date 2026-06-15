@@ -138,7 +138,14 @@ pub fn get_hardware_telemetry(
     // Convert to MB/s
     let network_up = total_up / 1024.0 / 1024.0;
     let network_down = total_down / 1024.0 / 1024.0;
-    let gpu_usage = std::process::Command::new("nvidia-smi")
+    let mut cmd = std::process::Command::new("nvidia-smi");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    
+    let gpu_usage = cmd
         .args([
             "--query-gpu=utilization.gpu",
             "--format=csv,noheader,nounits",

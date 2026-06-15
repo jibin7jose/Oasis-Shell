@@ -346,17 +346,17 @@ export const MainCommandStage = (props: any) => {
                             {getCrateAppCount(crate)} apps saved
                           </span>
                         </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => setEditingCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 rounded-xl border border-purple-500/20 disabled:opacity-40 transition-colors">
+                        <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                          <button onClick={() => setEditingCrate(crate)} disabled={crateBusy || !crate.id} className="p-2 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 rounded-xl border border-purple-500/20 disabled:opacity-40 transition-colors" title="Edit">
                             <Settings className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => exportCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-xl border border-emerald-500/20 disabled:opacity-40 transition-colors" title="Export to Clipboard">
+                          <button onClick={() => exportCrate(crate)} disabled={crateBusy || !crate.id} className="p-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 rounded-xl border border-emerald-500/20 disabled:opacity-40 transition-colors" title="Export to Clipboard">
                             <UploadCloud className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => deleteContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-xl border border-red-500/20 disabled:opacity-40 transition-colors">
+                          <button onClick={() => deleteContextCrate(crate)} disabled={crateBusy || !crate.id} className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 rounded-xl border border-red-500/20 disabled:opacity-40 transition-colors" title="Delete">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                           </button>
-                          <button onClick={() => launchContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-4 py-2 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-emerald-500/20 disabled:opacity-40">
+                          <button onClick={() => launchContextCrate(crate)} disabled={crateBusy || !crate.id} className="px-3 py-2 bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-emerald-500/20 disabled:opacity-40 shrink-0">
                             Launch
                           </button>
                         </div>

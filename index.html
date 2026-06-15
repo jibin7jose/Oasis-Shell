@@ -9,6 +9,14 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        document.body.style.backgroundColor = "black";
+        document.body.style.color = "red";
+        document.body.innerHTML = "<h1>FATAL INIT ERROR</h1><p>" + msg + "</p><p>" + url + " : " + lineNo + ":" + columnNo + "</p><pre>" + (error ? error.stack : '') + "</pre>";
+        return false;
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

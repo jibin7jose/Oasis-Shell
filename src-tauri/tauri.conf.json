@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'none'; object-src 'none';"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434; img-src 'self' data: blob:; font-src 'self' data:; frame-src 'none'; object-src 'none';"
     }
   },
   "bundle": {
@@ -35,6 +35,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
+    }
   }
 }

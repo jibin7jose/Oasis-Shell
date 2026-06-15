@@ -1,0 +1,23 @@
+=========================================
+ OASIS DRAG-AND-DROP AUTOMATED TEST REPORT
+=========================================
+Time: 14/6/2026, 8:59:20 am
+
+[TEST 1] Single File (No Spaces)
+  - Input Payload: ["C:\\Users\\jibin\\file.txt"]
+  - Existing Terminal Input: ""
+  -> SUCCESS: Terminal input correctly updated to: [C:\Users\jibin\file.txt ]
+
+[TEST 2] Single File (With Spaces)
+  - Input Payload: ["C:\\Users\\jibin\\Desktop\\my new file.jpg"]
+  - Existing Terminal Input: "open"
+  -> SUCCESS: Terminal input correctly updated to: [open "C:\Users\jibin\Desktop\my new file.jpg" ]
+
+[TEST 3] Multiple Files
+  - Input Payload: ["C:\\file1.txt","C:\\folder A\\file2.txt"]
+  - Existing Terminal Input: "cp"
+  -> SUCCESS: Terminal input correctly updated to: [cp C:\file1.txt "C:\folder A\file2.txt" ]
+
+=========================================
+ STATUS: ALL TESTS PASSED
+=========================================

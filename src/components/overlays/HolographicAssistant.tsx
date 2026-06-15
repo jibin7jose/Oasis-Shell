@@ -88,7 +88,7 @@ export const HolographicAssistant: React.FC<HolographicAssistantProps> = ({
       </AnimatePresence>
       <button 
         onClick={() => setShowAI(!showAI)} 
-        className={cn("w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105 transition-all border border-indigo-400/30", showAI ? "bg-indigo-600" : "bg-gradient-to-br from-indigo-500 to-purple-600")}
+        className={cn("hidden w-20 h-20 rounded-[1.8rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105 transition-all border border-indigo-400/30", showAI ? "bg-indigo-600" : "bg-gradient-to-br from-indigo-500 to-purple-600")}
       >
         <FalconIcon className={cn("w-9 h-9", showAI ? "animate-pulse" : "")} />
       </button>
